@@ -25,12 +25,16 @@ private const val TAG = "Spider"
 class SpiderManager(private val appContext: Context) {
 
     private val client = OkHttpClient.Builder()
+        .dns(FallbackDns)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
     /** key = md5(jarUrl) → 已加载的 DexClassLoader */
     private val loaders = ConcurrentHashMap<String, DexClassLoader>()
+
+    /** key = md5(jarUrl) → guard jar 的 native loader 是否就绪（非 guard jar 记 true） */
+    private val guardReady = ConcurrentHashMap<String, Boolean>()
 
     /** key = md5(jarUrl)|siteKey → 已初始化的 Spider 实例（反射持有） */
     private val spiders = ConcurrentHashMap<String, Any>()
@@ -56,18 +60,30 @@ class SpiderManager(private val appContext: Context) {
         if (jarUrl.isBlank()) return null
         val spKey = md5(jarUrl) + "|" + site.key
         spiders[spKey]?.let { return it }
+        val loaderKey = md5(jarUrl)
         val loader = ensureLoader(jarSpec) ?: return null
+        // guard jar 的 native loader 未就绪时实例化 Guard 类会触发 JNI SIGABRT，必须跳过
+        if (guardReady[loaderKey] == false) {
+            Log.e(TAG, "skip guarded spider ${site.api}: native loader unavailable")
+            return null
+        }
         return withContext(Dispatchers.IO) {
             runCatching {
                 val className = "com.github.catvod.spider." + site.api.removePrefix("csp_")
                 Log.d(TAG, "loadSpider class=$className key=${site.key}")
                 val cls = loader.loadClass(className)
                 val instance = cls.getDeclaredConstructor().newInstance()
+                Log.d(TAG, "spider instantiated: $className")
+                // 与 fongmi JarLoader 一致：设置 Spider.siteKey 公共字段
+                runCatching {
+                    cls.getField("siteKey").set(instance, site.key)
+                }.onFailure { Log.w(TAG, "set siteKey fail", it) }
                 val extString = site.extAsString()
                 // 优先 init(Context, String)；失败回退 init(Context)
                 runCatching {
                     cls.getMethod("init", Context::class.java, String::class.java)
                         .invoke(instance, appContext, extString)
+                    Log.d(TAG, "spider init(ctx,ext) done: $className")
                 }.onFailure { t1 ->
                     Log.w(TAG, "init(ctx, ext) fail, fallback init(ctx)", t1)
                     runCatching {
@@ -85,8 +101,10 @@ class SpiderManager(private val appContext: Context) {
     /** homeContent(boolean filter) → JSON {class, list, filters} */
     suspend fun homeContent(spider: Any, filter: Boolean = true): String = withContext(Dispatchers.IO) {
         runCatching {
-            spider.javaClass.getMethod("homeContent", Boolean::class.javaPrimitiveType)
+            val result = spider.javaClass.getMethod("homeContent", Boolean::class.javaPrimitiveType)
                 .invoke(spider, filter) as? String ?: ""
+            Log.d(TAG, "homeContent bytes=${result.length} head=${result.take(120)}")
+            result
         }.onFailure { Log.e(TAG, "homeContent fail", it) }.getOrDefault("")
     }
 
@@ -183,9 +201,13 @@ class SpiderManager(private val appContext: Context) {
                 val loader = DexClassLoader(
                     jarFile.absolutePath,
                     dexOutDir.absolutePath,
-                    null,
+                    dexOutDir.absolutePath,
                     appContext.classLoader,
                 )
+                // 与 fongmi JarLoader 一致：加载后立即调用 com.github.catvod.spider.Init.init(Context)
+                // （饭太硬等 guard jar 需要借此初始化 native loader；普通 jar 无该类则忽略）
+                invokeInit(loader)
+                guardReady[loaderKey] = checkGuardReady(loader, loaderKey)
                 loaders[loaderKey] = loader
                 Log.d(TAG, "jar loaded: ${jarFile.absolutePath}")
                 loader
@@ -193,10 +215,45 @@ class SpiderManager(private val appContext: Context) {
         }.onFailure { Log.e(TAG, "ensureLoader fail", it) }.getOrNull()
     }
 
+    /** 调用 jar 内 com.github.catvod.spider.Init.init(Context)（静态方法，可选存在） */
+    private fun invokeInit(loader: DexClassLoader) {
+        runCatching {
+            val clz = loader.loadClass("com.github.catvod.spider.Init")
+            clz.getMethod("init", Context::class.java).invoke(null, appContext)
+            Log.d(TAG, "Init.init done")
+        }.onFailure { Log.w(TAG, "Init.init fail (plain jar?) : ${it.javaClass.simpleName}") }
+    }
+
+    /**
+     * guard jar 就绪检测：jar 内含 com.github.catvod.spider.Init 时（饭太硬系加壳 jar），
+     * 其 native getLoader 必须返回非空 DexClassLoader，否则实例化 Guard 类会 JNI 崩溃。
+     * 返回 true = 可安全实例化（含非 guard jar）。
+     */
+    private fun checkGuardReady(loader: DexClassLoader, loaderKey: String): Boolean {
+        val initCls = runCatching { loader.loadClass("com.github.catvod.spider.Init") }.getOrNull()
+        if (initCls == null) {
+            Log.d(TAG, "plain jar (no Init), safe to instantiate")
+            return true
+        }
+        repeat(3) { attempt ->
+            val nativeLoader = runCatching { initCls.getMethod("loader").invoke(null) }.getOrNull()
+            if (nativeLoader != null) {
+                Log.d(TAG, "guard native loader ready (attempt ${attempt + 1}): $nativeLoader")
+                return true
+            }
+            Log.w(TAG, "guard native loader null, retry Init.init (attempt ${attempt + 1})")
+            runCatching { initCls.getMethod("init", Context::class.java).invoke(null, appContext) }
+            Thread.sleep(300)
+        }
+        Log.e(TAG, "guard native loader NOT ready for jar $loaderKey (native getLoader 失败，疑似签名/系统版本不兼容)，跳过该 jar 的 Guard 类实例化")
+        return false
+    }
+
     private fun download(url: String, dest: File) {
         val req = Request.Builder()
             .url(url)
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36")
+            // 与 fongmi 默认 UA 一致（okhttp 默认）；某些站点对浏览器 UA 返回伪装 HTML
+            .header("User-Agent", "okhttp/4.12.0")
             .build()
         client.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) throw IllegalStateException("HTTP ${resp.code} $url")

@@ -102,4 +102,7 @@ dependencies {
     // TVBox 接口：OkHttp + kotlinx.serialization
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
+
+    // Gson：spider jar 内解密出的真实站点类依赖宿主提供（与 fongmi catvod 模块一致）
+    implementation(libs.gson)
 }
