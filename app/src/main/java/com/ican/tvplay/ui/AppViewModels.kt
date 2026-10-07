@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
@@ -44,13 +45,14 @@ class AppViewModel(container: AppContainer) : ViewModel() {
 class HomeViewModel(container: AppContainer) : ViewModel() {
     private val repo = container.videoRepository
 
-    val categories: List<VideoCategory> = repo.getCategories()
+    /** 分类列表：响应式，配置异步加载完成后自动推送 */
+    val categories: StateFlow<List<VideoCategory>> = repo.categoriesFlow
 
     private val selectedCategoryId = MutableStateFlow<String?>(null)
     val selectedCategory: StateFlow<String?> = selectedCategoryId.asStateFlow()
 
     val sections: StateFlow<List<Pair<VideoCategory, List<Video>>>> =
-        selectedCategoryId
+        combine(selectedCategoryId, repo.categoriesFlow) { categoryId, _ -> categoryId }
             .flatMapLatest { categoryId ->
                 kotlinx.coroutines.flow.flow { emit(repo.getHomeSections(categoryId)) }
             }
