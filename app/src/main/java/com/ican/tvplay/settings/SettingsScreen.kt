@@ -2,6 +2,8 @@ package com.ican.tvplay.ui.settings
 
 import android.content.res.Configuration
 import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -47,6 +49,7 @@ fun SettingsScreen(
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
     val predictiveBack by viewModel.predictiveBack.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val activity = LocalActivity.current
 
     val padding = topLevelContentPadding()
     Column(
@@ -105,16 +108,25 @@ fun SettingsScreen(
                 enabled = true,
                 onToggle = { viewModel.setEnableBlur(it) },
             )
+            val supportsPredictiveBack = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
             SettingsSwitchRow(
                 label = "预测性返回",
-                hint = "返回时动画跟随手指滑动，预览返回目标",
-                checked = predictiveBack,
-                enabled = true,
+                hint = if (supportsPredictiveBack) "返回时动画跟随手指滑动，预览返回目标"
+                else "需要 Android 14+",
+                checked = predictiveBack && supportsPredictiveBack,
+                enabled = supportsPredictiveBack,
                 onToggle = {
                     viewModel.setPredictiveBack(it)
                     TvPlayApplication.setEnableOnBackInvokedCallback(
                         context.applicationInfo, it,
                     )
+                    Toast.makeText(
+                        context,
+                        if (it) "预测性返回已开启" else "预测性返回已关闭",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    // 让 NavHost 内的预测返回手势处理器按新系统开关重新注册（跟 KernelSU 一样 recreate）
+                    activity?.recreate()
                 },
             )
         }
