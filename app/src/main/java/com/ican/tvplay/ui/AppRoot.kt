@@ -70,6 +70,8 @@ fun AppRoot() {
                         onVideoClick = { video ->
                             navController.navigate(Routes.detail(video.id))
                         },
+                        onSearchClick = { navController.navigate(Routes.SEARCH) },
+                        onHistoryClick = { navController.navigate(Routes.HISTORY) },
                     )
                 }
                 composable(Routes.SEARCH) {

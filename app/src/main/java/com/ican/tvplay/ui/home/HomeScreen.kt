@@ -8,19 +8,23 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -43,6 +47,8 @@ import androidx.tv.material3.Text
 @Composable
 fun HomeScreen(
     onVideoClick: (Video) -> Unit,
+    onSearchClick: () -> Unit,
+    onHistoryClick: () -> Unit,
 ) {
     val viewModel = appViewModel { HomeViewModel(this) }
     val sections by viewModel.sections.collectAsStateWithLifecycle()
@@ -54,12 +60,7 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
         item {
-            Text(
-                text = "ICAN云影",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
+            HomeTopBar(onSearchClick = onSearchClick, onHistoryClick = onHistoryClick)
         }
 
         item {
@@ -81,6 +82,62 @@ fun HomeScreen(
                 category = category,
                 videos = videos,
                 onVideoClick = onVideoClick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeTopBar(
+    onSearchClick: () -> Unit,
+    onHistoryClick: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        // 胶囊搜索框：点击进入搜索页
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .weight(1f)
+                .height(48.dp)
+                .tvCardEffect(onClick = onSearchClick, shape = CircleShape, focusedScale = 1.04f, glow = false)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = 18.dp),
+        ) {
+            Icon(
+                imageVector = AppIcons.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = "搜索影片、剧集",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        // 历史按钮
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(48.dp)
+                .tvCardEffect(onClick = onHistoryClick, shape = CircleShape, focusedScale = 1.1f)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Icon(
+                imageVector = AppIcons.History,
+                contentDescription = "历史",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
             )
         }
     }

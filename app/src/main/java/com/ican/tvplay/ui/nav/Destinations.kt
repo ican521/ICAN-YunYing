@@ -27,9 +27,7 @@ data class TopDestination(
 
 val topDestinations = listOf(
     TopDestination(Routes.HOME, "首页", AppIcons.Home),
-    TopDestination(Routes.SEARCH, "搜索", AppIcons.Search),
     TopDestination(Routes.FAVORITES, "收藏", AppIcons.Favorite),
-    TopDestination(Routes.HISTORY, "历史", AppIcons.History),
     TopDestination(Routes.SETTINGS, "设置", AppIcons.Settings),
 )
 
