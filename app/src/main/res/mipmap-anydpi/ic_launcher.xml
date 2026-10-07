@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API 24/25 回退图标（vector drawable）；API 26+ 使用 mipmap-anydpi-v26 自适应图标 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#0B0B12"
+        android:pathData="M0,0h48v48h-48z" />
+    <path
+        android:fillColor="#5B8CFF"
+        android:pathData="M19,15 L35,24 L19,33 Z" />
+</vector>

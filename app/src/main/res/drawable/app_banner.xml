@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV 启动横幅 320x180，纯自绘，无 Leanback 资源 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#0B0B12"
+        android:pathData="M0,0h320v180h-320z" />
+    <path
+        android:fillColor="#5B8CFF"
+        android:pathData="M48,58 L104,90 L48,122 Z" />
+    <path
+        android:fillColor="#00E0C8"
+        android:fillAlpha="0.85"
+        android:pathData="M116,58 h10 v64 h-10 z M134,58 h10 v64 h-10 z" />
+</vector>

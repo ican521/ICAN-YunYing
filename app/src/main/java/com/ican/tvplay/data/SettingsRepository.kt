@@ -1,0 +1,35 @@
+package com.ican.tvplay.data
+
+import android.content.Context
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+/** 主题模式：跟随系统 / 浅色 / 深色 */
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
+/**
+ * 应用设置。初始骨架阶段使用 SharedPreferences 持久化，
+ * 后续新增设置项可继续在此扩展。
+ */
+class SettingsRepository(context: Context) {
+
+    private val prefs = context.applicationContext
+        .getSharedPreferences("tvplay_settings", Context.MODE_PRIVATE)
+
+    private val _themeMode = MutableStateFlow(
+        runCatching {
+            ThemeMode.valueOf(prefs.getString(KEY_THEME, null) ?: ThemeMode.SYSTEM.name)
+        }.getOrDefault(ThemeMode.SYSTEM),
+    )
+    val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
+
+    fun setThemeMode(mode: ThemeMode) {
+        prefs.edit().putString(KEY_THEME, mode.name).apply()
+        _themeMode.value = mode
+    }
+
+    private companion object {
+        const val KEY_THEME = "theme_mode"
+    }
+}

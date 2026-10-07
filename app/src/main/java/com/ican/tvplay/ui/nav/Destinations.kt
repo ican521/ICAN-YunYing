@@ -1,0 +1,36 @@
+package com.ican.tvplay.ui.nav
+
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.ican.tvplay.ui.components.AppIcons
+
+/** 路由常量与导航参数 */
+object Routes {
+    const val HOME = "home"
+    const val SEARCH = "search"
+    const val FAVORITES = "favorites"
+    const val HISTORY = "history"
+    const val SETTINGS = "settings"
+
+    const val DETAIL_PATTERN = "detail/{videoId}"
+    fun detail(videoId: String) = "detail/$videoId"
+
+    const val PLAYER_PATTERN = "player/{videoId}/{episodeIndex}"
+    fun player(videoId: String, episodeIndex: Int) = "player/$videoId/$episodeIndex"
+}
+
+/** 底部胶囊导航的一个入口 */
+data class TopDestination(
+    val route: String,
+    val label: String,
+    val icon: ImageVector,
+)
+
+val topDestinations = listOf(
+    TopDestination(Routes.HOME, "首页", AppIcons.Home),
+    TopDestination(Routes.SEARCH, "搜索", AppIcons.Search),
+    TopDestination(Routes.FAVORITES, "收藏", AppIcons.Favorite),
+    TopDestination(Routes.HISTORY, "历史", AppIcons.History),
+    TopDestination(Routes.SETTINGS, "设置", AppIcons.Settings),
+)
+
+val topLevelRoutes = topDestinations.map { it.route }.toSet()
