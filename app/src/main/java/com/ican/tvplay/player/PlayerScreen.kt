@@ -35,7 +35,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.data.model.Video
@@ -97,7 +99,32 @@ fun PlayerScreen(
         val episode = v.episodes.getOrNull(episodeIndex) ?: return@LaunchedEffect
         val startPosition = pendingPosition
         pendingPosition = 0L
-        exoPlayer.setMediaItem(MediaItem.fromUri(episode.playUrl), startPosition)
+        // spider 站需先经 playerContent 解析真实 URL（可能带 header）
+        val source = container.videoRepository.resolvePlaySource(v, episode)
+        val mediaItem = MediaItem.Builder()
+            .setUri(source.url)
+            .apply {
+                if (source.headers.isNotEmpty()) {
+                    // Media3 不在 MediaItem 上直接支持 header；改在 DataSource 层注入
+                }
+            }
+            .build()
+        // 为本次播放重建 DataSource 工厂，注入 header
+        val dataSourceFactory = if (source.headers.isEmpty()) {
+            null
+        } else {
+            DefaultHttpDataSource.Factory()
+                .setDefaultRequestProperties(source.headers)
+                .setAllowCrossProtocolRedirects(true)
+        }
+        if (dataSourceFactory != null) {
+            exoPlayer.setMediaSource(
+                DefaultMediaSourceFactory(dataSourceFactory).createMediaSource(mediaItem),
+                startPosition,
+            )
+        } else {
+            exoPlayer.setMediaItem(mediaItem, startPosition)
+        }
         exoPlayer.prepare()
         exoPlayer.play()
     }

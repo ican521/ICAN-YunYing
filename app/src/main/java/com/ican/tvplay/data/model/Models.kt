@@ -26,4 +26,6 @@ data class Video(
     val description: String,
     val tags: List<String>,
     val episodes: List<Episode>,
+    /** 第一源的线路标识（vod_play_from），spider 站 playerContent 需要 */
+    val playFrom: String = "",
 )
