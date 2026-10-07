@@ -21,15 +21,20 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** 全局：主题模式 / 动态取色 / 主题色板 / 全局模糊 */
+/** 全局：主题模式 / 动态取色 / 主题色板 / 全局模糊 / 接口配置状态 */
 class AppViewModel(container: AppContainer) : ViewModel() {
     private val settings = container.settingsRepository
+    private val videoRepository = container.videoRepository
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
     val dynamicColor: StateFlow<Boolean> = settings.dynamicColor
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
-    val predictiveBack: StateFlow<Boolean> = settings.predictiveBack
+
+    /** 接口配置是否已就绪（已导入并成功加载站点） */
+    val configReady: StateFlow<Boolean> = videoRepository.currentSite
+        .map { it != null }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
 }
@@ -149,18 +154,22 @@ class CollectionViewModel(container: AppContainer) : ViewModel() {
 /** 设置 */
 class SettingsViewModel(container: AppContainer) : ViewModel() {
     private val settings = container.settingsRepository
+    private val videoRepository = container.videoRepository
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
     val dynamicColor: StateFlow<Boolean> = settings.dynamicColor
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
-    val predictiveBack: StateFlow<Boolean> = settings.predictiveBack
     val configUrl: StateFlow<String> = settings.configUrl
 
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
     fun setDynamicColor(enabled: Boolean) = settings.setDynamicColor(enabled)
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
     fun setEnableBlur(enabled: Boolean) = settings.setEnableBlur(enabled)
-    fun setPredictiveBack(enabled: Boolean) = settings.setPredictiveBack(enabled)
-    fun setConfigUrl(url: String) = settings.setConfigUrl(url)
+
+    /** 保存配置 URL 后立即重新拉取站点与分类 */
+    fun setConfigUrl(url: String) {
+        settings.setConfigUrl(url)
+        viewModelScope.launch { videoRepository.reload() }
+    }
 }

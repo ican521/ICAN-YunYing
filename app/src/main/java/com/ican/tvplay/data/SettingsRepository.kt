@@ -56,15 +56,6 @@ class SettingsRepository(context: Context) {
         _enableBlur.value = enabled
     }
 
-    /** 预测性返回：返回手势进度跟随滑入滑出转场 */
-    private val _predictiveBack = MutableStateFlow(prefs.getBoolean(KEY_PREDICTIVE_BACK, true))
-    val predictiveBack: StateFlow<Boolean> = _predictiveBack.asStateFlow()
-
-    fun setPredictiveBack(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_PREDICTIVE_BACK, enabled).apply()
-        _predictiveBack.value = enabled
-    }
-
     /** 导入配置的 URL 链接（仅保存，不解析） */
     private val _configUrl = MutableStateFlow(prefs.getString(KEY_CONFIG_URL, null).orEmpty())
     val configUrl: StateFlow<String> = _configUrl.asStateFlow()
@@ -79,7 +70,6 @@ class SettingsRepository(context: Context) {
         const val KEY_DYNAMIC_COLOR = "dynamic_color"
         const val KEY_THEME_COLOR = "theme_color"
         const val KEY_ENABLE_BLUR = "enable_blur"
-        const val KEY_PREDICTIVE_BACK = "predictive_back"
         const val KEY_CONFIG_URL = "config_url"
     }
 }
