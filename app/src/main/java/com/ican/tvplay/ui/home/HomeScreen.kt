@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,25 +30,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,12 +55,6 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
-
-private val TopBarHeight = 48.dp
-private val TopBarBottomGap = 14.dp
-private val ChipsBottomGap = 18.dp
-private val ChipsRowHeight = 40.dp
 
 @Composable
 fun HomeScreen(
@@ -85,50 +69,11 @@ fun HomeScreen(
     val contentPadding = topLevelContentPadding()
     val categories = viewModel.categories
     val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-
-    // 顶部栏可折叠高度（搜索栏 + 底部间距），chips 行高度固定并吸附
-    val headerHeightPx = with(density) {
-        (TopBarHeight + TopBarBottomGap).toPx()
-    }
-    var headerOffsetPx by remember { mutableFloatStateOf(0f) }
-
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val delta = available.y
-                if (delta < 0f) {
-                    // 内容上滑：优先折叠顶栏
-                    val newOffset = (headerOffsetPx - delta).coerceIn(0f, headerHeightPx)
-                    val consumed = newOffset - headerOffsetPx
-                    headerOffsetPx = newOffset
-                    return Offset(0f, -consumed)
-                }
-                return Offset.Zero
-            }
-
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource,
-            ): Offset {
-                val delta = available.y
-                if (delta > 0f) {
-                    // 内容下滑到顶后：展开顶栏
-                    val newOffset = (headerOffsetPx - delta).coerceIn(0f, headerHeightPx)
-                    val consumedY = headerOffsetPx - newOffset
-                    headerOffsetPx = newOffset
-                    return Offset(0f, consumedY)
-                }
-                return Offset.Zero
-            }
-        }
-    }
 
     // 顶部分类 pager：第 0 页"全部" + 每个分类一页
     val pagerState = rememberPagerState(pageCount = { categories.size + 1 })
 
-    // pager 滑动 → 同步分类选中态到 ViewModel
+    // pager 滑动停止后 → 同步分类选中态到 ViewModel
     LaunchedEffect(pagerState.settledPage) {
         val index = pagerState.settledPage
         val id = if (index == 0) null else categories.getOrNull(index - 1)?.id
@@ -145,37 +90,65 @@ fun HomeScreen(
         scope.launch { pagerState.animateScrollToPage(index) }
     }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .nestedScroll(nestedScrollConnection)
-            .clipToBounds(),
+            .background(MaterialTheme.colorScheme.background),
     ) {
-        // 内容区（pager）：顶部 padding 预留 chips 高度 + 顶栏剩余可见高度
-        val contentTopPadding = with(density) {
-            contentPadding.calculateTopPadding() +
-                ChipsRowHeight + ChipsBottomGap +
-                (headerHeightPx - headerOffsetPx).toDp()
+        // 固定顶栏：搜索 + 历史（不透明背景，防止内容透出）
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(
+                    start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                    end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
+                    top = contentPadding.calculateTopPadding(),
+                ),
+        ) {
+            HomeTopBar(onSearchClick = onSearchClick, onHistoryClick = onHistoryClick)
         }
-        val contentHorizontalPadding = PaddingValues(
-            start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
-            end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-        )
 
+        Spacer(Modifier.height(14.dp))
+
+        // 固定分类 chips（不透明背景）
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(
+                    start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                    end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
+                ),
+        ) {
+            CategoryChips(
+                categories = categories,
+                selectedIndex = selectedIndex,
+                onSelect = onChipClick,
+            )
+        }
+
+        Spacer(Modifier.height(18.dp))
+
+        // 内容区 pager：每页内容由 page index 决定（避免滑动过程中两页读同一状态）
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
         ) { page ->
+            val pageContentPadding = PaddingValues(
+                start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
+                bottom = contentPadding.calculateBottomPadding(),
+            )
+
             if (page == 0) {
                 // 「全部」：Banner + 各分类 LazyRow 分区
+                // 此页数据 = sections（selectedCategory == null 时返回所有分类）
+                val listState = remember(page) { androidx.compose.foundation.lazy.LazyListState() }
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        start = contentHorizontalPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                        end = contentHorizontalPadding.calculateRightPadding(LayoutDirection.Ltr),
-                        top = contentTopPadding,
-                        bottom = contentPadding.calculateBottomPadding(),
-                    ),
+                    contentPadding = pageContentPadding,
                     verticalArrangement = Arrangement.spacedBy(22.dp),
                 ) {
                     sections.firstOrNull()?.second?.firstOrNull()?.let { featured ->
@@ -193,8 +166,16 @@ fun HomeScreen(
                     }
                 }
             } else {
-                // 具体分类：顶部 Banner 占满整行 + 竖向瀑布流
-                val videos = sections.firstOrNull()?.second.orEmpty()
+                // 具体分类：按 page index 直接决定该页分类，与 ViewModel 选中态解耦
+                val pageCategory = categories.getOrNull(page - 1)
+                // 此页数据：仅当 ViewModel 当前选中分类 == 该页分类时取 sections；
+                // 否则显示空（等滑动结束 ViewModel 同步后自然填充，滑动过程中不互相串数据）
+                val pageVideos = if (pageCategory != null && selectedCategory == pageCategory.id) {
+                    sections.firstOrNull()?.second.orEmpty()
+                } else {
+                    emptyList()
+                }
+                val gridState = remember(page) { androidx.compose.foundation.lazy.grid.LazyGridState() }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val columns = if (maxWidth < 600.dp) {
                         GridCells.Fixed(3)
@@ -202,71 +183,24 @@ fun HomeScreen(
                         GridCells.Adaptive(minSize = 132.dp)
                     }
                     LazyVerticalGrid(
+                        state = gridState,
                         columns = columns,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            start = contentHorizontalPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                            end = contentHorizontalPadding.calculateRightPadding(LayoutDirection.Ltr),
-                            top = contentTopPadding,
-                            bottom = contentPadding.calculateBottomPadding(),
-                        ),
+                        contentPadding = pageContentPadding,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        videos.firstOrNull()?.let { featured ->
+                        pageVideos.firstOrNull()?.let { featured ->
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 FeaturedBanner(video = featured, onClick = { onVideoClick(featured) })
                             }
                         }
-                        gridItems(videos, key = { it.id }) { video ->
+                        gridItems(pageVideos, key = { it.id }) { video ->
                             VideoCardItem(video = video, onClick = { onVideoClick(video) })
                         }
                     }
                 }
             }
-        }
-
-        // 固定背景层：覆盖 HomeTopBar 和 chips 行的整个区域，防止内容透出
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(
-                    contentPadding.calculateTopPadding() +
-                        TopBarHeight + TopBarBottomGap + ChipsRowHeight + ChipsBottomGap,
-                )
-                .background(MaterialTheme.colorScheme.background),
-        )
-
-        // 顶部 chips 行：初始位于顶栏下方（顶栏高度 + 间距），随折叠上移并吸附在内容区顶部
-        val chipsBaseTopPadding = contentPadding.calculateTopPadding() + TopBarHeight + TopBarBottomGap
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .offset { IntOffset(0, (chipsBaseTopPadding.toPx() - headerOffsetPx).roundToInt()) }
-                .padding(
-                    start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-                ),
-        ) {
-            CategoryChips(
-                categories = categories,
-                selectedIndex = selectedIndex,
-                onSelect = onChipClick,
-            )
-        }
-
-        // 顶栏（搜索 + 历史）：位于 chips 上方，折叠时同步上移并完全隐藏
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .offset { IntOffset(0, -headerOffsetPx.roundToInt()) }
-                .padding(
-                    start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-                    top = contentPadding.calculateTopPadding(),
-                ),
-        ) {
-            HomeTopBar(onSearchClick = onSearchClick, onHistoryClick = onHistoryClick)
         }
     }
 }
@@ -279,7 +213,7 @@ private fun HomeTopBar(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxWidth().height(TopBarHeight),
+        modifier = Modifier.fillMaxWidth().height(48.dp),
     ) {
         // 胶囊搜索框：点击进入搜索页
         Row(
@@ -336,7 +270,7 @@ private fun CategoryChips(
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.height(ChipsRowHeight),
+        modifier = Modifier.height(40.dp),
     ) {
         item {
             CategoryChip(text = "全部", selected = selectedIndex == 0, onClick = { onSelect(0) })
