@@ -5,6 +5,8 @@ import com.ican.tvplay.ui.components.AppIcons
 
 /** 路由常量与导航参数 */
 object Routes {
+    /** 一级页面容器（HorizontalPager：首页/收藏/设置） */
+    const val MAIN = "main"
     const val HOME = "home"
     const val SEARCH = "search"
     const val FAVORITES = "favorites"

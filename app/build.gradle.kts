@@ -80,9 +80,8 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.common)
 
-    // Haze：实时毛玻璃 / 液态玻璃（Android 12+ RenderEffect，低版本自动降级）
-    implementation(libs.haze)
-    implementation(libs.haze.glass)
+    // miuix-blur：液态玻璃悬浮底栏的 Backdrop 模糊 / 折射
+    implementation(libs.miuix.blur)
 
     // Coil 3：网络封面加载
     implementation(libs.coil.compose)
