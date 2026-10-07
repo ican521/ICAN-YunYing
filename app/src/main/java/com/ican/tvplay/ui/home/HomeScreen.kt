@@ -5,18 +5,22 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,16 +58,33 @@ fun HomeScreen(
     val sections by viewModel.sections.collectAsStateWithLifecycle()
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
 
-    LazyColumn(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = topLevelContentPadding(),
-        verticalArrangement = Arrangement.spacedBy(22.dp),
-    ) {
-        item {
+    val contentPadding = topLevelContentPadding()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // 固定顶部：搜索栏 + 历史按钮（不随内容滚动）
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = contentPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                    end = contentPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                    top = contentPadding.calculateTopPadding(),
+                ),
+        ) {
             HomeTopBar(onSearchClick = onSearchClick, onHistoryClick = onHistoryClick)
         }
 
-        item {
+        Spacer(Modifier.height(14.dp))
+
+        // 固定分类条（不随内容滚动）
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = contentPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                    end = contentPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                ),
+        ) {
             CategoryChips(
                 categories = viewModel.categories,
                 selectedId = selectedCategory,
@@ -71,18 +92,58 @@ fun HomeScreen(
             )
         }
 
-        sections.firstOrNull()?.second?.firstOrNull()?.let { featured ->
-            item {
-                FeaturedBanner(video = featured, onClick = { onVideoClick(featured) })
-            }
-        }
+        Spacer(Modifier.height(18.dp))
 
-        items(sections, key = { it.first.id }) { (category, videos) ->
-            VideoSection(
-                category = category,
-                videos = videos,
-                onVideoClick = onVideoClick,
-            )
+        if (selectedCategory == null) {
+            // 「全部」：保持原有 LazyRow 分区
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = contentPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                    end = contentPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                    bottom = contentPadding.calculateBottomPadding(),
+                ),
+                verticalArrangement = Arrangement.spacedBy(22.dp),
+            ) {
+                sections.firstOrNull()?.second?.firstOrNull()?.let { featured ->
+                    item {
+                        FeaturedBanner(video = featured, onClick = { onVideoClick(featured) })
+                    }
+                }
+
+                items(sections, key = { it.first.id }) { (category, videos) ->
+                    VideoSection(
+                        category = category,
+                        videos = videos,
+                        onVideoClick = onVideoClick,
+                    )
+                }
+            }
+        } else {
+            // 具体分类：竖向瀑布流网格
+            val videos = sections.firstOrNull()?.second.orEmpty()
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val columns = if (maxWidth < 600.dp) {
+                    GridCells.Fixed(3)
+                } else {
+                    GridCells.Adaptive(minSize = 132.dp)
+                }
+                LazyVerticalGrid(
+                    columns = columns,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = contentPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                        end = contentPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                        bottom = contentPadding.calculateBottomPadding(),
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    gridItems(videos, key = { it.id }) { video ->
+                        VideoCardItem(video = video, onClick = { onVideoClick(video) })
+                    }
+                }
+            }
         }
     }
 }

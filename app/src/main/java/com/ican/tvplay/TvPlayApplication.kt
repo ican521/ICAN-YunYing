@@ -36,14 +36,14 @@ class TvPlayApplication : Application() {
         super.onCreate()
         container = AppContainer(this)
 
-        // 显式关闭系统预测性返回（与 KernelSU 一致：manifest 默认 false）。
-        // 若开启，MIUI/HyperOS 会在返回手势时叠加系统级"整页圆角缩小"动画；
-        // 我们的返回跟手由 AppRoot 内的应用内手势层实现，不依赖系统路径。
+        // 启动时按设置应用系统预测性返回开关（对齐 KernelSU：HiddenApiBypass + 反射，默认 false）。
+        // 返回跟手由 AppRoot 的 NavigationBackHandler 手势层实现，不依赖系统缩放动画。
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val enable = container.settingsRepository.predictiveBack.value
             HiddenApiBypass.addHiddenApiExemptions(
                 "Landroid/content/pm/ApplicationInfo;->setEnableOnBackInvokedCallback",
             )
-            setEnableOnBackInvokedCallback(applicationInfo, false)
+            setEnableOnBackInvokedCallback(applicationInfo, enable)
         }
     }
 }

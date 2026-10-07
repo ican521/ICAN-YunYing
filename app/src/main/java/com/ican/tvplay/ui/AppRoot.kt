@@ -13,9 +13,9 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -37,8 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,6 +50,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.NavigationEventTransitionState
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -117,21 +121,71 @@ fun AppRoot() {
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background),
         ) {
-            // 应用内跟手侧滑返回（照搬 KernelSU/Miuix 思路：系统预测性返回关闭，
-            // 手势完全由 App 接管）：
-            // 开关开启且处于二级页时，从屏幕左缘向右拖动实时驱动当前页 translationX；
-            // 拖过阈值 → 播完滑出后弹栈；未过阈值 → 弹簧回弹。
-            // 系统边缘返回（flag=false）只会触发普通 300ms 转场，不再有系统缩放动画。
+            // 返回手势接管（照搬 KernelSU 的 NavigationBackHandler 方案，系统侧 flag=false）：
+            // 二级页返回手势进度实时驱动当前页 translationX 跟手右滑；
+            // 完成 → 播完剩余滑出后弹栈；取消 → 弹簧回弹。
+            // 开关关闭时手势层禁用，返回走 NavHost 默认 300ms popExit 滑动转场。
             var swipeOffset by remember { mutableFloatStateOf(0f) }
             var swipeJustCompleted by remember { mutableStateOf(false) }
-            val canSwipeBack = predictiveBack &&
-                currentRoute != null && currentRoute != Routes.MAIN
-            val edgeZonePx = with(LocalDensity.current) { 28.dp.toPx() }
             val scope = rememberCoroutineScope()
+            val backGestureEnabled = predictiveBack &&
+                currentRoute != null && currentRoute != Routes.MAIN
+            val screenWidthPx = with(LocalDensity.current) {
+                LocalConfiguration.current.screenWidthDp.dp.toPx()
+            }
+
+            val navEventState = rememberNavigationEventState(NavigationEventInfo.None)
+            var isCustomAnimating by remember { mutableStateOf(false) }
+            // 手势进度（系统/框架派发）→ 页面跟手位移
+            LaunchedEffect(navEventState) {
+                snapshotFlow { navEventState.transitionState }
+                    .collect { state ->
+                        if (isCustomAnimating) return@collect
+                        val progress = (state as? NavigationEventTransitionState.InProgress)
+                            ?.latestEvent?.progress ?: 0f
+                        swipeOffset = progress * screenWidthPx
+                    }
+            }
+            NavigationBackHandler(
+                state = navEventState,
+                isBackEnabled = backGestureEnabled,
+                onBackCancelled = {
+                    isCustomAnimating = true
+                    val start = swipeOffset
+                    scope.launch {
+                        animate(
+                            initialValue = start,
+                            targetValue = 0f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium,
+                            ),
+                        ) { value, _ -> swipeOffset = value }
+                        isCustomAnimating = false
+                    }
+                },
+                onBackCompleted = {
+                    isCustomAnimating = true
+                    val start = swipeOffset
+                    scope.launch {
+                        animate(
+                            initialValue = start,
+                            targetValue = screenWidthPx,
+                            animationSpec = tween(150),
+                        ) { value, _ -> swipeOffset = value }
+                        // 播完剩余滑出再瞬时弹栈（popExit 读 swipeJustCompleted=None，避免二次动画）
+                        swipeJustCompleted = true
+                        navController.popBackStack()
+                        swipeOffset = 0f
+                        isCustomAnimating = false
+                    }
+                },
+            )
 
             LaunchedEffect(currentRoute) {
                 // 路由变化后复位手势状态（swipeJustCompleted 已在弹栈那一帧被转场 lambda 读取）
                 swipeJustCompleted = false
+                swipeOffset = 0f
             }
 
             NavHost(
@@ -140,81 +194,11 @@ fun AppRoot() {
                 modifier = Modifier
                     .fillMaxSize()
                     .layerBackdrop(backdrop)
-                    .graphicsLayer { translationX = swipeOffset }
-                    .pointerInput(canSwipeBack) {
-                        if (!canSwipeBack) return@pointerInput
-                        awaitEachGesture {
-                            val down = awaitFirstDown(
-                                pass = PointerEventPass.Initial,
-                                requireUnconsumed = false,
-                            )
-                            if (down.position.x > edgeZonePx) return@awaitEachGesture
-
-                            var accX = 0f
-                            var accY = 0f
-                            var claimed = false
-                            var released = false
-                            var releasedClaimed = false
-                            while (true) {
-                                val event = awaitPointerEvent(PointerEventPass.Initial)
-                                val change = event.changes.firstOrNull { it.id == down.id }
-                                if (change == null || !change.pressed) {
-                                    released = true
-                                    releasedClaimed = claimed
-                                    break
-                                }
-                                if (!claimed) {
-                                    accX += change.position.x - change.previousPosition.x
-                                    accY += change.position.y - change.previousPosition.y
-                                    val slop = viewConfiguration.touchSlop
-                                    if (kotlin.math.abs(accX) > slop || kotlin.math.abs(accY) > slop) {
-                                        if (accX > slop && kotlin.math.abs(accX) > kotlin.math.abs(accY) * 1.5f) {
-                                            claimed = true
-                                        } else {
-                                            // 垂直主导：不消费，交还给子视图正常滚动/点击
-                                            break
-                                        }
-                                    }
-                                } else {
-                                    val dx = change.position.x - change.previousPosition.x
-                                    swipeOffset = (swipeOffset + dx)
-                                        .coerceIn(0f, size.width.toFloat())
-                                    change.consume()
-                                }
-                            }
-                            if (released && releasedClaimed) {
-                                // 抬手结算（动画不能在受限的指针作用域里挂起，放到外层协程）
-                                val width = size.width.toFloat()
-                                if (swipeOffset > width * 0.35f) {
-                                    scope.launch {
-                                        animate(
-                                            initialValue = swipeOffset,
-                                            targetValue = width,
-                                            animationSpec = tween(150),
-                                        ) { value, _ -> swipeOffset = value }
-                                        // 播完剩余滑出再瞬时弹栈（popExit 读 swipeJustCompleted=None，避免二次动画）
-                                        swipeJustCompleted = true
-                                        navController.popBackStack()
-                                        swipeOffset = 0f
-                                    }
-                                } else {
-                                    scope.launch {
-                                        animate(
-                                            initialValue = swipeOffset,
-                                            targetValue = 0f,
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = Spring.StiffnessMedium,
-                                            ),
-                                        ) { value, _ -> swipeOffset = value }
-                                    }
-                                }
-                            }
-                        }
-                    },
+                    .graphicsLayer { translationX = swipeOffset },
                 // 二级页纯覆盖式平移：新页从右滑入，旧页固定不动；返回同理
                 enterTransition = { slideInHorizontally(animationSpec = tween(300)) { it } },
-                exitTransition = { ExitTransition.None },
+                // ExitTransition.None 会让旧页瞬间消失，改用延迟快照淡出实现"保持不动"
+                exitTransition = { fadeOut(animationSpec = snap(delayMillis = 300)) },
                 popEnterTransition = { EnterTransition.None },
                 // 跟手滑完后的弹栈已由手势层驱动过位移动画，此处瞬时消失避免二次播放
                 popExitTransition = {
@@ -240,10 +224,12 @@ fun AppRoot() {
                                 onVideoClick = { videoId ->
                                     navController.navigate(Routes.detail(videoId))
                                 },
+                                onBack = { mainPagerState.animateToPage(0) },
                             )
 
                             2 -> SettingsScreen(
                                 onColorPaletteClick = { navController.navigate(Routes.COLOR_PALETTE) },
+                                onBack = { mainPagerState.animateToPage(0) },
                             )
                         }
                     }
@@ -256,6 +242,7 @@ fun AppRoot() {
                         onVideoClick = { video ->
                             navController.navigate(Routes.detail(video.id))
                         },
+                        onBack = { navController.popBackStack() },
                     )
                 }
                 composable(Routes.HISTORY) {
@@ -263,6 +250,7 @@ fun AppRoot() {
                         onVideoClick = { videoId ->
                             navController.navigate(Routes.detail(videoId))
                         },
+                        onBack = { navController.popBackStack() },
                     )
                 }
 

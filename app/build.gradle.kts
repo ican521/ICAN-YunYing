@@ -100,4 +100,7 @@ dependencies {
 
     // HiddenApiBypass：运行时切换系统预测性返回（反射 ApplicationInfo.setEnableOnBackInvokedCallback）
     implementation(libs.hiddenapibypass)
+
+    // NavigationEvent：照搬 KernelSU 的返回手势接管（NavigationBackHandler 跟手驱动）
+    implementation(libs.navigationevent.compose)
 }

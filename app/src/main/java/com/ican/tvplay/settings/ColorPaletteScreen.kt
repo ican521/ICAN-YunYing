@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -30,6 +31,7 @@ import androidx.tv.material3.Text
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.CircleBackButton
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.BrandBlue
 import com.ican.tvplay.ui.theme.BrandBlueDeep
@@ -49,6 +51,7 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .statusBarsPadding()
             .padding(horizontal = 16.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -56,20 +59,7 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(
-                imageVector = AppIcons.Back,
-                contentDescription = "返回",
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier
-                    .size(34.dp)
-                    .tvCardEffect(
-                        onClick = onBack,
-                        shape = CircleShape,
-                        focusedScale = 1.1f,
-                        glow = false,
-                    )
-                    .padding(5.dp),
-            )
+            CircleBackButton(onClick = onBack)
             Text(
                 text = "主题色板",
                 style = MaterialTheme.typography.headlineMedium,
