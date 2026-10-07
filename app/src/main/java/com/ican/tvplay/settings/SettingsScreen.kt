@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ican.tvplay.TvPlayApplication
 import com.ican.tvplay.data.ThemeMode
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
@@ -38,7 +39,6 @@ import androidx.tv.material3.Text
 @Composable
 fun SettingsScreen(
     onColorPaletteClick: () -> Unit = {},
-    onThemePreviewClick: () -> Unit = {},
 ) {
     val viewModel = appViewModel { SettingsViewModel(this) }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
@@ -46,6 +46,7 @@ fun SettingsScreen(
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
     val predictiveBack by viewModel.predictiveBack.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     val padding = topLevelContentPadding()
     Column(
@@ -109,13 +110,12 @@ fun SettingsScreen(
                 hint = "返回时动画跟随手指滑动，预览返回目标",
                 checked = predictiveBack,
                 enabled = true,
-                onToggle = { viewModel.setPredictiveBack(it) },
-            )
-            SettingsEntryRow(
-                label = "主题预览",
-                value = "查看效果",
-                dotColor = null,
-                onClick = onThemePreviewClick,
+                onToggle = {
+                    viewModel.setPredictiveBack(it)
+                    TvPlayApplication.setEnableOnBackInvokedCallback(
+                        context.applicationInfo, it,
+                    )
+                },
             )
         }
 

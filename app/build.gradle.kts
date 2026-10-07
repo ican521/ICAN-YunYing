@@ -86,4 +86,7 @@ dependencies {
     // Coil 3：网络封面加载
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+
+    // HiddenApiBypass：运行时切换系统预测性返回（反射 ApplicationInfo.setEnableOnBackInvokedCallback）
+    implementation(libs.hiddenapibypass)
 }

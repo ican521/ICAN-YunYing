@@ -52,7 +52,6 @@ import com.ican.tvplay.ui.player.PlayerScreen
 import com.ican.tvplay.ui.search.SearchScreen
 import com.ican.tvplay.ui.settings.ColorPaletteScreen
 import com.ican.tvplay.ui.settings.SettingsScreen
-import com.ican.tvplay.ui.settings.ThemePreviewScreen
 import com.ican.tvplay.ui.theme.TvPlayTheme
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
@@ -65,7 +64,6 @@ fun AppRoot() {
     val dynamicColor by appViewModel.dynamicColor.collectAsStateWithLifecycle()
     val themeColor by appViewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by appViewModel.enableBlur.collectAsStateWithLifecycle()
-    val predictiveBack by appViewModel.predictiveBack.collectAsStateWithLifecycle()
 
     TvPlayTheme(
         themeMode = themeMode,
@@ -102,39 +100,23 @@ fun AppRoot() {
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background),
         ) {
-            val enterTrans = if (predictiveBack) {
-                slideInHorizontally(animationSpec = tween(300)) { it }
-            } else {
-                fadeIn(animationSpec = tween(200))
-            }
-            val exitTrans = if (predictiveBack) {
-                slideOutHorizontally(animationSpec = tween(300)) { -it / 4 } +
-                    fadeOut(animationSpec = tween(200))
-            } else {
-                fadeOut(animationSpec = tween(200))
-            }
-            val popEnterTrans = if (predictiveBack) {
-                slideInHorizontally(animationSpec = tween(300)) { -it / 4 } +
-                    fadeIn(animationSpec = tween(200))
-            } else {
-                fadeIn(animationSpec = tween(200))
-            }
-            val popExitTrans = if (predictiveBack) {
-                slideOutHorizontally(animationSpec = tween(300)) { it }
-            } else {
-                fadeOut(animationSpec = tween(200))
-            }
-
             NavHost(
                 navController = navController,
                 startDestination = Routes.MAIN,
                 modifier = Modifier
                     .fillMaxSize()
                     .layerBackdrop(backdrop),
-                enterTransition = { enterTrans },
-                exitTransition = { exitTrans },
-                popEnterTransition = { popEnterTrans },
-                popExitTransition = { popExitTrans },
+                // 二级页固定右进右出滑动转场；返回跟手由系统预测性返回开关控制（运行时反射切换）
+                enterTransition = { slideInHorizontally(animationSpec = tween(300)) { it } },
+                exitTransition = {
+                    slideOutHorizontally(animationSpec = tween(300)) { -it / 4 } +
+                        fadeOut(animationSpec = tween(200))
+                },
+                popEnterTransition = {
+                    slideInHorizontally(animationSpec = tween(300)) { -it / 4 } +
+                        fadeIn(animationSpec = tween(200))
+                },
+                popExitTransition = { slideOutHorizontally(animationSpec = tween(300)) { it } },
             ) {
                 composable(Routes.MAIN) {
                     HorizontalPager(
@@ -158,16 +140,12 @@ fun AppRoot() {
 
                             2 -> SettingsScreen(
                                 onColorPaletteClick = { navController.navigate(Routes.COLOR_PALETTE) },
-                                onThemePreviewClick = { navController.navigate(Routes.THEME_PREVIEW) },
                             )
                         }
                     }
                 }
                 composable(Routes.COLOR_PALETTE) {
                     ColorPaletteScreen(onBack = { navController.popBackStack() })
-                }
-                composable(Routes.THEME_PREVIEW) {
-                    ThemePreviewScreen(onBack = { navController.popBackStack() })
                 }
                 composable(Routes.SEARCH) {
                     SearchScreen(
