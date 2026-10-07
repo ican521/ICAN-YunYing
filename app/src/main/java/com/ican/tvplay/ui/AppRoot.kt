@@ -1,9 +1,12 @@
 package com.ican.tvplay.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -62,6 +65,7 @@ fun AppRoot() {
     val dynamicColor by appViewModel.dynamicColor.collectAsStateWithLifecycle()
     val themeColor by appViewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by appViewModel.enableBlur.collectAsStateWithLifecycle()
+    val predictiveBack by appViewModel.predictiveBack.collectAsStateWithLifecycle()
 
     TvPlayTheme(
         themeMode = themeMode,
@@ -98,12 +102,39 @@ fun AppRoot() {
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background),
         ) {
+            val enterTrans = if (predictiveBack) {
+                slideInHorizontally(animationSpec = tween(300)) { it }
+            } else {
+                fadeIn(animationSpec = tween(200))
+            }
+            val exitTrans = if (predictiveBack) {
+                slideOutHorizontally(animationSpec = tween(300)) { -it / 4 } +
+                    fadeOut(animationSpec = tween(200))
+            } else {
+                fadeOut(animationSpec = tween(200))
+            }
+            val popEnterTrans = if (predictiveBack) {
+                slideInHorizontally(animationSpec = tween(300)) { -it / 4 } +
+                    fadeIn(animationSpec = tween(200))
+            } else {
+                fadeIn(animationSpec = tween(200))
+            }
+            val popExitTrans = if (predictiveBack) {
+                slideOutHorizontally(animationSpec = tween(300)) { it }
+            } else {
+                fadeOut(animationSpec = tween(200))
+            }
+
             NavHost(
                 navController = navController,
                 startDestination = Routes.MAIN,
                 modifier = Modifier
                     .fillMaxSize()
                     .layerBackdrop(backdrop),
+                enterTransition = { enterTrans },
+                exitTransition = { exitTrans },
+                popEnterTransition = { popEnterTrans },
+                popExitTransition = { popExitTrans },
             ) {
                 composable(Routes.MAIN) {
                     HorizontalPager(

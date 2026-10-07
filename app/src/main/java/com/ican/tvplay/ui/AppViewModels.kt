@@ -29,6 +29,7 @@ class AppViewModel(container: AppContainer) : ViewModel() {
     val dynamicColor: StateFlow<Boolean> = settings.dynamicColor
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
+    val predictiveBack: StateFlow<Boolean> = settings.predictiveBack
 
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
 }
@@ -153,9 +154,11 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val dynamicColor: StateFlow<Boolean> = settings.dynamicColor
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
+    val predictiveBack: StateFlow<Boolean> = settings.predictiveBack
 
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
     fun setDynamicColor(enabled: Boolean) = settings.setDynamicColor(enabled)
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
     fun setEnableBlur(enabled: Boolean) = settings.setEnableBlur(enabled)
+    fun setPredictiveBack(enabled: Boolean) = settings.setPredictiveBack(enabled)
 }

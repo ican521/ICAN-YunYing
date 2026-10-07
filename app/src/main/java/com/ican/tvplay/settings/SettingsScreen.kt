@@ -45,6 +45,7 @@ fun SettingsScreen(
     val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
+    val predictiveBack by viewModel.predictiveBack.collectAsStateWithLifecycle()
 
     val padding = topLevelContentPadding()
     Column(
@@ -102,6 +103,13 @@ fun SettingsScreen(
                 checked = enableBlur,
                 enabled = true,
                 onToggle = { viewModel.setEnableBlur(it) },
+            )
+            SettingsSwitchRow(
+                label = "预测性返回",
+                hint = "返回时动画跟随手指滑动，预览返回目标",
+                checked = predictiveBack,
+                enabled = true,
+                onToggle = { viewModel.setPredictiveBack(it) },
             )
             SettingsEntryRow(
                 label = "主题预览",
