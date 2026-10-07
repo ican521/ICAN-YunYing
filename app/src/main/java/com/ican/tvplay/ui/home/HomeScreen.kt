@@ -38,10 +38,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -148,7 +148,8 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .nestedScroll(nestedScrollConnection),
+            .nestedScroll(nestedScrollConnection)
+            .clipToBounds(),
     ) {
         // 内容区（pager）：顶部 padding 预留 chips 高度 + 顶栏剩余可见高度
         val contentTopPadding = with(density) {
@@ -225,6 +226,17 @@ fun HomeScreen(
             }
         }
 
+        // 固定背景层：覆盖 HomeTopBar 和 chips 行的整个区域，防止内容透出
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(
+                    contentPadding.calculateTopPadding() +
+                        TopBarHeight + TopBarBottomGap + ChipsRowHeight + ChipsBottomGap,
+                )
+                .background(MaterialTheme.colorScheme.background),
+        )
+
         // 顶部 chips 行：初始位于顶栏下方（顶栏高度 + 间距），随折叠上移并吸附在内容区顶部
         val chipsBaseTopPadding = contentPadding.calculateTopPadding() + TopBarHeight + TopBarBottomGap
         Box(
@@ -247,9 +259,7 @@ fun HomeScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .graphicsLayer {
-                    translationY = -headerOffsetPx
-                }
+                .offset { IntOffset(0, -headerOffsetPx.roundToInt()) }
                 .padding(
                     start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
                     end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
