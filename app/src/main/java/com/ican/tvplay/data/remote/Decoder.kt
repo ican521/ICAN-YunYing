@@ -22,14 +22,15 @@ object Decoder {
         if (raw.isEmpty()) return raw
         // 去 BOM
         val trimmed = raw.trimStart(BOM).trim()
-        if (trimmed.startsWith("{") || trimmed.startsWith("[")) return trimmed
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) return stripComments(trimmed)
         if (raw.contains("**")) {
             val extracted = extract(raw)
             if (extracted.isNotEmpty()) {
                 return try {
-                    String(Base64.decode(extracted, Base64.DEFAULT), StandardCharsets.UTF_8)
+                    val decoded = String(Base64.decode(extracted, Base64.DEFAULT), StandardCharsets.UTF_8)
                         .trimStart(BOM)
                         .trim()
+                    stripComments(decoded)
                 } catch (t: Throwable) {
                     Log.e(DECODER_TAG, "Decoder base64 fail", t)
                     raw
@@ -37,6 +38,63 @@ object Decoder {
             }
         }
         return raw
+    }
+
+    /** 去除 JSON 中的行注释和块注释（TVBox 配置常见） */
+    private fun stripComments(json: String): String {
+        val sb = StringBuilder(json.length)
+        var inString = false
+        var inEscape = false
+        var inLineComment = false
+        var inBlockComment = false
+        var i = 0
+        while (i < json.length) {
+            val c = json[i]
+            when {
+                inLineComment -> {
+                    if (c == '\n' || c == '\r') {
+                        inLineComment = false
+                        sb.append(c)
+                    }
+                }
+                inBlockComment -> {
+                    if (c == '*' && i + 1 < json.length && json[i + 1] == '/') {
+                        inBlockComment = false
+                        i++ // skip /
+                    }
+                }
+                inEscape -> {
+                    sb.append(c)
+                    inEscape = false
+                }
+                inString -> {
+                    if (c == '\\') {
+                        inEscape = true
+                        sb.append(c)
+                    } else if (c == '"') {
+                        inString = false
+                        sb.append(c)
+                    } else {
+                        sb.append(c)
+                    }
+                }
+                c == '"' -> {
+                    inString = true
+                    sb.append(c)
+                }
+                c == '/' && i + 1 < json.length && json[i + 1] == '/' -> {
+                    inLineComment = true
+                    i++ // skip second /
+                }
+                c == '/' && i + 1 < json.length && json[i + 1] == '*' -> {
+                    inBlockComment = true
+                    i++ // skip *
+                }
+                else -> sb.append(c)
+            }
+            i++
+        }
+        return sb.toString()
     }
 
     private fun extract(data: String): String {

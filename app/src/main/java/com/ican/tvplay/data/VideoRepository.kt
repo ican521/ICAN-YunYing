@@ -97,7 +97,9 @@ class VideoRepository(
                 return
             }
             val homeJson = spiderManager.homeContent(spider, filter = true)
-            _categories.value = parseClasses(homeJson).map {
+            val classes = parseClasses(homeJson)
+            Log.d(REPO_TAG, "spider homeContent classes=${classes.size}")
+            _categories.value = classes.map {
                 VideoCategory(id = it.typeId, name = it.typeName)
             }
         } else {

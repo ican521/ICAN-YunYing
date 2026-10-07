@@ -8,8 +8,18 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import okhttp3.Call
+import okhttp3.Connection
+import okhttp3.EventListener
+import okhttp3.Handshake
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
+import okhttp3.Response
+import java.io.IOException
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
 private const val TAG = "VodApi"
@@ -97,8 +107,36 @@ class VodApiClient(
     },
 ) {
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .dns(FallbackDns)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(30, TimeUnit.SECONDS)
+        .eventListener(object : EventListener() {
+            override fun callStart(call: Call) { Log.d(TAG, ">> callStart ${call.request().url}") }
+            override fun dnsStart(call: Call, domainName: String) { Log.d(TAG, ">> dnsStart $domainName") }
+            override fun dnsEnd(call: Call, domainName: String, inetAddressList: List<InetAddress>) {
+                Log.d(TAG, ">> dnsEnd $domainName -> ${inetAddressList.map { it.hostAddress }}")
+            }
+            override fun connectStart(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy) {
+                Log.d(TAG, ">> connectStart ${inetSocketAddress.address}:${inetSocketAddress.port}")
+            }
+            override fun connectEnd(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?) {
+                Log.d(TAG, ">> connectEnd ${inetSocketAddress.address}:${inetSocketAddress.port} protocol=$protocol")
+            }
+            override fun connectFailed(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?, ioe: IOException) {
+                Log.e(TAG, ">> connectFailed ${inetSocketAddress.address}:${inetSocketAddress.port} err=${ioe.message}")
+            }
+            override fun requestHeadersStart(call: Call) { Log.d(TAG, ">> requestHeadersStart") }
+            override fun requestHeadersEnd(call: Call, request: Request) { Log.d(TAG, ">> requestHeadersEnd") }
+            override fun requestBodyStart(call: Call) { Log.d(TAG, ">> requestBodyStart") }
+            override fun requestBodyEnd(call: Call, byteCount: Long) { Log.d(TAG, ">> requestBodyEnd bytes=$byteCount") }
+            override fun responseHeadersStart(call: Call) { Log.d(TAG, ">> responseHeadersStart") }
+            override fun responseHeadersEnd(call: Call, response: Response) { Log.d(TAG, ">> responseHeadersEnd code=${response.code}") }
+            override fun responseBodyStart(call: Call) { Log.d(TAG, ">> responseBodyStart") }
+            override fun responseBodyEnd(call: Call, byteCount: Long) { Log.d(TAG, ">> responseBodyEnd bytes=$byteCount") }
+            override fun callEnd(call: Call) { Log.d(TAG, ">> callEnd") }
+            override fun callFailed(call: Call, ioe: IOException) { Log.e(TAG, ">> callFailed err=${ioe.javaClass.simpleName}: ${ioe.message}") }
+        })
         .build()
 
     /**
@@ -119,8 +157,11 @@ class VodApiClient(
                 Log.d(TAG, "site[$i] key=${s.key} name=${s.name} type=${s.type} api=${s.api.take(60)}")
             }
 
-            // 优先 spider 站（type=3 + api=csp_Xxx + 排除纯 meta 站（searchable=changeable=0）+ 有 jar）
+            // 优先纯内容 spider 站（searchable=changeable=1），避免选中云盘/配置类站点
             val spiderSite = config.sites.firstOrNull { s ->
+                s.isSpider() && s.searchable == 1 && s.changeable == 1 &&
+                    (s.jar.isNotBlank() || config.spider.isNotBlank())
+            } ?: config.sites.firstOrNull { s ->
                 s.isSpider() && (s.searchable != 0 || s.changeable != 0) &&
                     (s.jar.isNotBlank() || config.spider.isNotBlank())
             }
@@ -140,7 +181,9 @@ class VodApiClient(
             }
             Log.d(TAG, "chosen http=${httpSite?.name ?: "<none>"} api=${httpSite?.api ?: ""}")
             httpSite?.let { LoadedSite(it, "") }
-        }.onFailure { Log.e(TAG, "loadHomeSite fail", it) }.getOrNull()
+        }.onFailure {
+            Log.e(TAG, "loadHomeSite fail: ${it.javaClass.simpleName}: ${it.message}", it)
+        }.getOrNull()
     }
 
     /** 拉取首页分类（ac=class） */
@@ -199,7 +242,8 @@ class VodApiClient(
     private fun get(url: String): String {
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36")
+            // TVBox 服务器按 UA 区分返回：okhttp UA 才返回伪装 JPEG 配置，浏览器 UA 返回 HTML 导航页
+            .header("User-Agent", "okhttp/4.12.0")
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code} for $url")
