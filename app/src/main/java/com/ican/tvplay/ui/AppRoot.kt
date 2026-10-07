@@ -47,7 +47,9 @@ import com.ican.tvplay.ui.nav.Routes
 import com.ican.tvplay.ui.nav.topDestinations
 import com.ican.tvplay.ui.player.PlayerScreen
 import com.ican.tvplay.ui.search.SearchScreen
+import com.ican.tvplay.ui.settings.ColorPaletteScreen
 import com.ican.tvplay.ui.settings.SettingsScreen
+import com.ican.tvplay.ui.settings.ThemePreviewScreen
 import com.ican.tvplay.ui.theme.TvPlayTheme
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
@@ -57,8 +59,15 @@ import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 fun AppRoot() {
     val appViewModel = appViewModel { AppViewModel(this) }
     val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
+    val dynamicColor by appViewModel.dynamicColor.collectAsStateWithLifecycle()
+    val themeColor by appViewModel.themeColor.collectAsStateWithLifecycle()
+    val enableBlur by appViewModel.enableBlur.collectAsStateWithLifecycle()
 
-    TvPlayTheme(themeMode = themeMode) {
+    TvPlayTheme(
+        themeMode = themeMode,
+        dynamicColor = dynamicColor,
+        themeColor = themeColor,
+    ) {
         val navController = rememberNavController()
         val backStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = backStackEntry?.destination?.route
@@ -116,9 +125,18 @@ fun AppRoot() {
                                 },
                             )
 
-                            2 -> SettingsScreen()
+                            2 -> SettingsScreen(
+                                onColorPaletteClick = { navController.navigate(Routes.COLOR_PALETTE) },
+                                onThemePreviewClick = { navController.navigate(Routes.THEME_PREVIEW) },
+                            )
                         }
                     }
+                }
+                composable(Routes.COLOR_PALETTE) {
+                    ColorPaletteScreen(onBack = { navController.popBackStack() })
+                }
+                composable(Routes.THEME_PREVIEW) {
+                    ThemePreviewScreen(onBack = { navController.popBackStack() })
                 }
                 composable(Routes.SEARCH) {
                     SearchScreen(
@@ -184,7 +202,7 @@ fun AppRoot() {
                     onSelected = { mainPagerState.animateToPage(it) },
                     backdrop = backdrop,
                     tabsCount = topDestinations.size,
-                    isBlurEnabled = true,
+                    isBlurEnabled = enableBlur,
                 ) { activateTab ->
                     topDestinations.forEachIndexed { index, destination ->
                         FloatingBottomBarItem(

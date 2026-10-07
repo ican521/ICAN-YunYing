@@ -1,6 +1,7 @@
 package com.ican.tvplay.ui.settings
 
 import android.content.res.Configuration
+import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -11,11 +12,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,18 +36,26 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    onColorPaletteClick: () -> Unit = {},
+    onThemePreviewClick: () -> Unit = {},
+) {
     val viewModel = appViewModel { SettingsViewModel(this) }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
+    val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
+    val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
 
     val padding = topLevelContentPadding()
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
             .padding(
                 start = 16.dp,
                 end = 16.dp,
                 top = padding.calculateTopPadding(),
+                bottom = padding.calculateBottomPadding(),
             ),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -65,6 +78,37 @@ fun SettingsScreen() {
                     viewModel.setThemeMode(ThemeMode.DARK)
                 }
             }
+        }
+
+        SettingsCard(title = "主题", subtitle = "取色与效果") {
+            val supportsDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+            SettingsSwitchRow(
+                label = "动态取色",
+                hint = if (supportsDynamic) "跟随系统壁纸色调" else "需要 Android 12+",
+                checked = dynamicColor && supportsDynamic,
+                enabled = supportsDynamic,
+                onToggle = { viewModel.setDynamicColor(it) },
+            )
+            SettingsEntryRow(
+                label = "主题色板",
+                value = if (themeColor == 0) "默认" else "自定义",
+                dotColor = if (themeColor == 0) MaterialTheme.colorScheme.primary
+                else Color(themeColor),
+                onClick = onColorPaletteClick,
+            )
+            SettingsSwitchRow(
+                label = "全局模糊",
+                hint = "底部导航液态玻璃效果",
+                checked = enableBlur,
+                enabled = true,
+                onToggle = { viewModel.setEnableBlur(it) },
+            )
+            SettingsEntryRow(
+                label = "主题预览",
+                value = "查看效果",
+                dotColor = null,
+                onClick = onThemePreviewClick,
+            )
         }
 
         SettingsCard(title = "关于", subtitle = "版本与运行环境") {
@@ -171,5 +215,118 @@ private fun InfoLine(label: String, value: String) {
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
         )
+    }
+}
+
+/** 设置项开关行：点击整行切换，右侧胶囊指示 */
+@Composable
+private fun SettingsSwitchRow(
+    label: String,
+    hint: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    val contentAlpha = if (enabled) 1f else 0.45f
+    val trackColor by animateColorAsState(
+        targetValue = if (checked) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.surfaceVariant,
+        animationSpec = tween(200),
+        label = "switchTrack",
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .tvCardEffect(
+                onClick = { onToggle(!checked) },
+                shape = RoundedCornerShape(14.dp),
+                focusedScale = 1.02f,
+                glow = false,
+                enabled = enabled,
+            )
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha),
+            )
+            Text(
+                text = hint,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(width = 42.dp, height = 24.dp)
+                .background(trackColor, RoundedCornerShape(12.dp)),
+        ) {
+            val thumbOffset by androidx.compose.animation.core.animateDpAsState(
+                targetValue = if (checked) 20.dp else 2.dp,
+                animationSpec = tween(200),
+                label = "switchThumb",
+            )
+            Box(
+                modifier = Modifier
+                    .padding(start = thumbOffset)
+                    .size(20.dp)
+                    .align(Alignment.CenterStart)
+                    .background(Color.White, CircleShape),
+            )
+        }
+    }
+}
+
+/** 设置项入口行：点击跳转，右侧色点（可选）+ 文案 */
+@Composable
+private fun SettingsEntryRow(
+    label: String,
+    value: String,
+    dotColor: Color?,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .tvCardEffect(
+                onClick = onClick,
+                shape = RoundedCornerShape(14.dp),
+                focusedScale = 1.02f,
+                glow = false,
+            )
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (dotColor != null) {
+                Box(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .background(dotColor, CircleShape),
+                )
+            }
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

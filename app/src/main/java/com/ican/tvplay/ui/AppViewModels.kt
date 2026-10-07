@@ -21,11 +21,14 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** 全局：主题模式 */
+/** 全局：主题模式 / 动态取色 / 主题色板 / 全局模糊 */
 class AppViewModel(container: AppContainer) : ViewModel() {
     private val settings = container.settingsRepository
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
+    val dynamicColor: StateFlow<Boolean> = settings.dynamicColor
+    val themeColor: StateFlow<Int> = settings.themeColor
+    val enableBlur: StateFlow<Boolean> = settings.enableBlur
 
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
 }
@@ -147,6 +150,12 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     private val settings = container.settingsRepository
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
+    val dynamicColor: StateFlow<Boolean> = settings.dynamicColor
+    val themeColor: StateFlow<Int> = settings.themeColor
+    val enableBlur: StateFlow<Boolean> = settings.enableBlur
 
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
+    fun setDynamicColor(enabled: Boolean) = settings.setDynamicColor(enabled)
+    fun setThemeColor(color: Int) = settings.setThemeColor(color)
+    fun setEnableBlur(enabled: Boolean) = settings.setEnableBlur(enabled)
 }

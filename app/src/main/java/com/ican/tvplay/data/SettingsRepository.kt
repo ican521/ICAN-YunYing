@@ -29,7 +29,37 @@ class SettingsRepository(context: Context) {
         _themeMode.value = mode
     }
 
+    /** 动态取色（仅 Android 12+ 生效，低版本忽略并回退品牌色） */
+    private val _dynamicColor = MutableStateFlow(prefs.getBoolean(KEY_DYNAMIC_COLOR, false))
+    val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
+
+    fun setDynamicColor(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_DYNAMIC_COLOR, enabled).apply()
+        _dynamicColor.value = enabled
+    }
+
+    /** 主题色板种子色，0 表示默认（品牌蓝） */
+    private val _themeColor = MutableStateFlow(prefs.getInt(KEY_THEME_COLOR, 0))
+    val themeColor: StateFlow<Int> = _themeColor.asStateFlow()
+
+    fun setThemeColor(color: Int) {
+        prefs.edit().putInt(KEY_THEME_COLOR, color).apply()
+        _themeColor.value = color
+    }
+
+    /** 全局模糊（液态玻璃底栏） */
+    private val _enableBlur = MutableStateFlow(prefs.getBoolean(KEY_ENABLE_BLUR, true))
+    val enableBlur: StateFlow<Boolean> = _enableBlur.asStateFlow()
+
+    fun setEnableBlur(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ENABLE_BLUR, enabled).apply()
+        _enableBlur.value = enabled
+    }
+
     private companion object {
         const val KEY_THEME = "theme_mode"
+        const val KEY_DYNAMIC_COLOR = "dynamic_color"
+        const val KEY_THEME_COLOR = "theme_color"
+        const val KEY_ENABLE_BLUR = "enable_blur"
     }
 }

@@ -12,6 +12,8 @@ object Routes {
     const val FAVORITES = "favorites"
     const val HISTORY = "history"
     const val SETTINGS = "settings"
+    const val COLOR_PALETTE = "color_palette"
+    const val THEME_PREVIEW = "theme_preview"
 
     const val DETAIL_PATTERN = "detail/{videoId}"
     fun detail(videoId: String) = "detail/$videoId"
