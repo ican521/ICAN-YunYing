@@ -2,8 +2,6 @@ package com.ican.tvplay.ui.settings
 
 import android.content.res.Configuration
 import android.os.Build
-import android.widget.Toast
-import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -27,7 +25,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.ican.tvplay.TvPlayApplication
 import com.ican.tvplay.data.ThemeMode
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
@@ -48,8 +45,6 @@ fun SettingsScreen(
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
     val predictiveBack by viewModel.predictiveBack.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val activity = LocalActivity.current
 
     val padding = topLevelContentPadding()
     Column(
@@ -108,26 +103,12 @@ fun SettingsScreen(
                 enabled = true,
                 onToggle = { viewModel.setEnableBlur(it) },
             )
-            val supportsPredictiveBack = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
             SettingsSwitchRow(
                 label = "预测性返回",
-                hint = if (supportsPredictiveBack) "返回时动画跟随手指滑动，预览返回目标"
-                else "需要 Android 14+",
-                checked = predictiveBack && supportsPredictiveBack,
-                enabled = supportsPredictiveBack,
-                onToggle = {
-                    viewModel.setPredictiveBack(it)
-                    TvPlayApplication.setEnableOnBackInvokedCallback(
-                        context.applicationInfo, it,
-                    )
-                    Toast.makeText(
-                        context,
-                        if (it) "预测性返回已开启" else "预测性返回已关闭",
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                    // 让 NavHost 内的预测返回手势处理器按新系统开关重新注册（跟 KernelSU 一样 recreate）
-                    activity?.recreate()
-                },
+                hint = "从屏幕左缘向右拖动，页面跟随手指滑出",
+                checked = predictiveBack,
+                enabled = true,
+                onToggle = { viewModel.setPredictiveBack(it) },
             )
         }
 
