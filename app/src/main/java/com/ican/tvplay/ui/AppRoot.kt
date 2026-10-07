@@ -210,6 +210,7 @@ fun AppRoot() {
                     HorizontalPager(
                         state = pagerState,
                         modifier = Modifier.fillMaxSize(),
+                        userScrollEnabled = false,
                     ) { page ->
                         when (page) {
                             0 -> HomeScreen(
