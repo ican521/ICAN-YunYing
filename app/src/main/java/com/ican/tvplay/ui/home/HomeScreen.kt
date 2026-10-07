@@ -67,7 +67,7 @@ fun HomeScreen(
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
 
     val contentPadding = topLevelContentPadding()
-    val categories = viewModel.categories
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     // 顶部分类 pager：第 0 页"全部" + 每个分类一页
