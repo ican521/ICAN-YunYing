@@ -6,6 +6,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
@@ -13,11 +15,13 @@ import java.util.concurrent.TimeUnit
 private const val TAG = "VodApi"
 
 /**
- * TVBox 配置 JSON：仅取 sites 数组中第一个可用的 provide/vod 采集站。
- * 仅支持 HTTP JSON 采集站（spider jar 等不实现）。
+ * TVBox 配置 JSON：
+ * - spider：站点共用的 spider jar（csp_Xxx 站点专用），格式 `url[;md5;xxx]`
+ * - sites：站点列表，type=3 表示 spider jar；type 0/1 表示 HTTP 采集站
  */
 @Serializable
 data class TvBoxConfig(
+    val spider: String = "",
     val sites: List<TvBoxSite> = emptyList(),
 )
 
@@ -27,7 +31,21 @@ data class TvBoxSite(
     val name: String = "",
     val api: String = "",
     val type: Int? = null,
-)
+    val jar: String = "",
+    val searchable: Int = 1,
+    val changeable: Int = 1,
+    val ext: JsonElement? = null,
+) {
+    /** 是否 spider 站（type=3 + api=csp_Xxx） */
+    fun isSpider(): Boolean = type == 3 && api.startsWith("csp_")
+
+    /** ext 字段统一为字符串：字符串原样返回，对象/数组序列化为 JSON 字符串 */
+    fun extAsString(): String = when (val e = ext) {
+        null -> ""
+        is JsonPrimitive -> if (e.isString) e.content else e.toString()
+        else -> e.toString()
+    }
+}
 
 /** 分类（ac=class 返回的 class 数组元素） */
 @Serializable
@@ -64,6 +82,12 @@ data class VodDetailResult(
     val list: List<VodItem> = emptyList(),
 )
 
+/** 已加载站点：包含站点本身 + 生效的 spider jar spec（若有） */
+data class LoadedSite(
+    val site: TvBoxSite,
+    val jarSpec: String,
+)
+
 /** TVBox 采集站 HTTP 客户端 */
 class VodApiClient(
     private val json: Json = Json {
@@ -77,23 +101,45 @@ class VodApiClient(
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    /** 拉取配置 URL，返回第一个可用的 provide/vod 站点 */
-    suspend fun loadHomeSite(configUrl: String): TvBoxSite? = withContext(Dispatchers.IO) {
+    /**
+     * 拉取配置 URL，返回当前生效的站点。
+     * - 响应经 [Decoder] 解码（支持伪装 JPEG 中的 base64）
+     * - 站点优先选 type=3 且 api=csp_Xxx 的 spider 站；fallback 为 type 0/1 的 HTTP 采集站
+     */
+    suspend fun loadHomeSite(configUrl: String): LoadedSite? = withContext(Dispatchers.IO) {
         runCatching {
             Log.d(TAG, "loadConfig: $configUrl")
             val body = get(configUrl)
             Log.d(TAG, "config bytes=${body.length}, head=${body.take(200)}")
-            val config = json.decodeFromString<TvBoxConfig>(body)
-            Log.d(TAG, "sites count=${config.sites.size}")
+            val decoded = Decoder.decode(body)
+            Log.d(TAG, "decoded bytes=${decoded.length}, head=${decoded.take(200)}")
+            val config = json.decodeFromString<TvBoxConfig>(decoded)
+            Log.d(TAG, "sites count=${config.sites.size}, spider=${config.spider.take(80)}")
             config.sites.forEachIndexed { i, s ->
-                Log.d(TAG, "site[$i] key=${s.key} name=${s.name} type=${s.type} api=${s.api}")
+                Log.d(TAG, "site[$i] key=${s.key} name=${s.name} type=${s.type} api=${s.api.take(60)}")
             }
-            // 仅支持纯 HTTP JSON 采集站：api 含 provide/vod；type 缺省/0/1 均可
-            val chosen = config.sites.firstOrNull { site ->
-                site.api.contains("provide/vod") && (site.type == null || site.type!! <= 1)
-            } ?: config.sites.firstOrNull { it.api.startsWith("http") }
-            Log.d(TAG, "chosen=${chosen?.name ?: "<none>"} api=${chosen?.api ?: ""}")
-            chosen
+
+            // 优先 spider 站（type=3 + api=csp_Xxx + 排除纯 meta 站（searchable=changeable=0）+ 有 jar）
+            val spiderSite = config.sites.firstOrNull { s ->
+                s.isSpider() && (s.searchable != 0 || s.changeable != 0) &&
+                    (s.jar.isNotBlank() || config.spider.isNotBlank())
+            }
+            if (spiderSite != null) {
+                val jar = spiderSite.jar.ifBlank { config.spider }
+                Log.d(TAG, "chosen spider=${spiderSite.name} api=${spiderSite.api} jar=${jar.take(80)}")
+                return@runCatching LoadedSite(spiderSite, jar)
+            }
+
+            // fallback：纯 HTTP JSON 采集站
+            val httpSite = config.sites.firstOrNull { s ->
+                val t = s.type
+                s.api.contains("provide/vod") && (t == null || t <= 1)
+            } ?: config.sites.firstOrNull { s ->
+                val t = s.type
+                s.api.startsWith("http") && (t == null || t <= 1)
+            }
+            Log.d(TAG, "chosen http=${httpSite?.name ?: "<none>"} api=${httpSite?.api ?: ""}")
+            httpSite?.let { LoadedSite(it, "") }
         }.onFailure { Log.e(TAG, "loadHomeSite fail", it) }.getOrNull()
     }
 

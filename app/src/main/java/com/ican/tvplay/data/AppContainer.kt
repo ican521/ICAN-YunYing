@@ -14,5 +14,7 @@ class AppContainer(context: Context) {
     val historyDao: HistoryDao by lazy { database.historyDao() }
 
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(context) }
-    val videoRepository: VideoRepository by lazy { VideoRepository(settingsRepository) }
+    val videoRepository: VideoRepository by lazy {
+        VideoRepository(context.applicationContext, settingsRepository)
+    }
 }
