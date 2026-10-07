@@ -65,11 +65,21 @@ class SettingsRepository(context: Context) {
         _predictiveBack.value = enabled
     }
 
+    /** 导入配置的 URL 链接（仅保存，不解析） */
+    private val _configUrl = MutableStateFlow(prefs.getString(KEY_CONFIG_URL, null).orEmpty())
+    val configUrl: StateFlow<String> = _configUrl.asStateFlow()
+
+    fun setConfigUrl(url: String) {
+        prefs.edit().putString(KEY_CONFIG_URL, url).apply()
+        _configUrl.value = url
+    }
+
     private companion object {
         const val KEY_THEME = "theme_mode"
         const val KEY_DYNAMIC_COLOR = "dynamic_color"
         const val KEY_THEME_COLOR = "theme_color"
         const val KEY_ENABLE_BLUR = "enable_blur"
         const val KEY_PREDICTIVE_BACK = "predictive_back"
+        const val KEY_CONFIG_URL = "config_url"
     }
 }

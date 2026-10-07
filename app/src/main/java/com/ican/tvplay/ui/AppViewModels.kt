@@ -155,10 +155,12 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
     val predictiveBack: StateFlow<Boolean> = settings.predictiveBack
+    val configUrl: StateFlow<String> = settings.configUrl
 
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
     fun setDynamicColor(enabled: Boolean) = settings.setDynamicColor(enabled)
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
     fun setEnableBlur(enabled: Boolean) = settings.setEnableBlur(enabled)
     fun setPredictiveBack(enabled: Boolean) = settings.setPredictiveBack(enabled)
+    fun setConfigUrl(url: String) = settings.setConfigUrl(url)
 }

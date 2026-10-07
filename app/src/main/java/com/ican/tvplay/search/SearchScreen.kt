@@ -35,6 +35,7 @@ import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.ui.SearchViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.CircleBackButton
 import com.ican.tvplay.ui.components.VideoCard
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.components.topLevelContentPadding
@@ -45,24 +46,34 @@ import androidx.tv.material3.Text
 @Composable
 fun SearchScreen(
     onVideoClick: (Video) -> Unit,
+    onBack: () -> Unit,
 ) {
     val viewModel = appViewModel { SearchViewModel(this) }
     val query by viewModel.queryText.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = "搜索",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier
-                .padding(
-                    top = topLevelContentPadding().calculateTopPadding(),
-                    start = 16.dp,
-                    end = 16.dp,
-                ),
-        )
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(
+                top = topLevelContentPadding().calculateTopPadding(),
+                start = 16.dp,
+                end = 16.dp,
+            ),
+        ) {
+            CircleBackButton(onClick = onBack)
+            Text(
+                text = "搜索",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
 
         SearchField(
             value = query,

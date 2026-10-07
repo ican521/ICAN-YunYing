@@ -2,6 +2,7 @@ package com.ican.tvplay.ui.settings
 
 import android.content.res.Configuration
 import android.os.Build
+import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -15,20 +16,28 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ican.tvplay.data.ThemeMode
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.CircleBackButton
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import androidx.tv.material3.Icon
@@ -38,6 +47,7 @@ import androidx.tv.material3.Text
 @Composable
 fun SettingsScreen(
     onColorPaletteClick: () -> Unit = {},
+    onBack: () -> Unit = {},
 ) {
     val viewModel = appViewModel { SettingsViewModel(this) }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
@@ -45,6 +55,9 @@ fun SettingsScreen(
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
     val predictiveBack by viewModel.predictiveBack.collectAsStateWithLifecycle()
+    val configUrl by viewModel.configUrl.collectAsStateWithLifecycle()
+    var showConfigDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     val padding = topLevelContentPadding()
     Column(
@@ -59,12 +72,18 @@ fun SettingsScreen(
             ),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = "设置",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CircleBackButton(onClick = onBack)
+            Text(
+                text = "设置",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
 
         SettingsCard(title = "外观", subtitle = "主题模式") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -112,6 +131,15 @@ fun SettingsScreen(
             )
         }
 
+        SettingsCard(title = "数据", subtitle = "配置来源") {
+            SettingsEntryRow(
+                label = "导入配置",
+                value = configUrl.ifEmpty { "未设置" },
+                dotColor = null,
+                onClick = { showConfigDialog = true },
+            )
+        }
+
         SettingsCard(title = "关于", subtitle = "版本与运行环境") {
             val isTv = LocalContext.current.resources.configuration.uiMode.let { uiMode ->
                 (uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION
@@ -120,6 +148,18 @@ fun SettingsScreen(
             InfoLine("版本", "0.1.0")
             InfoLine("运行设备", if (isTv) "Android TV" else "手机 / 平板")
         }
+    }
+
+    if (showConfigDialog) {
+        ConfigImportDialog(
+            initialUrl = configUrl,
+            onConfirm = {
+                viewModel.setConfigUrl(it)
+                showConfigDialog = false
+                Toast.makeText(context, "已保存", Toast.LENGTH_SHORT).show()
+            },
+            onDismiss = { showConfigDialog = false },
+        )
     }
 }
 
@@ -328,6 +368,110 @@ private fun SettingsEntryRow(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/** 导入配置对话框：输入 URL 并保存到 SharedPreferences */
+@Composable
+private fun ConfigImportDialog(
+    initialUrl: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var url by remember { mutableStateOf(initialUrl) }
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    MaterialTheme.colorScheme.surface,
+                    RoundedCornerShape(22.dp),
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = "导入配置",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            BasicTextField(
+                value = url,
+                onValueChange = { url = it },
+                singleLine = true,
+                textStyle = TextStyle(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = MaterialTheme.typography.bodyLarge.fontSize,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                decorationBox = { innerTextField ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant,
+                                RoundedCornerShape(14.dp),
+                            )
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                    ) {
+                        if (url.isEmpty()) {
+                            Text(
+                                text = "输入配置链接（http/https）…",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        innerTextField()
+                    }
+                },
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .tvCardEffect(
+                            onClick = onDismiss,
+                            shape = RoundedCornerShape(12.dp),
+                            focusedScale = 1.03f,
+                            glow = false,
+                        )
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            RoundedCornerShape(12.dp),
+                        )
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                ) {
+                    Text(
+                        text = "取消",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .tvCardEffect(
+                            onClick = { onConfirm(url) },
+                            shape = RoundedCornerShape(12.dp),
+                            focusedScale = 1.03f,
+                            glow = false,
+                        )
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            RoundedCornerShape(12.dp),
+                        )
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                ) {
+                    Text(
+                        text = "确认",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+            }
         }
     }
 }

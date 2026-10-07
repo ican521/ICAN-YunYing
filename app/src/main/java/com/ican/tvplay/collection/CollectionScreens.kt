@@ -32,6 +32,7 @@ import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.ui.CollectionViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.CircleBackButton
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import androidx.tv.material3.Icon
@@ -41,6 +42,7 @@ import androidx.tv.material3.Text
 @Composable
 fun FavoritesScreen(
     onVideoClick: (String) -> Unit,
+    onBack: () -> Unit = {},
 ) {
     val viewModel = appViewModel { CollectionViewModel(this) }
     val favorites by viewModel.favorites.collectAsStateWithLifecycle()
@@ -49,6 +51,7 @@ fun FavoritesScreen(
         title = "我的收藏",
         items = favorites,
         emptyText = "还没有收藏，去首页发现好片吧",
+        onBack = onBack,
         idOf = { it.videoId },
         coverOf = { it.cover },
         titleOf = { it.title },
@@ -61,11 +64,16 @@ fun FavoritesScreen(
 @Composable
 fun HistoryScreen(
     onVideoClick: (String) -> Unit,
+    onBack: () -> Unit = {},
 ) {
     val viewModel = appViewModel { CollectionViewModel(this) }
     val histories by viewModel.histories.collectAsStateWithLifecycle()
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
         Row(
             modifier = Modifier
                 .padding(
@@ -74,7 +82,9 @@ fun HistoryScreen(
                     end = 8.dp,
                 ),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            CircleBackButton(onClick = onBack)
             Text(
                 text = "播放历史",
                 style = MaterialTheme.typography.headlineMedium,
@@ -144,6 +154,7 @@ private fun <T> CollectionGridScaffold(
     title: String,
     items: List<T>,
     emptyText: String,
+    onBack: () -> Unit = {},
     idOf: (T) -> String,
     coverOf: (T) -> String,
     titleOf: (T) -> String,
@@ -152,17 +163,23 @@ private fun <T> CollectionGridScaffold(
     onDelete: (T) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
+        Row(
             modifier = Modifier.padding(
                 top = topLevelContentPadding().calculateTopPadding(),
                 start = 16.dp,
                 end = 16.dp,
             ),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CircleBackButton(onClick = onBack)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
         if (items.isEmpty()) {
             EmptyText(text = emptyText)
         } else {
