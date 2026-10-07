@@ -54,7 +54,6 @@ fun SettingsScreen(
     val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
-    val predictiveBack by viewModel.predictiveBack.collectAsStateWithLifecycle()
     val configUrl by viewModel.configUrl.collectAsStateWithLifecycle()
     var showConfigDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -121,13 +120,6 @@ fun SettingsScreen(
                 checked = enableBlur,
                 enabled = true,
                 onToggle = { viewModel.setEnableBlur(it) },
-            )
-            SettingsSwitchRow(
-                label = "预测性返回",
-                hint = "从屏幕左缘向右拖动，页面跟随手指滑出",
-                checked = predictiveBack,
-                enabled = true,
-                onToggle = { viewModel.setPredictiveBack(it) },
             )
         }
 

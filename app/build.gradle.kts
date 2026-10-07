@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     // AGP 9 内置 Kotlin，无需应用 org.jetbrains.kotlin.android
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
 }
 
@@ -98,9 +99,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 
-    // HiddenApiBypass：运行时切换系统预测性返回（反射 ApplicationInfo.setEnableOnBackInvokedCallback）
-    implementation(libs.hiddenapibypass)
-
-    // NavigationEvent：照搬 KernelSU 的返回手势接管（NavigationBackHandler 跟手驱动）
-    implementation(libs.navigationevent.compose)
+    // TVBox 接口：OkHttp + kotlinx.serialization
+    implementation(libs.okhttp)
+    implementation(libs.kotlinx.serialization.json)
 }

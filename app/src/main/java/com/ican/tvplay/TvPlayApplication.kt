@@ -1,10 +1,11 @@
 package com.ican.tvplay
 
 import android.app.Application
-import android.content.pm.ApplicationInfo
-import android.os.Build
 import com.ican.tvplay.data.AppContainer
-import org.lsposed.hiddenapibypass.HiddenApiBypass
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Application 入口：持有应用级依赖容器（数据库 / 设置 / 仓库）。
@@ -14,36 +15,15 @@ class TvPlayApplication : Application() {
     lateinit var container: AppContainer
         private set
 
-    companion object {
-        /**
-         * 反射调用隐藏的 ApplicationInfo.setEnableOnBackInvokedCallback，
-         * 运行时开关系统预测性返回（照搬 KernelSU 方案，无需重启）。
-         */
-        fun setEnableOnBackInvokedCallback(appInfo: ApplicationInfo, enable: Boolean) {
-            runCatching {
-                val applicationInfoClass = ApplicationInfo::class.java
-                val method = applicationInfoClass.getDeclaredMethod(
-                    "setEnableOnBackInvokedCallback",
-                    Boolean::class.javaPrimitiveType,
-                )
-                method.isAccessible = true
-                method.invoke(appInfo, enable)
-            }
-        }
-    }
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
 
-        // 启动时按设置应用系统预测性返回开关（对齐 KernelSU：HiddenApiBypass + 反射，默认 false）。
-        // 返回跟手由 AppRoot 的 NavigationBackHandler 手势层实现，不依赖系统缩放动画。
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val enable = container.settingsRepository.predictiveBack.value
-            HiddenApiBypass.addHiddenApiExemptions(
-                "Landroid/content/pm/ApplicationInfo;->setEnableOnBackInvokedCallback",
-            )
-            setEnableOnBackInvokedCallback(applicationInfo, enable)
+        // 启动时预加载已保存的接口配置，拉取站点与分类
+        appScope.launch {
+            container.videoRepository.ensureLoaded()
         }
     }
 }
