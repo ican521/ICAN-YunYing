@@ -1,12 +1,16 @@
 package com.ican.tvplay.data.model
 
+import kotlinx.serialization.Serializable
+
 /** 视频分类 */
+@Serializable
 data class VideoCategory(
     val id: String,
     val name: String,
 )
 
 /** 单集（电影通常只有一个「正片」） */
+@Serializable
 data class Episode(
     val index: Int,
     val title: String,
@@ -14,6 +18,7 @@ data class Episode(
 )
 
 /** 一条播放线路（vod_play_from 以 $$$ 分隔的其中一条） */
+@Serializable
 data class PlayLine(
     /** 线路标识（传给 spider playerContent 的 flag） */
     val flag: String,
@@ -21,6 +26,7 @@ data class PlayLine(
 )
 
 /** 视频条目 */
+@Serializable
 data class Video(
     val id: String,
     val title: String,
