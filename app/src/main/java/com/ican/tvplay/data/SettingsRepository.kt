@@ -74,6 +74,44 @@ class SettingsRepository(context: Context) {
         _siteKey.value = key
     }
 
+    // ---- 播放器设置 ----
+
+    /** 倍速（0.5x - 3.0x） */
+    private val _playerSpeed = MutableStateFlow(prefs.getFloat(KEY_PLAYER_SPEED, 1.0f))
+    val playerSpeed: StateFlow<Float> = _playerSpeed.asStateFlow()
+
+    fun setPlayerSpeed(speed: Float) {
+        prefs.edit().putFloat(KEY_PLAYER_SPEED, speed).apply()
+        _playerSpeed.value = speed
+    }
+
+    /** 画面缩放模式名（Players.ScaleMode） */
+    private val _playerScale = MutableStateFlow(prefs.getString(KEY_PLAYER_SCALE, null).orEmpty())
+    val playerScale: StateFlow<String> = _playerScale.asStateFlow()
+
+    fun setPlayerScale(scale: String) {
+        prefs.edit().putString(KEY_PLAYER_SCALE, scale).apply()
+        _playerScale.value = scale
+    }
+
+    /** 解码内核：HARD / SOFT（ffmpeg 软解） */
+    private val _playerDecode = MutableStateFlow(prefs.getString(KEY_PLAYER_DECODE, null).orEmpty())
+    val playerDecode: StateFlow<String> = _playerDecode.asStateFlow()
+
+    fun setPlayerDecode(decode: String) {
+        prefs.edit().putString(KEY_PLAYER_DECODE, decode).apply()
+        _playerDecode.value = decode
+    }
+
+    /** 缓冲档位：1/2/3（默认缓冲时长的倍率，仿 fongmi PlayerSetting.getBuffer） */
+    private val _playerBuffer = MutableStateFlow(prefs.getInt(KEY_PLAYER_BUFFER, 1))
+    val playerBuffer: StateFlow<Int> = _playerBuffer.asStateFlow()
+
+    fun setPlayerBuffer(tier: Int) {
+        prefs.edit().putInt(KEY_PLAYER_BUFFER, tier).apply()
+        _playerBuffer.value = tier
+    }
+
     private companion object {
         const val KEY_THEME = "theme_mode"
         const val KEY_DYNAMIC_COLOR = "dynamic_color"
@@ -81,5 +119,9 @@ class SettingsRepository(context: Context) {
         const val KEY_ENABLE_BLUR = "enable_blur"
         const val KEY_CONFIG_URL = "config_url"
         const val KEY_SITE_KEY = "site_key"
+        const val KEY_PLAYER_SPEED = "player_speed"
+        const val KEY_PLAYER_SCALE = "player_scale"
+        const val KEY_PLAYER_DECODE = "player_decode"
+        const val KEY_PLAYER_BUFFER = "player_buffer"
     }
 }

@@ -91,6 +91,9 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.common)
+    // ffmpeg 软解扩展：fongmi 预编译 AAR（含 native so + Java 类，
+    // media3 官方 maven 不发布解码器扩展；DefaultRenderersFactory 反射加载，无需编译期引用）
+    implementation(fileTree("libs") { include("*.aar") })
 
     // miuix-blur：液态玻璃悬浮底栏的 Backdrop 模糊 / 折射
     implementation(libs.miuix.blur)
