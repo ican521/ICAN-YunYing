@@ -13,12 +13,18 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.data.remote.VodApiClient
 import com.ican.tvplay.data.remote.VodClass
 import com.ican.tvplay.data.remote.VodItem
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -66,6 +72,9 @@ class VideoRepository(
      *  导入配置/切站点后预热写入，进入首页直接命中，秒出卡片 */
     private val homeCache = java.util.concurrent.ConcurrentHashMap<String, List<Video>>()
 
+    /** 详情缓存（videoId → Video）：重复进详情页秒开，reload 时清空 */
+    private val detailCache = java.util.concurrent.ConcurrentHashMap<String, Video>()
+
     private val rawJson = Json { ignoreUnknownKeys = true }
 
     /** 当前站点对应的 Spider 实例（仅 type=3 时非空） */
@@ -84,6 +93,7 @@ class VideoRepository(
     suspend fun reload() {
         // 站点/配置变更后旧缓存全部作废
         homeCache.clear()
+        detailCache.clear()
         val url = settingsRepository.configUrl.value
         if (url.isBlank()) {
             _currentSite.value = null
@@ -168,13 +178,15 @@ class VideoRepository(
         return loadCategoryVideos(loaded, cat, page = 1)
     }
 
-    /** 详情：补全选集 / 播放地址等 */
+    /** 详情：补全选集 / 播放地址等（带内存缓存，重复进详情秒开） */
     suspend fun getVideo(videoId: String): Video? {
+        detailCache[videoId]?.let { return it }
         ensureLoaded()
         val loaded = _currentSite.value ?: return null
         val item = fetchDetail(loaded, videoId) ?: return null
         val catName = item.typeName.ifBlank { "未知" }
         return item.toVideo(VideoCategory(id = "", name = catName), withEpisodes = true)
+            .also { detailCache[videoId] = it }
     }
 
     suspend fun search(query: String): List<Video> {
@@ -277,6 +289,46 @@ class VideoRepository(
         }
         Log.d(REPO_TAG, "prewarmHome done cats=${cats.size}")
     }
+
+    /** 并发预下载全部站点 spider jar（fongmi 式：导入配置后即预热，后续搜索/详情/播放零首次开销） */
+    suspend fun prewarmJars() {
+        val url = settingsRepository.configUrl.value
+        if (url.isBlank()) return
+        val config = apiClient.loadConfig(url) ?: return
+        val specs = config.sites.filter { it.isSpider() }.map { it.jar.ifBlank { config.spider } }
+        spiderManager.prewarmJars(specs)
+    }
+
+    /**
+     * 流式首页分区：每个分类加载完成立即推送一次累积列表（fongmi 式边加载边显示），
+     * 快分类先上屏，不被慢分类拖住。缓存命中时几乎瞬时全部推送。
+     */
+    fun homeSectionsFlow(categoryId: String?): Flow<List<Pair<VideoCategory, List<Video>>>> = flow {
+        ensureLoaded()
+        val loaded = _currentSite.value ?: return@flow
+        val cats = _categories.value
+        if (cats.isEmpty()) return@flow
+        val target = if (categoryId == null) cats else listOfNotNull(cats.firstOrNull { it.id == categoryId })
+        if (target.isEmpty()) return@flow
+
+        val channel = kotlinx.coroutines.channels.Channel<Pair<VideoCategory, List<Video>>>(
+            kotlinx.coroutines.channels.Channel.UNLIMITED,
+        )
+        coroutineScope {
+            // 生产者：全部分类并行加载
+            launch {
+                target.map { cat -> launch { channel.send(cat to loadCategoryVideos(loaded, cat, page = 1)) } }
+                    .joinAll()
+                channel.close()
+            }
+            // 消费：到达即累积发射（emit 在 flow 协程内，合法）
+            val acc = ArrayList<Pair<VideoCategory, List<Video>>>(target.size)
+            for (entry in channel) {
+                acc.add(entry)
+                emit(acc.toList())
+            }
+        }
+    }.flowOn(Dispatchers.IO)
 
     private suspend fun fetchDetail(loaded: LoadedSite, vodId: String): VodItem? {
         return if (loaded.site.isSpider()) {
