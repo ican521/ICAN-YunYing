@@ -1,24 +1,25 @@
 package com.ican.tvplay.ui.search
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,12 +33,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -45,12 +48,10 @@ import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.player.core.PlaySpec
 import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.ui.MultiSourceSearchViewModel
-import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.CircleBackButton
 import com.ican.tvplay.ui.components.tvCardEffect
-import com.ican.tvplay.ui.nav.Routes
 import kotlinx.coroutines.launch
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -58,9 +59,9 @@ import androidx.tv.material3.Text
 
 /**
  * 跨站源搜索结果页（图一风格）：
- * - 左侧：全部可用站源（来自配置文件），每个条目显示名称 + 搜索命中数量
- * - 右侧：当前选中站源的视频卡片网格
- * - 点击卡片 → 加载完整详情 + 解析播放地址 → 启动播放器 → 跳转到 PlayerScreen
+ * - 左侧：「全部」+ 配置里全部可用站源，每个条目显示名称 + 搜索命中数量
+ * - 右侧：默认展示所有站源合并的视频卡片网格；点击左侧筛选单个站源
+ * - 卡片比例与首页一致 (3:4)，右上角站源标签，底部显示更新状态 / 备注 / 标题
  */
 @Composable
 fun MultiSourceSearchScreen(
@@ -79,12 +80,11 @@ fun MultiSourceSearchScreen(
 
     var queryText by remember { mutableStateOf(initialQuery) }
 
-    // 首次进入时触发跨站搜索
+    // 首次进入时触发跨站搜索（initialQuery 非空才触发）
     LaunchedEffect(initialQuery) {
-        vm.searchAll(initialQuery)
+        if (initialQuery.isNotBlank()) vm.searchAll(initialQuery)
     }
 
-    // 回车/点搜索按钮重新搜索
     fun doSearch() {
         val q = queryText.trim()
         if (q.isNotEmpty()) vm.searchAll(q)
@@ -169,7 +169,7 @@ fun MultiSourceSearchScreen(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 100.dp),
+                .navigationBarsPadding(),
         ) {
             // 左侧站源列表（纵向）
             LazyColumn(
@@ -180,21 +180,29 @@ fun MultiSourceSearchScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 4.dp, bottom = 4.dp),
             ) {
-                // "全部"（显示全部站点的所有视频合并）— 暂不实现，直接按站点
-                items(sites, key = { it.site.key }) { entry ->
+                // === 「全部」选项（显示所有站源合并）===
+                item {
+                    SiteSourceChip(
+                        name = "全部",
+                        count = vm.totalVideoCount,
+                        selected = selectedIndex == MultiSourceSearchViewModel.ALL_SITES_INDEX,
+                        onClick = { vm.selectSite(MultiSourceSearchViewModel.ALL_SITES_INDEX) },
+                    )
+                }
+                // === 具体站源 ===
+                itemsIndexed(sites, key = { _, entry -> entry.site.key }) { _, entry ->
                     val idx = sites.indexOf(entry)
-                    val selected = idx == selectedIndex
                     SiteSourceChip(
                         name = entry.site.name.ifBlank { entry.site.key },
                         count = entry.videos.size,
-                        selected = selected,
+                        selected = idx == selectedIndex,
                         onClick = { vm.selectSite(idx) },
                     )
                 }
                 if (loading || sites.isEmpty()) {
                     item {
                         Text(
-                            text = if (loading) "搜索中…" else "暂无可用站点",
+                            text = if (loading) "搜索中…" else if (queryText.isBlank()) "输入关键词搜索" else "暂无可用站点",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -213,14 +221,13 @@ fun MultiSourceSearchScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                itemsIndexed(displayVideos, key = { _, v -> "${v.id}_${v.playFrom}" }) { _, video ->
-                    val siteKey = sites.getOrNull(selectedIndex)?.site?.key.orEmpty()
+                items(displayVideos, key = { "${it.video.id}_${it.siteKey}" }) { dv ->
                     CrossSourceVideoCard(
-                        video = video,
-                        siteName = sites.getOrNull(selectedIndex)?.site?.name.orEmpty(),
+                        video = dv.video,
+                        siteName = dv.siteName,
                         onClick = {
                             scope.launch {
-                                handlePlayClick(vm, context, video, siteKey, onPlay)
+                                handlePlayClick(vm, context, dv.video, dv.siteKey, onPlay)
                             }
                         },
                     )
@@ -291,7 +298,7 @@ private fun SiteSourceChip(
             color = fg,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = "$count 条",
@@ -303,24 +310,60 @@ private fun SiteSourceChip(
 
 // ========== 右侧视频卡片 ==========
 
+/**
+ * 根据 Video 的 rating (vodRemarks) 和 episodes 生成底部状态标签
+ * 返回：主状态文本 + 标签列表
+ */
+private fun buildVideoStatus(video: Video): Pair<String, List<String>> {
+    val tags = mutableListOf<String>()
+
+    // rating 就是 vodRemarks（如 "更新至HD" / "全85集" / "国语" / "4K"）
+    video.rating.trim().takeIf { it.isNotBlank() }?.let { r ->
+        // 按常见分隔符拆分（空格 / / · / ,）
+        r.split(" ", "/", "·", "，", ",").map { it.trim() }.filter { it.isNotBlank() }
+            .forEach { part ->
+                when {
+                    part.contains("完结", ignoreCase = true) -> tags.add("已完结")
+                    part.contains("更新") -> tags.add(part)  // "更新至HD" 原样保留
+                    part.contains("全") -> tags.add(part)    // "全85集"
+                    part.length <= 4 -> tags.add(part)       // "国语" / "4K" / "HD" 等短标签也收进去
+                }
+            }
+    }
+
+    // 从 episodes 推断集数
+    val eps = video.episodes
+    val firstPlayFrom = video.playSources.firstOrNull()?.episodes.orEmpty()
+    val effectiveEps = firstPlayFrom.ifEmpty { eps }
+
+    val mainStatus = when {
+        tags.any { it.contains("完结") } -> "已完结"
+        effectiveEps.isNotEmpty() -> {
+            val last = effectiveEps.lastOrNull()?.title ?: ""
+            when {
+                last.contains("完结") -> "已完结"
+                effectiveEps.size >= 2 -> "更新至第${effectiveEps.size}集"
+                else -> ""
+            }
+        }
+        else -> ""
+    }
+
+    // 如果 tags 里没有完结信息但有集数，补充
+    if (mainStatus.isNotBlank() && tags.none { it.contains("完结") || it.contains("更新") }) {
+        // 不再额外加
+    }
+
+    return mainStatus to tags.distinct()
+}
+
 @Composable
 private fun CrossSourceVideoCard(
     video: Video,
     siteName: String,
     onClick: () -> Unit,
 ) {
-    val updateState = video.episodes.let { eps ->
-        if (eps.isEmpty()) ""
-        else {
-            val lastTitle = eps.lastOrNull()?.title ?: ""
-            when {
-                lastTitle.contains("完结") -> "已完结"
-                eps.size >= 2 -> "更新至第${eps.size}集"
-                else -> "共${eps.size}集"
-            }
-        }
-    }
-
+    val (mainStatus, tags) = buildVideoStatus(video)
     val sourceChipColor = hashColor(video.categoryName.ifBlank { siteName.ifBlank { "未知" } })
 
     Column(
@@ -333,7 +376,7 @@ private fun CrossSourceVideoCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(186.dp)
+                .aspectRatio(3f / 4f)
                 .clip(RoundedCornerShape(14.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
@@ -343,50 +386,88 @@ private fun CrossSourceVideoCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-            // 右上角来源标签
-            Box(
+
+            // 右上角：站源标签 + 状态标签（如果有）
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .background(sourceChipColor, RoundedCornerShape(percent = 50))
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
-                    text = siteName.ifBlank { video.categoryName.ifBlank { "来源" } },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                )
+                if (mainStatus.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xCC000000), RoundedCornerShape(percent = 50))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        Text(
+                            text = mainStatus,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .background(sourceChipColor, RoundedCornerShape(percent = 50))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                ) {
+                    Text(
+                        text = siteName.ifBlank { video.categoryName.ifBlank { "来源" } },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-            // 底部渐变 + 更新状态 + 视频名
+
+            // 底部渐变 + 标签 + 标题
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .background(
-                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                        Brush.verticalGradient(
                             listOf(Color.Transparent, Color(0xE6000000)),
                         ),
                     )
                     .padding(horizontal = 10.dp, vertical = 10.dp),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    if (updateState.isNotBlank()) {
-                        Text(
-                            text = updateState,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.9f),
-                        )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // 标签行
+                    if (tags.isNotEmpty()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            tags.take(3).forEach { tag ->
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            Color.White.copy(alpha = 0.2f),
+                                            RoundedCornerShape(percent = 50),
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 1.dp),
+                                ) {
+                                    Text(
+                                        text = tag,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        fontWeight = FontWeight.Medium,
+                                    )
+                                }
+                            }
+                        }
                     }
                     Text(
                         text = video.title,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

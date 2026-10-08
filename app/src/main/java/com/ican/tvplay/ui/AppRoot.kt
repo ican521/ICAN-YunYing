@@ -53,7 +53,6 @@ import com.ican.tvplay.ui.home.HomeScreen
 import com.ican.tvplay.ui.nav.Routes
 import com.ican.tvplay.ui.nav.topDestinations
 import com.ican.tvplay.player.PlayerScreen
-import com.ican.tvplay.search.SearchScreen
 import com.ican.tvplay.ui.search.MultiSourceSearchScreen
 import com.ican.tvplay.ui.settings.ColorPaletteScreen
 import com.ican.tvplay.ui.settings.SettingsScreen
@@ -163,11 +162,12 @@ fun AppRoot() {
                     ColorPaletteScreen(onBack = { navController.popBackStack() })
                 }
                 composable(Routes.SEARCH) {
-                    SearchScreen(
-                        onVideoClick = { video ->
-                            navController.navigate(Routes.multiSearch(video.title))
-                        },
+                    MultiSourceSearchScreen(
+                        initialQuery = "",
                         onBack = { navController.popBackStack() },
+                        onPlay = { videoId, episodeIndex, flag, preInit ->
+                            navController.navigate(Routes.player(videoId, episodeIndex, flag, preInit))
+                        },
                     )
                 }
 

@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.ican.tvplay.data.SettingsRepository
 import com.ican.tvplay.data.PlaySource
 import com.ican.tvplay.data.model.Episode
 import com.ican.tvplay.data.model.PlayLine
@@ -13,6 +12,7 @@ import com.ican.tvplay.data.remote.SpiderManager
 import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.data.remote.VodApiClient
 import com.ican.tvplay.data.remote.VodItem
+import com.ican.tvplay.data.SettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -30,7 +30,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * 跨站源搜索 ViewModel：
  * - 直接使用 VodApiClient / SpiderManager 绕过 VideoRepository 的单站点 currentSite 状态
  * - 一次性加载配置里全部可用站点，并行搜索关键词
- * - 每个站点独立维护搜索结果，选中哪个站点就展示哪个站点的视频
+ * - selectedIndex = -1 表示「全部」站源合并视图；0..N 表示选中的具体站源
  */
 class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
 
@@ -41,6 +41,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
 
     companion object {
         private const val TAG = "MultiSourceSearch"
+        const val ALL_SITES_INDEX = -1
     }
 
     /** 条目：一个站点 + 它的 jarSpec + 搜索结果视频列表 */
@@ -50,10 +51,20 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
         val videos: List<Video>,
     )
 
+    /** 展示用条目：Video + 它来自哪个站源（全部视图下每条视频独立带站源标签） */
+    data class DisplayVideo(
+        val video: Video,
+        val siteName: String,
+        val siteKey: String,
+    )
+
     private val _sites = MutableStateFlow<List<SiteEntry>>(emptyList())
     val sites: StateFlow<List<SiteEntry>> = _sites.asStateFlow()
 
-    private val _selectedIndex = MutableStateFlow(0)
+    /** 站源总数（用于左侧「全部」条目显示总条数） */
+    val totalVideoCount: Int get() = _sites.value.sumOf { it.videos.size }
+
+    private val _selectedIndex = MutableStateFlow(ALL_SITES_INDEX)
     val selectedIndex: StateFlow<Int> = _selectedIndex.asStateFlow()
 
     private val _loading = MutableStateFlow(false)
@@ -62,14 +73,36 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
-    /** 显示的视频（当前选中站点的结果） */
-    private val _displayVideos = MutableStateFlow<List<Video>>(emptyList())
-    val displayVideos: StateFlow<List<Video>> = _displayVideos.asStateFlow()
+    /** 显示的视频（带站源信息） */
+    private val _displayVideos = MutableStateFlow<List<DisplayVideo>>(emptyList())
+    val displayVideos: StateFlow<List<DisplayVideo>> = _displayVideos.asStateFlow()
 
     fun selectSite(index: Int) {
-        if (index in _sites.value.indices) {
-            _selectedIndex.value = index
-            _displayVideos.value = _sites.value[index].videos
+        _selectedIndex.value = index
+        refreshDisplay(index)
+    }
+
+    private fun refreshDisplay(index: Int) {
+        _displayVideos.value = if (index == ALL_SITES_INDEX) {
+            _sites.value.flatMap { entry ->
+                entry.videos.map { v ->
+                    DisplayVideo(
+                        video = v,
+                        siteName = entry.site.name.ifBlank { entry.site.key },
+                        siteKey = entry.site.key,
+                    )
+                }
+            }
+        } else {
+            _sites.value.getOrNull(index)?.let { entry ->
+                entry.videos.map { v ->
+                    DisplayVideo(
+                        video = v,
+                        siteName = entry.site.name.ifBlank { entry.site.key },
+                        siteKey = entry.site.key,
+                    )
+                }
+            }.orEmpty()
         }
     }
 
@@ -126,8 +159,8 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                 }.awaitAll().filter { it.videos.isNotEmpty() }
 
                 _sites.value = entries
-                _selectedIndex.value = 0
-                _displayVideos.value = entries.firstOrNull()?.videos.orEmpty()
+                _selectedIndex.value = ALL_SITES_INDEX
+                refreshDisplay(ALL_SITES_INDEX)
             } finally {
                 _loading.value = false
             }
