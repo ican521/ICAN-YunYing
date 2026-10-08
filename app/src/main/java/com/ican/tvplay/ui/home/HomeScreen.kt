@@ -1,9 +1,6 @@
 package com.ican.tvplay.ui.home
 
-import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -404,11 +401,6 @@ private fun HomeTopBar(
     }
 }
 
-private val chipIndicatorSpec: AnimationSpec<Float> = spring(
-    dampingRatio = 0.55f,
-    stiffness = 380f,
-)
-
 @Composable
 private fun CategoryChips(
     categories: List<VideoCategory>,
@@ -416,66 +408,45 @@ private fun CategoryChips(
     onSelect: (Int) -> Unit,
 ) {
     val density = LocalDensity.current
-    val totalCount = categories.size + 1 // "全部" + 各分类
 
-    // 每个 chip 的位置和宽度（相对于 CategoryChips 外层 Box 的本地坐标）
-    val chipLayouts = remember(totalCount) { mutableStateMapOf<Int, Float>() }
-    val chipWidths = remember(totalCount) { mutableStateMapOf<Int, Float>() }
-    var rowRootX by remember { mutableStateOf<Float?>(null) }
+    val chipOffsets = remember { mutableStateMapOf<Int, Float>() }
+    val chipWidths = remember { mutableStateMapOf<Int, Float>() }
+    var rowLeft by remember { mutableStateOf(0f) }
 
-    // 指示器目标值（由 onGloballyPositioned 记录的位置/宽度）
-    val chipX = chipLayouts[selectedIndex] ?: 0f
-    val chipW = chipWidths[selectedIndex] ?: 0f
+    val targetX = chipOffsets[selectedIndex] ?: 0f
+    val targetW = chipWidths[selectedIndex] ?: 0f
 
-    // 平滑动画（照搬底栏 dampingRatio=0.55f, stiffness=380f spring）
-    val offsetPx by animateFloatAsState(targetValue = chipX, animationSpec = chipIndicatorSpec, label = "indicatorOffset")
-    val widthPx by animateFloatAsState(targetValue = chipW, animationSpec = chipIndicatorSpec, label = "indicatorWidth")
+    // 简单平移动画（默认 tween 260ms 线性）
+    val indicatorX by animateFloatAsState(targetValue = targetX, label = "chipX")
+    val indicatorW by animateFloatAsState(targetValue = targetW, label = "chipW")
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(40.dp)
-            .onGloballyPositioned { coords -> rowRootX = coords.boundsInRoot().left },
+        modifier = Modifier.fillMaxWidth().height(40.dp),
     ) {
-        // === 底层：彩色滑动态 ===
+        // 底层：选中彩色 pill（从旧位置平移到新位置）
         Box(
             modifier = Modifier
-                .width(with(density) { widthPx.toDp() })
+                .graphicsLayer { translationX = indicatorX }
+                .width(with(density) { indicatorW.toDp() })
                 .height(32.dp)
-                .graphicsLayer { translationX = offsetPx }
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary, CircleShape)
                 .align(Alignment.CenterStart),
         )
 
-        // === 顶层：chip 文字（透明背景，让底下的彩色指示露出来） ===
+        // 顶层：chip 文字（未选中有底色，选中透明让底层彩色露出来）
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth()
+                .onGloballyPositioned { rowLeft = it.boundsInRoot().left },
         ) {
             item {
-                CategoryChip(
-                    text = "全部",
-                    selected = selectedIndex == 0,
-                    onClick = { onSelect(0) },
-                    index = 0,
-                    rowRootX = rowRootX,
-                    chipLayouts = chipLayouts,
-                    chipWidths = chipWidths,
-                )
+                CategoryChip("全部", 0, selectedIndex == 0, rowLeft, chipOffsets, chipWidths, onSelect)
             }
-            items(categories.size, key = { categories[it].id }) { index ->
-                val actualIndex = index + 1
-                CategoryChip(
-                    text = categories[index].name,
-                    selected = selectedIndex == actualIndex,
-                    onClick = { onSelect(actualIndex) },
-                    index = actualIndex,
-                    rowRootX = rowRootX,
-                    chipLayouts = chipLayouts,
-                    chipWidths = chipWidths,
-                )
+            items(categories.size, key = { categories[it].id }) { i ->
+                val idx = i + 1
+                CategoryChip(categories[i].name, idx, selectedIndex == idx, rowLeft, chipOffsets, chipWidths, onSelect)
             }
         }
     }
@@ -484,39 +455,36 @@ private fun CategoryChips(
 @Composable
 private fun CategoryChip(
     text: String,
-    selected: Boolean,
-    onClick: () -> Unit,
     index: Int,
-    rowRootX: Float?,
-    chipLayouts: MutableMap<Int, Float>,
+    selected: Boolean,
+    rowLeft: Float,
+    chipOffsets: MutableMap<Int, Float>,
     chipWidths: MutableMap<Int, Float>,
+    onSelect: (Int) -> Unit,
 ) {
     val pill = RoundedCornerShape(percent = 50)
-    // 选中时文本变白色（因为底下有彩色 indicator）；未选中时是 surface 底色 + onSurfaceVariant 文字
-    val content = if (selected) MaterialTheme.colorScheme.onPrimary
+    val textColor = if (selected) MaterialTheme.colorScheme.onPrimary
     else MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(
         modifier = Modifier
             .onGloballyPositioned { coords ->
-                val root = rowRootX ?: return@onGloballyPositioned
-                chipLayouts[index] = coords.boundsInRoot().left - root
+                chipOffsets[index] = coords.boundsInRoot().left - rowLeft
                 chipWidths[index] = coords.size.width.toFloat()
             }
             .tvCardEffect(
-                onClick = onClick,
+                onClick = { onSelect(index) },
                 shape = pill,
                 focusedScale = 1.06f,
                 glow = false,
             )
-            // 未选中才有背景，选中时底下的彩色 indicator 已把它盖住
             .then(
                 if (!selected) Modifier.background(MaterialTheme.colorScheme.surfaceVariant, pill)
                 else Modifier
             )
             .padding(horizontal = 20.dp, vertical = 10.dp),
     ) {
-        Text(text = text, style = MaterialTheme.typography.labelLarge, color = content)
+        Text(text = text, style = MaterialTheme.typography.labelLarge, color = textColor)
     }
 }
 
