@@ -17,6 +17,10 @@ object Routes {
     const val DETAIL_PATTERN = "detail/{videoId}"
     fun detail(videoId: String) = "detail/$videoId"
 
+    /** 跨站源搜索结果页：query 参数是搜索关键词 */
+    const val MULTI_SEARCH_PATTERN = "multi_search?query={query}"
+    fun multiSearch(query: String) = "multi_search?query=${android.net.Uri.encode(query)}"
+
     const val PLAYER_PATTERN = "player/{videoId}/{episodeIndex}?flag={flag}&preInit={preInit}"
     fun player(videoId: String, episodeIndex: Int, flag: String = "", preInit: Boolean = false) =
         "player/$videoId/$episodeIndex?flag=${android.net.Uri.encode(flag)}&preInit=$preInit"
