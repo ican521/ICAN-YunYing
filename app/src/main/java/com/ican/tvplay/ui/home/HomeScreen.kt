@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
@@ -32,9 +34,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -100,7 +104,20 @@ fun HomeScreen(
     val selectedIndex = if (selectedCategory == null) 0
     else categories.indexOfFirst { it.id == selectedCategory }.let { if (it >= 0) it + 1 else 0 }
 
-    // 点击 chip → pager 平移切换
+    // 每页数据缓存：key=null 为「全部」页，其余为分类 id。
+    // 滑动过程中 ViewModel 选中态要等 settle 才同步，若目标页只认实时 sections 会全程空白（黑屏闪现），
+    // 因此命中缓存先渲染旧数据，settle 后新数据到达自动覆盖。
+    val pageCache = remember { mutableStateMapOf<String?, List<Pair<VideoCategory, List<Video>>>>() }
+    LaunchedEffect(sections, selectedCategory) {
+        if (sections.isEmpty()) return@LaunchedEffect
+        pageCache[selectedCategory] = sections
+        if (selectedCategory == null) {
+            // 「全部」页包含所有分类数据，顺带填充各分类页缓存
+            sections.forEach { (cat, videos) -> pageCache[cat.id] = listOf(cat to videos) }
+        }
+    }
+
+    // 点击 chip → pager 平滑翻页（非瞬跳）
     val onChipClick: (Int) -> Unit = { index ->
         scope.launch { pagerState.animateScrollToPage(index) }
     }
@@ -150,10 +167,12 @@ fun HomeScreen(
 
         Spacer(Modifier.height(18.dp))
 
-        // 内容区 pager：每页内容由 page index 决定（避免滑动过程中两页读同一状态）
+        // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1），拖拽时页面已就绪；
+        // 每页内容由 page index + 缓存决定（避免滑动过程中两页读同一状态、目标页空白）
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
+            beyondViewportPageCount = 1,
         ) { page ->
             val pageContentPadding = PaddingValues(
                 start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
@@ -163,21 +182,29 @@ fun HomeScreen(
 
             if (page == 0) {
                 // 「全部」：Banner + 各分类 LazyRow 分区
-                // 此页数据 = sections（selectedCategory == null 时返回所有分类）
-                val listState = remember(page) { androidx.compose.foundation.lazy.LazyListState() }
+                // 实时数据仅在选中「全部」时取用，否则回退缓存（切走再切回不空白）
+                val pageSections = if (selectedCategory == null && sections.isNotEmpty()) {
+                    sections
+                } else {
+                    pageCache[null].orEmpty()
+                }
+                // rememberSaveable：页面离开组合后滚动位置仍保留
+                val listState = rememberSaveable(page, saver = LazyListState.Saver) { LazyListState() }
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
                     contentPadding = pageContentPadding,
                     verticalArrangement = Arrangement.spacedBy(22.dp),
                 ) {
-                    sections.firstOrNull()?.second?.firstOrNull()?.let { featured ->
+                    pageSections.firstOrNull()?.second?.firstOrNull()?.let { featured ->
                         item {
                             FeaturedBanner(video = featured, onClick = { onVideoClick(featured) })
                         }
                     }
 
-                    items(sections, key = { it.first.id }) { (category, videos) ->
+                    items(pageSections, key = { it.first.id }) { (category, videos) ->
                         VideoSection(
                             category = category,
                             videos = videos,
@@ -186,17 +213,19 @@ fun HomeScreen(
                     }
                 }
             } else {
-                // 具体分类：按 page index 直接决定该页分类，与 ViewModel 选中态解耦
+                // 具体分类：按 page index 直接决定该页分类；实时数据未覆盖该页时用缓存兜底
                 val pageCategory = categories.getOrNull(page - 1)
-                // 此页数据：仅当 ViewModel 当前选中分类 == 该页分类时取 sections；
-                // 否则显示空（等滑动结束 ViewModel 同步后自然填充，滑动过程中不互相串数据）
-                val pageVideos = if (pageCategory != null && selectedCategory == pageCategory.id) {
-                    sections.firstOrNull()?.second.orEmpty()
-                } else {
-                    emptyList()
+                val pageVideos = when {
+                    pageCategory == null -> emptyList()
+                    selectedCategory == pageCategory.id -> sections.firstOrNull()?.second.orEmpty()
+                    else -> pageCache[pageCategory.id]?.firstOrNull()?.second.orEmpty()
                 }
-                val gridState = remember(page) { androidx.compose.foundation.lazy.grid.LazyGridState() }
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val gridState = rememberSaveable(page, saver = LazyGridState.Saver) { LazyGridState() }
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
+                ) {
                     // 3:4 卡片宽度自适应列数
                     val columns = GridCells.Adaptive(minSize = 132.dp)
                     LazyVerticalGrid(
@@ -469,7 +498,9 @@ private fun FeaturedBanner(
         modifier = Modifier
             .fillMaxWidth()
             .height(200.dp)
-            .tvCardEffect(onClick = onClick, shape = shape),
+            .tvCardEffect(onClick = onClick, shape = shape)
+            // 大图首帧加载前的占位底色，避免切换时透底闪烁
+            .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
         AsyncImage(
             model = video.cover,
