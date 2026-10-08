@@ -91,6 +91,9 @@ object Players {
     private var subtitleView: SubtitleView? = null
     private var retryCount = 0
 
+    /** 保存最近一次 attach 的 view，player 创建/重建后自动 re-attach（解决 Compose AndroidView.factory 先于 LaunchedEffect 的时序问题） */
+    private var pendingSurfaceView: SurfaceView? = null
+
     private val ticker = object : Runnable {
         override fun run() {
             val p = player ?: return
@@ -139,14 +142,18 @@ object Players {
 
     // ---- 生命周期 ----
 
-    /** 挂接视图：Activity 重建（横竖屏切换）后重新调用即可，播放不中断 */
+    /** 挂接视图：保存到 pending 字段，player 已存在则立即绑定；player 不存在等 ensurePlayer 创建后自动 re-attach */
     fun attach(surfaceView: SurfaceView, subView: SubtitleView) {
+        pendingSurfaceView = surfaceView
         subtitleView = subView
+        Log.d(TAG, "attach sv=$surfaceView player=$player pending=$pendingSurfaceView")
         player?.setVideoSurfaceView(surfaceView)
     }
 
     /** 视图销毁时调用：只解绑 surface，不释放播放器 */
     fun detach(surfaceView: SurfaceView) {
+        Log.d(TAG, "detach sv=$surfaceView")
+        pendingSurfaceView = null
         if (subtitleView != null) subtitleView = null
         player?.clearVideoSurfaceView(surfaceView)
     }
@@ -249,6 +256,11 @@ object Players {
         val p = buildPlayer(ctx, _state.value.decode, _state.value.bufferTier)
         player = p
         handler.post(ticker)
+        // 创建新 player 后立即 re-attach 之前保存的 surfaceView（修复 attach 先于 start 的时序）
+        pendingSurfaceView?.let { sv ->
+            Log.d(TAG, "ensurePlayer re-attach sv=$sv")
+            p.setVideoSurfaceView(sv)
+        }
         return p
     }
 
@@ -310,6 +322,8 @@ object Players {
         val p = buildPlayer(ctx, _state.value.decode, _state.value.bufferTier)
         player = p
         handler.post(ticker)
+        // 重建后 re-attach surfaceView（可能已 pending 或仍在显示）
+        pendingSurfaceView?.let { p.setVideoSurfaceView(it) }
         if (spec != null) {
             startInternal(p, spec, pos)
             if (!wasPlaying) p.pause()
