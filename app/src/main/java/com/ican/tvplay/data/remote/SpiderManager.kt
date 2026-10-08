@@ -30,23 +30,32 @@ class SpiderManager(private val appContext: Context) {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    /** key = md5(jarUrl) → 已加载的 DexClassLoader */
-    private val loaders = ConcurrentHashMap<String, DexClassLoader>()
+    companion object {
+        // 全局缓存：SpiderManager 可能随 ViewModel 重建，jar/classloader/spider 实例
+        // 必须跨实例常驻（fongmi 同款做法），否则每次进搜索页全部站点重新加载 init，极慢
+        private val locks = ConcurrentHashMap<String, Any>()
 
-    /** key = md5(jarUrl) → guard jar 的 native loader 是否就绪（非 guard jar 记 true） */
-    private val guardReady = ConcurrentHashMap<String, Boolean>()
+        /** key = md5(jarUrl) → 已加载的 DexClassLoader */
+        private val loaders = ConcurrentHashMap<String, DexClassLoader>()
 
-    /** key = md5(jarUrl)|siteKey → 已初始化的 Spider 实例（反射持有） */
-    private val spiders = ConcurrentHashMap<String, Any>()
+        /** key = md5(jarUrl) → guard jar 的 native loader 是否就绪（非 guard jar 记 true） */
+        private val guardReady = ConcurrentHashMap<String, Boolean>()
 
-    private val locks = ConcurrentHashMap<String, Any>()
+        /** key = md5(jarUrl)|siteKey → 已初始化的 Spider 实例（反射持有） */
+        private val spiders = ConcurrentHashMap<String, Any>()
 
-    private val jarDir: File by lazy {
-        File(appContext.filesDir, "spider_jars").apply { mkdirs() }
+        private var jarDirRef: File? = null
+        private var dexOutDirRef: File? = null
+
+        fun jarDir(ctx: Context): File =
+            jarDirRef ?: File(ctx.filesDir, "spider_jars").apply { mkdirs() }.also { jarDirRef = it }
+
+        fun dexOutDir(ctx: Context): File =
+            dexOutDirRef ?: File(ctx.codeCacheDir, "spider_dex").apply { mkdirs() }.also { dexOutDirRef = it }
     }
-    private val dexOutDir: File by lazy {
-        File(appContext.codeCacheDir, "spider_dex").apply { mkdirs() }
-    }
+
+    private val jarDir: File by lazy { jarDir(appContext) }
+    private val dexOutDir: File by lazy { dexOutDir(appContext) }
 
     /**
      * 获取指定站点的 Spider 实例；失败返回 null（上层降级为空态）。

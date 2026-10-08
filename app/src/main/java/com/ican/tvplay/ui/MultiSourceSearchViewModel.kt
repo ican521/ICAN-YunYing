@@ -14,6 +14,7 @@ import com.ican.tvplay.data.remote.VodApiClient
 import com.ican.tvplay.data.remote.VodItem
 import com.ican.tvplay.data.SettingsRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -107,7 +108,8 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
     }
 
     /**
-     * 跨全部站点并行搜索。每个站点独立处理，一个失败不影响其他。
+     * 跨全部站点并行搜索，结果流式上屏：每个站点一返回立即合入列表（fongmi 式"边搜边出"），
+     * 慢站/坏站不拖住其他站点结果的展示。
      */
     fun searchAll(keyword: String) {
         val key = keyword.trim()
@@ -120,26 +122,26 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
 
         viewModelScope.launch {
             _loading.value = true
+            _sites.value = emptyList()
+            _displayVideos.value = emptyList()
             try {
                 val configUrl = settings.configUrl.value
-                if (configUrl.isBlank()) {
-                    _sites.value = emptyList()
-                    _displayVideos.value = emptyList()
-                    return@launch
-                }
+                if (configUrl.isBlank()) return@launch
 
-                val config = apiClient.loadConfig(configUrl)
-                if (config == null) {
-                    _sites.value = emptyList()
-                    _displayVideos.value = emptyList()
-                    return@launch
-                }
-
+                val config = apiClient.loadConfig(configUrl) ?: return@launch
                 val validSites = config.sites.filter { it.isSpider() || it.api.startsWith("http") }
 
-                // 并行搜索全部站点
-                val entries = validSites.map { site ->
-                    async(Dispatchers.IO) {
+                // 收集协程：站点结果到达即合并上屏（单线程合并，避免并发写丢条目）
+                val channel = kotlinx.coroutines.channels.Channel<SiteEntry>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+                val collector = launch {
+                    for (entry in channel) {
+                        _sites.value = _sites.value + entry
+                        if (_selectedIndex.value == ALL_SITES_INDEX) refreshDisplay(ALL_SITES_INDEX)
+                    }
+                }
+
+                validSites.map { site ->
+                    launch(Dispatchers.IO) {
                         val jarSpec = if (site.isSpider()) site.jar.ifBlank { config.spider } else ""
                         val vodItems = runCatching {
                             if (site.isSpider()) {
@@ -154,19 +156,19 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                         }.onFailure { Log.e(TAG, "search site=${site.name} fail", it) }
                             .getOrDefault(emptyList())
 
-                        SiteEntry(site, jarSpec, vodItems.map { it.toVideo() })
+                        if (vodItems.isNotEmpty()) {
+                            channel.send(SiteEntry(site, jarSpec, vodItems.map { it.toVideo() }))
+                        }
                     }
-                }.awaitAll().filter { it.videos.isNotEmpty() }
+                }.joinAll()
 
-                _sites.value = entries
-                _selectedIndex.value = ALL_SITES_INDEX
-                refreshDisplay(ALL_SITES_INDEX)
+                channel.close()
+                collector.join()
             } finally {
                 _loading.value = false
             }
         }
     }
-
     /**
      * 选中站点后拉取完整详情（带 episodes / playSources），用于进入播放页
      */
