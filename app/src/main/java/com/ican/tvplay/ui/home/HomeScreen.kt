@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,7 +72,9 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 
 @Composable
@@ -181,6 +184,8 @@ fun HomeScreen(
             if (page == 0) {
                 // 「全部」页：始终用实时 sections
                 val pageSections = sections
+                var showLoading by remember(page) { mutableStateOf(true) }
+                var firstCardLoaded by remember(page) { mutableStateOf(false) }
                 val listState = remember(page) { LazyListState() }
                 // 离开当前页时立即滚回顶部（currentPage ≠ page）
                 LaunchedEffect(pagerState.currentPage) {
@@ -200,7 +205,11 @@ fun HomeScreen(
                 ) {
                     pageSections.firstOrNull()?.second?.firstOrNull()?.let { featured ->
                         item {
-                            FeaturedBanner(video = featured, onClick = { onVideoClick(featured) })
+                            FeaturedBanner(
+                                video = featured,
+                                onClick = { onVideoClick(featured) },
+                                onImageSettled = { firstCardLoaded = true },
+                            )
                         }
                     }
 
@@ -209,14 +218,17 @@ fun HomeScreen(
                             category = category,
                             videos = videos,
                             onVideoClick = onVideoClick,
+                            onImageSettled = { firstCardLoaded = true },
                         )
                     }
                 }
-                // 「全部」页：转圈绘制在最表层；只要界面上还没有任何视频卡片就持续显示（最短 600ms）
-                var showLoading by remember(page) { mutableStateOf(true) }
+                // 「全部」页：转圈绘制在最表层；等第一张卡片封面真正显示（成功/失败均算，4s 超时兜底）
                 val sectionsReady = sections.any { it.second.isNotEmpty() }
                 LaunchedEffect(page, sectionsReady) {
                     if (sectionsReady) {
+                        withTimeoutOrNull(4000L) {
+                            snapshotFlow { firstCardLoaded }.first { it }
+                        }
                         delay(600)
                         showLoading = false
                     }
@@ -235,6 +247,8 @@ fun HomeScreen(
                 val pageVideos = remember(page, pageCategory?.id) {
                     mutableStateOf<List<Video>>(emptyList())
                 }
+                var showLoading by remember(pageCategory?.id) { mutableStateOf(true) }
+                var firstCardLoaded by remember(pageCategory?.id) { mutableStateOf(false) }
                 // 首次进入该页或分类变化时，触发加载（协程结果缓存到 pageVideos）
                 LaunchedEffect(pageCategory?.id) {
                     if (pageCategory != null) {
@@ -266,18 +280,28 @@ fun HomeScreen(
                     ) {
                         pageVideos.value.firstOrNull()?.let { featured ->
                             item(span = { GridItemSpan(maxLineSpan) }) {
-                                FeaturedBanner(video = featured, onClick = { onVideoClick(featured) })
+                                FeaturedBanner(
+                                    video = featured,
+                                    onClick = { onVideoClick(featured) },
+                                    onImageSettled = { firstCardLoaded = true },
+                                )
                             }
                         }
                         gridItems(pageVideos.value, key = { it.id }) { video ->
-                            VideoCardItem(video = video, onClick = { onVideoClick(video) })
+                            VideoCardItem(
+                                video = video,
+                                onClick = { onVideoClick(video) },
+                                onImageSettled = { firstCardLoaded = true },
+                            )
                         }
                     }
-                    // 分类页：转圈绘制在最表层，卡片数据上屏后停止（最短展示 600ms）
-                    var showLoading by remember(pageCategory?.id) { mutableStateOf(true) }
+                    // 分类页：转圈绘制在最表层；等第一张卡片封面真正显示（4s 超时兜底）
                     val videosReady = pageVideos.value.isNotEmpty()
                     LaunchedEffect(pageCategory?.id, videosReady) {
                         if (videosReady) {
+                            withTimeoutOrNull(4000L) {
+                                snapshotFlow { firstCardLoaded }.first { it }
+                            }
                             delay(600)
                             showLoading = false
                         }
@@ -537,6 +561,7 @@ private fun CategoryChipPlain(
 private fun FeaturedBanner(
     video: Video,
     onClick: () -> Unit,
+    onImageSettled: (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(24.dp)
     Box(
@@ -552,6 +577,13 @@ private fun FeaturedBanner(
             contentDescription = video.title,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxWidth().height(200.dp),
+            onState = { state ->
+                if (state is coil3.compose.AsyncImagePainter.State.Success ||
+                    state is coil3.compose.AsyncImagePainter.State.Error
+                ) {
+                    onImageSettled?.invoke()
+                }
+            },
         )
         Box(
             modifier = Modifier
@@ -619,6 +651,7 @@ private fun VideoSection(
     category: VideoCategory,
     videos: List<Video>,
     onVideoClick: (Video) -> Unit,
+    onImageSettled: (() -> Unit)? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
@@ -630,13 +663,25 @@ private fun VideoSection(
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(videos, key = { it.id }) { video ->
-                VideoCardItem(video = video, onClick = { onVideoClick(video) })
+                VideoCardItem(
+                    video = video,
+                    onClick = { onVideoClick(video) },
+                    onImageSettled = onImageSettled,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun VideoCardItem(video: Video, onClick: () -> Unit) {
-    com.ican.tvplay.ui.components.VideoCard(video = video, onClick = onClick)
+private fun VideoCardItem(
+    video: Video,
+    onClick: () -> Unit,
+    onImageSettled: (() -> Unit)? = null,
+) {
+    com.ican.tvplay.ui.components.VideoCard(
+        video = video,
+        onClick = onClick,
+        onImageSettled = onImageSettled,
+    )
 }
