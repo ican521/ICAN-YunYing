@@ -6,10 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,19 +18,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +47,10 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 
+/**
+ * 详情页（纵向信息流布局，仿主流视频 App）：
+ * 顶部大海报 → 立即播放/收藏 → 线路 chips → 选集卡片列表 → 详情信息
+ */
 @Composable
 fun DetailScreen(
     videoId: String,
@@ -71,150 +71,240 @@ fun DetailScreen(
         return
     }
 
-    // 当前选中线路与集数
     var selectedSourceIndex by remember { mutableIntStateOf(0) }
-    val currentSource = current.playSources.getOrNull(selectedSourceIndex)
     val watchedIndex = history?.episodeIndex ?: -1
 
-    Row(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding(),
+            .background(MaterialTheme.colorScheme.background),
     ) {
-        // 左侧：线路 tabs + 选集列表（55%）
-        LeftEpisodePanel(
-            playSources = current.playSources,
-            currentSourceIndex = selectedSourceIndex,
-            onSourceChange = { selectedSourceIndex = it },
-            watchedIndex = watchedIndex,
-            onPlay = { episodeIndex, flag -> onPlay(current.id, episodeIndex, flag) },
-            modifier = Modifier
-                .fillMaxHeight()
-                .weight(0.55f),
-        )
+        // 顶部大海报区域
+        item { DetailHero(video = current, onBack = onBack) }
 
-        // 右侧：海报 + 信息 + 按钮（45%）
-        RightInfoPanel(
-            video = current,
-            isFavorite = isFavorite,
-            onBack = onBack,
-            onToggleFavorite = { viewModel.toggleFavorite(current) },
-            onPlay = { currentSource?.let { onPlay(current.id, 0, it.flag) } },
-            modifier = Modifier
-                .fillMaxHeight()
-                .weight(0.45f),
-        )
+        // 操作按钮 + 信息
+        item {
+            DetailActions(
+                video = current,
+                isFavorite = isFavorite,
+                onToggleFavorite = { viewModel.toggleFavorite(current) },
+                onPlay = {
+                    val flag = current.playSources.getOrNull(selectedSourceIndex)?.flag.orEmpty()
+                    onPlay(current.id, 0, flag)
+                },
+            )
+        }
+
+        // 线路 chips
+        if (current.playSources.size > 1) {
+            item {
+                SourceChips(
+                    playSources = current.playSources,
+                    selectedIndex = selectedSourceIndex,
+                    onSelect = { selectedSourceIndex = it },
+                )
+            }
+        }
+
+        // 选集列表
+        item {
+            val episodes = current.playSources.getOrNull(selectedSourceIndex)?.episodes.orEmpty()
+            val flag = current.playSources.getOrNull(selectedSourceIndex)?.flag.orEmpty()
+            EpisodeList(
+                video = current,
+                episodes = episodes,
+                flag = flag,
+                watchedIndex = watchedIndex,
+                onPlay = { episodeIndex -> onPlay(current.id, episodeIndex, flag) },
+            )
+        }
+
+        // 视频详情信息区
+        item { DetailInfo(video = current) }
     }
 }
 
-/** 左侧：线路 tabs + 选集网格 */
+/** 顶部大海报：封面横幅 + 渐变遮罩 + 标题/标签/简介 + 返回按钮 */
 @Composable
-private fun LeftEpisodePanel(
+private fun DetailHero(video: Video, onBack: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(280.dp),
+    ) {
+        AsyncImage(
+            model = video.cover,
+            contentDescription = video.title,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        )
+        // 底部渐变遮罩融入背景
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color(0x40000000), MaterialTheme.colorScheme.background),
+                    ),
+                ),
+        )
+        // 左上角返回按钮
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(start = 12.dp, top = 8.dp),
+        ) {
+            CircleIconButton(icon = AppIcons.Back, contentDescription = "返回", onClick = onBack)
+        }
+        // 海报底部：标题 + 标签
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = video.title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val infoText = buildString {
+                append(video.year)
+                if (video.region.isNotBlank()) append(" · ${video.region}")
+                if (video.categoryName.isNotBlank()) append(" · ${video.categoryName}")
+                if (video.rating.isNotBlank()) append(" · ${video.rating} 分")
+            }
+            Text(
+                text = infoText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFFE0E0E8),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** 立即播放 + 收藏按钮行 */
+@Composable
+private fun DetailActions(
+    video: Video,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onPlay: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // 立即播放（主题色主按钮）
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .weight(1f)
+                .tvCardEffect(
+                    onClick = onPlay,
+                    shape = RoundedCornerShape(percent = 50),
+                    focusedScale = 1.04f,
+                    glow = false,
+                )
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(percent = 50))
+                .padding(vertical = 13.dp),
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                imageVector = AppIcons.Play,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = "立即播放",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+        // 收藏按钮
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .tvCardEffect(
+                    onClick = onToggleFavorite,
+                    shape = RoundedCornerShape(percent = 50),
+                    focusedScale = 1.04f,
+                    glow = false,
+                )
+                .background(Color(0x22FFFFFF), RoundedCornerShape(percent = 50))
+                .padding(horizontal = 18.dp, vertical = 13.dp),
+        ) {
+            Icon(
+                imageVector = if (isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
+                contentDescription = null,
+                tint = if (isFavorite) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = if (isFavorite) "已收藏" else "收藏",
+                style = MaterialTheme.typography.titleSmall,
+                color = if (isFavorite) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+    }
+}
+
+/** 线路 chips（横向滚动） */
+@Composable
+private fun SourceChips(
     playSources: List<PlayLine>,
-    currentSourceIndex: Int,
-    onSourceChange: (Int) -> Unit,
-    watchedIndex: Int,
-    onPlay: (episodeIndex: Int, flag: String) -> Unit,
-    modifier: Modifier = Modifier,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
 ) {
     Column(
-        modifier = modifier
-            .padding(start = 20.dp, top = 12.dp, end = 14.dp, bottom = 20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // 顶部返回占位，与右侧顶部对齐
-        Spacer(Modifier.height(4.dp))
-
-        if (playSources.isEmpty()) {
-            Text(
-                text = "暂无选集",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            return
-        }
-
-        // 线路 tabs
-        if (playSources.size > 1) {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.height(36.dp),
-            ) {
-                items(playSources.size) { index ->
-                    val selected = index == currentSourceIndex
-                    val shape = RoundedCornerShape(percent = 50)
-                    val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                    val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .tvCardEffect(
-                                onClick = { onSourceChange(index) },
-                                shape = shape,
-                                focusedScale = 1.05f,
-                                glow = false,
-                            )
-                            .background(bg, shape)
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
-                    ) {
-                        Text(
-                            text = playSources[index].flag,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = fg,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-
-        val episodes = playSources.getOrNull(currentSourceIndex)?.episodes.orEmpty()
-        val flag = playSources.getOrNull(currentSourceIndex)?.flag.orEmpty()
-
         Text(
-            text = "选集（${episodes.size} 集）",
-            style = MaterialTheme.typography.titleLarge,
+            text = "线路",
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(bottom = 12.dp),
         )
-
-        // 选集网格
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            episodes.forEach { episode ->
-                val isWatched = episode.index == watchedIndex
-                val shape = RoundedCornerShape(12.dp)
-                val container = if (isWatched) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant
-                }
-                val content = if (isWatched) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                }
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(playSources.size) { index ->
+                val selected = index == selectedIndex
+                val shape = RoundedCornerShape(percent = 50)
+                val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .width(72.dp)
                         .tvCardEffect(
-                            onClick = { onPlay(episode.index, flag) },
+                            onClick = { onSelect(index) },
                             shape = shape,
-                            focusedScale = 1.08f,
+                            focusedScale = 1.05f,
                             glow = false,
                         )
-                        .background(container, shape)
-                        .padding(vertical = 12.dp),
+                        .background(bg, shape)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        text = episode.title,
+                        text = playSources[index].flag,
                         style = MaterialTheme.typography.labelLarge,
-                        color = content,
+                        color = fg,
                         maxLines = 1,
                     )
                 }
@@ -223,183 +313,172 @@ private fun LeftEpisodePanel(
     }
 }
 
-/** 右侧：海报卡片 + 信息 + 立即播放 + 收藏 */
+/** 选集列表：纵向卡片，每项左侧小封面 + 右侧标题/信息 */
 @Composable
-private fun RightInfoPanel(
+private fun EpisodeList(
     video: Video,
-    isFavorite: Boolean,
-    onBack: () -> Unit,
-    onToggleFavorite: () -> Unit,
-    onPlay: () -> Unit,
-    modifier: Modifier = Modifier,
+    episodes: List<Episode>,
+    flag: String,
+    watchedIndex: Int,
+    onPlay: (Int) -> Unit,
 ) {
     Column(
-        modifier = modifier
-            .verticalScroll(rememberScrollState())
-            .padding(start = 14.dp, top = 12.dp, end = 20.dp, bottom = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        // 返回按钮
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            CircleIconButton(
-                icon = AppIcons.Back,
-                contentDescription = "返回",
-                onClick = onBack,
+        Text(
+            text = "选集（${episodes.size} 集）",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        if (episodes.isEmpty()) {
+            Text(
+                text = "暂无选集",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        } else {
+            episodes.forEach { episode ->
+                EpisodeCard(
+                    video = video,
+                    episode = episode,
+                    isCurrent = episode.index == watchedIndex,
+                    onClick = { onPlay(episode.index) },
+                )
+            }
         }
+        Spacer(Modifier.height(8.dp))
+    }
+}
 
-        // 海报卡片
-        val posterShape = RoundedCornerShape(16.dp)
+/** 单个选集卡片：左小封面 + 右标题/信息 */
+@Composable
+private fun EpisodeCard(
+    video: Video,
+    episode: Episode,
+    isCurrent: Boolean,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(14.dp)
+    val bg = if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+    else MaterialTheme.colorScheme.surface
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.02f, glow = false)
+            .background(bg, shape)
+            .padding(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // 左侧小封面缩略图（共用视频封面）
+        val thumbShape = RoundedCornerShape(10.dp)
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .tvCardEffect(onClick = onPlay, shape = posterShape, focusedScale = 1.02f, glow = true)
-                .clip(posterShape),
+                .size(width = 107.dp, height = 60.dp)
+                .clip(thumbShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             AsyncImage(
                 model = video.cover,
-                contentDescription = video.title,
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp),
+                modifier = Modifier.fillMaxSize(),
             )
-            // 海报渐变遮罩
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp)
-                    .background(
-                        androidx.compose.ui.graphics.Brush.verticalGradient(
-                            listOf(Color.Transparent, Color(0xB3000000)),
-                        ),
-                    ),
-            )
-            // 评分角标
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(10.dp)
-                    .background(Color(0x66000000), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = AppIcons.Star,
-                    contentDescription = null,
-                    tint = Color(0xFFFFC53D),
-                    modifier = Modifier.size(14.dp),
-                )
-                Text(
-                    text = video.rating,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                    modifier = Modifier.padding(start = 3.dp),
-                )
-            }
-            // 标题在海报底部
-            Text(
-                text = video.title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(14.dp),
-            )
-        }
-
-        // 信息行
-        Text(
-            text = "${video.year} · ${video.region} · ${video.categoryName} · ${video.rating} 分",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        // 简介
-        Text(
-            text = video.description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        // 标签
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            video.tags.forEach { tag ->
-                Text(
-                    text = tag,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFFBDD0FF),
+            // 当前集播放中角标
+            if (isCurrent) {
+                Box(
                     modifier = Modifier
-                        .background(Color(0x335B8CFF), RoundedCornerShape(percent = 50))
-                        .padding(horizontal = 10.dp, vertical = 3.dp),
-                )
+                        .fillMaxSize()
+                        .background(Color(0x66000000), thumbShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = AppIcons.Play,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
-
-        Spacer(Modifier.height(4.dp))
-
-        // 按钮行
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        // 右侧标题/信息
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .tvCardEffect(
-                        onClick = onPlay,
-                        shape = RoundedCornerShape(percent = 50),
-                        focusedScale = 1.05f,
-                        glow = false,
-                    )
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(percent = 50))
-                    .padding(horizontal = 26.dp, vertical = 11.dp),
-            ) {
-                Icon(
-                    imageVector = AppIcons.Play,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp),
-                )
+            Text(
+                text = episode.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isCurrent) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "${video.title} · ${video.year}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (isCurrent) {
                 Text(
-                    text = "立即播放",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = Color.White,
-                    modifier = Modifier.padding(start = 6.dp),
-                )
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .tvCardEffect(
-                        onClick = onToggleFavorite,
-                        shape = RoundedCornerShape(percent = 50),
-                        focusedScale = 1.05f,
-                        glow = false,
-                    )
-                    .background(Color(0x33FFFFFF), RoundedCornerShape(percent = 50))
-                    .padding(horizontal = 20.dp, vertical = 11.dp),
-            ) {
-                Icon(
-                    imageVector = if (isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
-                    contentDescription = null,
-                    tint = if (isFavorite) Color(0xFFFF5C8A) else Color.White,
-                    modifier = Modifier.size(18.dp),
-                )
-                Text(
-                    text = if (isFavorite) "已收藏" else "收藏",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = Color.White,
-                    modifier = Modifier.padding(start = 6.dp),
+                    text = "正在播放",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
+    }
+}
+
+/** 视频详情信息区：完整简介、标签 */
+@Composable
+private fun DetailInfo(video: Video) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text = "详情",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        // 标签
+        if (video.tags.isNotEmpty()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                video.tags.forEach { tag ->
+                    Text(
+                        text = tag,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFBDD0FF),
+                        modifier = Modifier
+                            .background(Color(0x335B8CFF), RoundedCornerShape(percent = 50))
+                            .padding(horizontal = 10.dp, vertical = 3.dp),
+                    )
+                }
+            }
+        }
+        // 简介
+        if (video.description.isNotBlank()) {
+            Text(
+                text = video.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(20.dp))
     }
 }
 

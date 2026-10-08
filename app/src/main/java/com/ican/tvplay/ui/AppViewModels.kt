@@ -182,6 +182,16 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
     val configUrl: StateFlow<String> = settings.configUrl
 
+    /** 当前站源名；未加载成功时为「未配置」 */
+    val siteName: StateFlow<String> = videoRepository.currentSite
+        .map { it?.site?.name?.takeIf { n -> n.isNotBlank() } ?: "未配置" }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "未配置")
+
+    /** 当前站源 key（用于站点选择对话框高亮） */
+    val currentSiteKey: StateFlow<String> = videoRepository.currentSite
+        .map { it?.site?.key.orEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
     fun setDynamicColor(enabled: Boolean) = settings.setDynamicColor(enabled)
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
@@ -191,5 +201,13 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setConfigUrl(url: String) {
         settings.setConfigUrl(url)
         viewModelScope.launch { videoRepository.reload() }
+    }
+
+    /** 配置中全部可切换站点 */
+    suspend fun listSites() = videoRepository.listSites()
+
+    /** 切换站源：仓库层会保存选择并重新加载分类 */
+    fun switchSite(siteKey: String) {
+        viewModelScope.launch { videoRepository.switchSite(siteKey) }
     }
 }

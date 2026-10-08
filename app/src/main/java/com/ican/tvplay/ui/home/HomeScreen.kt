@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
@@ -75,15 +74,6 @@ fun HomeScreen(
     val viewModel = appViewModel { HomeViewModel(this) }
     val sections by viewModel.sections.collectAsStateWithLifecycle()
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
-    val siteName by viewModel.siteName.collectAsStateWithLifecycle()
-    val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
-
-    // 站源选择对话框状态：打开时才拉取站点列表
-    var showSiteDialog by remember { mutableStateOf(false) }
-    var siteList by remember { mutableStateOf<List<TvBoxSite>>(emptyList()) }
-    LaunchedEffect(showSiteDialog) {
-        if (showSiteDialog) siteList = viewModel.listSites()
-    }
 
     val contentPadding = topLevelContentPadding()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
@@ -139,8 +129,6 @@ fun HomeScreen(
                 ),
         ) {
             HomeTopBar(
-                siteName = siteName,
-                onSiteClick = { showSiteDialog = true },
                 onSearchClick = onSearchClick,
                 onHistoryClick = onHistoryClick,
             )
@@ -249,23 +237,11 @@ fun HomeScreen(
             }
         }
     }
-
-    if (showSiteDialog) {
-        SitePickerDialog(
-            sites = siteList,
-            currentKey = currentSiteKey,
-            onSelect = { site ->
-                viewModel.switchSite(site.key)
-                showSiteDialog = false
-            },
-            onDismiss = { showSiteDialog = false },
-        )
-    }
 }
 
 /** 站源选择对话框：列出配置里全部可用站点（spider + HTTP），高亮当前站 */
 @Composable
-private fun SitePickerDialog(
+fun SitePickerDialog(
     sites: List<TvBoxSite>,
     currentKey: String,
     onSelect: (TvBoxSite) -> Unit,
@@ -350,8 +326,6 @@ private fun SitePickerDialog(
 
 @Composable
 private fun HomeTopBar(
-    siteName: String,
-    onSiteClick: () -> Unit,
     onSearchClick: () -> Unit,
     onHistoryClick: () -> Unit,
 ) {
@@ -360,34 +334,7 @@ private fun HomeTopBar(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxWidth().height(48.dp),
     ) {
-        // 站源胶囊：显示当前站点名，点击弹出站点选择
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .height(48.dp)
-                .widthIn(max = 132.dp)
-                .tvCardEffect(onClick = onSiteClick, shape = CircleShape, focusedScale = 1.04f, glow = false)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 14.dp),
-        ) {
-            Icon(
-                imageVector = AppIcons.Site,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = siteName,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        // 胶囊搜索框：点击进入搜索页
+        // 胶囊搜索框：点击进入搜索页（站源入口已迁移至设置页，搜索框占满剩余空间）
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
