@@ -52,7 +52,7 @@ import com.ican.tvplay.ui.detail.DetailScreen
 import com.ican.tvplay.ui.home.HomeScreen
 import com.ican.tvplay.ui.nav.Routes
 import com.ican.tvplay.ui.nav.topDestinations
-import com.ican.tvplay.ui.player.PlayerScreen
+import com.ican.tvplay.player.PlayerScreen
 import com.ican.tvplay.ui.search.SearchScreen
 import com.ican.tvplay.ui.settings.ColorPaletteScreen
 import com.ican.tvplay.ui.settings.SettingsScreen

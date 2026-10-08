@@ -157,6 +157,64 @@ object AppIcons {
     val Subtitle: ImageVector = vector(
         "subtitle",
         "M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM4 12h4v2H4z" +
-            "m14 6H4v-2h14zm6-4h-4v-2h4z",
+            "m14 6H4v-2h14zm6-4h-4v-2h4zm0 4h-4v-2h4z",
+    )
+
+    // ---- FongMi 播放器控制 ----
+
+    val Cast: ImageVector = vector(
+        "cast",
+        "M21 3H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM1 15v3h3a3 3 0 0 0-3-3zm0 4v3h3a3 3 0 0 0-3-3zm0-8v2a7 7 0 0 1 7 7h2a9 9 0 0 0-9-9z",
+    )
+
+    val Info: ImageVector = vector(
+        "info",
+        "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2zm0-8h-2V7h2z",
+    )
+
+    val Fullscreen: ImageVector = vector(
+        "fullscreen",
+        "M7 14H5v5h5v-2H7zm-2-4h2V7h3V5H5zm12 7h-3v2h5v-5h-2zM14 5v2h3v3h2V5z",
+    )
+
+    val Lock: ImageVector = vector(
+        "lock",
+        "M18 8h-1V6a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3-9H9V6a3 3 0 0 1 6 0z",
+    )
+
+    val LockOpen: ImageVector = vector(
+        "lock_open",
+        "M12 2a5 5 0 0 0-5 5h2a3 3 0 1 1 6 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V11a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm0 15a2 2 0 1 1 0-4 2 2 0 0 1 0 4z",
+    )
+
+    val Refresh: ImageVector = vector(
+        "refresh",
+        "M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08" +
+            "A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z",
+    )
+
+    val Loop: ImageVector = vector(
+        "loop",
+        "M12 4V1L8 5l4 4V6a6 6 0 0 1 6 6 6 6 0 0 1-6 6 6 6 0 0 1-6-6H4a8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8z",
+    )
+
+    val SkipPrev: ImageVector = vector(
+        "skip_prev",
+        "M6 6h2v12H6zm3.5 6 8.5 6.5V5.5z",
+    )
+
+    val SkipNext: ImageVector = vector(
+        "skip_next",
+        "M6 18l8.5-6L6 6v12zM16 6v12h2V6z",
+    )
+
+    val Rewind: ImageVector = vector(
+        "rewind",
+        "M11 18V6l-8.5 6zM12.5 8.5V15l8.5-6.5z",
+    )
+
+    val Forward: ImageVector = vector(
+        "forward",
+        "M4 18l8.5-6L4 6v12zM16 6v12l8.5-6z",
     )
 }
