@@ -8,6 +8,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -184,6 +187,45 @@ class SpiderManager(private val appContext: Context) {
                 ).invoke(spider, flag, id, emptyList<String>()) as? String ?: ""
             }.onFailure { Log.e(TAG, "playerContent fail flag=$flag id=$id", it) }.getOrDefault("")
         }
+
+    /**
+     * 完整播放地址解析：spider 走 playerContent + 可选 jx/parse 二次解析，HTTP 站直接返回原 URL。
+     * 供播放页延迟解析使用（某些网盘 jar 在 playerContent 时触发扫码弹窗，须在进入播放页后调用）。
+     */
+    suspend fun resolvePlayUrl(
+        site: TvBoxSite,
+        jarSpec: String,
+        playUrl: String,
+        flag: String,
+    ): com.ican.tvplay.data.PlaySource = withContext(Dispatchers.IO) {
+        if (!site.isSpider()) return@withContext com.ican.tvplay.data.PlaySource(playUrl)
+        val spider = getSpider(site, jarSpec)
+            ?: return@withContext com.ican.tvplay.data.PlaySource(playUrl)
+        val jsonStr = playerContent(spider, flag.ifBlank { site.key }, playUrl)
+        if (jsonStr.isBlank()) return@withContext com.ican.tvplay.data.PlaySource(playUrl)
+        runCatching {
+            val json = Json { ignoreUnknownKeys = true }
+            val obj = json.parseToJsonElement(jsonStr).jsonObject
+            val rawUrl = obj["url"]?.jsonPrimitive?.content ?: playUrl
+            val headers = mutableMapOf<String, String>()
+            obj["header"]?.let { el ->
+                runCatching {
+                    el.jsonObject.entries.forEach { (k, v) ->
+                        headers[k] = v.jsonPrimitive.content
+                    }
+                }
+            }
+            val parse = obj["parse"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+            val jx = obj["jx"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+            Log.d(TAG, "resolvePlayUrl rawUrl=$rawUrl parse=$parse jx=$jx")
+            val finalUrl = if (com.ican.tvplay.data.remote.JxParser.needsParse(rawUrl, parse, jx)) {
+                com.ican.tvplay.data.remote.JxParser.resolve(rawUrl, headers).ifBlank { rawUrl }
+            } else {
+                rawUrl
+            }
+            com.ican.tvplay.data.PlaySource(url = finalUrl.ifBlank { playUrl }, headers = headers)
+        }.getOrNull() ?: com.ican.tvplay.data.PlaySource(playUrl)
+    }
 
     // ---- 内部：jar 下载 / 校验 / 加载 ----
 
