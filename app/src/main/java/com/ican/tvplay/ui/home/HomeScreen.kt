@@ -172,7 +172,11 @@ fun HomeScreen(
             if (page == 0) {
                 // 「全部」页：始终用实时 sections
                 val pageSections = sections
-                val listState = rememberSaveable(page, saver = LazyListState.Saver) { LazyListState() }
+                val listState = remember(page) { LazyListState() }
+                // Tab 切换 → 目标页强制回到顶部
+                LaunchedEffect(pagerState.settledPage) {
+                    if (pagerState.settledPage == page) listState.scrollToItem(0)
+                }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -207,7 +211,11 @@ fun HomeScreen(
                         pageVideos.value = viewModel.getCategoryVideos(pageCategory.id)
                     }
                 }
-                val gridState = rememberSaveable(page, saver = LazyGridState.Saver) { LazyGridState() }
+                val gridState = remember(page) { LazyGridState() }
+                // Tab 切换 → 目标页强制回到顶部
+                LaunchedEffect(pagerState.settledPage) {
+                    if (pagerState.settledPage == page) gridState.scrollToItem(0)
+                }
                 BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxSize()

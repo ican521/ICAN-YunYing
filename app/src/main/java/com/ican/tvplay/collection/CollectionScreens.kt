@@ -1,6 +1,7 @@
 package com.ican.tvplay.ui.collection
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,13 +11,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -25,6 +29,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.local.FavoriteEntity
@@ -47,18 +52,251 @@ fun FavoritesScreen(
     val viewModel = appViewModel { CollectionViewModel(this) }
     val favorites by viewModel.favorites.collectAsStateWithLifecycle()
 
-    CollectionGridScaffold(
-        title = "我的收藏",
-        items = favorites,
-        emptyText = "还没有收藏，去首页发现好片吧",
-        onBack = onBack,
-        idOf = { it.videoId },
-        coverOf = { it.cover },
-        titleOf = { it.title },
-        subtitleOf = { "${it.categoryName} · 收藏" },
-        onClick = { onVideoClick(it.videoId) },
-        onDelete = { viewModel.removeFavorite(it.videoId) },
-    )
+    // 编辑模式：控制卡片叉号显示 + 右上角按钮变红
+    var editMode by remember { mutableStateOf(false) }
+    // 清空确认弹窗
+    var showConfirm by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        // 顶栏：返回 + 标题 + 右上角圆形删除按钮
+        Row(
+            modifier = Modifier.padding(
+                top = topLevelContentPadding().calculateTopPadding(),
+                start = 16.dp,
+                end = 16.dp,
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CircleBackButton(onClick = onBack)
+            Text(
+                text = "我的收藏",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+            )
+            // 右上角圆形删除按钮（与 CircleBackButton 完全同尺寸同样式）
+            if (favorites.isNotEmpty()) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .tvCardEffect(
+                            onClick = {
+                                if (!editMode) {
+                                    // 进入编辑模式
+                                    editMode = true
+                                } else {
+                                    // 编辑模式 → 弹出清空确认
+                                    showConfirm = true
+                                }
+                            },
+                            shape = CircleShape,
+                            focusedScale = 1.1f,
+                            glow = false,
+                        )
+                        .background(
+                            if (editMode) Color(0xFFFF5C5C)
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                            CircleShape,
+                        ),
+                ) {
+                    Icon(
+                        imageVector = AppIcons.Delete,
+                        contentDescription = if (editMode) "清空全部" else "编辑",
+                        tint = if (editMode) Color.White
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+        }
+
+        if (favorites.isEmpty()) {
+            EmptyText(text = "还没有收藏，去首页发现好片吧")
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(132.dp),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 14.dp,
+                    bottom = 120.dp,
+                ),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(favorites, key = { it.videoId }) { item ->
+                    FavoriteCard(
+                        entity = item,
+                        editMode = editMode,
+                        onClick = {
+                            if (editMode) {
+                                // 编辑模式下点击卡片也触发单条删除（更方便）
+                                viewModel.removeFavorite(item.videoId)
+                            } else {
+                                onVideoClick(item.videoId)
+                            }
+                        },
+                        onDelete = { viewModel.removeFavorite(item.videoId) },
+                    )
+                }
+            }
+        }
+    }
+
+    // 清空全部确认弹窗
+    if (showConfirm) {
+        Dialog(onDismissRequest = {
+            // 取消 → 关闭弹窗 + 退出编辑模式
+            showConfirm = false
+            editMode = false
+        }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                    .padding(24.dp),
+            ) {
+                Text(
+                    text = "删除全部收藏",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "确定要清空所有收藏吗？此操作不可恢复。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 20.dp),
+                ) {
+                    Text(
+                        text = "取消",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clickable {
+                                showConfirm = false
+                                editMode = false
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                    Text(
+                        text = "确定",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF5C5C),
+                        modifier = Modifier
+                            .clickable {
+                                viewModel.clearFavorites()
+                                showConfirm = false
+                                editMode = false
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 收藏卡片：editMode=true 时才显示右上角叉号 */
+@Composable
+private fun FavoriteCard(
+    entity: FavoriteEntity,
+    editMode: Boolean,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    androidx.compose.foundation.layout.Column(
+        modifier = Modifier.tvCardEffect(
+            onClick = onClick,
+            shape = RoundedCornerShape(16.dp),
+        ),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(186.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            AsyncImage(
+                model = entity.cover,
+                contentDescription = entity.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))),
+                    ),
+            )
+            Text(
+                text = entity.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(10.dp),
+            )
+            // 仅编辑模式下显示叉号
+            if (editMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(30.dp)
+                        .tvCardEffect(
+                            onClick = onDelete,
+                            shape = CircleShape,
+                            focusedScale = 1.15f,
+                            glow = false,
+                        )
+                        .background(Color(0x88000000), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = AppIcons.Close,
+                        contentDescription = "删除",
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+        }
+        Text(
+            text = entity.categoryName.ifBlank { "收藏" },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+        )
+    }
 }
 
 @Composable

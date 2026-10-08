@@ -52,6 +52,9 @@ interface FavoriteDao {
 
     @Query("DELETE FROM favorites WHERE videoId = :videoId")
     suspend fun delete(videoId: String)
+
+    @Query("DELETE FROM favorites")
+    suspend fun clear()
 }
 
 @Dao
