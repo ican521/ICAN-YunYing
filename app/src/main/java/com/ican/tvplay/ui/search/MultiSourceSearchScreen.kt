@@ -257,15 +257,11 @@ private suspend fun handlePlayClick(
     val fullVideo = vm.getDetail(siteKey, video.id) ?: return
     val firstLine = fullVideo.playSources.firstOrNull()
     if (firstLine == null) return
-    val firstEp = firstLine.episodes.firstOrNull() ?: return
 
-    // 解析播放地址（供 PlayerScreen 自行 start 使用；此处不预启动，避免 SurfaceView 未创建时 player 先 start 导致有声音无画面）
-    val source = vm.resolvePlaySourceForSite(siteKey, firstEp.playUrl, firstLine.flag)
-        ?: com.ican.tvplay.data.PlaySource(firstEp.playUrl)
-
-    // cache 完整 Video + 解析好的 PlaySpec 到 Players，让 PlayerScreen 能拿到
-    Players.cacheVideo(fullVideo, siteKey)
-    Players.pendingPreStartSpec = PlaySpec(url = source.url, headers = source.headers)
+    // 不在此处预解析播放地址：某些网盘 jar 在 playerContent 时触发扫码弹窗，
+    // 必须进入播放页后再解析（PlayerScreen 用 cached.site/jarSpec 延迟解析）
+    val entry = vm.siteEntry(siteKey)
+    Players.cacheVideo(fullVideo, siteKey, entry?.site, entry?.jarSpec.orEmpty())
 
     // preInit=false: 让 PlayerScreen 自己调 Players.start()，此时 SurfaceView 已 attach，时序正确
     onPlay(fullVideo.id, 0, firstLine.flag, false)

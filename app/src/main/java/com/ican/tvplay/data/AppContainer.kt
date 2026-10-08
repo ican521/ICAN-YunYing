@@ -17,4 +17,9 @@ class AppContainer(context: Context) {
     val videoRepository: VideoRepository by lazy {
         VideoRepository(context.applicationContext, settingsRepository)
     }
+
+    /** 全局 spider 管理器：播放页跨站源延迟解析播放地址时使用（jar 内部缓存为进程级常驻） */
+    val spiderManager: com.ican.tvplay.data.remote.SpiderManager by lazy {
+        com.ican.tvplay.data.remote.SpiderManager(context.applicationContext)
+    }
 }

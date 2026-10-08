@@ -98,12 +98,15 @@ object Players {
     data class CachedVideo(
         val video: Video,
         val siteKey: String,
+        /** 跨站源来源站点与 jar 规格：播放页内延迟解析播放地址用（jar 扫码弹窗等交互需在播放页触发） */
+        val site: com.ican.tvplay.data.remote.TvBoxSite? = null,
+        val jarSpec: String = "",
     )
     var cachedVideo: CachedVideo? = null
         private set
 
-    fun cacheVideo(video: Video, siteKey: String) {
-        cachedVideo = CachedVideo(video, siteKey)
+    fun cacheVideo(video: Video, siteKey: String, site: com.ican.tvplay.data.remote.TvBoxSite? = null, jarSpec: String = "") {
+        cachedVideo = CachedVideo(video, siteKey, site, jarSpec)
     }
 
     fun consumeCachedVideo(videoId: String): CachedVideo? {
@@ -138,6 +141,7 @@ object Players {
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
+            Log.d(TAG, "onPlaybackStateChanged state=$playbackState")
             _state.value = _state.value.copy(
                 buffering = playbackState == Player.STATE_BUFFERING,
                 ready = playbackState >= Player.STATE_READY,
@@ -145,6 +149,9 @@ object Players {
         }
 
         override fun onTracksChanged(tracks: Tracks) {
+            val codec = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO }
+                ?.let { g -> (0 until g.length).firstNotNullOfOrNull { i -> g.getTrackFormat(i).codecs } }
+            Log.d(TAG, "onTracksChanged videoCodec=$codec")
             _state.value = _state.value.copy(
                 audioTracks = collectOptions(tracks, C.TRACK_TYPE_AUDIO),
                 textTracks = collectOptions(tracks, C.TRACK_TYPE_TEXT),
@@ -343,6 +350,7 @@ object Players {
     }
 
     private fun startInternal(p: ExoPlayer, spec: PlaySpec, positionMs: Long) {
+        Log.d(TAG, "startInternal url=${spec.url.take(120)} headers=${spec.headers.keys}")
         // 换源前先 stop 释放上一个 MediaSource，避免资源冲突导致无声/崩溃
         p.stop()
         p.clearMediaItems()

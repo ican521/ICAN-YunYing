@@ -197,6 +197,9 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
             )
         }
 
+    /** 按 siteKey 查站点条目（播放页延迟解析需要 site + jarSpec） */
+    fun siteEntry(siteKey: String): SiteEntry? = _sites.value.firstOrNull { it.site.key == siteKey }
+
     /**
      * 对指定站点解析播放地址：spider 走 playerContent + 可选 jx 解析，HTTP 直接返回原 URL
      */

@@ -177,13 +177,24 @@ fun PlayerScreen(
         val pos = pendingPosition
         pendingPosition = 0L
 
-        // 优先用上游（MultiSourceSearchScreen/DetailScreen）提前解析好的 PlaySpec
-        // （已经过 jx/parse 真实 URL + headers 处理，跨站源场景下不会用错 currentSite）
+        // 优先用上游（DetailScreen）提前解析好的 PlaySpec
         val preResolved = Players.pendingPreStartSpec?.also { Players.pendingPreStartSpec = null }
         val spec = if (preResolved != null) {
             preResolved
         } else {
-            val source = container.videoRepository.resolvePlaySource(v, episode, playLine?.flag ?: v.playFrom)
+            val cached = Players.cachedVideo?.takeIf { it.video.id == v.id }
+            val source = if (cached?.site != null) {
+                // 跨站源：在播放页内解析（某些网盘 jar 在 playerContent 时触发扫码弹窗，
+                // 解析必须发生在进入播放页之后，弹窗时机才正确）
+                container.spiderManager.resolvePlayUrl(
+                    site = cached.site,
+                    jarSpec = cached.jarSpec,
+                    playUrl = episode.playUrl,
+                    flag = playLine?.flag ?: v.playFrom,
+                )
+            } else {
+                container.videoRepository.resolvePlaySource(v, episode, playLine?.flag ?: v.playFrom)
+            }
             PlaySpec(url = source.url, headers = source.headers)
         }
         Players.start(
