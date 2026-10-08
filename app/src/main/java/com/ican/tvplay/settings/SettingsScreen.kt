@@ -162,7 +162,19 @@ fun SettingsScreen(
                 hint = "播放期间以前台服务保活，切后台/横竖屏不中断（通知栏显示）",
                 checked = playerKeepAlive,
                 enabled = true,
-                onToggle = { viewModel.setPlayerKeepAlive(it) },
+                onToggle = { enabled ->
+                    viewModel.setPlayerKeepAlive(enabled)
+                    // Android 13+ 需要运行时通知权限，通知栏控制才能显示
+                    if (enabled && Build.VERSION.SDK_INT >= 33) {
+                        (context as? android.app.Activity)?.let { act ->
+                            androidx.core.app.ActivityCompat.requestPermissions(
+                                act,
+                                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                                1001,
+                            )
+                        }
+                    }
+                },
             )
         }
 

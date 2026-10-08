@@ -6,6 +6,7 @@ import android.os.Looper
 import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -18,9 +19,16 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import com.ican.tvplay.TvPlayApplication
+import com.ican.tvplay.data.local.HistoryEntity
+import com.ican.tvplay.data.model.Episode
 import com.ican.tvplay.data.model.PlayLine
 import com.ican.tvplay.data.model.Video
 
@@ -114,11 +122,163 @@ object Players {
         return if (c != null && c.video.id == videoId) c else null
     }
 
-    /**
-     * 跨站源场景下：MultiSourceSearchScreen 提前解析好的 PlaySpec（已经 jx/parse 处理过真实 URL + headers）
-     * PlayerScreen LaunchedEffect 里优先用这个，避免 VideoRepository.resolvePlaySource 查 currentSite 错站
-     */
+    /** 跨站源场景下：MultiSourceSearchScreen 提前解析好的 PlaySpec（已经 jx/parse 处理过真实 URL + headers）
+     *  PlayerScreen LaunchedEffect 里优先用这个，避免 VideoRepository.resolvePlaySource 查 currentSite 错站 */
     var pendingPreStartSpec: PlaySpec? = null
+
+    // ---- 后台续播 / 通知栏控制 / PiP ----
+
+    /** 当前播放的剧集上下文：通知栏展示 + 上一集/下一集切换 + 后台片尾自动切集所需 */
+    data class PlaybackContext(
+        val video: Video,
+        val lineFlag: String,
+        val episodes: List<Episode>,
+        val episodeIndex: Int,
+        val openingMs: Long = 0L,
+        val endingMs: Long = 0L,
+    )
+
+    private val _playbackContext = MutableStateFlow<PlaybackContext?>(null)
+    val playbackContextFlow: StateFlow<PlaybackContext?> = _playbackContext.asStateFlow()
+    var playbackContext: PlaybackContext?
+        get() = _playbackContext.value
+        set(value) { _playbackContext.value = value }
+
+    /** 全屏播放中（MainActivity.onUserLeaveHint 判断是否自动进 PiP） */
+    @Volatile
+    var isFullscreen: Boolean = false
+
+    private val _pipMode = MutableStateFlow(false)
+
+    /** 画中画模式（MainActivity 回调更新，PlayerScreen 收集后切换为纯画面布局） */
+    val pipMode: StateFlow<Boolean> = _pipMode.asStateFlow()
+    fun setPipMode(inPip: Boolean) { _pipMode.value = inPip }
+
+    /** 通知栏点击 → 回到播放页（AppRoot 收集后导航） */
+    data class OpenPlayerRequest(
+        val token: Long,
+        val videoId: String,
+        val episodeIndex: Int,
+        val flag: String,
+    )
+
+    private val _openPlayerRequest = MutableStateFlow<OpenPlayerRequest?>(null)
+    val openPlayerRequest: StateFlow<OpenPlayerRequest?> = _openPlayerRequest.asStateFlow()
+
+    /** 通知栏点击恢复播放页（从 playbackContext 取当前播放信息） */
+    fun requestOpenPlayerFromContext() {
+        val ctx = playbackContext ?: return
+        _openPlayerRequest.value = OpenPlayerRequest(
+            token = System.currentTimeMillis(),
+            videoId = ctx.video.id,
+            episodeIndex = ctx.episodeIndex,
+            flag = ctx.lineFlag,
+        )
+    }
+
+    /** player 实例变化钩子（PlaybackService 的 MediaSession 同步 setPlayer 用） */
+    var onPlayerChanged: ((ExoPlayer?) -> Unit)? = null
+
+    /** 播放器是否存活（后台续播时 player 不为 null） */
+    fun isAlive(): Boolean = player != null
+
+    /** 页面存活时的切集导航（更新页面 episodeIndex 触发页面解析流）；null = 页面已退出，走后台直接解析 */
+    var uiEpisodeNavigator: ((Int) -> Unit)? = null
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /** 后台片尾自动切集防重（页面存活时由 PlayerScreen 的 autoNextArmed 负责） */
+    private var autoNextFired = false
+
+    /** 通知栏/后台切集：delta=+1 下一集，-1 上一集 */
+    fun skipEpisode(delta: Int) {
+        val ctx = playbackContext ?: return
+        val target = ctx.episodeIndex + delta
+        if (target !in ctx.episodes.indices) return
+        val nav = uiEpisodeNavigator
+        if (nav != null) {
+            nav(target)
+        } else {
+            scope.launch { resolveAndStart(ctx, target) }
+        }
+    }
+
+    /** 页面不在时的切集：直接解析并开播（无 UI 弹窗能力，扫码类站源后台切集不可用，可接受） */
+    private suspend fun resolveAndStart(ctx: PlaybackContext, targetIndex: Int) {
+        val app = appContext as? TvPlayApplication ?: return
+        val container = app.container
+        val episode = ctx.episodes.getOrNull(targetIndex) ?: return
+        val source = try {
+            val cached = cachedVideo?.takeIf { it.video.id == ctx.video.id }
+            if (cached?.site != null) {
+                container.spiderManager.resolvePlayUrl(
+                    site = cached.site,
+                    jarSpec = cached.jarSpec,
+                    playUrl = episode.playUrl,
+                    flag = ctx.lineFlag,
+                )
+            } else {
+                container.videoRepository.resolvePlaySource(ctx.video, episode, ctx.lineFlag)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "background skipEpisode resolve failed", e)
+            return
+        }
+        playbackContext = ctx.copy(episodeIndex = targetIndex)
+        val act = appContext ?: return
+        start(act, PlaySpec(url = source.url, headers = source.headers))
+        // 后台切集：把新集锚点写进历史（进度从 0 开始计）
+        val dao = container.historyDao
+        val index = targetIndex
+        scope.launch {
+            runCatching {
+                dao.upsert(
+                    HistoryEntity(
+                        videoId = ctx.video.id,
+                        title = ctx.video.title,
+                        cover = ctx.video.cover,
+                        categoryName = ctx.video.categoryName,
+                        episodeIndex = index,
+                        episodeTitle = episode.title,
+                        positionMs = 0L,
+                        durationMs = 0L,
+                        updatedAt = System.currentTimeMillis(),
+                        openingMs = ctx.openingMs,
+                        endingMs = ctx.endingMs,
+                    ),
+                )
+            }
+        }
+    }
+
+    /** 后台进度持久化（PlaybackService 周期调用）：页面退出后进度不丢 */
+    fun persistProgressIfNeeded() {
+        val ctx = playbackContext ?: return
+        val p = player ?: return
+        val app = appContext as? TvPlayApplication ?: return
+        val ep = ctx.episodes.getOrNull(ctx.episodeIndex) ?: return
+        val pos = p.currentPosition.coerceAtLeast(0L)
+        val dur = if (p.duration != C.TIME_UNSET) p.duration.coerceAtLeast(0L) else 0L
+        scope.launch {
+            runCatching {
+                app.container.historyDao.upsert(
+                    HistoryEntity(
+                        videoId = ctx.video.id,
+                        title = ctx.video.title,
+                        cover = ctx.video.cover,
+                        categoryName = ctx.video.categoryName,
+                        episodeIndex = ctx.episodeIndex,
+                        episodeTitle = ep.title,
+                        positionMs = pos,
+                        durationMs = dur,
+                        updatedAt = System.currentTimeMillis(),
+                        openingMs = ctx.openingMs,
+                        endingMs = ctx.endingMs,
+                    ),
+                )
+            }
+        }
+    }
 
 
     private val ticker = object : Runnable {
@@ -130,6 +290,15 @@ object Players {
                     durationMs = p.duration.coerceAtLeast(0L),
                     bufferedMs = p.bufferedPosition.coerceAtLeast(0L),
                 )
+            }
+            // 后台续播（页面已退出）时的片尾自动切下一集；页面存活时由 PlayerScreen 负责
+            val ctx = playbackContext
+            if (uiEpisodeNavigator == null && ctx != null && ctx.endingMs > 0 &&
+                p.isPlaying && p.duration != C.TIME_UNSET &&
+                ctx.endingMs + p.currentPosition >= p.duration && !autoNextFired
+            ) {
+                autoNextFired = true
+                skipEpisode(+1)
             }
             handler.postDelayed(this, 500L)
         }
@@ -198,6 +367,12 @@ object Players {
         startInternal(p, spec, startPositionMs)
     }
 
+    /** 退出播放页但继续后台播放（保活开关开启）：解绑视图，播放器保持，转交前台服务 */
+    fun detachForBackground() {
+        playerView?.let { it.player = null }
+        playerView = null
+    }
+
     /** 退出播放页时释放 */
     fun release() {
         handler.removeCallbacks(ticker)
@@ -211,6 +386,9 @@ object Players {
         player = null
         currentSpec = null
         appContext = null
+        playbackContext = null
+        autoNextFired = false
+        onPlayerChanged?.invoke(null)
         _state.value = _state.value.copy(
             ready = false, playing = false, buffering = false,
             positionMs = 0L, durationMs = 0L, bufferedMs = 0L,
@@ -304,6 +482,7 @@ object Players {
         val p = buildPlayer(ctx, _state.value.decode, _state.value.bufferTier)
         player = p
         handler.post(ticker)
+        onPlayerChanged?.invoke(p)
         // 创建新 player 后重新绑定到已保存的 PlayerView（PlayerView 内部自管 surface）
         playerView?.let { pv ->
             Log.d(TAG, "ensurePlayer re-bind playerView=$pv")
@@ -351,10 +530,22 @@ object Players {
 
     private fun startInternal(p: ExoPlayer, spec: PlaySpec, positionMs: Long) {
         Log.d(TAG, "startInternal url=${spec.url.take(120)} headers=${spec.headers.keys}")
+        autoNextFired = false   // 新一集重新武装后台片尾自动切集
         // 换源前先 stop 释放上一个 MediaSource，避免资源冲突导致无声/崩溃
         p.stop()
         p.clearMediaItems()
-        val item = MediaItemFactory.from(spec)
+        // 挂上片名/集名元数据：通知栏（Android 13+ 系统媒体模板）与媒体控件展示用
+        val metaTitle = playbackContext?.video?.title
+        val metaArtist = playbackContext?.episodes
+            ?.getOrNull(playbackContext?.episodeIndex ?: -1)?.title
+        val item = MediaItemFactory.from(spec).buildUpon()
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(metaTitle)
+                    .setArtist(metaArtist?.takeIf { it.isNotBlank() } ?: "视频播放中")
+                    .build(),
+            )
+            .build()
         val headers = MediaItemFactory.checkUa(spec.headers)
         if (headers.isNotEmpty()) {
             val ds = DefaultHttpDataSource.Factory()
@@ -384,6 +575,7 @@ object Players {
         val p = buildPlayer(ctx, _state.value.decode, _state.value.bufferTier)
         player = p
         handler.post(ticker)
+        onPlayerChanged?.invoke(p)
         // 重新绑定到 PlayerView（PlayerView 内部自管 surface）
         playerView?.let { it.player = p }
         if (spec != null) {
