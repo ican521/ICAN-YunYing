@@ -9,6 +9,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -277,6 +278,16 @@ fun PlayerScreen(
     BackHandler(enabled = true) { handleBack() }
 
     val current = video
+
+    // video 加载失败 → 显示全屏错误态，不要渲染残缺的 PortraitPlayLayout（纯白底+只有按钮）
+    if (current == null) {
+        PlayerErrorScreen(
+            videoId = videoId,
+            playerError = playerState.error,
+            onBack = { handleBack() },
+        )
+        return
+    }
 
     if (fullscreen) {
         FullscreenPlayLayout(
@@ -1212,4 +1223,67 @@ private fun formatSpeed(speed: Float): String =
 
 private const val RESUME_THRESHOLD_MS = 5_000L
 private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
+
+// ========== 视频加载失败全屏错误态 ==========
+
+/**
+ * 当 VideoRepository.getVideo + Players.consumeCachedVideo 都查不到时，
+ * 渲染这个全屏错误界面替代残缺的 PortraitPlayLayout（纯白底+只有控制按钮）。
+ */
+@Composable
+private fun PlayerErrorScreen(
+    videoId: String,
+    playerError: String?,
+    onBack: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(24.dp),
+        ) {
+            Icon(
+                imageVector = AppIcons.Close,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(64.dp),
+            )
+            Text(
+                text = "视频加载失败",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = when {
+                    playerError != null -> "播放器错误：$playerError"
+                    else -> "未找到该视频（ID: $videoId），请返回重试或检查站源是否可用"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable { onBack() }
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+            ) {
+                Text(
+                    text = "返回",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
+        }
+    }
+}
 private const val HIDE_DELAY_MS = 4_000L
