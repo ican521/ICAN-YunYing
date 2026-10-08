@@ -93,6 +93,7 @@ data class VodDetailResult(
 )
 
 /** 已加载站点：包含站点本身 + 生效的 spider jar spec（若有） */
+@Serializable
 data class LoadedSite(
     val site: TvBoxSite,
     val jarSpec: String,

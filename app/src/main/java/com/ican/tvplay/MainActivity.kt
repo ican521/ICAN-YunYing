@@ -21,12 +21,14 @@ import com.ican.tvplay.ui.AppRoot
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        android.util.Log.d("Startup", "activity onCreate begin")
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         handleOpenPlayerIntent(intent)
         setContent {
             AppRoot()
         }
+        android.util.Log.d("Startup", "activity onCreate end")
     }
 
     override fun onNewIntent(intent: Intent) {

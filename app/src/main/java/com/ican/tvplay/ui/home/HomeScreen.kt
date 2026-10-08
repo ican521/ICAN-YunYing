@@ -1,5 +1,6 @@
 package com.ican.tvplay.ui.home
 
+import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -104,6 +105,9 @@ fun HomeScreen(
         animationSpec = tween(durationMillis = 150),
         label = "homeContentAlpha",
     )
+    LaunchedEffect(contentReady) {
+        if (contentReady) Log.d("Startup", "home contentReady (categories+sections)")
+    }
 
     // 顶部分类 pager：第 0 页"全部" + 每个分类一页
     val pagerState = rememberPagerState(pageCount = { categories.size + 1 })
@@ -556,6 +560,11 @@ private fun FeaturedBanner(
             contentDescription = video.title,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxWidth().height(200.dp),
+            onState = { state ->
+                if (state is coil3.compose.AsyncImagePainter.State.Success) {
+                    Log.d("Startup", "first banner image success")
+                }
+            },
         )
         Box(
             modifier = Modifier
