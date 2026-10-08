@@ -62,7 +62,7 @@ fun FavoritesScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        // 顶栏：返回 + 标题 + 右上角圆形删除按钮
+        // 顶栏：标题 + 右上角圆形删除按钮（Tab 页无返回按钮）
         Row(
             modifier = Modifier.padding(
                 top = topLevelContentPadding().calculateTopPadding(),
@@ -72,7 +72,6 @@ fun FavoritesScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            CircleBackButton(onClick = onBack)
             Text(
                 text = "我的收藏",
                 style = MaterialTheme.typography.headlineMedium,

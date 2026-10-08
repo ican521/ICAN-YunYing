@@ -49,7 +49,6 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
-import com.ican.tvplay.ui.components.CircleBackButton
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import androidx.tv.material3.Icon
@@ -108,7 +107,6 @@ fun SettingsScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            CircleBackButton(onClick = onBack)
             Text(
                 text = "设置",
                 style = MaterialTheme.typography.headlineMedium,
