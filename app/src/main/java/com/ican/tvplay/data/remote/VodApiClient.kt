@@ -108,6 +108,7 @@ class VodApiClient(
 ) {
     private val client = OkHttpClient.Builder()
         .dns(FallbackDns)
+        .connectionPool(sharedPool)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(30, TimeUnit.SECONDS)
@@ -144,6 +145,9 @@ class VodApiClient(
          *  与 fongmi 一致：配置只下载解析一次常驻内存，避免每次进搜索页/首页重复下载 */
         @Volatile
         private var cachedConfig: Pair<String, TvBoxConfig>? = null
+
+        /** 全局共享连接池——所有模块（采集站/ spider jar 下载）复用 TCP 连接，减少握手开销 */
+        internal val sharedPool = okhttp3.ConnectionPool(16, 5, TimeUnit.MINUTES)
     }
 
     /** 拉取并解码配置（带全局缓存）；失败返回 null */

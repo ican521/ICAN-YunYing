@@ -63,9 +63,7 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
 
     val sections: StateFlow<List<Pair<VideoCategory, List<Video>>>> =
         combine(selectedCategoryId, repo.categoriesFlow) { categoryId, _ -> categoryId }
-            .flatMapLatest { categoryId ->
-                kotlinx.coroutines.flow.flow { emit(repo.getHomeSections(categoryId)) }
-            }
+            .flatMapLatest { categoryId -> repo.homeSectionsFlow(categoryId) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun selectCategory(id: String?) {
@@ -231,7 +229,8 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
         settings.setConfigUrl(url)
         viewModelScope.launch {
             videoRepository.reload()
-            videoRepository.prewarmHome()
+            launch { videoRepository.prewarmHome() }
+            launch { videoRepository.prewarmJars() }
         }
     }
 
@@ -242,7 +241,7 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun switchSite(siteKey: String) {
         viewModelScope.launch {
             videoRepository.switchSite(siteKey)
-            videoRepository.prewarmHome()
+            launch { videoRepository.prewarmHome() }
         }
     }
 }

@@ -4,6 +4,9 @@ import android.content.Context
 import android.util.Log
 import dalvik.system.DexClassLoader
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -26,6 +29,7 @@ class SpiderManager(private val appContext: Context) {
 
     private val client = OkHttpClient.Builder()
         .dns(FallbackDns)
+        .connectionPool(VodApiClient.sharedPool)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
@@ -105,6 +109,19 @@ class SpiderManager(private val appContext: Context) {
                 instance
             }.onFailure { Log.e(TAG, "getSpider fail", it) }.getOrNull()
         }
+    }
+
+    /**
+     * 并发预下载并加载全部站点 jar（fongmi 式预加载）：导入配置后调用，
+     * 之后任意站点的搜索/详情/播放不再有 jar 下载与类加载的首次开销。
+     */
+    suspend fun prewarmJars(jarSpecs: Collection<String>) {
+        val specs = jarSpecs.filter { it.isNotBlank() }.distinct()
+        if (specs.isEmpty()) return
+        coroutineScope {
+            specs.map { spec -> async(Dispatchers.IO) { runCatching { ensureLoader(spec) } } }.awaitAll()
+        }
+        Log.d(TAG, "prewarmJars done count=${specs.size}")
     }
 
     /** homeContent(boolean filter) → JSON {class, list, filters} */
