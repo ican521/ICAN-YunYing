@@ -21,6 +21,7 @@ import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.ican.tvplay.MainActivity
+import com.ican.tvplay.data.BACKGROUND_OFF
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -231,9 +232,9 @@ class PlaybackService : Service() {
         const val ACTION_STOP = "com.ican.tvplay.STOP"
         const val EXTRA_OPEN_PLAYER = "extra_open_player"
 
-        /** 进入播放页时调用：开启保活则启动前台服务 */
-        fun startIfNeeded(context: Context, enabled: Boolean) {
-            if (!enabled) return
+        /** 进入播放页时调用：后台播放非关闭模式则启动前台服务 */
+        fun startIfNeeded(context: Context, mode: Int) {
+            if (mode == BACKGROUND_OFF) return
             val intent = Intent(context, PlaybackService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)

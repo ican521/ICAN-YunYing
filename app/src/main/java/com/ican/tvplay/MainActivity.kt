@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.ican.tvplay.player.core.PlaybackService
 import com.ican.tvplay.player.core.Players
+import com.ican.tvplay.data.BACKGROUND_PIP
 import com.ican.tvplay.ui.AppRoot
 
 /**
@@ -40,14 +41,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** 全屏播放中切后台（Home/上滑）→ 自动进入画中画（保活开关开启时） */
+    /** 全屏播放中切后台（Home/上滑）→ 自动进入画中画（后台播放选「画中画」时） */
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         if (!Players.isFullscreen) return
-        val keepAlive = (application as TvPlayApplication)
-            .container.settingsRepository.playerKeepAlive.value
-        if (!keepAlive) return
+        val mode = (application as TvPlayApplication)
+            .container.settingsRepository.playerBackgroundPlay.value
+        // 仅「画中画」模式自动进入小窗
+        if (mode != BACKGROUND_PIP) return
         try {
             enterPictureInPictureMode(
                 PictureInPictureParams.Builder()

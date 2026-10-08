@@ -207,7 +207,7 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val dynamicColor: StateFlow<Boolean> = settings.dynamicColor
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
-    val playerKeepAlive: StateFlow<Boolean> = settings.playerKeepAlive
+    val playerBackgroundPlay: StateFlow<Int> = settings.playerBackgroundPlay
     val configUrl: StateFlow<String> = settings.configUrl
 
     /** 当前站源名；未加载成功时为「未配置」 */
@@ -224,7 +224,7 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setDynamicColor(enabled: Boolean) = settings.setDynamicColor(enabled)
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
     fun setEnableBlur(enabled: Boolean) = settings.setEnableBlur(enabled)
-    fun setPlayerKeepAlive(enabled: Boolean) = settings.setPlayerKeepAlive(enabled)
+    fun setPlayerBackgroundPlay(mode: Int) = settings.setPlayerBackgroundPlay(mode)
 
     /** 保存配置 URL 后立即重新拉取站点与分类，并后台预热首页各分类首屏（fongmi 式） */
     fun setConfigUrl(url: String) {

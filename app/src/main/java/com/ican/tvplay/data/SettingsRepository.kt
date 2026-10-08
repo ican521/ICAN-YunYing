@@ -8,6 +8,11 @@ import kotlinx.coroutines.flow.asStateFlow
 /** 主题模式：跟随系统 / 浅色 / 深色 */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/** 后台播放模式（fongmi「后台播放」三态） */
+const val BACKGROUND_OFF = 0 // 关闭：退出播放页即停止（默认）
+const val BACKGROUND_ON = 1  // 开启：后台续播 + 通知栏控制
+const val BACKGROUND_PIP = 2 // 画中画：开启基础上，全屏播放切后台自动进 PiP
+
 /**
  * 应用设置。初始骨架阶段使用 SharedPreferences 持久化，
  * 后续新增设置项可继续在此扩展。
@@ -112,13 +117,15 @@ class SettingsRepository(context: Context) {
         _playerBuffer.value = tier
     }
 
-    /** 播放保活（前台服务）：开启后播放期间以前台服务保活，横竖屏/切后台播放不中断 */
-    private val _playerKeepAlive = MutableStateFlow(prefs.getBoolean(KEY_PLAYER_KEEP_ALIVE, false))
-    val playerKeepAlive: StateFlow<Boolean> = _playerKeepAlive.asStateFlow()
+    /** 后台播放（fongmi 同款三态）：关闭 / 开启（后台续播+通知栏） / 画中画 */
+    private val _playerBackgroundPlay = MutableStateFlow(
+        prefs.getInt(KEY_PLAYER_BACKGROUND, BACKGROUND_OFF),
+    )
+    val playerBackgroundPlay: StateFlow<Int> = _playerBackgroundPlay.asStateFlow()
 
-    fun setPlayerKeepAlive(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_PLAYER_KEEP_ALIVE, enabled).apply()
-        _playerKeepAlive.value = enabled
+    fun setPlayerBackgroundPlay(mode: Int) {
+        prefs.edit().putInt(KEY_PLAYER_BACKGROUND, mode).apply()
+        _playerBackgroundPlay.value = mode
     }
 
     // ---- 搜索历史 ----
@@ -154,7 +161,7 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_SCALE = "player_scale"
         const val KEY_PLAYER_DECODE = "player_decode"
         const val KEY_PLAYER_BUFFER = "player_buffer"
-        const val KEY_PLAYER_KEEP_ALIVE = "player_keep_alive"
+        const val KEY_PLAYER_BACKGROUND = "player_background"
         const val KEY_SEARCH_HISTORY = "search_history"
         const val MAX_SEARCH_HISTORY = 10
     }
