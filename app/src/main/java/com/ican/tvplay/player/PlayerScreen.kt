@@ -597,19 +597,29 @@ private fun PortraitPlayLayout(
 
         if (showAllEps || lineEpisodes.size <= 20) {
             val cols = if (lineEpisodes.size > 50) 8 else 6
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(cols),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            val rows = epsToShow.chunked(cols)
+            Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.height((((lineEpisodes.size / cols) + 1) * 44).dp),
-                userScrollEnabled = false,
             ) {
-                itemsIndexed(lineEpisodes) { idx, ep ->
-                    EpisodeChip(
-                        title = ep.title,
-                        selected = idx == episodeIndex,
-                        onClick = { onEpisodeSelect(idx) },
-                    )
+                rows.forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        row.forEach { ep ->
+                            val idx = lineEpisodes.indexOf(ep)
+                            EpisodeChip(
+                                title = ep.title,
+                                selected = idx == episodeIndex,
+                                onClick = { onEpisodeSelect(idx) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        // Fill empty spaces in last row
+                        repeat(cols - row.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
                 }
             }
         } else {
@@ -962,11 +972,11 @@ private fun ActionBtn(
 }
 
 @Composable
-private fun EpisodeChip(title: String, selected: Boolean, onClick: () -> Unit) {
+private fun EpisodeChip(title: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(8.dp)
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier
+        modifier = modifier
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false)
             .background(
                 if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
