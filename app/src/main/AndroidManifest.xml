@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- 播放保活前台服务（设置开关控制，Android 14+ 需声明类型权限） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- miuix-blur 声明 minSdk 33（内部按需降级处理），强制按本项目 minSdk 24 合并 -->
     <uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
 
@@ -48,6 +53,12 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 播放保活前台服务（设置开关控制，仅播放期间存在） -->
+        <service
+            android:name=".player.core.PlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
     </application>
 
 </manifest>

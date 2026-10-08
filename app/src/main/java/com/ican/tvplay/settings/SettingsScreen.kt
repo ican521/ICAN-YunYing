@@ -63,6 +63,7 @@ fun SettingsScreen(
     val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
+    val playerKeepAlive by viewModel.playerKeepAlive.collectAsStateWithLifecycle()
     val configUrl by viewModel.configUrl.collectAsStateWithLifecycle()
     val siteName by viewModel.siteName.collectAsStateWithLifecycle()
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
@@ -152,6 +153,16 @@ fun SettingsScreen(
                 value = siteName,
                 dotColor = null,
                 onClick = { showSiteDialog = true },
+            )
+        }
+
+        SettingsCard(title = "播放", subtitle = "播放行为") {
+            SettingsSwitchRow(
+                label = "播放保活",
+                hint = "播放期间以前台服务保活，切后台/横竖屏不中断（通知栏显示）",
+                checked = playerKeepAlive,
+                enabled = true,
+                onToggle = { viewModel.setPlayerKeepAlive(it) },
             )
         }
 
