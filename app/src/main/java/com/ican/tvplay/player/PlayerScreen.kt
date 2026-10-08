@@ -459,7 +459,7 @@ private fun PortraitPlayLayout(
                         indication = null,
                     ) { onToggleControls() },
             ) {
-                // 顶栏：返回 + 标题 + 锁屏
+                // 顶栏：返回 + 标题（锁屏按钮仅全屏提供）
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -482,7 +482,6 @@ private fun PortraitPlayLayout(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f).padding(start = 8.dp),
                     )
-                    MiniCircleBtn(AppIcons.Lock, "锁屏") { onLockToggle() }
                 }
 
                 // 中部：上一集 / 播放暂停 / 下一集
@@ -538,22 +537,6 @@ private fun PortraitPlayLayout(
                 color = Color.White,
                 modifier = Modifier.align(Alignment.Center).size(36.dp),
             )
-        }
-
-        if (locked) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-                    .clickable { onUnlock() },
-            ) {
-                Icon(
-                    AppIcons.LockOpen,
-                    contentDescription = "解锁",
-                    tint = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.size(28.dp),
-                )
-            }
         }
     }
 
