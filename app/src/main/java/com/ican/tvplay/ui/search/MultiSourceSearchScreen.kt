@@ -178,21 +178,11 @@ fun MultiSourceSearchScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 4.dp, bottom = 16.dp),
             ) {
-                // === 「全部」选项（显示所有站源合并）===
-                item {
-                    SiteSourceChip(
-                        name = "全部",
-                        count = vm.totalVideoCount,
-                        selected = selectedIndex == MultiSourceSearchViewModel.ALL_SITES_INDEX,
-                        onClick = { vm.selectSite(MultiSourceSearchViewModel.ALL_SITES_INDEX) },
-                    )
-                }
-                // === 具体站源 ===
+                // === 具体站源（固定宽度胶囊，仅取 | 前名称，不显示条数）===
                 itemsIndexed(sites, key = { _, entry -> entry.site.key }) { _, entry ->
                     val idx = sites.indexOf(entry)
                     SiteSourceChip(
-                        name = entry.site.name.ifBlank { entry.site.key },
-                        count = entry.videos.size,
+                        name = entry.site.name.substringBefore("|").ifBlank { entry.site.key },
                         selected = idx == selectedIndex,
                         onClick = { vm.selectSite(idx) },
                     )
@@ -286,7 +276,6 @@ private suspend fun handlePlayClick(
 @Composable
 private fun SiteSourceChip(
     name: String,
-    count: Int,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -296,13 +285,16 @@ private fun SiteSourceChip(
     else MaterialTheme.colorScheme.onSurfaceVariant
     val shape = RoundedCornerShape(percent = 50)
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    // 固定宽度：所有胶囊等宽，不因名字长短变化
+    Box(
         modifier = Modifier
             .padding(horizontal = 6.dp)
+            .fillMaxWidth()
+            .height(40.dp)
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false)
             .background(bg, shape)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = name,
@@ -311,11 +303,6 @@ private fun SiteSourceChip(
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = "$count 条",
-            style = MaterialTheme.typography.labelSmall,
-            color = fg.copy(alpha = 0.7f),
         )
     }
 }

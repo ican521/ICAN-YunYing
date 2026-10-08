@@ -428,46 +428,22 @@ private fun PortraitPlayLayout(
             onRelease = { view -> Players.unbindPlayerView(view) },
         )
 
-        // 叠加控制层
-        if (controlsVisible && !locked) {
-            VideoOverlay(
-                title = "${current?.title.orEmpty()} · ${lineEpisodes.getOrNull(episodeIndex)?.title.orEmpty()}",
-                positionMs = playerState.positionMs,
-                durationMs = playerState.durationMs,
-                playing = playerState.playing,
-                isFav = isFav,
-                onFav = {
-                    scope.launch {
-                        val v = current ?: return@launch
-                        if (container.favoriteDao.isFavorite(v.id)) {
-                            container.favoriteDao.delete(v.id)
-                        } else {
-                            container.favoriteDao.upsert(
-                                FavoriteEntity(
-                                    videoId = v.id, title = v.title, cover = v.cover,
-                                    categoryName = v.categoryName, addedAt = System.currentTimeMillis(),
-                                ),
-                            )
-                        }
-                        isFav = container.favoriteDao.isFavorite(v.id)
-                    }
-                },
-                onSeek = { Players.seekTo(it) },
-                onBack = onBack,
-                onFullscreen = onEnterFullscreen,
-                onLock = onLockToggle,
-                onPrev = onPrev,
-                onNext = onNext,
-                onTogglePlay = onTogglePlay,
-                bottomActions = {
-                    ControlChip(playerState.decode.label) { showDecode = true }
-                    ControlChip(playerState.bufferTier.label) { showBuffer = true }
-                    ControlChip(formatSpeed(playerState.speed)) { showSpeed = true }
-                    ControlChip(playerState.scaleMode.label) { showScale = true }
-                    ControlChip("字幕") { showText = true }
-                    ControlChip("音轨") { showAudio = true }
-                    ControlChip("重播") { Players.seekTo(0) }
-                },
+        // 预览小窗不显示控制层（仅全屏显示）；右上角保留全屏入口
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.45f))
+                .clickable { onEnterFullscreen() },
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.tv.material3.Icon(
+                imageVector = AppIcons.Fullscreen,
+                contentDescription = "全屏",
+                tint = Color.White,
+                modifier = Modifier.size(18.dp),
             )
         }
 
@@ -545,7 +521,7 @@ private fun PortraitPlayLayout(
 
         // 站源（fongmi: site）
         Text(
-            text = "站源：$lineFlag",
+            text = "站源：${current?.sourceName?.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

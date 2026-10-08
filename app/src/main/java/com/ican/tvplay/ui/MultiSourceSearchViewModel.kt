@@ -65,7 +65,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
     /** 站源总数（用于左侧「全部」条目显示总条数） */
     val totalVideoCount: Int get() = _sites.value.sumOf { it.videos.size }
 
-    private val _selectedIndex = MutableStateFlow(ALL_SITES_INDEX)
+    private val _selectedIndex = MutableStateFlow(0)
     val selectedIndex: StateFlow<Int> = _selectedIndex.asStateFlow()
 
     private val _loading = MutableStateFlow(false)
@@ -89,7 +89,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                 entry.videos.map { v ->
                     DisplayVideo(
                         video = v,
-                        siteName = entry.site.name.ifBlank { entry.site.key },
+                        siteName = entry.site.name.substringBefore("|").ifBlank { entry.site.key },
                         siteKey = entry.site.key,
                     )
                 }
@@ -99,7 +99,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                 entry.videos.map { v ->
                     DisplayVideo(
                         video = v,
-                        siteName = entry.site.name.ifBlank { entry.site.key },
+                        siteName = entry.site.name.substringBefore("|").ifBlank { entry.site.key },
                         siteKey = entry.site.key,
                     )
                 }
@@ -124,6 +124,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
             _loading.value = true
             _sites.value = emptyList()
             _displayVideos.value = emptyList()
+            _selectedIndex.value = 0
             try {
                 val configUrl = settings.configUrl.value
                 if (configUrl.isBlank()) return@launch
@@ -136,7 +137,11 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                 val collector = launch {
                     for (entry in channel) {
                         _sites.value = _sites.value + entry
-                        if (_selectedIndex.value == ALL_SITES_INDEX) refreshDisplay(ALL_SITES_INDEX)
+                        val sel = _selectedIndex.value
+                        // 选中站点的新结果到达时刷新右侧列表
+                        if (_sites.value.getOrNull(sel)?.site?.key == entry.site.key) {
+                            refreshDisplay(sel)
+                        }
                     }
                 }
 
@@ -187,7 +192,9 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                     apiClient.detail(entry.site, videoId)
                 }
             }.getOrNull()
-            item?.toVideo(withEpisodes = true)
+            item?.toVideo(withEpisodes = true)?.copy(
+                sourceName = entry.site.name.substringBefore("|").ifBlank { entry.site.key },
+            )
         }
 
     /**

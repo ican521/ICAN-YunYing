@@ -35,6 +35,8 @@ data class Video(
     val episodes: List<Episode>,
     /** 第一源的线路标识（vod_play_from），spider 站 playerContent 需要 */
     val playFrom: String = "",
+    /** 视频所属站源显示名（搜索左侧栏选中的站源，仅取 | 前名称），播放页站源行用 */
+    val sourceName: String = "",
     /** 全部播放线路（vod_play_from / vod_play_url 按 $$$ 分隔完整保留） */
     val playSources: List<PlayLine> = emptyList(),
 )
