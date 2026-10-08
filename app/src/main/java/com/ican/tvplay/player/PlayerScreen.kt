@@ -162,13 +162,35 @@ fun PlayerScreen(
         )
     }
 
-    // 播放保活（设置开关）：进入播放页时按需启动前台服务，退出播放页时停止
+    // 播放保活（设置开关）：开启后退出播放页转交前台服务后台续播（通知栏控制/PiP）
+    var keepAliveEnabled by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        PlaybackService.startIfNeeded(context, container.settingsRepository.playerKeepAlive.first())
+        keepAliveEnabled = container.settingsRepository.playerKeepAlive.first()
+        PlaybackService.startIfNeeded(context, keepAliveEnabled)
     }
+    // PiP 画中画模式（全屏播放时切后台触发）
+    val inPip by Players.pipMode.collectAsStateWithLifecycle()
+    // 后台续播返回本页时跳过一次重新解析（直接接管在播的播放器）
+    var resumeFromBackground by remember { mutableStateOf(false) }
 
     // 加载视频信息 + 历史进度
     LaunchedEffect(videoId) {
+        // 后台续播返回：播放器仍在播同一部剧同一集 → 直接接管，不重新解析
+        val alive = Players.playbackContext?.takeIf {
+            Players.isAlive() && it.video.id == videoId
+        }
+        if (alive != null && startEpisode == alive.episodeIndex &&
+            (startFlag.isEmpty() || startFlag == alive.lineFlag)
+        ) {
+            video = alive.video
+            episodeIndex = alive.episodeIndex
+            lineFlag = alive.lineFlag
+            openingMs = alive.openingMs
+            endingMs = alive.endingMs
+            resumeFromBackground = true
+            initialized = true
+            return@LaunchedEffect
+        }
         // 跨站源场景优先：MultiSourceSearchScreen 提前 cache 的完整视频直接命中，
         // 避免先在 VideoRepository 的当前站点上发起慢查询（错站查询既慢又可能查错视频）
         var v = Players.consumeCachedVideo(videoId)?.video
@@ -199,6 +221,11 @@ fun PlayerScreen(
     // 解析并播放
     LaunchedEffect(initialized, episodeIndex, lineFlag) {
         if (!initialized) return@LaunchedEffect
+        if (resumeFromBackground) {
+            // 后台续播接管：播放器已在播，无需重新解析
+            resumeFromBackground = false
+            return@LaunchedEffect
+        }
         val v = video ?: return@LaunchedEffect
         val episode = lineEpisodes.getOrNull(episodeIndex) ?: return@LaunchedEffect
         val pos = pendingPosition
@@ -224,6 +251,15 @@ fun PlayerScreen(
             }
             PlaySpec(url = source.url, headers = source.headers)
         }
+        // 注册播放上下文：通知栏展示 / 上一集下一集 / 后台片尾自动切集依赖
+        Players.playbackContext = Players.PlaybackContext(
+            video = v,
+            lineFlag = playLine?.flag ?: v.playFrom,
+            episodes = lineEpisodes,
+            episodeIndex = episodeIndex,
+            openingMs = openingMs,
+            endingMs = endingMs,
+        )
         Players.start(
             context = context,
             spec = spec,
@@ -235,6 +271,10 @@ fun PlayerScreen(
         val v = video ?: return
         val episode = lineEpisodes.getOrNull(episodeIndex) ?: return
         val st = Players.state.value
+        // 同步片头/片尾标记到播放上下文（后台切集/通知栏用）
+        Players.playbackContext?.takeIf { it.video.id == v.id }?.let {
+            Players.playbackContext = it.copy(openingMs = openingMs, endingMs = endingMs)
+        }
         scope.launch {
             container.historyDao.upsert(
                 HistoryEntity(
@@ -327,6 +367,7 @@ fun PlayerScreen(
 
     // 全屏切换时请求横屏 + 自动收起/恢复状态栏
     LaunchedEffect(fullscreen) {
+        Players.isFullscreen = fullscreen
         val activity = context as? Activity ?: return@LaunchedEffect
         val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         if (fullscreen) {
@@ -349,13 +390,24 @@ fun PlayerScreen(
         }
     }
 
+    // 通知栏/后台切集导航：页面存活时通过 episodeIndex 驱动页面解析流
+    DisposableEffect(Unit) {
+        Players.uiEpisodeNavigator = { target ->
+            if (target != episodeIndex) episodeIndex = target
+        }
+        onDispose { Players.uiEpisodeNavigator = null }
+    }
+
     // Surface 生命周期
     DisposableEffect(Unit) {
         // 监听 Activity 生命周期：切后台自动 pause，回前台 resume
         val activity = context as? android.app.Activity
         val lifecycle = (activity as? androidx.lifecycle.LifecycleOwner)?.lifecycle
         val lifecycleObserver = object : DefaultLifecycleObserver {
-            override fun onPause(owner: LifecycleOwner) { Players.onPause() }
+            override fun onPause(owner: LifecycleOwner) {
+                // PiP 画中画中不暂停（小窗继续播）
+                if (activity?.isInPictureInPictureMode != true) Players.onPause()
+            }
             override fun onResume(owner: LifecycleOwner) { Players.onResume() }
         }
         lifecycle?.addObserver(lifecycleObserver)
@@ -368,10 +420,14 @@ fun PlayerScreen(
                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                 saveProgress()
             } else {
-                // 真正退出：保存进度 + release + 停止保活服务
+                // 真正退出：保存进度；保活开启 → 转交前台服务后台续播（不销毁播放器）
                 saveProgress()
-                Players.release()
-                PlaybackService.stop(context)
+                if (keepAliveEnabled && Players.isAlive()) {
+                    Players.detachForBackground()
+                } else {
+                    Players.release()
+                    PlaybackService.stop(context)
+                }
                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
         }
@@ -382,11 +438,34 @@ fun PlayerScreen(
             fullscreen = false
             return
         }
-        saveProgress()
-        Players.release()
+        // release / 后台续播转交由 onDispose 统一处理（popBackStack 后触发）
         onBack()
     }
     BackHandler(enabled = true) { handleBack() }
+
+    // PiP 画中画：窗口是整个 Activity 缩小画面，只渲染纯视频（隐藏全部 UI）
+    if (inPip) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+        ) {
+            AndroidView(
+                factory = { pctx ->
+                    PlayerView(pctx).apply {
+                        useController = false
+                        Players.bindPlayerView(this)
+                    }
+                },
+                update = { view ->
+                    if (view.player !== Players.player) Players.bindPlayerView(view)
+                },
+                onRelease = { view -> Players.unbindPlayerView(view) },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        return
+    }
 
     val current = video
 

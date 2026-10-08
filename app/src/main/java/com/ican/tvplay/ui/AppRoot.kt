@@ -53,6 +53,7 @@ import com.ican.tvplay.ui.home.HomeScreen
 import com.ican.tvplay.ui.nav.Routes
 import com.ican.tvplay.ui.nav.topDestinations
 import com.ican.tvplay.player.PlayerScreen
+import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.ui.search.MultiSourceSearchScreen
 import com.ican.tvplay.ui.settings.ColorPaletteScreen
 import com.ican.tvplay.ui.settings.SettingsScreen
@@ -87,6 +88,16 @@ fun AppRoot() {
         themeColor = themeColor,
     ) {
         val navController = rememberNavController()
+
+        // 通知栏点击 → 恢复播放页（后台续播场景）
+        LaunchedEffect(Unit) {
+            Players.openPlayerRequest.collect { req ->
+                if (req != null) {
+                    navController.navigate(Routes.player(req.videoId, req.episodeIndex, req.flag))
+                }
+            }
+        }
+
         val backStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = backStackEntry?.destination?.route
 

@@ -91,6 +91,8 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.common)
+    // MediaSession + MediaStyle 通知栏控制（后台续播）
+    implementation(libs.androidx.media3.session)
     // ffmpeg 软解扩展：fongmi 预编译 AAR（含 native so + Java 类，
     // media3 官方 maven 不发布解码器扩展；DefaultRenderersFactory 反射加载，无需编译期引用）
     implementation(fileTree("libs") { include("*.aar") })

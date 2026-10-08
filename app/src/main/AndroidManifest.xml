@@ -39,6 +39,7 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:exported="true"
             android:launchMode="singleTop"
+            android:supportsPictureInPicture="true"
             android:windowSoftInputMode="adjustResize">
 
             <!-- 手机 / 平板入口 -->
