@@ -173,7 +173,11 @@ fun HomeScreen(
                 // 「全部」页：始终用实时 sections
                 val pageSections = sections
                 val listState = remember(page) { LazyListState() }
-                // Tab 切换 → 目标页强制回到顶部
+                // 离开当前页时立即滚回顶部（currentPage ≠ page）
+                LaunchedEffect(pagerState.currentPage) {
+                    if (pagerState.currentPage != page) listState.scrollToItem(0)
+                }
+                // 进入目标页 settle 后再次确保在顶部
                 LaunchedEffect(pagerState.settledPage) {
                     if (pagerState.settledPage == page) listState.scrollToItem(0)
                 }
@@ -212,7 +216,11 @@ fun HomeScreen(
                     }
                 }
                 val gridState = remember(page) { LazyGridState() }
-                // Tab 切换 → 目标页强制回到顶部
+                // 离开当前页时立即滚回顶部（currentPage ≠ page）
+                LaunchedEffect(pagerState.currentPage) {
+                    if (pagerState.currentPage != page) gridState.scrollToItem(0)
+                }
+                // 进入目标页 settle 后再次确保在顶部
                 LaunchedEffect(pagerState.settledPage) {
                     if (pagerState.settledPage == page) gridState.scrollToItem(0)
                 }
