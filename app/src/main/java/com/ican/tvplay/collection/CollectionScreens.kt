@@ -307,18 +307,22 @@ fun HistoryScreen(
     val viewModel = appViewModel { CollectionViewModel(this) }
     val histories by viewModel.histories.collectAsStateWithLifecycle()
 
+    // 编辑模式：控制卡片叉号显示 + 右上角按钮变红（与收藏页同款交互）
+    var editMode by remember { mutableStateOf(false) }
+    // 清空确认弹窗
+    var showConfirm by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
         Row(
-            modifier = Modifier
-                .padding(
-                    top = topLevelContentPadding().calculateTopPadding(),
-                    start = 16.dp,
-                    end = 8.dp,
-                ),
+            modifier = Modifier.padding(
+                top = topLevelContentPadding().calculateTopPadding(),
+                start = 16.dp,
+                end = 16.dp,
+            ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -330,31 +334,36 @@ fun HistoryScreen(
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f),
             )
+            // 右上角圆形删除按钮（与收藏页完全同款：两段式 编辑→清空确认）
             if (histories.isNotEmpty()) {
-                val pill = RoundedCornerShape(percent = 50)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
+                        .size(48.dp)
                         .tvCardEffect(
-                            onClick = viewModel::clearHistory,
-                            shape = pill,
-                            focusedScale = 1.05f,
+                            onClick = {
+                                if (!editMode) {
+                                    editMode = true
+                                } else {
+                                    showConfirm = true
+                                }
+                            },
+                            shape = CircleShape,
+                            focusedScale = 1.1f,
                             glow = false,
                         )
-                        .background(MaterialTheme.colorScheme.surfaceVariant, pill)
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .background(
+                            if (editMode) Color(0xFFFF5C5C)
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                            CircleShape,
+                        ),
                 ) {
                     Icon(
                         imageVector = AppIcons.Delete,
-                        contentDescription = "清空历史",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(
-                        text = "清空",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 4.dp),
+                        contentDescription = if (editMode) "清空全部" else "编辑",
+                        tint = if (editMode) Color.White
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp),
                     )
                 }
             }
@@ -378,8 +387,76 @@ fun HistoryScreen(
                 items(histories, key = { it.videoId }) { history ->
                     HistoryCard(
                         history = history,
-                        onClick = { onVideoClick(history.videoId) },
+                        editMode = editMode,
+                        onClick = {
+                            if (editMode) {
+                                // 编辑模式下点击卡片也触发单条删除（更方便）
+                                viewModel.removeHistory(history.videoId)
+                            } else {
+                                onVideoClick(history.videoId)
+                            }
+                        },
                         onDelete = { viewModel.removeHistory(history.videoId) },
+                    )
+                }
+            }
+        }
+    }
+
+    // 清空全部确认弹窗（与收藏页同款）
+    if (showConfirm) {
+        Dialog(onDismissRequest = {
+            showConfirm = false
+            editMode = false
+        }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                    .padding(24.dp),
+            ) {
+                Text(
+                    text = "删除全部播放历史",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "确定要清空所有播放记录吗？此操作不可恢复。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 20.dp),
+                ) {
+                    Text(
+                        text = "取消",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clickable {
+                                showConfirm = false
+                                editMode = false
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                    Text(
+                        text = "确定",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF5C5C),
+                        modifier = Modifier
+                            .clickable {
+                                viewModel.clearHistory()
+                                showConfirm = false
+                                editMode = false
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
             }
@@ -534,6 +611,7 @@ private fun CollectionCard(
 @Composable
 private fun HistoryCard(
     history: HistoryEntity,
+    editMode: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -560,27 +638,29 @@ private fun HistoryCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-            // 右上角删除按钮
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(6.dp)
-                    .size(30.dp)
-                    .tvCardEffect(
-                        onClick = onDelete,
-                        shape = RoundedCornerShape(percent = 50),
-                        focusedScale = 1.1f,
-                        glow = false,
+            // 仅编辑模式下显示叉号（与收藏卡片一致）
+            if (editMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(30.dp)
+                        .tvCardEffect(
+                            onClick = onDelete,
+                            shape = CircleShape,
+                            focusedScale = 1.15f,
+                            glow = false,
+                        )
+                        .background(Color(0x88000000), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = AppIcons.Close,
+                        contentDescription = "删除",
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
                     )
-                    .background(Color(0x88000000), RoundedCornerShape(percent = 50)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = AppIcons.Close,
-                    contentDescription = "删除",
-                    tint = Color.White,
-                    modifier = Modifier.size(14.dp),
-                )
+                }
             }
             Box(
                 modifier = Modifier
