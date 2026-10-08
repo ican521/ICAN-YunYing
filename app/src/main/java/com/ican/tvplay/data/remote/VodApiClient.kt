@@ -139,11 +139,14 @@ class VodApiClient(
         })
         .build()
 
-    /** 最近一次成功拉取的配置（configUrl to config），供站点列表复用，避免重复请求 */
-    @Volatile
-    private var cachedConfig: Pair<String, TvBoxConfig>? = null
+    companion object {
+        /** 全局共享的已加载配置（configUrl to config）——所有 VodApiClient 实例复用，
+         *  与 fongmi 一致：配置只下载解析一次常驻内存，避免每次进搜索页/首页重复下载 */
+        @Volatile
+        private var cachedConfig: Pair<String, TvBoxConfig>? = null
+    }
 
-    /** 拉取并解码配置（带缓存）；失败返回 null */
+    /** 拉取并解码配置（带全局缓存）；失败返回 null */
     suspend fun loadConfig(configUrl: String): TvBoxConfig? = withContext(Dispatchers.IO) {
         cachedConfig?.takeIf { it.first == configUrl }?.second?.let { return@withContext it }
         runCatching {
