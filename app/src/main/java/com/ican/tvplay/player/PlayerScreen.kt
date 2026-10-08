@@ -89,6 +89,7 @@ fun PlayerScreen(
     videoId: String,
     startEpisode: Int,
     startFlag: String = "",
+    preInitialized: Boolean = false,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -108,6 +109,7 @@ fun PlayerScreen(
     var episodeIndex by remember { mutableIntStateOf(startEpisode) }
     var initialized by remember { mutableStateOf(false) }
     var pendingPosition by remember { mutableLongStateOf(0L) }
+    val skipFirstStart = remember { mutableStateOf(preInitialized) }
 
     // 线路切换
     var lineFlag by remember { mutableStateOf(startFlag) }
@@ -167,6 +169,11 @@ fun PlayerScreen(
         val episode = lineEpisodes.getOrNull(episodeIndex) ?: return@LaunchedEffect
         val pos = pendingPosition
         pendingPosition = 0L
+        // skipFirstStart=true 时 Players 已由 MultiSourceSearchScreen 提前启动，跳过首次 start
+        if (skipFirstStart.value) {
+            skipFirstStart.value = false
+            return@LaunchedEffect
+        }
         val source = container.videoRepository.resolvePlaySource(v, episode, playLine?.flag ?: v.playFrom)
         Players.start(
             context = context,
