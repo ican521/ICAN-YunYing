@@ -420,34 +420,61 @@ private fun CategoryChips(
     val indicatorX by animateFloatAsState(targetValue = targetX, label = "chipX")
     val indicatorW by animateFloatAsState(targetValue = targetW, label = "chipW")
 
-    Box(
-        modifier = Modifier.fillMaxWidth().height(40.dp),
-    ) {
-        // 底层：选中彩色 pill（从旧位置平移到新位置）
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier.fillMaxWidth().height(40.dp),
+        ) {
+            // 底层：选中彩色 pill（从旧位置平移到新位置）
+            Box(
+                modifier = Modifier
+                    .graphicsLayer { translationX = indicatorX }
+                    .width(with(density) { indicatorW.toDp() })
+                    .height(32.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .align(Alignment.CenterStart),
+            )
+
+            // 顶层：chip 文字（未选中有底色，选中透明让底层彩色露出来）
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+                    .onGloballyPositioned { rowLeft = it.boundsInRoot().left },
+            ) {
+                item {
+                    CategoryChip("全部", 0, selectedIndex == 0, rowLeft, chipOffsets, chipWidths, onSelect)
+                }
+                items(categories.size, key = { categories[it].id }) { i ->
+                    val idx = i + 1
+                    CategoryChip(categories[i].name, idx, selectedIndex == idx, rowLeft, chipOffsets, chipWidths, onSelect)
+                }
+            }
+        }
+
+        // === 底部横线指示器 ===
         Box(
             modifier = Modifier
-                .graphicsLayer { translationX = indicatorX }
-                .width(with(density) { indicatorW.toDp() })
-                .height(32.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary, CircleShape)
-                .align(Alignment.CenterStart),
-        )
-
-        // 顶层：chip 文字（未选中有底色，选中透明让底层彩色露出来）
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-                .onGloballyPositioned { rowLeft = it.boundsInRoot().left },
+                .fillMaxWidth()
+                .padding(top = 2.dp),
         ) {
-            item {
-                CategoryChip("全部", 0, selectedIndex == 0, rowLeft, chipOffsets, chipWidths, onSelect)
-            }
-            items(categories.size, key = { categories[it].id }) { i ->
-                val idx = i + 1
-                CategoryChip(categories[i].name, idx, selectedIndex == idx, rowLeft, chipOffsets, chipWidths, onSelect)
-            }
+            val barHeight = 3.dp
+            val barCorner = RoundedCornerShape(percent = 50)
+            // 横线宽度 = chip 宽度的 60%，居中对齐
+            val barW = (indicatorW * 0.6f).coerceAtLeast(20f)
+            val barOffsetX = indicatorX + (indicatorW - barW) / 2f
+
+            Box(
+                modifier = Modifier
+                    .graphicsLayer { translationX = barOffsetX }
+                    .width(with(density) { barW.toDp() })
+                    .height(barHeight)
+                    .clip(barCorner)
+                    .background(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                        barCorner,
+                    ),
+            )
         }
     }
 }
