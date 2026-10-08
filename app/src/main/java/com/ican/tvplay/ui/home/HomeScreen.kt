@@ -70,6 +70,7 @@ import com.ican.tvplay.ui.components.tvCardEffect
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -211,8 +212,16 @@ fun HomeScreen(
                         )
                     }
                 }
-                // 「全部」页空态：新式转圈（数据流式上屏前的加载提示）
-                if (sections.isEmpty()) {
+                // 「全部」页：转圈绘制在最表层，卡片数据上屏后停止（最短展示 600ms 保证可感知）
+                var showLoading by remember(page) { mutableStateOf(true) }
+                val sectionsReady = sections.isNotEmpty()
+                LaunchedEffect(page, sectionsReady) {
+                    if (sectionsReady) {
+                        delay(600)
+                        showLoading = false
+                    }
+                }
+                if (showLoading) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
@@ -264,8 +273,16 @@ fun HomeScreen(
                             VideoCardItem(video = video, onClick = { onVideoClick(video) })
                         }
                     }
-                    // 分类页空态：新式转圈
-                    if (pageVideos.value.isEmpty()) {
+                    // 分类页：转圈绘制在最表层，卡片数据上屏后停止（最短展示 600ms）
+                    var showLoading by remember(pageCategory?.id) { mutableStateOf(true) }
+                    val videosReady = pageVideos.value.isNotEmpty()
+                    LaunchedEffect(pageCategory?.id, videosReady) {
+                        if (videosReady) {
+                            delay(600)
+                            showLoading = false
+                        }
+                    }
+                    if (showLoading) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center,
