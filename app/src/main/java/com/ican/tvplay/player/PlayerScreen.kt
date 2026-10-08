@@ -35,8 +35,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +44,11 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -539,15 +542,10 @@ private fun PortraitPlayLayout(
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
                     Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
-                    Slider(
-                        value = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
-                        onValueChange = { Players.seekTo((it * playerState.durationMs).toLong()) },
+                    LineSlider(
+                        progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
+                        onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
                         modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = Color(0x44FFFFFF),
-                        ),
                     )
                     Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
                     // 全屏按钮：随控制层显示/隐藏（与播放暂停按钮同机制），位于小窗右下角
@@ -896,15 +894,10 @@ private fun VideoOverlay(
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White,
                 )
-                Slider(
-                    value = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f,
-                    onValueChange = { onSeek((it * durationMs).toLong()) },
+                LineSlider(
+                    progress = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f,
+                    onSeek = { onSeek((it * durationMs).toLong()) },
                     modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = Color(0x44FFFFFF),
-                    ),
                 )
                 Text(
                     text = formatMs(durationMs),
@@ -1034,15 +1027,10 @@ private fun FullscreenPlayLayout(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                 ) {
                     Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
-                    Slider(
-                        value = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
-                        onValueChange = { Players.seekTo((it * playerState.durationMs).toLong()) },
+                    LineSlider(
+                        progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
+                        onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
                         modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = Color(0x44FFFFFF),
-                        ),
                     )
                     Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
                 }
@@ -1305,6 +1293,65 @@ private fun formatMs(ms: Long): String {
     val m = (totalSec % 3600) / 60
     val s = totalSec % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
+}
+
+/** 细直线进度条：2dp 轨道 + 白色圆点滑块，支持点按与横向拖动 seek（小窗/全屏统一风格） */
+@Composable
+private fun LineSlider(
+    progress: Float,
+    onSeek: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // 拖动中的临时进度（null=未拖动），松手才真正 seek，避免拖动过程中频繁跳转
+    var dragProgress by remember { mutableStateOf<Float?>(null) }
+    BoxWithConstraints(
+        modifier = modifier
+            .height(24.dp)
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    onSeek((offset.x / size.width).coerceIn(0f, 1f))
+                }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { offset -> dragProgress = (offset.x / size.width).coerceIn(0f, 1f) },
+                    onDragEnd = {
+                        dragProgress?.let(onSeek)
+                        dragProgress = null
+                    },
+                    onDragCancel = { dragProgress = null },
+                ) { change, _ ->
+                    dragProgress = (change.position.x / size.width).coerceIn(0f, 1f)
+                }
+            },
+    ) {
+        val p = (dragProgress ?: progress).coerceIn(0f, 1f)
+        val width = maxWidth
+        // 背景轨道
+        Box(
+            Modifier
+                .align(Alignment.CenterStart)
+                .fillMaxWidth()
+                .height(2.dp)
+                .background(Color(0x44FFFFFF), CircleShape),
+        )
+        // 已播放轨道
+        Box(
+            Modifier
+                .align(Alignment.CenterStart)
+                .fillMaxWidth(p)
+                .height(2.dp)
+                .background(Color.White, CircleShape),
+        )
+        // 圆点滑块
+        Box(
+            Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = width * p - 5.dp)
+                .size(10.dp)
+                .background(Color.White, CircleShape),
+        )
+    }
 }
 
 private fun formatSpeed(speed: Float): String =
