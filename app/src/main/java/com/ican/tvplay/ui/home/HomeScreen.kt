@@ -416,52 +416,33 @@ private fun CategoryChips(
     val targetX = chipOffsets[selectedIndex] ?: 0f
     val targetW = chipWidths[selectedIndex] ?: 0f
 
-    // 简单平移动画（默认 tween 260ms 线性）
+    // 简单平移动画（默认 tween 260ms）
     val indicatorX by animateFloatAsState(targetValue = targetX, label = "chipX")
     val indicatorW by animateFloatAsState(targetValue = targetW, label = "chipW")
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier = Modifier.fillMaxWidth().height(40.dp),
+        // 文字行（无底色、无 pill，纯文字）
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .onGloballyPositioned { rowLeft = it.boundsInRoot().left },
         ) {
-            // 底层：选中彩色 pill（从旧位置平移到新位置）
-            Box(
-                modifier = Modifier
-                    .graphicsLayer { translationX = indicatorX }
-                    .width(with(density) { indicatorW.toDp() })
-                    .height(32.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-                    .align(Alignment.CenterStart),
-            )
-
-            // 顶层：chip 文字（未选中有底色，选中透明让底层彩色露出来）
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-                    .onGloballyPositioned { rowLeft = it.boundsInRoot().left },
-            ) {
-                item {
-                    CategoryChip("全部", 0, selectedIndex == 0, rowLeft, chipOffsets, chipWidths, onSelect)
-                }
-                items(categories.size, key = { categories[it].id }) { i ->
-                    val idx = i + 1
-                    CategoryChip(categories[i].name, idx, selectedIndex == idx, rowLeft, chipOffsets, chipWidths, onSelect)
-                }
+            item {
+                CategoryChipPlain("全部", 0, selectedIndex == 0, rowLeft, chipOffsets, chipWidths, onSelect)
+            }
+            items(categories.size, key = { categories[it].id }) { i ->
+                val idx = i + 1
+                CategoryChipPlain(categories[i].name, idx, selectedIndex == idx, rowLeft, chipOffsets, chipWidths, onSelect)
             }
         }
 
-        // === 底部横线指示器 ===
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 2.dp),
-        ) {
+        // === 底部横线指示器（直接贴文字下方） ===
+        Box(modifier = Modifier.fillMaxWidth()) {
             val barHeight = 3.dp
             val barCorner = RoundedCornerShape(percent = 50)
-            // 横线宽度 = chip 宽度的 60%，居中对齐
-            val barW = (indicatorW * 0.6f).coerceAtLeast(20f)
+            val barW = (indicatorW * 0.5f).coerceAtLeast(18f)
             val barOffsetX = indicatorX + (indicatorW - barW) / 2f
 
             Box(
@@ -471,7 +452,7 @@ private fun CategoryChips(
                     .height(barHeight)
                     .clip(barCorner)
                     .background(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                        MaterialTheme.colorScheme.primary,
                         barCorner,
                     ),
             )
@@ -480,7 +461,7 @@ private fun CategoryChips(
 }
 
 @Composable
-private fun CategoryChip(
+private fun CategoryChipPlain(
     text: String,
     index: Int,
     selected: Boolean,
@@ -489,9 +470,9 @@ private fun CategoryChip(
     chipWidths: MutableMap<Int, Float>,
     onSelect: (Int) -> Unit,
 ) {
-    val pill = RoundedCornerShape(percent = 50)
-    val textColor = if (selected) MaterialTheme.colorScheme.onPrimary
+    val textColor = if (selected) MaterialTheme.colorScheme.primary
     else MaterialTheme.colorScheme.onSurfaceVariant
+    val fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
 
     Box(
         modifier = Modifier
@@ -501,17 +482,18 @@ private fun CategoryChip(
             }
             .tvCardEffect(
                 onClick = { onSelect(index) },
-                shape = pill,
+                shape = RoundedCornerShape(percent = 50),
                 focusedScale = 1.06f,
                 glow = false,
             )
-            .then(
-                if (!selected) Modifier.background(MaterialTheme.colorScheme.surfaceVariant, pill)
-                else Modifier
-            )
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 6.dp, vertical = 12.dp),
     ) {
-        Text(text = text, style = MaterialTheme.typography.labelLarge, color = textColor)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = textColor,
+            fontWeight = fontWeight,
+        )
     }
 }
 
