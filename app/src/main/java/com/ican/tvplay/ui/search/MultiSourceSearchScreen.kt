@@ -269,20 +269,16 @@ private suspend fun handlePlayClick(
     if (firstLine == null) return
     val firstEp = firstLine.episodes.firstOrNull() ?: return
 
-    // 解析播放地址
+    // 解析播放地址（供 PlayerScreen 自行 start 使用；此处不预启动，避免 SurfaceView 未创建时 player 先 start 导致有声音无画面）
     val source = vm.resolvePlaySourceForSite(siteKey, firstEp.playUrl, firstLine.flag)
         ?: com.ican.tvplay.data.PlaySource(firstEp.playUrl)
 
-    // 先把完整 Video 元数据 cache 到 Players，让 PlayerScreen 能拿到（跨站源场景下 VideoRepository.getVideo 查不到）
+    // cache 完整 Video + 解析好的 PlaySpec 到 Players，让 PlayerScreen 能拿到
     Players.cacheVideo(fullVideo, siteKey)
+    Players.pendingPreStartSpec = PlaySpec(url = source.url, headers = source.headers)
 
-    Players.start(
-        context = context,
-        spec = PlaySpec(url = source.url, headers = source.headers),
-        startPositionMs = 0L,
-    )
-
-    onPlay(fullVideo.id, 0, firstLine.flag, true)
+    // preInit=false: 让 PlayerScreen 自己调 Players.start()，此时 SurfaceView 已 attach，时序正确
+    onPlay(fullVideo.id, 0, firstLine.flag, false)
 }
 
 // ========== 左侧站源 chip ==========

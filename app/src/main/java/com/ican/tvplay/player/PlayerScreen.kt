@@ -178,15 +178,19 @@ fun PlayerScreen(
         val episode = lineEpisodes.getOrNull(episodeIndex) ?: return@LaunchedEffect
         val pos = pendingPosition
         pendingPosition = 0L
-        // skipFirstStart=true 时 Players 已由 MultiSourceSearchScreen 提前启动，跳过首次 start
-        if (skipFirstStart.value) {
-            skipFirstStart.value = false
-            return@LaunchedEffect
+
+        // 优先用上游（MultiSourceSearchScreen/DetailScreen）提前解析好的 PlaySpec
+        // （已经过 jx/parse 真实 URL + headers 处理，跨站源场景下不会用错 currentSite）
+        val preResolved = Players.pendingPreStartSpec?.also { Players.pendingPreStartSpec = null }
+        val spec = if (preResolved != null) {
+            preResolved
+        } else {
+            val source = container.videoRepository.resolvePlaySource(v, episode, playLine?.flag ?: v.playFrom)
+            PlaySpec(url = source.url, headers = source.headers)
         }
-        val source = container.videoRepository.resolvePlaySource(v, episode, playLine?.flag ?: v.playFrom)
         Players.start(
             context = context,
-            spec = PlaySpec(url = source.url, headers = source.headers),
+            spec = spec,
             startPositionMs = pos,
         )
     }
@@ -218,14 +222,6 @@ fun PlayerScreen(
             delay(PROGRESS_SAVE_INTERVAL_MS)
             if (initialized) saveProgress()
         }
-    }
-
-    // 防御性 surface 重新绑定：解决 MultiSourceSearchScreen 预启动 PlayerScreen 后有声音无画面
-    LaunchedEffect(initialized) {
-        if (!initialized) return@LaunchedEffect
-        // 等 AndroidView 一帧时间让 SurfaceView 被布局、Surface 创建
-        delay(150)
-        Players.rebindSurface()
     }
 
     // 自动隐藏控制层
