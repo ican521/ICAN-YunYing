@@ -147,12 +147,11 @@ fun PlayerScreen(
 
     // 加载视频信息 + 历史进度
     LaunchedEffect(videoId) {
-        var v = container.videoRepository.getVideo(videoId)
-        // 跨站源场景：VideoRepository 是单站点，getVideo 可能查不到 → 用 MultiSourceSearchScreen 提前 cache 的
+        // 跨站源场景优先：MultiSourceSearchScreen 提前 cache 的完整视频直接命中，
+        // 避免先在 VideoRepository 的当前站点上发起慢查询（错站查询既慢又可能查错视频）
+        var v = Players.consumeCachedVideo(videoId)?.video
         if (v == null) {
-            Players.consumeCachedVideo(videoId)?.let { cached ->
-                v = cached.video
-            }
+            v = container.videoRepository.getVideo(videoId)
         }
         video = v
         if (v != null) {
@@ -282,8 +281,18 @@ fun PlayerScreen(
 
     val current = video
 
-    // video 加载失败 → 显示全屏错误态，不要渲染残缺的 PortraitPlayLayout（纯白底+只有按钮）
+    // video 加载中 → 黑底转圈过渡页（LaunchedEffect 是异步的，初始帧 video 必为 null，
+    // 不能立即渲染错误页，否则加载期间会闪错误页）
     if (current == null) {
+        if (!initialized) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(36.dp))
+            }
+            return
+        }
         PlayerErrorScreen(
             videoId = videoId,
             playerError = playerState.error,
