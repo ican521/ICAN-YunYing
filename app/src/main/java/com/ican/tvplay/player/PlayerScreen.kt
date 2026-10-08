@@ -2,8 +2,6 @@ package com.ican.tvplay.player
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
-import android.view.TextureView
-import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -62,8 +60,7 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.SubtitleView
+import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -406,18 +403,19 @@ private fun PortraitPlayLayout(
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
-                AspectRatioFrameLayout(ctx).apply {
+                // fongmi 同款：Surface 全权交给 PlayerView 内部管理
+                PlayerView(ctx).apply {
+                    useController = false
                     resizeMode = playerState.scaleMode.resizeMode
-                    val tv = TextureView(ctx)
-                    addView(tv, FrameLayout.LayoutParams(-1, -1))
-                    val sub = SubtitleView(ctx)
-                    addView(sub, FrameLayout.LayoutParams(-1, -1))
-                    Players.attach(tv, sub)
+                    Players.bindPlayerView(this)
                 }
             },
             update = { view ->
                 view.resizeMode = playerState.scaleMode.resizeMode
+                // 播放器重建（切换解码/缓冲档位）后 player 实例变化 → 重新绑定
+                if (view.player !== Players.player) Players.bindPlayerView(view)
             },
+            onRelease = { view -> Players.unbindPlayerView(view) },
         )
 
         // 叠加控制层
@@ -901,16 +899,18 @@ private fun FullscreenPlayLayout(
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
-                AspectRatioFrameLayout(ctx).apply {
+                // fongmi 同款：Surface 全权交给 PlayerView 内部管理
+                PlayerView(ctx).apply {
+                    useController = false
                     resizeMode = playerState.scaleMode.resizeMode
-                    val tv = TextureView(ctx)
-                    addView(tv, FrameLayout.LayoutParams(-1, -1))
-                    val sub = SubtitleView(ctx)
-                    addView(sub, FrameLayout.LayoutParams(-1, -1))
-                    Players.attach(tv, sub)
+                    Players.bindPlayerView(this)
                 }
             },
-            update = { view -> view.resizeMode = playerState.scaleMode.resizeMode },
+            update = { view ->
+                view.resizeMode = playerState.scaleMode.resizeMode
+                if (view.player !== Players.player) Players.bindPlayerView(view)
+            },
+            onRelease = { view -> Players.unbindPlayerView(view) },
         )
 
         if (controlsVisible && !locked) {

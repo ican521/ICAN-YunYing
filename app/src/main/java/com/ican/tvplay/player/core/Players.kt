@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.TextureView
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -18,7 +17,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
-import androidx.media3.ui.SubtitleView
+import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -90,11 +89,10 @@ object Players {
 
     private var appContext: Context? = null
     private var currentSpec: PlaySpec? = null
-    private var subtitleView: SubtitleView? = null
     private var retryCount = 0
 
-    /** 保存最近一次 attach 的 view，player 创建/重建后自动 re-attach（解决 Compose AndroidView.factory 先于 LaunchedEffect 的时序问题） */
-    private var pendingTextureView: TextureView? = null
+    /** fongmi 同款：只保存绑定的 PlayerView，Surface 全权交给 PlayerView 内部管理（绝不手动 setVideoSurface） */
+    private var playerView: PlayerView? = null
 
     /** 跨站源场景下：提前 cache 的完整 Video 元数据（解决 VideoRepository 是单站点的 getVideo 查不到的问题） */
     data class CachedVideo(
@@ -155,10 +153,6 @@ object Players {
             )
         }
 
-        override fun onCues(cueGroup: androidx.media3.common.text.CueGroup) {
-            subtitleView?.setCues(cueGroup.cues)
-        }
-
         override fun onPlayerError(error: PlaybackException) {
             Log.e(TAG, "onPlayerError [retry=$retryCount]: ${error.errorCodeName}", error)
             if (handleError(error)) {
@@ -171,22 +165,21 @@ object Players {
 
     // ---- 生命周期 ----
 
-    /** 挂接视图：保存到 pending 字段，player 已存在则立即绑定；player 不存在等 ensurePlayer 创建后自动 re-attach */
-    fun attach(textureView: TextureView, subView: SubtitleView) {
-        pendingTextureView = textureView
-        subtitleView = subView
-        Log.d(TAG, "attach texture=$textureView player=$player pending=$pendingTextureView")
-        player?.setVideoTextureView(textureView)
+    /** fongmi 同款视图绑定：PlayerView 内部自管 Surface 的创建/绑定/释放 */
+    fun bindPlayerView(view: PlayerView) {
+        playerView = view
+        view.useController = false
+        view.player = player
+        Log.d(TAG, "bindPlayerView view=$view player=$player")
     }
 
-    /**
-     * 视图销毁时调用：只解绑 surface，不释放播放器
-     */
-    fun detach(textureView: TextureView) {
-        Log.d(TAG, "detach texture=$textureView")
-        pendingTextureView = null
-        if (subtitleView != null) subtitleView = null
-        player?.clearVideoTextureView(textureView)
+    /** 视图销毁时解绑（仅当是当前绑定的视图才清空，防止全屏/竖屏切换时误清新绑定） */
+    fun unbindPlayerView(view: PlayerView) {
+        if (playerView === view) {
+            playerView = null
+            view.player = null
+            Log.d(TAG, "unbindPlayerView view=$view")
+        }
     }
 
     /** 开始播放（或换源/换线路） */
@@ -201,6 +194,8 @@ object Players {
     /** 退出播放页时释放 */
     fun release() {
         handler.removeCallbacks(ticker)
+        playerView?.player = null
+        playerView = null
         player?.run {
             stop()          // 先 stop 释放媒体源，再 release
             removeListener(listener)
@@ -209,8 +204,6 @@ object Players {
         player = null
         currentSpec = null
         appContext = null
-        pendingTextureView = null
-        subtitleView = null
         _state.value = _state.value.copy(
             ready = false, playing = false, buffering = false,
             positionMs = 0L, durationMs = 0L, bufferedMs = 0L,
@@ -304,11 +297,11 @@ object Players {
         val p = buildPlayer(ctx, _state.value.decode, _state.value.bufferTier)
         player = p
         handler.post(ticker)
-        // 创建新 player 后立即 re-attach 之前保存的 surfaceView（修复 attach 先于 start 的时序）
-        pendingTextureView?.let { tv ->
-                Log.d(TAG, "ensurePlayer re-attach texture=$tv")
-                p.setVideoTextureView(tv)
-            }
+        // 创建新 player 后重新绑定到已保存的 PlayerView（PlayerView 内部自管 surface）
+        playerView?.let { pv ->
+            Log.d(TAG, "ensurePlayer re-bind playerView=$pv")
+            pv.player = p
+        }
         return p
     }
 
@@ -375,6 +368,7 @@ object Players {
         val wasPlaying = old.playWhenReady
         val spec = currentSpec
         handler.removeCallbacks(ticker)
+        playerView?.player = null   // 先解绑旧 player
         old.stop()           // 先 stop 释放媒体资源
         old.removeListener(listener)
         old.release()
@@ -382,8 +376,8 @@ object Players {
         val p = buildPlayer(ctx, _state.value.decode, _state.value.bufferTier)
         player = p
         handler.post(ticker)
-        // 重建后 re-attach surfaceView（可能已 pending 或仍在显示）
-        pendingTextureView?.let { p.setVideoTextureView(it) }
+        // 重新绑定到 PlayerView（PlayerView 内部自管 surface）
+        playerView?.let { it.player = p }
         if (spec != null) {
             retryCount = 0    // 重建后重置错误计数
             startInternal(p, spec, pos)
