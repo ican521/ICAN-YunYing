@@ -199,6 +199,12 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     private val settings = container.settingsRepository
     private val videoRepository = container.videoRepository
 
+    init {
+        // 启动即后台预热：已导入过配置时，加载站点/分类并把首页首屏拉进缓存，
+        // 用户切到首页时数据已就绪（fongmi 式启动预加载）
+        viewModelScope.launch { videoRepository.prewarmHome() }
+    }
+
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
     val dynamicColor: StateFlow<Boolean> = settings.dynamicColor
     val themeColor: StateFlow<Int> = settings.themeColor
@@ -220,17 +226,23 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
     fun setEnableBlur(enabled: Boolean) = settings.setEnableBlur(enabled)
 
-    /** 保存配置 URL 后立即重新拉取站点与分类 */
+    /** 保存配置 URL 后立即重新拉取站点与分类，并后台预热首页各分类首屏（fongmi 式） */
     fun setConfigUrl(url: String) {
         settings.setConfigUrl(url)
-        viewModelScope.launch { videoRepository.reload() }
+        viewModelScope.launch {
+            videoRepository.reload()
+            videoRepository.prewarmHome()
+        }
     }
 
     /** 配置中全部可切换站点 */
     suspend fun listSites() = videoRepository.listSites()
 
-    /** 切换站源：仓库层会保存选择并重新加载分类 */
+    /** 切换站源：仓库层会保存选择并重新加载分类，随后后台预热首页首屏 */
     fun switchSite(siteKey: String) {
-        viewModelScope.launch { videoRepository.switchSite(siteKey) }
+        viewModelScope.launch {
+            videoRepository.switchSite(siteKey)
+            videoRepository.prewarmHome()
+        }
     }
 }

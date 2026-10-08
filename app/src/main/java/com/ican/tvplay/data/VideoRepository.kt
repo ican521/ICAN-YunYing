@@ -13,6 +13,9 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.data.remote.VodApiClient
 import com.ican.tvplay.data.remote.VodClass
 import com.ican.tvplay.data.remote.VodItem
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,6 +62,10 @@ class VideoRepository(
 
     private val loadMutex = Mutex()
 
+    /** 首屏分类视频缓存（key = siteKey|catId）——fongmi 式预加载：
+     *  导入配置/切站点后预热写入，进入首页直接命中，秒出卡片 */
+    private val homeCache = java.util.concurrent.ConcurrentHashMap<String, List<Video>>()
+
     private val rawJson = Json { ignoreUnknownKeys = true }
 
     /** 当前站点对应的 Spider 实例（仅 type=3 时非空） */
@@ -75,6 +82,8 @@ class VideoRepository(
 
     /** 强制重新加载（导入新配置后调用） */
     suspend fun reload() {
+        // 站点/配置变更后旧缓存全部作废
+        homeCache.clear()
         val url = settingsRepository.configUrl.value
         if (url.isBlank()) {
             _currentSite.value = null
@@ -140,7 +149,12 @@ class VideoRepository(
         if (cats.isEmpty()) return emptyList()
 
         return if (categoryId == null) {
-            cats.map { cat -> cat to loadCategoryVideos(loaded, cat, page = 1) }
+            // 「全部」分区：所有分类并行加载（fongmi 同款），不再串行排队
+            coroutineScope {
+                cats.map { cat ->
+                    async { cat to loadCategoryVideos(loaded, cat, page = 1) }
+                }.awaitAll()
+            }
         } else {
             val cat = cats.firstOrNull { it.id == categoryId } ?: return emptyList()
             listOf(cat to loadCategoryVideos(loaded, cat, page = 1))
@@ -225,13 +239,43 @@ class VideoRepository(
         cat: VideoCategory,
         page: Int,
     ): List<Video> {
+        // 首页第一页走缓存（预热的收益点）；翻页不缓存
+        if (page == 1) {
+            val key = "${loaded.site.key}|${cat.id}"
+            homeCache[key]?.let { return it }
+            val list = fetchCategoryVideos(loaded, cat)
+            homeCache[key] = list
+            return list
+        }
+        return fetchCategoryVideos(loaded, cat)
+    }
+
+    private suspend fun fetchCategoryVideos(
+        loaded: LoadedSite,
+        cat: VideoCategory,
+    ): List<Video> {
         return if (loaded.site.isSpider()) {
             val spider = currentSpider ?: return emptyList()
-            val json = spiderManager.categoryContent(spider, cat.id, page, filter = true)
+            val json = spiderManager.categoryContent(spider, cat.id, 1, filter = true)
             parseList(json).map { it.toVideo(cat) }
         } else {
-            apiClient.categoryVideos(loaded.site, cat.id, page).map { it.toVideo(cat) }
+            apiClient.categoryVideos(loaded.site, cat.id, 1).map { it.toVideo(cat) }
         }
+    }
+
+    /**
+     * 后台预热首页各分类首屏进缓存（fongmi 式：导入配置/切站点后立即预加载）。
+     * 完成后首页卡片直接命中缓存，秒出。
+     */
+    suspend fun prewarmHome() {
+        ensureLoaded()
+        val loaded = _currentSite.value ?: return
+        val cats = _categories.value
+        if (cats.isEmpty()) return
+        coroutineScope {
+            cats.map { cat -> async { loadCategoryVideos(loaded, cat, page = 1) } }.awaitAll()
+        }
+        Log.d(REPO_TAG, "prewarmHome done cats=${cats.size}")
     }
 
     private suspend fun fetchDetail(loaded: LoadedSite, vodId: String): VodItem? {
