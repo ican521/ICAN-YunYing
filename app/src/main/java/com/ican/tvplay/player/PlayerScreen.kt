@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -33,6 +34,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
@@ -378,9 +380,9 @@ private fun PortraitPlayLayout(
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
     var showAddSub by remember { mutableStateOf(false) }
-    var showLineDialog by remember { mutableStateOf(false) }
     var expandedDesc by remember { mutableStateOf(false) }
     var showAllEps by remember { mutableStateOf(false) }
+    var reversedEp by remember { mutableStateOf(false) }
     var isFav by remember { mutableStateOf(false) }
 
     LaunchedEffect(current?.id) {
@@ -388,6 +390,14 @@ private fun PortraitPlayLayout(
             isFav = container.favoriteDao.isFavorite(current.id)
         }
     }
+
+    // 单一 Column 根：NavHost 目的地容器会给多个顶层子元素传播 fill 约束，
+    // 多顶层发射会让底部标签栏被拉伸成全屏、白色背景盖住视频区（"纯白底+只有按钮"的根因）
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
 
     // === 视频播放区 ===
     Box(
@@ -425,6 +435,23 @@ private fun PortraitPlayLayout(
                 positionMs = playerState.positionMs,
                 durationMs = playerState.durationMs,
                 playing = playerState.playing,
+                isFav = isFav,
+                onFav = {
+                    scope.launch {
+                        val v = current ?: return@launch
+                        if (container.favoriteDao.isFavorite(v.id)) {
+                            container.favoriteDao.delete(v.id)
+                        } else {
+                            container.favoriteDao.upsert(
+                                FavoriteEntity(
+                                    videoId = v.id, title = v.title, cover = v.cover,
+                                    categoryName = v.categoryName, addedAt = System.currentTimeMillis(),
+                                ),
+                            )
+                        }
+                        isFav = container.favoriteDao.isFavorite(v.id)
+                    }
+                },
                 onSeek = { Players.seekTo(it) },
                 onBack = onBack,
                 onFullscreen = onEnterFullscreen,
@@ -432,6 +459,23 @@ private fun PortraitPlayLayout(
                 onPrev = onPrev,
                 onNext = onNext,
                 onTogglePlay = onTogglePlay,
+                bottomActions = {
+                    ControlChip(playerState.decode.label) { showDecode = true }
+                    ControlChip(playerState.bufferTier.label) { showBuffer = true }
+                    ControlChip(formatSpeed(playerState.speed)) { showSpeed = true }
+                    ControlChip(playerState.scaleMode.label) { showScale = true }
+                    ControlChip("字幕") { showText = true }
+                    ControlChip("音轨") { showAudio = true }
+                    ControlChip("重播") { Players.seekTo(0) }
+                },
+            )
+        }
+
+        // 加载转圈（fongmi: view_progress）
+        if (playerState.buffering) {
+            CircularProgressIndicator(
+                color = Color.White,
+                modifier = Modifier.align(Alignment.Center).size(36.dp),
             )
         }
 
@@ -467,23 +511,24 @@ private fun PortraitPlayLayout(
     // === 可滚动详情信息流 ===
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .weight(1f)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         val v = current ?: return@Column
 
-        // 标题
+        // 标题（fongmi: name，20sp 粗体，最多 3 行）
         Text(
             text = v.title,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
         )
 
-        // 更新备注
+        // 更新备注（fongmi: remark）
         val eps = v.playSources.firstOrNull()?.episodes ?: v.episodes
         val remark = when {
             eps.isEmpty() -> ""
@@ -498,14 +543,14 @@ private fun PortraitPlayLayout(
             )
         }
 
-        // 站源
+        // 站源（fongmi: site）
         Text(
             text = "站源：$lineFlag",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        // 年份/地区/类型
+        // 年份/地区/类型（fongmi: other）
         val meta = buildString {
             if (v.year > 0) append("年份：${v.year}")
             if (v.region.isNotBlank()) {
@@ -525,93 +570,47 @@ private fun PortraitPlayLayout(
             )
         }
 
-        // 操作按钮行
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            ActionBtn(
-                icon = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
-                text = if (isFav) "已收藏" else "收藏",
-                tint = if (isFav) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurface,
-            ) {
-                scope.launch {
-                    if (container.favoriteDao.isFavorite(v.id)) {
-                        container.favoriteDao.delete(v.id)
-                    } else {
-                        container.favoriteDao.upsert(
-                            FavoriteEntity(
-                                videoId = v.id, title = v.title, cover = v.cover,
-                                categoryName = v.categoryName, addedAt = System.currentTimeMillis(),
-                            ),
+        // === 线路（fongmi: detail_flag 区块）===
+        Text(
+            text = "线路",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(v.playSources) { source ->
+                val selected = source.flag == lineFlag
+                val shape = RoundedCornerShape(8.dp)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .tvCardEffect(
+                            onClick = { onLineChange(source.flag) },
+                            shape = shape, focusedScale = 1.06f, glow = false,
                         )
-                    }
-                    isFav = container.favoriteDao.isFavorite(v.id)
-                }
-            }
-            ActionBtn(icon = AppIcons.Speed, text = formatSpeed(playerState.speed)) { showSpeed = true }
-            ActionBtn(icon = AppIcons.Settings, text = playerState.scaleMode.label) { showScale = true }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // === 线路 ===
-        if (v.playSources.size > 1) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "线路",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = "切换 ▸",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { showLineDialog = true },
-                )
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(v.playSources) { source ->
-                    val selected = source.flag == lineFlag
-                    val shape = RoundedCornerShape(8.dp)
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .tvCardEffect(
-                                onClick = { onLineChange(source.flag) },
-                                shape = shape, focusedScale = 1.06f, glow = false,
-                            )
-                            .background(
-                                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                                shape,
-                            )
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                    ) {
-                        Text(
-                            text = source.flag,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (selected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            maxLines = 1,
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                            shape,
                         )
-                    }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        text = source.flag,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1,
+                    )
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // === 选集 ===
+        // === 选集（fongmi: detail_episode 标题行 + 倒序 + 更多）===
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -621,6 +620,14 @@ private fun PortraitPlayLayout(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = if (reversedEp) "正序" else "倒序",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    .clickable { reversedEp = !reversedEp },
             )
             Spacer(modifier = Modifier.weight(1f))
             Text(
@@ -632,15 +639,13 @@ private fun PortraitPlayLayout(
         }
         Spacer(modifier = Modifier.height(6.dp))
 
-        val epsToShow = if (showAllEps || lineEpisodes.size <= 20) {
-            lineEpisodes
-        } else {
-            lineEpisodes.take(20)
-        }
+        val displayEps = if (reversedEp) lineEpisodes.asReversed() else lineEpisodes
+        fun realIdx(displayIdx: Int) = if (reversedEp) lineEpisodes.size - 1 - displayIdx else displayIdx
 
-        if (showAllEps || lineEpisodes.size <= 20) {
+        if (showAllEps) {
+            // 网格模式（fongmi "更多" 切换后的样式）
             val cols = if (lineEpisodes.size > 50) 8 else 6
-            val rows = epsToShow.chunked(cols)
+            val rows = displayEps.mapIndexed { i, ep -> i to ep }.chunked(cols)
             Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -649,8 +654,8 @@ private fun PortraitPlayLayout(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        row.forEach { ep ->
-                            val idx = lineEpisodes.indexOf(ep)
+                        row.forEach { (dispIdx, ep) ->
+                            val idx = realIdx(dispIdx)
                             EpisodeChip(
                                 title = ep.title,
                                 selected = idx == episodeIndex,
@@ -666,8 +671,10 @@ private fun PortraitPlayLayout(
                 }
             }
         } else {
+            // 默认横向滚动（fongmi: adapter_episode_hori）
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(epsToShow.withIndex().toList()) { (idx, ep) ->
+                itemsIndexed(displayEps) { dispIdx, ep ->
+                    val idx = realIdx(dispIdx)
                     EpisodeChip(
                         title = ep.title,
                         selected = idx == episodeIndex,
@@ -699,23 +706,6 @@ private fun PortraitPlayLayout(
         Spacer(modifier = Modifier.height(60.dp))
     }
 
-    // === 底部标签栏 ===
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        MiniTag(playerState.decode.label)
-        MiniTag(formatSpeed(playerState.speed)) { showSpeed = true }
-        MiniTag(playerState.scaleMode.label) { showScale = true }
-        MiniTag(playerState.bufferTier.label) { showBuffer = true }
-        MiniTag("刷新") { Players.release() }
-    }
-
     // === 对话框 ===
     if (showSpeed) {
         OptionDialog("倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
@@ -728,16 +718,6 @@ private fun PortraitPlayLayout(
     }
     if (showBuffer) {
         OptionDialog("缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
-    }
-    if (showLineDialog && current != null) {
-        OptionDialog(
-            title = "切换线路",
-            options = current.playSources,
-            current = current.playSources.firstOrNull { it.flag == lineFlag },
-            label = { it.flag },
-            onSelect = { onLineChange(it.flag); showLineDialog = false },
-            onDismiss = { showLineDialog = false },
-        )
     }
     if (showAudio) {
         OptionDialog("音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }) { showAudio = false }
@@ -758,6 +738,7 @@ private fun PortraitPlayLayout(
             onDismiss = { showAddSub = false },
         )
     }
+    } // Column 根结束
 }
 
 // ========== 视频叠加控制层（竖屏） ==========
@@ -768,6 +749,8 @@ private fun VideoOverlay(
     positionMs: Long,
     durationMs: Long,
     playing: Boolean,
+    isFav: Boolean,
+    onFav: () -> Unit,
     onSeek: (Long) -> Unit,
     onBack: () -> Unit,
     onFullscreen: () -> Unit,
@@ -775,9 +758,10 @@ private fun VideoOverlay(
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onTogglePlay: () -> Unit,
+    bottomActions: @Composable () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // 顶部栏
+        // 顶部栏（fongmi: 返回 + 标题 + 收藏）
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -800,6 +784,11 @@ private fun VideoOverlay(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(start = 8.dp),
             )
+            MiniCircleBtn(
+                if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
+                if (isFav) "已收藏" else "收藏",
+                tint = if (isFav) Color(0xFFFF5C8A) else Color.White,
+            ) { onFav() }
             MiniCircleBtn(AppIcons.Fullscreen, "全屏") { onFullscreen() }
             MiniCircleBtn(AppIcons.Lock, "锁屏") { onLock() }
         }
@@ -820,9 +809,8 @@ private fun VideoOverlay(
             MiniLargeBtn(AppIcons.SkipNext, "下集", onClick = { onNext() })
         }
 
-        // 底部进度条
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        // 底部：进度条 + 动作栏（fongmi: seek + view_control_vod_action）
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
@@ -833,26 +821,35 @@ private fun VideoOverlay(
                 )
                 .padding(horizontal = 12.dp, vertical = 6.dp),
         ) {
-            Text(
-                text = formatMs(positionMs),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
-            )
-            Slider(
-                value = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f,
-                onValueChange = { onSeek((it * durationMs).toLong()) },
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                    inactiveTrackColor = Color(0x44FFFFFF),
-                ),
-            )
-            Text(
-                text = formatMs(durationMs),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = formatMs(positionMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                )
+                Slider(
+                    value = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f,
+                    onValueChange = { onSeek((it * durationMs).toLong()) },
+                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = Color(0x44FFFFFF),
+                    ),
+                )
+                Text(
+                    text = formatMs(durationMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                )
+            }
+            // 动作栏：横向滚动文字按钮（fongmi: 解码/倍速/缩放/字幕/音轨…）
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            ) {
+                bottomActions()
+            }
         }
     }
 }
@@ -1055,14 +1052,33 @@ private fun MiniTag(text: String, onClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun MiniCircleBtn(icon: ImageVector, desc: String, onClick: () -> Unit) {
+private fun MiniCircleBtn(
+    icon: ImageVector,
+    desc: String,
+    tint: Color = Color.White,
+    onClick: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .size(32.dp)
             .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.08f, glow = false)
             .background(Color(0x55000000), CircleShape),
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, desc, tint = Color.White, modifier = Modifier.size(16.dp)) }
+    ) { Icon(icon, desc, tint = tint, modifier = Modifier.size(16.dp)) }
+}
+
+/** 播放器底部动作栏文字按钮（fongmi: style/Control，白色小字横向滚动） */
+@Composable
+private fun ControlChip(text: String, onClick: () -> Unit) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = Color.White,
+        maxLines = 1,
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+    )
 }
 
 @Composable
