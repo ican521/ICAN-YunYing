@@ -1,7 +1,11 @@
 package com.ican.tvplay.ui.home
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -382,12 +386,41 @@ private fun HomeTopBar(
             )
         }
 
-        // 历史按钮
+        // 历史按钮（试验：物理按压效果——按下果冻挤压，松手弹簧回弹过冲）
+        val historyInteraction = remember { MutableInteractionSource() }
+        val historyPressed by historyInteraction.collectIsPressedAsState()
+        val historySquashX by animateFloatAsState(
+            targetValue = if (historyPressed) 0.90f else 1f,
+            animationSpec = if (historyPressed) {
+                spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
+            } else {
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+            },
+            label = "historySquashX",
+        )
+        val historySquashY by animateFloatAsState(
+            targetValue = if (historyPressed) 0.95f else 1f,
+            animationSpec = if (historyPressed) {
+                spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
+            } else {
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+            },
+            label = "historySquashY",
+        )
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(48.dp)
-                .tvCardEffect(onClick = onHistoryClick, shape = CircleShape, focusedScale = 1.1f)
+                .graphicsLayer {
+                    scaleX = historySquashX
+                    scaleY = historySquashY
+                }
+                .tvCardEffect(
+                    onClick = onHistoryClick,
+                    shape = CircleShape,
+                    focusedScale = 1.1f,
+                    interactionSource = historyInteraction,
+                )
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
