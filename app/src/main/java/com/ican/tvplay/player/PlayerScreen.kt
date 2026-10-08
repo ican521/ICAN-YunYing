@@ -58,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.SubtitleView
@@ -238,12 +240,27 @@ fun PlayerScreen(
 
     // Surface 生命周期
     DisposableEffect(Unit) {
+        // 监听 Activity 生命周期：切后台自动 pause，回前台 resume
+        val activity = context as? android.app.Activity
+        val lifecycle = (activity as? androidx.lifecycle.LifecycleOwner)?.lifecycle
+        val lifecycleObserver = object : DefaultLifecycleObserver {
+            override fun onPause(owner: LifecycleOwner) { Players.onPause() }
+            override fun onResume(owner: LifecycleOwner) { Players.onResume() }
+        }
+        lifecycle?.addObserver(lifecycleObserver)
+
         onDispose {
-            val activity = context as? Activity
-            Players.release()
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            if (activity?.isChangingConfigurations != true) {
+            lifecycle?.removeObserver(lifecycleObserver)
+            val isConfigChange = activity?.isChangingConfigurations == true
+            // 屏幕旋转：只保存进度 + 解锁方向，不 release 播放器（单例保持播放）
+            if (isConfigChange) {
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                 saveProgress()
+            } else {
+                // 真正退出：保存进度 + release
+                saveProgress()
+                Players.release()
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
         }
     }

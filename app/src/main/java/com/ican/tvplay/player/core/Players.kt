@@ -153,8 +153,11 @@ object Players {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            Log.e(TAG, "onPlayerError: ${error.errorCodeName}", error)
-            if (handleError(error)) return
+            Log.e(TAG, "onPlayerError [retry=$retryCount]: ${error.errorCodeName}", error)
+            if (handleError(error)) {
+                _state.value = _state.value.copy(error = null)  // 重试成功后清掉错误提示
+                return
+            }
             _state.value = _state.value.copy(error = error.errorCodeName)
         }
     }
@@ -181,7 +184,7 @@ object Players {
     fun start(context: Context, spec: PlaySpec, startPositionMs: Long = 0L) {
         appContext = context.applicationContext
         currentSpec = spec
-        retryCount = 0
+        retryCount = 0  // 新源重置错误计数
         val p = ensurePlayer()
         startInternal(p, spec, startPositionMs)
     }
@@ -189,16 +192,33 @@ object Players {
     /** 退出播放页时释放 */
     fun release() {
         handler.removeCallbacks(ticker)
-        player?.release()
+        player?.run {
+            stop()          // 先 stop 释放媒体源，再 release
+            removeListener(listener)
+            release()
+        }
         player = null
         currentSpec = null
         appContext = null
+        pendingSurfaceView = null
         subtitleView = null
         _state.value = _state.value.copy(
             ready = false, playing = false, buffering = false,
             positionMs = 0L, durationMs = 0L, bufferedMs = 0L,
             audioTracks = emptyList(), textTracks = emptyList(), error = null,
         )
+    }
+
+    /** 后台：暂停并释放音频焦点（不销毁 player，页面回来还能恢复） */
+    fun onPause() {
+        player?.pause()
+        player?.playWhenReady = false
+    }
+
+    /** 前台：恢复播放 */
+    fun onResume() {
+        player?.playWhenReady = true
+        player?.play()
     }
 
     // ---- 播放控制 ----
@@ -305,7 +325,14 @@ object Players {
             .setLoadControl(loadControl)
             .build()
             .apply {
-                setAudioAttributes(androidx.media3.common.AudioAttributes.DEFAULT, true)
+                // CONTENT_TYPE_MOVIE 让系统把 AC3/EAC3/DTS 等音频路由到正确的硬件路径
+                setAudioAttributes(
+                    androidx.media3.common.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MOVIE)
+                        .build(),
+                    true,
+                )
                 setHandleAudioBecomingNoisy(true)
                 playWhenReady = true
                 addListener(listener)
@@ -314,6 +341,9 @@ object Players {
     }
 
     private fun startInternal(p: ExoPlayer, spec: PlaySpec, positionMs: Long) {
+        // 换源前先 stop 释放上一个 MediaSource，避免资源冲突导致无声/崩溃
+        p.stop()
+        p.clearMediaItems()
         val item = MediaItemFactory.from(spec)
         val headers = MediaItemFactory.checkUa(spec.headers)
         if (headers.isNotEmpty()) {
@@ -336,6 +366,8 @@ object Players {
         val wasPlaying = old.playWhenReady
         val spec = currentSpec
         handler.removeCallbacks(ticker)
+        old.stop()           // 先 stop 释放媒体资源
+        old.removeListener(listener)
         old.release()
         player = null
         val p = buildPlayer(ctx, _state.value.decode, _state.value.bufferTier)
@@ -344,6 +376,7 @@ object Players {
         // 重建后 re-attach surfaceView（可能已 pending 或仍在显示）
         pendingSurfaceView?.let { p.setVideoSurfaceView(it) }
         if (spec != null) {
+            retryCount = 0    // 重建后重置错误计数
             startInternal(p, spec, pos)
             if (!wasPlaying) p.pause()
         }
