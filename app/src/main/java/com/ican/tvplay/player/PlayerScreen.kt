@@ -220,6 +220,14 @@ fun PlayerScreen(
         }
     }
 
+    // 防御性 surface 重新绑定：解决 MultiSourceSearchScreen 预启动 PlayerScreen 后有声音无画面
+    LaunchedEffect(initialized) {
+        if (!initialized) return@LaunchedEffect
+        // 等 AndroidView 一帧时间让 SurfaceView 被布局、Surface 创建
+        delay(150)
+        Players.rebindSurface()
+    }
+
     // 自动隐藏控制层
     LaunchedEffect(controlsVisible, locked, playerState.playing) {
         if (!controlsVisible || locked) return@LaunchedEffect
