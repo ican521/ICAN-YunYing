@@ -526,27 +526,10 @@ private fun PortraitPlayLayout(
                         ),
                     )
                     Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    // 全屏按钮：随控制层显示/隐藏（与播放暂停按钮同机制），位于小窗右下角
+                    MiniCircleBtn(AppIcons.Fullscreen, "全屏") { onEnterFullscreen() }
                 }
             }
-        }
-
-        // 全屏按钮：常显于右下角（控制层显示时保持在最上层）
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(8.dp)
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.45f))
-                .clickable { onEnterFullscreen() },
-            contentAlignment = Alignment.Center,
-        ) {
-            androidx.tv.material3.Icon(
-                imageVector = AppIcons.Fullscreen,
-                contentDescription = "全屏",
-                tint = Color.White,
-                modifier = Modifier.size(18.dp),
-            )
         }
 
         // 加载转圈（fongmi: view_progress）
