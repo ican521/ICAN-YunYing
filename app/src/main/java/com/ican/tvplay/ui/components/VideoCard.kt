@@ -36,7 +36,6 @@ fun VideoCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     width: Dp = 148.dp,
-    onImageSettled: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier
@@ -54,13 +53,6 @@ fun VideoCard(
                 contentDescription = video.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxWidth().height(width * 4f / 3f),
-                onState = { state ->
-                    if (state is coil3.compose.AsyncImagePainter.State.Success ||
-                        state is coil3.compose.AsyncImagePainter.State.Error
-                    ) {
-                        onImageSettled?.invoke()
-                    }
-                },
             )
 
             // 底部渐变，保证标题可读
