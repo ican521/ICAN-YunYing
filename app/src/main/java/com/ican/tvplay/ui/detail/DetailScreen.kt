@@ -80,14 +80,17 @@ fun DetailScreen(
             .background(MaterialTheme.colorScheme.background),
     ) {
         // 顶部大海报区域
-        item { DetailHero(video = current, onBack = onBack) }
-
-        // 操作按钮 + 信息
-        item {
-            DetailActions(
+        item { DetailHero(
                 video = current,
                 isFavorite = isFavorite,
                 onToggleFavorite = { viewModel.toggleFavorite(current) },
+                onBack = onBack,
+            ) }
+
+        // 操作按钮行
+        item {
+            DetailActions(
+                isFavorite = isFavorite,
                 onPlay = {
                     val flag = current.playSources.getOrNull(selectedSourceIndex)?.flag.orEmpty()
                     onPlay(current.id, 0, flag)
@@ -124,9 +127,14 @@ fun DetailScreen(
     }
 }
 
-/** 顶部大海报：封面横幅 + 渐变遮罩 + 标题/标签/简介 + 返回按钮 */
+/** 顶部大海报：封面横幅 + 渐变遮罩 + 标题/标签/简介 + 左上返回 + 右上收藏 */
 @Composable
-private fun DetailHero(video: Video, onBack: () -> Unit) {
+private fun DetailHero(
+    video: Video,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onBack: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -150,14 +158,22 @@ private fun DetailHero(video: Video, onBack: () -> Unit) {
                     ),
                 ),
         )
-        // 左上角返回按钮
+        // 顶部状态栏按钮行：左返回 + 右收藏
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .statusBarsPadding()
-                .padding(start = 12.dp, top = 8.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
             CircleIconButton(icon = AppIcons.Back, contentDescription = "返回", onClick = onBack)
+            Spacer(modifier = Modifier.weight(1f))
+            CircleIconButton(
+                icon = if (isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
+                contentDescription = if (isFavorite) "已收藏" else "收藏",
+                onClick = onToggleFavorite,
+                tint = if (isFavorite) Color(0xFFFF5C8A) else Color.White,
+            )
         }
         // 海报底部：标题 + 标签
         Column(
@@ -192,26 +208,22 @@ private fun DetailHero(video: Video, onBack: () -> Unit) {
     }
 }
 
-/** 立即播放 + 收藏按钮行 */
+/** 立即播放主按钮 */
 @Composable
 private fun DetailActions(
-    video: Video,
     isFavorite: Boolean,
-    onToggleFavorite: () -> Unit,
     onPlay: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 立即播放（主题色主按钮）
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .weight(1f)
+                .fillMaxWidth()
                 .tvCardEffect(
                     onClick = onPlay,
                     shape = RoundedCornerShape(percent = 50),
@@ -232,32 +244,6 @@ private fun DetailActions(
                 text = "立即播放",
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
-                modifier = Modifier.padding(start = 6.dp),
-            )
-        }
-        // 收藏按钮
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .tvCardEffect(
-                    onClick = onToggleFavorite,
-                    shape = RoundedCornerShape(percent = 50),
-                    focusedScale = 1.04f,
-                    glow = false,
-                )
-                .background(Color(0x22FFFFFF), RoundedCornerShape(percent = 50))
-                .padding(horizontal = 18.dp, vertical = 13.dp),
-        ) {
-            Icon(
-                imageVector = if (isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
-                contentDescription = null,
-                tint = if (isFavorite) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
-            )
-            Text(
-                text = if (isFavorite) "已收藏" else "收藏",
-                style = MaterialTheme.typography.titleSmall,
-                color = if (isFavorite) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 6.dp),
             )
         }

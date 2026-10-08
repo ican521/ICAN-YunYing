@@ -141,6 +141,7 @@ fun HistoryScreen(
                     HistoryCard(
                         history = history,
                         onClick = { onVideoClick(history.videoId) },
+                        onDelete = { viewModel.removeHistory(history.videoId) },
                     )
                 }
             }
@@ -296,6 +297,7 @@ private fun CollectionCard(
 private fun HistoryCard(
     history: HistoryEntity,
     onClick: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     val progress = if (history.durationMs > 0) {
         (history.positionMs.toFloat() / history.durationMs).coerceIn(0f, 1f)
@@ -320,6 +322,28 @@ private fun HistoryCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
+            // 右上角删除按钮
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(30.dp)
+                    .tvCardEffect(
+                        onClick = onDelete,
+                        shape = RoundedCornerShape(percent = 50),
+                        focusedScale = 1.1f,
+                        glow = false,
+                    )
+                    .background(Color(0x88000000), RoundedCornerShape(percent = 50)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = AppIcons.Close,
+                    contentDescription = "删除",
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
