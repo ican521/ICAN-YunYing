@@ -18,11 +18,14 @@ class TvPlayApplication : Application() {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
+        android.util.Log.d("Startup", "app onCreate begin")
         super.onCreate()
         container = AppContainer(this)
+        android.util.Log.d("Startup", "app onCreate end")
 
         // 启动时预加载已保存的接口配置，拉取站点与分类
         appScope.launch {
+            android.util.Log.d("Startup", "ensureLoaded launch")
             container.videoRepository.ensureLoaded()
         }
     }

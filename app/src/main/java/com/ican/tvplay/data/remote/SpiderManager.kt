@@ -7,6 +7,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -36,6 +38,11 @@ class SpiderManager(private val appContext: Context) {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    /** spider jar 非线程安全：同一实例的全部反射调用必须串行（fongmi 用单线程执行器，这里每实例一把 Mutex） */
+    private val spiderLocks = ConcurrentHashMap<Any, Mutex>()
+
+    private fun lockOf(spider: Any): Mutex = spiderLocks.computeIfAbsent(spider) { Mutex() }
 
     companion object {
         // 全局缓存：SpiderManager 可能随 ViewModel 重建，jar/classloader/spider 实例
@@ -85,31 +92,36 @@ class SpiderManager(private val appContext: Context) {
         }
         return withContext(Dispatchers.IO) {
             runCatching {
-                val className = "com.github.catvod.spider." + site.api.removePrefix("csp_")
-                Log.d(TAG, "loadSpider class=$className key=${site.key}")
-                val cls = loader.loadClass(className)
-                val instance = cls.getDeclaredConstructor().newInstance()
-                Log.d(TAG, "spider instantiated: $className")
-                // 与 fongmi JarLoader 一致：设置 Spider.siteKey 公共字段
-                runCatching {
-                    cls.getField("siteKey").set(instance, site.key)
-                }.onFailure { Log.w(TAG, "set siteKey fail", it) }
-                val extString = site.extAsString()
-                // 优先 init(Context, String)；失败回退 init(Context)
-                runCatching {
-                    cls.getMethod("init", Context::class.java, String::class.java)
-                        .invoke(instance, appContext, extString)
-                    Log.d(TAG, "spider init(ctx,ext) done: $className")
-                }.onFailure { t1 ->
-                    Log.w(TAG, "init(ctx, ext) fail, fallback init(ctx)", t1)
+                // 同一站点实例化串行化：init 不能并发进 jar（并发 init 会触发 jar 内部崩溃）
+                val instanceLock = locks.computeIfAbsent("init|$spKey") { Any() }
+                synchronized(instanceLock) {
+                    spiders[spKey]?.let { return@synchronized it }
+                    val className = "com.github.catvod.spider." + site.api.removePrefix("csp_")
+                    Log.d(TAG, "loadSpider class=$className key=${site.key}")
+                    val cls = loader.loadClass(className)
+                    val instance = cls.getDeclaredConstructor().newInstance()
+                    Log.d(TAG, "spider instantiated: $className")
+                    // 与 fongmi JarLoader 一致：设置 Spider.siteKey 公共字段
                     runCatching {
-                        cls.getMethod("init", Context::class.java).invoke(instance, appContext)
-                    }.onFailure { t2 ->
-                        Log.e(TAG, "init(ctx) fail", t2)
+                        cls.getField("siteKey").set(instance, site.key)
+                    }.onFailure { Log.w(TAG, "set siteKey fail", it) }
+                    val extString = site.extAsString()
+                    // 优先 init(Context, String)；失败回退 init(Context)
+                    runCatching {
+                        cls.getMethod("init", Context::class.java, String::class.java)
+                            .invoke(instance, appContext, extString)
+                        Log.d(TAG, "spider init(ctx,ext) done: $className")
+                    }.onFailure { t1 ->
+                        Log.w(TAG, "init(ctx, ext) fail, fallback init(ctx)", t1)
+                        runCatching {
+                            cls.getMethod("init", Context::class.java).invoke(instance, appContext)
+                        }.onFailure { t2 ->
+                            Log.e(TAG, "init(ctx) fail", t2)
+                        }
                     }
+                    spiders[spKey] = instance
+                    instance
                 }
-                spiders[spKey] = instance
-                instance
             }.onFailure { Log.e(TAG, "getSpider fail", it) }.getOrNull()
         }
     }
@@ -129,11 +141,13 @@ class SpiderManager(private val appContext: Context) {
 
     /** homeContent(boolean filter) → JSON {class, list, filters} */
     suspend fun homeContent(spider: Any, filter: Boolean = true): String = withContext(Dispatchers.IO) {
-        runCatching {
-            val result = spider.javaClass.getMethod("homeContent", Boolean::class.javaPrimitiveType)
-                .invoke(spider, filter) as? String ?: ""
-            Log.d(TAG, "homeContent bytes=${result.length} head=${result.take(120)}")
-            result
+        lockOf(spider).withLock {
+            runCatching {
+                val result = spider.javaClass.getMethod("homeContent", Boolean::class.javaPrimitiveType)
+                    .invoke(spider, filter) as? String ?: ""
+                Log.d(TAG, "homeContent bytes=${result.length} head=${result.take(120)}")
+                result
+            }
         }.onFailure { Log.e(TAG, "homeContent fail", it) }.getOrDefault("")
     }
 
@@ -144,47 +158,55 @@ class SpiderManager(private val appContext: Context) {
         pg: Int,
         filter: Boolean = true,
     ): String = withContext(Dispatchers.IO) {
-        runCatching {
-            spider.javaClass.getMethod(
-                "categoryContent",
-                String::class.java,
-                String::class.java,
-                Boolean::class.javaPrimitiveType,
-                HashMap::class.java,
-            ).invoke(spider, tid, pg.toString(), filter, HashMap<String, String>()) as? String ?: ""
+        lockOf(spider).withLock {
+            runCatching {
+                spider.javaClass.getMethod(
+                    "categoryContent",
+                    String::class.java,
+                    String::class.java,
+                    Boolean::class.javaPrimitiveType,
+                    HashMap::class.java,
+                ).invoke(spider, tid, pg.toString(), filter, HashMap<String, String>()) as? String ?: ""
+            }
         }.onFailure { Log.e(TAG, "categoryContent fail tid=$tid pg=$pg", it) }.getOrDefault("")
     }
 
     /** detailContent(List ids) → JSON {list} */
     suspend fun detailContent(spider: Any, ids: List<String>): String = withContext(Dispatchers.IO) {
-        runCatching {
-            spider.javaClass.getMethod("detailContent", List::class.java)
-                .invoke(spider, ids) as? String ?: ""
+        lockOf(spider).withLock {
+            runCatching {
+                spider.javaClass.getMethod("detailContent", List::class.java)
+                    .invoke(spider, ids) as? String ?: ""
+            }
         }.onFailure { Log.e(TAG, "detailContent fail", it) }.getOrDefault("")
     }
 
     /** searchContent(key, quick) → JSON {list} */
     suspend fun searchContent(spider: Any, key: String, quick: Boolean = true): String =
         withContext(Dispatchers.IO) {
-            runCatching {
-                spider.javaClass.getMethod(
-                    "searchContent",
-                    String::class.java,
-                    Boolean::class.javaPrimitiveType,
-                ).invoke(spider, key, quick) as? String ?: ""
+            lockOf(spider).withLock {
+                runCatching {
+                    spider.javaClass.getMethod(
+                        "searchContent",
+                        String::class.java,
+                        Boolean::class.javaPrimitiveType,
+                    ).invoke(spider, key, quick) as? String ?: ""
+                }
             }.onFailure { Log.e(TAG, "searchContent fail key=$key", it) }.getOrDefault("")
         }
 
     /** playerContent(flag, id, List vipFlags) → JSON {url, header, parse, jx} */
     suspend fun playerContent(spider: Any, flag: String, id: String): String =
         withContext(Dispatchers.IO) {
-            runCatching {
-                spider.javaClass.getMethod(
-                    "playerContent",
-                    String::class.java,
-                    String::class.java,
-                    List::class.java,
-                ).invoke(spider, flag, id, emptyList<String>()) as? String ?: ""
+            lockOf(spider).withLock {
+                runCatching {
+                    spider.javaClass.getMethod(
+                        "playerContent",
+                        String::class.java,
+                        String::class.java,
+                        List::class.java,
+                    ).invoke(spider, flag, id, emptyList<String>()) as? String ?: ""
+                }
             }.onFailure { Log.e(TAG, "playerContent fail flag=$flag id=$id", it) }.getOrDefault("")
         }
 
@@ -285,6 +307,12 @@ class SpiderManager(private val appContext: Context) {
 
     /** 调用 jar 内 com.github.catvod.spider.Init.init(Context)（静态方法，可选存在） */
     private fun invokeInit(loader: DexClassLoader) {
+        // guard jar（饭太硬系）Init.init 会只读打开宿主 App 的 databases/tv 数据库
+        // （fongmi/TVBox 宿主的 Room 库名即 tv）；宿主无此文件时 jar 内部错误分支会
+        // post 一个携带 null Throwable 的 Runnable 到主线程导致闪退，这里对齐 fongmi 宿主环境
+        runCatching {
+            appContext.openOrCreateDatabase("tv", Context.MODE_PRIVATE, null).close()
+        }.onFailure { Log.w(TAG, "ensure host tv database fail: ${it.message}") }
         runCatching {
             val clz = loader.loadClass("com.github.catvod.spider.Init")
             clz.getMethod("init", Context::class.java).invoke(null, appContext)

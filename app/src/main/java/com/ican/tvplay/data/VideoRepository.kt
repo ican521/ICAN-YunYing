@@ -80,6 +80,19 @@ class VideoRepository(
         java.io.File(appContext.filesDir, "home_cache.json")
     }
 
+    /** 配置+分类磁盘缓存：冷启动毫秒级恢复分类列表，网络全链路只在后台刷新（fongmi VodConfig 同款策略） */
+    private val configFile: java.io.File by lazy {
+        java.io.File(appContext.filesDir, "config_cache.json")
+    }
+
+    @kotlinx.serialization.Serializable
+    private data class ConfigDiskCache(
+        val siteKey: String,
+        val configUrl: String,
+        val loaded: com.ican.tvplay.data.remote.LoadedSite,
+        val categories: List<VideoCategory>,
+    )
+
     /** 内存缓存被后台预热刷新后的版本号；首页监听它实现静默无感刷新 */
     private val _homeCacheVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
     val homeCacheVersion: kotlinx.coroutines.flow.StateFlow<Int> = _homeCacheVersion.asStateFlow()
@@ -126,50 +139,95 @@ class VideoRepository(
     @Volatile
     private var currentSpider: Any? = null
 
-    /** App 启动 / 用户导入配置后调用：拉取 config_url 并加载站点与分类 */
+    /** App 启动 / 业务兜底：先读配置缓存毫秒级恢复分类，网络全链路随后刷新（fongmi VodConfig 策略） */
     suspend fun ensureLoaded() {
+        // 快路径（锁外）：配置缓存已恢复时直接放行，不让 sections/预热排队等后台网络刷新
+        if (_currentSite.value != null) return
         loadMutex.withLock {
             if (_currentSite.value != null) return
-            reload()
+            if (tryRestoreConfigCache()) {
+                Log.d("Startup", "config cache restored, network refresh starts")
+                refreshFromNetwork(preserveState = true)
+            } else {
+                refreshFromNetwork(preserveState = false)
+            }
         }
     }
 
-    /** 强制重新加载（导入新配置后调用） */
+    /** 强制重新加载（导入新配置后调用）：缓存全部作废重建 */
     suspend fun reload() {
-        // 站点/配置变更后旧缓存全部作废
-        homeCache.clear()
-        detailCache.clear()
-        diskCacheFile.delete()
+        loadMutex.withLock {
+            homeCache.clear()
+            detailCache.clear()
+            diskCacheFile.delete()
+            configFile.delete()
+            refreshFromNetwork(preserveState = false)
+        }
+    }
+
+    /** 冷启动：从磁盘恢复「站点+分类+首页数据」（毫秒级），失败返回 false */
+    private fun tryRestoreConfigCache(): Boolean = runCatching {
+        if (!configFile.exists()) return false
+        val cache = rawJson.decodeFromString<ConfigDiskCache>(configFile.readText())
+        if (cache.configUrl != settingsRepository.configUrl.value) {
+            configFile.delete()
+            return false
+        }
+        _currentSite.value = cache.loaded
+        _categories.value = cache.categories
+        // spider 实例需运行时加载，缓存恢复不含；首页数据命中 homeCache 不依赖它
+        currentSpider = null
+        loadDiskCacheIntoMemory(cache.siteKey)
+        _homeCacheVersion.value++
+        Log.d("Startup", "config cache restored cats=${cache.categories.size}")
+        true
+    }.getOrDefault(false)
+
+    /** 网络全链路：配置下载 → spider → 分类。preserveState=true 时失败/为空都保留现有缓存态 */
+    private suspend fun refreshFromNetwork(preserveState: Boolean) {
         val url = settingsRepository.configUrl.value
         if (url.isBlank()) {
-            _currentSite.value = null
-            _categories.value = emptyList()
-            currentSpider = null
+            if (!preserveState) {
+                _currentSite.value = null
+                _categories.value = emptyList()
+                currentSpider = null
+            }
             return
         }
-        val loaded = apiClient.loadHomeSite(url, settingsRepository.siteKey.value)
-        _currentSite.value = loaded
+        val loaded = run {
+            Log.d("Startup", "reload: loadHomeSite begin")
+            val r = apiClient.loadHomeSite(url, settingsRepository.siteKey.value)
+            Log.d("Startup", "reload: loadHomeSite done site=${r?.site?.key}")
+            r
+        }
         if (loaded == null) {
-            _categories.value = emptyList()
-            currentSpider = null
+            Log.d("Startup", "reload: loadHomeSite failed, preserveState=$preserveState")
+            if (!preserveState) {
+                _categories.value = emptyList()
+                currentSpider = null
+            }
             return
         }
-
+        _currentSite.value = loaded
         if (loaded.site.isSpider()) {
             // spider 站：先加载 spider，再用 homeContent 拿分类
+            Log.d("Startup", "reload: getSpider begin")
             val spider = spiderManager.getSpider(loaded.site, loaded.jarSpec)
+            Log.d("Startup", "reload: getSpider done ok=${spider != null}")
             currentSpider = spider
             if (spider == null) {
                 Log.e(REPO_TAG, "spider load fail, fallback empty")
-                _categories.value = emptyList()
+                if (!preserveState) _categories.value = emptyList()
                 return
             }
+            Log.d("Startup", "reload: homeContent begin")
             val homeJson = spiderManager.homeContent(spider, filter = true)
             val classes = parseClasses(homeJson)
-            Log.d(REPO_TAG, "spider homeContent classes=${classes.size}")
+            Log.d("Startup", "reload: homeContent done classes=${classes.size}")
             _categories.value = classes.map {
                 VideoCategory(id = it.typeId, name = it.typeName)
             }
+            Log.d("Startup", "reload: categories published size=${classes.size}")
         } else {
             // HTTP 采集站
             currentSpider = null
@@ -179,6 +237,24 @@ class VideoRepository(
         }
         // 分类就绪后把上次落盘的首页数据读回内存（冷启动秒出）
         loadDiskCacheIntoMemory(loaded.site.key)
+        persistConfigCache(loaded)
+    }
+
+    /** 站点+分类落盘，供下次冷启动毫秒级恢复 */
+    private fun persistConfigCache(loaded: com.ican.tvplay.data.remote.LoadedSite) {
+        runCatching {
+            configFile.writeText(
+                rawJson.encodeToString(
+                    ConfigDiskCache.serializer(),
+                    ConfigDiskCache(
+                        siteKey = loaded.site.key,
+                        configUrl = settingsRepository.configUrl.value,
+                        loaded = loaded,
+                        categories = _categories.value,
+                    ),
+                ),
+            )
+        }
     }
 
     fun getCategories(): List<VideoCategory> = _categories.value
