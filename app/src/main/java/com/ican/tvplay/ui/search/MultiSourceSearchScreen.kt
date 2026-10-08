@@ -10,11 +10,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -167,18 +167,16 @@ fun MultiSourceSearchScreen(
 
         // ========== 主体：左站源列表 + 右卡片网格 ==========
         Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .navigationBarsPadding(),
+            modifier = Modifier.fillMaxSize(),
         ) {
             // 左侧站源列表（纵向）
             LazyColumn(
                 modifier = Modifier
-                    .width(120.dp)
+                    .width(100.dp)
                     .fillMaxHeight()
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 4.dp, bottom = 4.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 4.dp, bottom = 16.dp),
             ) {
                 // === 「全部」选项（显示所有站源合并）===
                 item {
@@ -211,26 +209,41 @@ fun MultiSourceSearchScreen(
                 }
             }
 
-            // 右侧卡片网格
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 132.dp),
+            // 右侧卡片网格：手机强制 2 列，大屏（宽 > 640dp）自适应
+            BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .fillMaxHeight(),
             ) {
-                items(displayVideos, key = { "${it.video.id}_${it.siteKey}" }) { dv ->
-                    CrossSourceVideoCard(
-                        video = dv.video,
-                        siteName = dv.siteName,
-                        onClick = {
-                            scope.launch {
-                                handlePlayClick(vm, context, dv.video, dv.siteKey, onPlay)
-                            }
-                        },
-                    )
+                val columns = if (maxWidth < 640.dp) {
+                    GridCells.Fixed(2)
+                } else {
+                    GridCells.Adaptive(minSize = 160.dp)
+                }
+
+                LazyVerticalGrid(
+                    columns = columns,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        start = 8.dp,
+                        end = 8.dp,
+                        top = 4.dp,
+                        bottom = 16.dp,
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(displayVideos, key = { "${it.video.id}_${it.siteKey}" }) { dv ->
+                        CrossSourceVideoCard(
+                            video = dv.video,
+                            siteName = dv.siteName,
+                            onClick = {
+                                scope.launch {
+                                    handlePlayClick(vm, context, dv.video, dv.siteKey, onPlay)
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -259,6 +272,9 @@ private suspend fun handlePlayClick(
     // 解析播放地址
     val source = vm.resolvePlaySourceForSite(siteKey, firstEp.playUrl, firstLine.flag)
         ?: com.ican.tvplay.data.PlaySource(firstEp.playUrl)
+
+    // 先把完整 Video 元数据 cache 到 Players，让 PlayerScreen 能拿到（跨站源场景下 VideoRepository.getVideo 查不到）
+    Players.cacheVideo(fullVideo, siteKey)
 
     Players.start(
         context = context,

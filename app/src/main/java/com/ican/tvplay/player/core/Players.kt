@@ -22,6 +22,8 @@ import androidx.media3.ui.SubtitleView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.ican.tvplay.data.model.PlayLine
+import com.ican.tvplay.data.model.Video
 
 /**
  * 播放器门面（仿 fongmi Players 单例模式，基于官方 media3 1.11.1 重写，
@@ -93,6 +95,23 @@ object Players {
 
     /** 保存最近一次 attach 的 view，player 创建/重建后自动 re-attach（解决 Compose AndroidView.factory 先于 LaunchedEffect 的时序问题） */
     private var pendingSurfaceView: SurfaceView? = null
+
+    /** 跨站源场景下：提前 cache 的完整 Video 元数据（解决 VideoRepository 是单站点的 getVideo 查不到的问题） */
+    data class CachedVideo(
+        val video: Video,
+        val siteKey: String,
+    )
+    var cachedVideo: CachedVideo? = null
+        private set
+
+    fun cacheVideo(video: Video, siteKey: String) {
+        cachedVideo = CachedVideo(video, siteKey)
+    }
+
+    fun consumeCachedVideo(videoId: String): CachedVideo? {
+        val c = cachedVideo
+        return if (c != null && c.video.id == videoId) c else null
+    }
 
     private val ticker = object : Runnable {
         override fun run() {
