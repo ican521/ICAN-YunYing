@@ -1,6 +1,8 @@
 package com.ican.tvplay.ui.home
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +28,8 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -44,9 +48,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -64,6 +73,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @Composable
 fun HomeScreen(
@@ -394,26 +404,79 @@ private fun HomeTopBar(
     }
 }
 
+private val chipIndicatorSpec: AnimationSpec<Float> = spring(
+    dampingRatio = 0.55f,
+    stiffness = 380f,
+)
+
 @Composable
 private fun CategoryChips(
     categories: List<VideoCategory>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
 ) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.height(40.dp),
+    val density = LocalDensity.current
+    val totalCount = categories.size + 1 // "全部" + 各分类
+
+    // 每个 chip 的位置和宽度（相对于 CategoryChips 外层 Box 的本地坐标）
+    val chipLayouts = remember(totalCount) { mutableStateMapOf<Int, Float>() }
+    val chipWidths = remember(totalCount) { mutableStateMapOf<Int, Float>() }
+    var rowRootX by remember { mutableStateOf<Float?>(null) }
+
+    // 指示器目标值（由 onGloballyPositioned 记录的位置/宽度）
+    val chipX = chipLayouts[selectedIndex] ?: 0f
+    val chipW = chipWidths[selectedIndex] ?: 0f
+
+    // 平滑动画（照搬底栏 dampingRatio=0.55f, stiffness=380f spring）
+    val offsetPx by animateFloatAsState(targetValue = chipX, animationSpec = chipIndicatorSpec, label = "indicatorOffset")
+    val widthPx by animateFloatAsState(targetValue = chipW, animationSpec = chipIndicatorSpec, label = "indicatorWidth")
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .onGloballyPositioned { coords -> rowRootX = coords.boundsInRoot().left },
     ) {
-        item {
-            CategoryChip(text = "全部", selected = selectedIndex == 0, onClick = { onSelect(0) })
-        }
-        items(categories.size, key = { categories[it].id }) { index ->
-            CategoryChip(
-                text = categories[index].name,
-                selected = selectedIndex == index + 1,
-                onClick = { onSelect(index + 1) },
-            )
+        // === 底层：彩色滑动态 ===
+        Box(
+            modifier = Modifier
+                .width(with(density) { widthPx.toDp() })
+                .height(32.dp)
+                .graphicsLayer { translationX = offsetPx }
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                .align(Alignment.CenterStart),
+        )
+
+        // === 顶层：chip 文字（透明背景，让底下的彩色指示露出来） ===
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            item {
+                CategoryChip(
+                    text = "全部",
+                    selected = selectedIndex == 0,
+                    onClick = { onSelect(0) },
+                    index = 0,
+                    rowRootX = rowRootX,
+                    chipLayouts = chipLayouts,
+                    chipWidths = chipWidths,
+                )
+            }
+            items(categories.size, key = { categories[it].id }) { index ->
+                val actualIndex = index + 1
+                CategoryChip(
+                    text = categories[index].name,
+                    selected = selectedIndex == actualIndex,
+                    onClick = { onSelect(actualIndex) },
+                    index = actualIndex,
+                    rowRootX = rowRootX,
+                    chipLayouts = chipLayouts,
+                    chipWidths = chipWidths,
+                )
+            }
         }
     }
 }
@@ -423,26 +486,34 @@ private fun CategoryChip(
     text: String,
     selected: Boolean,
     onClick: () -> Unit,
+    index: Int,
+    rowRootX: Float?,
+    chipLayouts: MutableMap<Int, Float>,
+    chipWidths: MutableMap<Int, Float>,
 ) {
     val pill = RoundedCornerShape(percent = 50)
-    val container by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.surfaceVariant,
-        animationSpec = tween(220),
-        label = "chipContainer",
-    )
+    // 选中时文本变白色（因为底下有彩色 indicator）；未选中时是 surface 底色 + onSurfaceVariant 文字
     val content = if (selected) MaterialTheme.colorScheme.onPrimary
     else MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(
         modifier = Modifier
+            .onGloballyPositioned { coords ->
+                val root = rowRootX ?: return@onGloballyPositioned
+                chipLayouts[index] = coords.boundsInRoot().left - root
+                chipWidths[index] = coords.size.width.toFloat()
+            }
             .tvCardEffect(
                 onClick = onClick,
                 shape = pill,
                 focusedScale = 1.06f,
                 glow = false,
             )
-            .background(container, pill)
+            // 未选中才有背景，选中时底下的彩色 indicator 已把它盖住
+            .then(
+                if (!selected) Modifier.background(MaterialTheme.colorScheme.surfaceVariant, pill)
+                else Modifier
+            )
             .padding(horizontal = 20.dp, vertical = 10.dp),
     ) {
         Text(text = text, style = MaterialTheme.typography.labelLarge, color = content)
