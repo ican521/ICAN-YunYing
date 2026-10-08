@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -121,6 +122,11 @@ fun PlayerScreen(
     var episodeIndex by remember { mutableIntStateOf(startEpisode) }
     var initialized by remember { mutableStateOf(false) }
     var pendingPosition by remember { mutableLongStateOf(0L) }
+    // 片头/片尾标记（ms；片尾存"距结尾时长"，fongmi History.opening/ending 同款）
+    var openingMs by remember { mutableLongStateOf(0L) }
+    var endingMs by remember { mutableLongStateOf(0L) }
+    // 片尾自动切下一集的防重复触发标志（每集/每次改标记后重新武装）
+    var autoNextArmed by remember(endingMs) { mutableStateOf(true) }
     val skipFirstStart = remember { mutableStateOf(preInitialized) }
 
     // 线路切换
@@ -173,8 +179,13 @@ fun PlayerScreen(
                 episodeIndex = history.episodeIndex
                 val nearEnd = history.durationMs > 0 &&
                     history.durationMs - history.positionMs < RESUME_THRESHOLD_MS
-                pendingPosition = if (nearEnd) 0L else history.positionMs
+                val resume = if (nearEnd) 0L else history.positionMs
+                // fongmi: startPositionMs = max(opening, 续播位置)，每次开播自动跳过片头
+                pendingPosition = maxOf(resume, history.openingMs)
             }
+            // 片头/片尾标记（按剧存储，fongmi History.opening/ending 同款）
+            openingMs = history?.openingMs ?: 0L
+            endingMs = history?.endingMs ?: 0L
         }
         initialized = true
     }
@@ -230,8 +241,64 @@ fun PlayerScreen(
                     positionMs = st.positionMs,
                     durationMs = st.durationMs,
                     updatedAt = System.currentTimeMillis(),
+                    openingMs = openingMs,
+                    endingMs = endingMs,
                 ),
             )
+        }
+    }
+
+    // ========== 片头/片尾标记（fongmi: onOpening/onEnding 同款规则） ==========
+
+    /** 标记允许的时限：视频 <15 分钟→3 分钟；<30 分钟→6 分钟；否则→10 分钟 */
+    fun opEdLimit(duration: Long): Long = when {
+        duration < 15 * 60_000L -> 3 * 60_000L
+        duration < 30 * 60_000L -> 6 * 60_000L
+        else -> 10 * 60_000L
+    }
+
+    fun toastMsg(msg: String) {
+        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    /** 短按片头：把当前进度标记为片头（fongmi: canSetOpening + setOpening(position)） */
+    fun markOpening() {
+        val st = Players.state.value
+        val limit = opEdLimit(st.durationMs)
+        if (st.durationMs > 0 && st.positionMs > 0 && st.positionMs <= limit) {
+            openingMs = st.positionMs
+            toastMsg("已标记片头 ${formatMs(st.positionMs)}，此后自动跳过")
+            saveProgress()
+        } else {
+            toastMsg("片头标记需在开头 ${limit / 60_000} 分钟内")
+        }
+    }
+
+    /** 短按片尾：把当前进度距结尾的时长标记为片尾（fongmi: setEnding(duration - position)） */
+    fun markEnding() {
+        val st = Players.state.value
+        val remain = st.durationMs - st.positionMs
+        val limit = opEdLimit(st.durationMs)
+        if (st.durationMs > 0 && st.positionMs > 0 && remain in 1 until limit) {
+            endingMs = remain
+            toastMsg("已标记片尾，播到此处自动下一集")
+            saveProgress()
+        } else {
+            toastMsg("片尾标记需在结尾 ${limit / 60_000} 分钟内")
+        }
+    }
+
+    // 片尾自动切下一集（fongmi: onTimeChanged → nextEpisode）
+    LaunchedEffect(playerState.positionMs) {
+        val dur = playerState.durationMs
+        if (autoNextArmed && endingMs > 0 && dur > 0 && playerState.playing &&
+            endingMs + playerState.positionMs >= dur
+        ) {
+            autoNextArmed = false
+            if (episodeIndex < lineEpisodes.size - 1) {
+                toastMsg("已跳过片尾")
+                episodeIndex++
+            }
         }
     }
 
@@ -356,6 +423,20 @@ fun PlayerScreen(
             onScaleChange = { settings.setPlayerScale(it.name) },
             onDecodeChange = { settings.setPlayerDecode(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
+            openingMs = openingMs,
+            endingMs = endingMs,
+            onMarkOpening = { markOpening() },
+            onMarkEnding = { markEnding() },
+            onClearOpening = {
+                openingMs = 0
+                toastMsg("已清除片头标记")
+                saveProgress()
+            },
+            onClearEnding = {
+                endingMs = 0
+                toastMsg("已清除片尾标记")
+                saveProgress()
+            },
         )
     } else {
         PortraitPlayLayout(
@@ -949,6 +1030,12 @@ private fun FullscreenPlayLayout(
     onScaleChange: (Players.ScaleMode) -> Unit,
     onDecodeChange: (Players.Decode) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
+    openingMs: Long,
+    endingMs: Long,
+    onMarkOpening: () -> Unit,
+    onMarkEnding: () -> Unit,
+    onClearOpening: () -> Unit,
+    onClearEnding: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     // 锁定状态下的解锁按钮显隐（单击唤出，2.5s 自动隐藏）
@@ -1082,6 +1169,19 @@ private fun FullscreenPlayLayout(
                         ActionBtn(AppIcons.AspectRatio, playerState.scaleMode.label) { showScale = true }
                         ActionBtn(AppIcons.Subtitle, "字幕") { showText = true }
                         ActionBtn(AppIcons.AudioTrack, "音轨") { showAudio = true }
+                        // 片头/片尾：短按标记，长按清除（fongmi 同款）
+                        ActionBtn(
+                            AppIcons.SkipPrev,
+                            if (openingMs > 0) formatMs(openingMs) else "片头",
+                            onLongClick = onClearOpening,
+                            onClick = onMarkOpening,
+                        )
+                        ActionBtn(
+                            AppIcons.SkipNext,
+                            if (endingMs > 0) formatMs(endingMs) else "片尾",
+                            onLongClick = onClearEnding,
+                            onClick = onMarkEnding,
+                        )
                         ActionBtn(AppIcons.Refresh, "重播") { Players.seekTo(0) }
                     }
                 }
@@ -1155,15 +1255,18 @@ private fun FullscreenPlayLayout(
 
 // ========== 通用 UI 组件 ==========
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ActionBtn(
-    icon: ImageVector, text: String, tint: Color = MaterialTheme.colorScheme.onSurface, onClick: () -> Unit,
+    icon: ImageVector, text: String, tint: Color = MaterialTheme.colorScheme.onSurface,
+    onLongClick: (() -> Unit)? = null, onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(percent = 50)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.06f, glow = false)
+            .clip(shape)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .background(MaterialTheme.colorScheme.surfaceVariant, shape)
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
