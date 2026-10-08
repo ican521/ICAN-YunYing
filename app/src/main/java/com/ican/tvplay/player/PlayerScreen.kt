@@ -352,6 +352,10 @@ fun PlayerScreen(
             onLockToggle = { locked = true; controlsVisible = false },
             onUnlock = { locked = false; controlsVisible = true },
             onBack = { handleBack() },
+            onSpeedChange = { settings.setPlayerSpeed(it) },
+            onScaleChange = { settings.setPlayerScale(it.name) },
+            onDecodeChange = { settings.setPlayerDecode(it.name) },
+            onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
         )
     } else {
         PortraitPlayLayout(
@@ -941,6 +945,10 @@ private fun FullscreenPlayLayout(
     onLockToggle: () -> Unit,
     onUnlock: () -> Unit,
     onBack: () -> Unit,
+    onSpeedChange: (Float) -> Unit,
+    onScaleChange: (Players.ScaleMode) -> Unit,
+    onDecodeChange: (Players.Decode) -> Unit,
+    onBufferChange: (Players.BufferTier) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     // 锁定状态下的解锁按钮显隐（单击唤出，2.5s 自动隐藏）
@@ -951,6 +959,14 @@ private fun FullscreenPlayLayout(
             unlockHint = false
         }
     }
+    // 动作栏对话框状态
+    var showSpeed by remember { mutableStateOf(false) }
+    var showScale by remember { mutableStateOf(false) }
+    var showDecode by remember { mutableStateOf(false) }
+    var showBuffer by remember { mutableStateOf(false) }
+    var showAudio by remember { mutableStateOf(false) }
+    var showText by remember { mutableStateOf(false) }
+    var showAddSub by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -1005,7 +1021,7 @@ private fun FullscreenPlayLayout(
                         .statusBarsPadding()
                         .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp),
                 ) {
-                    CircleBtn(AppIcons.Back, "返回") { onBack() }
+                    CircleBtn(AppIcons.Back, "返回") { onExitFullscreen() }
                     Text(
                         text = "${current?.title.orEmpty()} · 第${episodeIndex + 1}集",
                         style = MaterialTheme.typography.titleMedium,
@@ -1013,7 +1029,6 @@ private fun FullscreenPlayLayout(
                         modifier = Modifier.padding(start = 12.dp),
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    CircleBtn(AppIcons.Fullscreen, "退出全屏") { onExitFullscreen() }
                 }
 
                 Row(
@@ -1031,8 +1046,8 @@ private fun FullscreenPlayLayout(
                     BigBtn(AppIcons.SkipNext, "下集", onClick = { onNext() })
                 }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                // 底部：进度条 + 动作栏（fongmi: seek + view_control_vod_action）
+                Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
@@ -1043,13 +1058,32 @@ private fun FullscreenPlayLayout(
                         )
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                 ) {
-                    Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
-                    LineSlider(
-                        progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
-                        onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
-                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                    )
-                    Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                        LineSlider(
+                            progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
+                            onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
+                            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                        )
+                        Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    }
+                    // 动作栏：解码/缓冲/倍速/缩放/字幕/音轨/重播
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                            .horizontalScroll(rememberScrollState()),
+                    ) {
+                        ActionBtn(AppIcons.Memory, playerState.decode.label) { showDecode = true }
+                        ActionBtn(AppIcons.Buffer, playerState.bufferTier.label) { showBuffer = true }
+                        ActionBtn(AppIcons.Speed, formatSpeed(playerState.speed)) { showSpeed = true }
+                        ActionBtn(AppIcons.AspectRatio, playerState.scaleMode.label) { showScale = true }
+                        ActionBtn(AppIcons.Subtitle, "字幕") { showText = true }
+                        ActionBtn(AppIcons.AudioTrack, "音轨") { showAudio = true }
+                        ActionBtn(AppIcons.Refresh, "重播") { Players.seekTo(0) }
+                    }
                 }
             }
         }
@@ -1066,7 +1100,7 @@ private fun FullscreenPlayLayout(
                     .clickable { onLockToggle() },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(AppIcons.Lock, "锁屏", tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(AppIcons.LockOpen, "锁屏", tint = Color.White, modifier = Modifier.size(20.dp))
             }
         }
         if (locked && unlockHint) {
@@ -1080,8 +1114,41 @@ private fun FullscreenPlayLayout(
                     .clickable { onUnlock() },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(AppIcons.LockOpen, "解锁", tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(AppIcons.Lock, "解锁", tint = Color.White, modifier = Modifier.size(20.dp))
             }
+        }
+
+        // 动作栏对话框（与竖屏同款）
+        if (showSpeed) {
+            OptionDialog("倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
+        }
+        if (showScale) {
+            OptionDialog("画面缩放", Players.ScaleMode.entries, playerState.scaleMode, { it.label }, { onScaleChange(it); showScale = false }) { showScale = false }
+        }
+        if (showDecode) {
+            OptionDialog("解码内核", Players.Decode.entries, playerState.decode, { it.label }, { onDecodeChange(it); showDecode = false }) { showDecode = false }
+        }
+        if (showBuffer) {
+            OptionDialog("缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
+        }
+        if (showAudio) {
+            OptionDialog("音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }) { showAudio = false }
+        }
+        if (showText) {
+            SubtitleDialog(
+                tracks = playerState.textTracks,
+                textDisabled = playerState.textDisabled,
+                onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
+                onDisable = { Players.selectTrack(null, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
+                onAddExternal = { showAddSub = true },
+                onDismiss = { showText = false },
+            )
+        }
+        if (showAddSub) {
+            AddSubtitleDialog(
+                onAdd = { n, u -> Players.addSubtitle(SubItem(name = n, url = u)); showAddSub = false },
+                onDismiss = { showAddSub = false },
+            )
         }
     }
 }
