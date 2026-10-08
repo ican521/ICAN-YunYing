@@ -145,14 +145,20 @@ fun PlayerScreen(
 
     // 加载视频信息 + 历史进度
     LaunchedEffect(videoId) {
-        val v = container.videoRepository.getVideo(videoId) ?: return@LaunchedEffect
-        val history = container.historyDao.observeOne(videoId).first()
+        var v = container.videoRepository.getVideo(videoId)
+        // 跨站源场景：VideoRepository 是单站点，getVideo 可能查不到 → 用 MultiSourceSearchScreen 提前 cache 的
+        if (v == null) {
+            Players.consumeCachedVideo(videoId)?.let { cached ->
+                v = cached.video
+            }
+        }
         video = v
-        if (history != null) {
+        if (v != null) {
+            val history = container.historyDao.observeOne(videoId).first()
             val eps = v.playSources
                 .let { s -> s.firstOrNull { it.flag == lineFlag } ?: s.firstOrNull() }
                 ?.episodes ?: v.episodes
-            if (history.episodeIndex in eps.indices) {
+            if (history != null && history.episodeIndex in eps.indices) {
                 episodeIndex = history.episodeIndex
                 val nearEnd = history.durationMs > 0 &&
                     history.durationMs - history.positionMs < RESUME_THRESHOLD_MS
