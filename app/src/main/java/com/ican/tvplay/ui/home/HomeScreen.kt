@@ -317,7 +317,7 @@ fun SitePickerDialog(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = site.name.ifBlank { site.key },
+                                    text = site.name.substringBefore("|").ifBlank { site.key },
                                     style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
