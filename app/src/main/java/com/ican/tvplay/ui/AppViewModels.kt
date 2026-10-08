@@ -188,6 +188,10 @@ class CollectionViewModel(container: AppContainer) : ViewModel() {
     fun clearHistory() {
         viewModelScope.launch { historyDao.clear() }
     }
+
+    fun clearFavorites() {
+        viewModelScope.launch { favoriteDao.clear() }
+    }
 }
 
 /** 设置 */
