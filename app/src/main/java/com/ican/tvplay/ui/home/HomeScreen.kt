@@ -92,14 +92,13 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
 
     // 首页加载转圈（根级 overlay，不依赖 pager 组合——冷启动时 pager 内容可能延迟数秒才上屏）：
-    // 显示直到当前页第一张卡片封面真正显示（8s 超时兜底），封面就绪即停止
+    // 封面就绪即停；最迟 2.5s 提前收场，保证转圈在卡片出现前消失
     var showLoading by remember { mutableStateOf(true) }
     var firstCardLoaded by remember { mutableStateOf(false) }
     val sectionsReady = sections.any { it.second.isNotEmpty() }
     LaunchedEffect(sectionsReady) {
         if (sectionsReady) {
-            // 等当前页的第一张卡片封面真正加载出来（8s 超时兜底），转圈立即停止
-            withTimeoutOrNull(8000L) {
+            withTimeoutOrNull(2500L) {
                 snapshotFlow { firstCardLoaded }.first { it }
             }
             showLoading = false
