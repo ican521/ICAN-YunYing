@@ -112,6 +112,15 @@ class SettingsRepository(context: Context) {
         _playerBuffer.value = tier
     }
 
+    /** 播放保活（前台服务）：开启后播放期间以前台服务保活，横竖屏/切后台播放不中断 */
+    private val _playerKeepAlive = MutableStateFlow(prefs.getBoolean(KEY_PLAYER_KEEP_ALIVE, false))
+    val playerKeepAlive: StateFlow<Boolean> = _playerKeepAlive.asStateFlow()
+
+    fun setPlayerKeepAlive(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_PLAYER_KEEP_ALIVE, enabled).apply()
+        _playerKeepAlive.value = enabled
+    }
+
     // ---- 搜索历史 ----
 
     private val _searchHistory = MutableStateFlow(
@@ -145,6 +154,7 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_SCALE = "player_scale"
         const val KEY_PLAYER_DECODE = "player_decode"
         const val KEY_PLAYER_BUFFER = "player_buffer"
+        const val KEY_PLAYER_KEEP_ALIVE = "player_keep_alive"
         const val KEY_SEARCH_HISTORY = "search_history"
         const val MAX_SEARCH_HISTORY = 10
     }

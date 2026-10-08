@@ -79,6 +79,7 @@ import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.data.model.Episode
 import com.ican.tvplay.data.model.Video
+import com.ican.tvplay.player.core.PlaybackService
 import com.ican.tvplay.player.core.PlaySpec
 import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.player.core.SubItem
@@ -159,6 +160,11 @@ fun PlayerScreen(
             Players.BufferTier.entries.firstOrNull { it.multiplier == savedBuffer }
                 ?: Players.BufferTier.LOW,
         )
+    }
+
+    // 播放保活（设置开关）：进入播放页时按需启动前台服务，退出播放页时停止
+    LaunchedEffect(Unit) {
+        PlaybackService.startIfNeeded(context, container.settingsRepository.playerKeepAlive.first())
     }
 
     // 加载视频信息 + 历史进度
@@ -362,9 +368,10 @@ fun PlayerScreen(
                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                 saveProgress()
             } else {
-                // 真正退出：保存进度 + release
+                // 真正退出：保存进度 + release + 停止保活服务
                 saveProgress()
                 Players.release()
+                PlaybackService.stop(context)
                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
         }
