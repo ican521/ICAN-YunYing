@@ -75,6 +75,8 @@ import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.player.core.SubItem
 import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.CircleBackButton
+import com.ican.tvplay.ui.components.CircleIconButton
 import com.ican.tvplay.ui.components.tvCardEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -419,7 +421,53 @@ private fun PortraitPlayLayout(
             .background(MaterialTheme.colorScheme.background),
     ) {
 
-    // === 视频播放区 ===
+    // === 页面顶栏：返回圆钮 + 标题 + 收藏圆钮（视频小窗上方，不遮挡画面） ===
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 8.dp),
+    ) {
+        CircleBackButton(onClick = onBack)
+        Text(
+            text = current?.title.orEmpty(),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+        )
+        // 收藏圆钮（与返回圆钮同尺寸同样式）
+        CircleIconButton(
+            icon = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
+            contentDescription = if (isFav) "取消收藏" else "收藏",
+            tint = if (isFav) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
+            onClick = {
+                val v = current ?: return@CircleIconButton
+                val newFav = !isFav
+                isFav = newFav
+                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    if (newFav) {
+                        container.favoriteDao.upsert(
+                            com.ican.tvplay.data.local.FavoriteEntity(
+                                videoId = v.id,
+                                title = v.title,
+                                cover = v.cover,
+                                categoryName = v.categoryName,
+                                addedAt = System.currentTimeMillis(),
+                            ),
+                        )
+                    } else {
+                        container.favoriteDao.delete(v.id)
+                    }
+                }
+            },
+        )
+    }
+
+    // === 视频播放区（位于顶栏下方，避开返回/收藏按钮） ===
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -459,30 +507,7 @@ private fun PortraitPlayLayout(
                         indication = null,
                     ) { onToggleControls() },
             ) {
-                // 顶栏：返回 + 标题（锁屏按钮仅全屏提供）
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color(0xCC000000), Color.Transparent),
-                            ),
-                        )
-                        .statusBarsPadding()
-                        .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 16.dp),
-                ) {
-                    MiniCircleBtn(AppIcons.Back, "返回") { onBack() }
-                    Text(
-                        text = "${current?.title.orEmpty()} · 第${episodeIndex + 1}集",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(start = 8.dp),
-                    )
-                }
+                // 控制层：中部播放控制 + 底部进度条/全屏（返回/标题/收藏在视频区上方顶栏，不再覆盖画面）
 
                 // 中部：上一集 / 播放暂停 / 下一集
                 Row(
