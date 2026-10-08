@@ -6,6 +6,7 @@ import com.ican.tvplay.data.model.Episode
 import com.ican.tvplay.data.model.PlayLine
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.data.model.VideoCategory
+import com.ican.tvplay.data.remote.JxParser
 import com.ican.tvplay.data.remote.LoadedSite
 import com.ican.tvplay.data.remote.SpiderManager
 import com.ican.tvplay.data.remote.TvBoxSite
@@ -193,7 +194,7 @@ class VideoRepository(
         if (json.isBlank()) return PlaySource(episode.playUrl)
         return runCatching {
             val obj = rawJson.parseToJsonElement(json).jsonObject
-            val url = obj["url"]?.jsonPrimitive?.content ?: episode.playUrl
+            val rawUrl = obj["url"]?.jsonPrimitive?.content ?: episode.playUrl
             // header 可能是 JSON 对象 {"User-Agent": "...", "Referer": "..."} 或字符串
             val headers = mutableMapOf<String, String>()
             obj["header"]?.let { el ->
@@ -203,10 +204,16 @@ class VideoRepository(
                     }
                 }
             }
-            // parse=1 表示需解析（暂不实现，按原样返回）
             val parse = obj["parse"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-            Log.d(REPO_TAG, "playerContent url=$url parse=$parse headers=${headers.keys}")
-            PlaySource(url = url.ifBlank { episode.playUrl }, headers = headers)
+            val jx = obj["jx"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+            Log.d(REPO_TAG, "playerContent rawUrl=$rawUrl parse=$parse jx=$jx headers=${headers.keys}")
+            // parse=1/2 或 jx=1 → 需 jx 解析（很多 spider 返回的是解析页 URL 而非真实流）
+            val finalUrl = if (JxParser.needsParse(rawUrl, parse, jx)) {
+                JxParser.resolve(rawUrl, headers).ifBlank { rawUrl }
+            } else {
+                rawUrl
+            }
+            PlaySource(url = finalUrl.ifBlank { episode.playUrl }, headers = headers)
         }.onFailure { Log.e(REPO_TAG, "parse playerContent fail", it) }
             .getOrDefault(PlaySource(episode.playUrl))
     }
