@@ -50,6 +50,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.setValue
@@ -727,29 +729,19 @@ private fun PortraitPlayLayout(
         fun realIdx(displayIdx: Int) = if (reversedEp) lineEpisodes.size - 1 - displayIdx else displayIdx
 
         if (showAllEps) {
-            // 网格模式：与收起状态同一尺寸的固定按钮（64×40dp），按可用宽度自动排列
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val chipW = 64.dp
-                val gap = 6.dp
-                val cols = ((maxWidth + gap) / (chipW + gap)).toInt().coerceIn(3, 9)
-                val rows = displayEps.mapIndexed { i, ep -> i to ep }.chunked(cols)
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(gap),
-                ) {
-                    rows.forEach { row ->
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(gap),
-                        ) {
-                            row.forEach { (dispIdx, ep) ->
-                                val idx = realIdx(dispIdx)
-                                EpisodeChip(
-                                    title = ep.title,
-                                    selected = idx == episodeIndex,
-                                    onClick = { onEpisodeSelect(idx) },
-                                )
-                            }
-                        }
-                    }
+            // 网格模式：与收起状态同一自适应按钮（最小正方形、随文字变长），FlowRow 自动换行
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                displayEps.forEachIndexed { dispIdx, ep ->
+                    val idx = realIdx(dispIdx)
+                    EpisodeChip(
+                        title = ep.title,
+                        selected = idx == episodeIndex,
+                        onClick = { onEpisodeSelect(idx) },
+                    )
                 }
             }
         } else {
@@ -1120,15 +1112,16 @@ private fun EpisodeChip(title: String, selected: Boolean, onClick: () -> Unit, m
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            // 收起（横向滚动）与展开（网格）统一固定尺寸，保证大小形状完全一致
-            .width(64.dp)
+            // 高度固定，最小宽度为正方形（40dp）；文字长时宽度自适应撑开
             .height(40.dp)
+            .defaultMinSize(minWidth = 40.dp)
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false)
             .background(
                 if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                 else MaterialTheme.colorScheme.surfaceVariant,
                 shape,
-            ),
+            )
+            .padding(horizontal = 12.dp),
     ) {
         Text(
             text = title,
