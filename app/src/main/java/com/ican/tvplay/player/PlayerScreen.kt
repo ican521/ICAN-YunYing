@@ -615,56 +615,11 @@ private fun PortraitPlayLayout(
             .background(MaterialTheme.colorScheme.background),
     ) {
 
-    // === 页面顶栏：返回圆钮 + 标题 + 收藏圆钮（视频小窗上方，不遮挡画面） ===
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 8.dp),
-    ) {
-        CircleBackButton(onClick = onBack)
-        Text(
-            text = current?.title.orEmpty(),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-        )
-        // 收藏圆钮（与返回圆钮同尺寸同样式）
-        CircleIconButton(
-            icon = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
-            contentDescription = if (isFav) "取消收藏" else "收藏",
-            tint = if (isFav) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
-            onClick = {
-                val v = current ?: return@CircleIconButton
-                val newFav = !isFav
-                isFav = newFav
-                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    if (newFav) {
-                        container.favoriteDao.upsert(
-                            com.ican.tvplay.data.local.FavoriteEntity(
-                                videoId = v.id,
-                                title = v.title,
-                                cover = v.cover,
-                                categoryName = v.categoryName,
-                                addedAt = System.currentTimeMillis(),
-                            ),
-                        )
-                    } else {
-                        container.favoriteDao.delete(v.id)
-                    }
-                }
-            },
-        )
-    }
-
-    // === 视频播放区（位于顶栏下方，避开返回/收藏按钮） ===
+    // === 视频播放区（顶部贴状态栏下沿；返回/标题/收藏悬浮叠加在画面顶部） ===
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .statusBarsPadding()
             .aspectRatio(16f / 9f)
             .background(Color.Black)
             .clickable(
@@ -690,8 +645,58 @@ private fun PortraitPlayLayout(
             onRelease = { view -> Players.unbindPlayerView(view) },
         )
 
+        // 悬浮顶栏：返回圆钮 + 标题 + 收藏圆钮，叠加在视频画面顶部（背景为画面，标题用白字+阴影）
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 12.dp, top = 6.dp),
+        ) {
+            CircleBackButton(onClick = onBack)
+            Text(
+                text = current?.title.orEmpty(),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = Color.Black.copy(alpha = 0.6f),
+                        blurRadius = 8f,
+                    ),
+                ),
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+            )
+            // 收藏圆钮（与返回圆钮同尺寸同样式）
+            CircleIconButton(
+                icon = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
+                contentDescription = if (isFav) "取消收藏" else "收藏",
+                tint = if (isFav) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = {
+                    val v = current ?: return@CircleIconButton
+                    val newFav = !isFav
+                    isFav = newFav
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        if (newFav) {
+                            container.favoriteDao.upsert(
+                                com.ican.tvplay.data.local.FavoriteEntity(
+                                    videoId = v.id,
+                                    title = v.title,
+                                    cover = v.cover,
+                                    categoryName = v.categoryName,
+                                    addedAt = System.currentTimeMillis(),
+                                ),
+                            )
+                        } else {
+                            container.favoriteDao.delete(v.id)
+                        }
+                    }
+                },
+            )
+        }
+
         // 预览小窗控制层：单击视频区显示/隐藏（fongmi 同款交互）
-        // 顶栏 statusBarsPadding 避让状态栏；全屏按钮独立常显在右下角
+        // 视频区已做 statusBarsPadding，控制层天然避让；全屏按钮独立常显在右下角
         if (controlsVisible && !locked) {
             Box(
                 modifier = Modifier
