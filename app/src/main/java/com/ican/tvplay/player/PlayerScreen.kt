@@ -41,6 +41,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -247,13 +250,27 @@ fun PlayerScreen(
         }
     }
 
-    // 全屏切换时请求横屏
+    // 全屏切换时请求横屏 + 自动收起/恢复状态栏
     LaunchedEffect(fullscreen) {
         val activity = context as? Activity ?: return@LaunchedEffect
+        val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         if (fullscreen) {
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            // 沉浸式：隐藏状态栏，从边缘上滑可临时唤出
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.statusBars())
         } else {
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            controller.show(WindowInsetsCompat.Type.statusBars())
+        }
+    }
+
+    // 页面销毁时恢复状态栏（防止全屏中直接退出后状态栏缺失）
+    DisposableEffect(Unit) {
+        onDispose {
+            (context as? Activity)?.window?.let { w ->
+                WindowCompat.getInsetsController(w, w.decorView).show(WindowInsetsCompat.Type.statusBars())
+            }
         }
     }
 
@@ -936,23 +953,34 @@ private fun FullscreenPlayLayout(
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    // 锁定状态下的解锁按钮显隐（单击唤出，2.5s 自动隐藏）
+    var unlockHint by remember { mutableStateOf(false) }
+    LaunchedEffect(unlockHint) {
+        if (unlockHint) {
+            delay(2500)
+            unlockHint = false
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) {
-                if (locked) {
-                    scope.launch {
-                        delay(400)
-                        onUnlock()
-                    }
-                } else {
-                    onToggleControls()
-                }
+            .pointerInput(locked) {
+                detectTapGestures(
+                    onTap = {
+                        if (locked) {
+                            // 锁定中：单击只唤出解锁按钮，不触发任何其他控制
+                            unlockHint = true
+                        } else {
+                            onToggleControls()
+                        }
+                    },
+                    onDoubleTap = {
+                        // 双击：任何状态下都切换播放/暂停
+                        onTogglePlay()
+                    },
+                )
             },
     ) {
         AndroidView(
@@ -996,7 +1024,6 @@ private fun FullscreenPlayLayout(
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     CircleBtn(AppIcons.Fullscreen, "退出全屏") { onExitFullscreen() }
-                    CircleBtn(AppIcons.Lock, "锁屏") { onLockToggle() }
                 }
 
                 Row(
@@ -1037,14 +1064,33 @@ private fun FullscreenPlayLayout(
             }
         }
 
-        if (locked) {
+        // 右侧居中：锁定按钮（未锁定时随控制层显示）与解锁按钮（锁定中单击唤出）
+        if (!locked && controlsVisible) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-                    .clickable { onUnlock() },
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 10.dp)
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .clickable { onLockToggle() },
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(AppIcons.LockOpen, "解锁", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(32.dp))
+                Icon(AppIcons.Lock, "锁屏", tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+        }
+        if (locked && unlockHint) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 10.dp)
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .clickable { onUnlock() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(AppIcons.LockOpen, "解锁", tint = Color.White, modifier = Modifier.size(20.dp))
             }
         }
     }
