@@ -1,5 +1,6 @@
 package com.ican.tvplay.ui.home
 
+import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -76,6 +77,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
+
+/** 首页加载转圈调试日志 TAG（验证完可删） */
+private const val TAG = "HomeLoading"
 
 @Composable
 fun HomeScreen(
@@ -226,11 +230,13 @@ fun HomeScreen(
                 val sectionsReady = sections.any { it.second.isNotEmpty() }
                 LaunchedEffect(page, sectionsReady) {
                     if (sectionsReady) {
-                        withTimeoutOrNull(4000L) {
+                        val waited = withTimeoutOrNull(4000L) {
                             snapshotFlow { firstCardLoaded }.first { it }
                         }
-                        delay(600)
+                        Log.d(TAG, "all page: sectionsReady, firstCardLoaded=$waited, spinner stops after 1500ms")
+                        delay(1500)
                         showLoading = false
+                        Log.d(TAG, "all page: spinner stopped")
                     }
                 }
                 if (showLoading) {
@@ -253,6 +259,7 @@ fun HomeScreen(
                 LaunchedEffect(pageCategory?.id) {
                     if (pageCategory != null) {
                         pageVideos.value = viewModel.getCategoryVideos(pageCategory.id)
+                        Log.d(TAG, "category ${pageCategory.id}: data loaded, size=${pageVideos.value.size}")
                     }
                 }
                 val gridState = remember(page) { LazyGridState() }
@@ -299,11 +306,13 @@ fun HomeScreen(
                     val videosReady = pageVideos.value.isNotEmpty()
                     LaunchedEffect(pageCategory?.id, videosReady) {
                         if (videosReady) {
-                            withTimeoutOrNull(4000L) {
+                            val waited = withTimeoutOrNull(4000L) {
                                 snapshotFlow { firstCardLoaded }.first { it }
                             }
-                            delay(600)
+                            Log.d(TAG, "category ${pageCategory?.id}: firstCardLoaded=$waited, spinner stops after 1500ms")
+                            delay(1500)
                             showLoading = false
+                            Log.d(TAG, "category ${pageCategory?.id}: spinner stopped")
                         }
                     }
                     if (showLoading) {
