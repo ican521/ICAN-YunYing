@@ -189,7 +189,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
         }
 
     /**
-     * 对指定站点解析播放地址：spider 走 playerContent，HTTP 直接返回原 URL
+     * 对指定站点解析播放地址：spider 走 playerContent + 可选 jx 解析，HTTP 直接返回原 URL
      */
     suspend fun resolvePlaySourceForSite(siteKey: String, playUrl: String, flag: String): PlaySource? =
         withContext(Dispatchers.IO) {
@@ -202,7 +202,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
             if (jsonStr.isBlank()) return@withContext PlaySource(playUrl)
             runCatching {
                 val obj = json.parseToJsonElement(jsonStr).jsonObject
-                val url = obj["url"]?.jsonPrimitive?.content ?: playUrl
+                val rawUrl = obj["url"]?.jsonPrimitive?.content ?: playUrl
                 val headers = mutableMapOf<String, String>()
                 obj["header"]?.let { el ->
                     runCatching {
@@ -211,7 +211,15 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                         }
                     }
                 }
-                PlaySource(url = url.ifBlank { playUrl }, headers = headers)
+                val parse = obj["parse"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                val jx = obj["jx"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                Log.d(TAG, "playerContent rawUrl=$rawUrl parse=$parse jx=$jx")
+                val finalUrl = if (com.ican.tvplay.data.remote.JxParser.needsParse(rawUrl, parse, jx)) {
+                    com.ican.tvplay.data.remote.JxParser.resolve(rawUrl, headers).ifBlank { rawUrl }
+                } else {
+                    rawUrl
+                }
+                PlaySource(url = finalUrl.ifBlank { playUrl }, headers = headers)
             }.getOrNull()
         }
 
