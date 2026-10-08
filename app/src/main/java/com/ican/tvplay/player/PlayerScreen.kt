@@ -342,7 +342,7 @@ fun PlayerScreen(
             onTogglePlay = { Players.playPause() },
             onPrev = { if (episodeIndex > 0) episodeIndex-- },
             onNext = { if (episodeIndex < lineEpisodes.size - 1) episodeIndex++ },
-            onEnterFullscreen = { fullscreen = true },
+            onEnterFullscreen = { controlsVisible = false; fullscreen = true },
             onLockToggle = { locked = true; controlsVisible = false },
             onUnlock = { locked = false; controlsVisible = true },
             onBack = { handleBack() },
@@ -448,10 +448,92 @@ private fun PortraitPlayLayout(
             onRelease = { view -> Players.unbindPlayerView(view) },
         )
 
-        // 预览小窗不显示控制层（仅全屏显示）；右上角保留全屏入口
+        // 预览小窗控制层：单击视频区显示/隐藏（fongmi 同款交互）
+        // 顶栏 statusBarsPadding 避让状态栏；全屏按钮独立常显在右下角
+        if (controlsVisible && !locked) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onToggleControls() },
+            ) {
+                // 顶栏：返回 + 标题 + 锁屏
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(0xCC000000), Color.Transparent),
+                            ),
+                        )
+                        .statusBarsPadding()
+                        .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 16.dp),
+                ) {
+                    MiniCircleBtn(AppIcons.Back, "返回") { onBack() }
+                    Text(
+                        text = "${current?.title.orEmpty()} · 第${episodeIndex + 1}集",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(start = 8.dp),
+                    )
+                    MiniCircleBtn(AppIcons.Lock, "锁屏") { onLockToggle() }
+                }
+
+                // 中部：上一集 / 播放暂停 / 下一集
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.align(Alignment.Center),
+                ) {
+                    MiniLargeBtn(AppIcons.SkipPrev, "上集", onClick = { onPrev() })
+                    MiniLargeBtn(
+                        if (playerState.playing) AppIcons.Pause else AppIcons.Play,
+                        if (playerState.playing) "暂停" else "播放",
+                        onClick = { onTogglePlay() },
+                        isPrimary = true,
+                    )
+                    MiniLargeBtn(AppIcons.SkipNext, "下集", onClick = { onNext() })
+                }
+
+                // 底部：进度条
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color(0xAA000000)),
+                            ),
+                        )
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    Slider(
+                        value = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
+                        onValueChange = { Players.seekTo((it * playerState.durationMs).toLong()) },
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = Color(0x44FFFFFF),
+                        ),
+                    )
+                    Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                }
+            }
+        }
+
+        // 全屏按钮：常显于右下角（控制层显示时保持在最上层）
         Box(
             modifier = Modifier
-                .align(Alignment.TopEnd)
+                .align(Alignment.BottomEnd)
                 .padding(8.dp)
                 .size(36.dp)
                 .clip(CircleShape)
