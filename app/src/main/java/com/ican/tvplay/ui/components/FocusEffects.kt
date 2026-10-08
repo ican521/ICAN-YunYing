@@ -43,11 +43,10 @@ fun Modifier.tvCardEffect(
     focusedScale: Float = 1.07f,
     glow: Boolean = true,
     enabled: Boolean = true,
-    interactionSource: MutableInteractionSource? = null,
 ): Modifier {
-    val source = interactionSource ?: remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val focused by source.collectIsFocusedAsState()
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val focused by interactionSource.collectIsFocusedAsState()
 
     val scale by animateFloatAsState(
         targetValue = if (focused) focusedScale else 1f,
@@ -88,7 +87,7 @@ fun Modifier.tvCardEffect(
         )
         .clip(shape)
         .clickable(
-            interactionSource = source,
+            interactionSource = interactionSource,
             indication = null,
             enabled = enabled,
             onClick = onClick,
