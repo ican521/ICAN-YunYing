@@ -113,6 +113,13 @@ object Players {
         return if (c != null && c.video.id == videoId) c else null
     }
 
+    /**
+     * 跨站源场景下：MultiSourceSearchScreen 提前解析好的 PlaySpec（已经 jx/parse 处理过真实 URL + headers）
+     * PlayerScreen LaunchedEffect 里优先用这个，避免 VideoRepository.resolvePlaySource 查 currentSite 错站
+     */
+    var pendingPreStartSpec: PlaySpec? = null
+
+
     private val ticker = object : Runnable {
         override fun run() {
             val p = player ?: return
