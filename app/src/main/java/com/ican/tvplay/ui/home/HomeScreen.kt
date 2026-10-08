@@ -155,8 +155,9 @@ fun HomeScreen(
 
         Spacer(Modifier.height(18.dp))
 
-        // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1），拖拽时页面已就绪；
-        // 每页内容由 page index + 缓存决定（避免滑动过程中两页读同一状态、目标页空白）
+        // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；
+        // 每页数据完全独立于 selectedCategory（按 page index 从 categories 直接取对应分类 + 独立缓存），
+        // 不再等 settle 同步后才更新 — 避免「目标页先显示旧内容再刷新」
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
@@ -169,14 +170,8 @@ fun HomeScreen(
             )
 
             if (page == 0) {
-                // 「全部」：Banner + 各分类 LazyRow 分区
-                // 实时数据仅在选中「全部」时取用，否则回退缓存（切走再切回不空白）
-                val pageSections = if (selectedCategory == null && sections.isNotEmpty()) {
-                    sections
-                } else {
-                    pageCache[null].orEmpty()
-                }
-                // rememberSaveable：页面离开组合后滚动位置仍保留
+                // 「全部」页：始终用实时 sections
+                val pageSections = sections
                 val listState = rememberSaveable(page, saver = LazyListState.Saver) { LazyListState() }
                 LazyColumn(
                     state = listState,
@@ -201,12 +196,16 @@ fun HomeScreen(
                     }
                 }
             } else {
-                // 具体分类：按 page index 直接决定该页分类；实时数据未覆盖该页时用缓存兜底
+                // 具体分类页：按 page-1 直接取 categories，独立加载/缓存该分类数据
                 val pageCategory = categories.getOrNull(page - 1)
-                val pageVideos = when {
-                    pageCategory == null -> emptyList()
-                    selectedCategory == pageCategory.id -> sections.firstOrNull()?.second.orEmpty()
-                    else -> pageCache[pageCategory.id]?.firstOrNull()?.second.orEmpty()
+                val pageVideos = remember(page, pageCategory?.id) {
+                    mutableStateOf<List<Video>>(emptyList())
+                }
+                // 首次进入该页或分类变化时，触发加载（协程结果缓存到 pageVideos）
+                LaunchedEffect(pageCategory?.id) {
+                    if (pageCategory != null) {
+                        pageVideos.value = viewModel.getCategoryVideos(pageCategory.id)
+                    }
                 }
                 val gridState = rememberSaveable(page, saver = LazyGridState.Saver) { LazyGridState() }
                 BoxWithConstraints(
@@ -214,7 +213,6 @@ fun HomeScreen(
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background),
                 ) {
-                    // 3:4 卡片宽度自适应列数
                     val columns = GridCells.Adaptive(minSize = 132.dp)
                     LazyVerticalGrid(
                         state = gridState,
@@ -224,12 +222,12 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        pageVideos.firstOrNull()?.let { featured ->
+                        pageVideos.value.firstOrNull()?.let { featured ->
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 FeaturedBanner(video = featured, onClick = { onVideoClick(featured) })
                             }
                         }
-                        gridItems(pageVideos, key = { it.id }) { video ->
+                        gridItems(pageVideos.value, key = { it.id }) { video ->
                             VideoCardItem(video = video, onClick = { onVideoClick(video) })
                         }
                     }

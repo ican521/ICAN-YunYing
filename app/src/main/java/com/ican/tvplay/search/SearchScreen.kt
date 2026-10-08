@@ -1,7 +1,8 @@
-package com.ican.tvplay.ui.search
+package com.ican.tvplay.search
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -51,6 +54,7 @@ fun SearchScreen(
     val viewModel = appViewModel { SearchViewModel(this) }
     val query by viewModel.queryText.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
+    val history by viewModel.history.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -82,7 +86,14 @@ fun SearchScreen(
         )
 
         if (query.isBlank()) {
-            EmptyHint(text = "输入影片名称开始搜索")
+            // 空查询：历史搜索 + 推荐热门词
+            SearchHints(
+                history = history,
+                hotWords = viewModel.hotWords,
+                onWordClick = { viewModel.onQueryChange(it) },
+                onClearHistory = viewModel::clearHistory,
+                modifier = Modifier.fillMaxSize(),
+            )
         } else if (results.isEmpty()) {
             EmptyHint(text = "没有找到与「$query」相关的影片")
         } else {
@@ -102,6 +113,105 @@ fun SearchScreen(
                 }
             }
         }
+    }
+}
+
+// ========== 空查询时的历史/推荐区域 ==========
+
+@Composable
+private fun SearchHints(
+    history: List<String>,
+    hotWords: List<String>,
+    onWordClick: (String) -> Unit,
+    onClearHistory: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        // 历史搜索
+        if (history.isNotEmpty()) {
+            SectionHeader(
+                title = "历史搜索",
+                action = "清空",
+                onAction = onClearHistory,
+            )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                rowItems(history) { word ->
+                    SearchChip(text = word, onClick = { onWordClick(word) })
+                }
+            }
+        }
+
+        // 热门推荐（横向可滚动）
+        SectionHeader(title = "热门推荐")
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            rowItems(hotWords) { word ->
+                SearchChip(text = word, onClick = { onWordClick(word) }, primary = true)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(
+    title: String,
+    action: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.weight(1f),
+        )
+        if (action != null && onAction != null) {
+            Text(
+                text = action,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clickable(onClick = onAction)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchChip(
+    text: String,
+    onClick: () -> Unit,
+    primary: Boolean = false,
+) {
+    val bg = if (primary) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+    else MaterialTheme.colorScheme.surfaceVariant
+    val fg = if (primary) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.onSurfaceVariant
+    val shape = RoundedCornerShape(percent = 50)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.06f, glow = false)
+            .background(bg, shape)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = fg,
+            maxLines = 1,
+        )
     }
 }
 
