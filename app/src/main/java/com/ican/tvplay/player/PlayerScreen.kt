@@ -727,36 +727,34 @@ private fun PortraitPlayLayout(
         fun realIdx(displayIdx: Int) = if (reversedEp) lineEpisodes.size - 1 - displayIdx else displayIdx
 
         if (showAllEps) {
-            // 网格模式（fongmi "更多" 切换后的样式）
-            val cols = if (lineEpisodes.size > 50) 8 else 6
-            val rows = displayEps.mapIndexed { i, ep -> i to ep }.chunked(cols)
-            Column(
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                rows.forEach { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        row.forEach { (dispIdx, ep) ->
-                            val idx = realIdx(dispIdx)
-                            EpisodeChip(
-                                title = ep.title,
-                                selected = idx == episodeIndex,
-                                onClick = { onEpisodeSelect(idx) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        // Fill empty spaces in last row
-                        repeat(cols - row.size) {
-                            Spacer(modifier = Modifier.weight(1f))
+            // 网格模式：与收起状态同一尺寸的固定按钮（64×40dp），按可用宽度自动排列
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val chipW = 64.dp
+                val gap = 6.dp
+                val cols = ((maxWidth + gap) / (chipW + gap)).toInt().coerceIn(3, 9)
+                val rows = displayEps.mapIndexed { i, ep -> i to ep }.chunked(cols)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(gap),
+                ) {
+                    rows.forEach { row ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(gap),
+                        ) {
+                            row.forEach { (dispIdx, ep) ->
+                                val idx = realIdx(dispIdx)
+                                EpisodeChip(
+                                    title = ep.title,
+                                    selected = idx == episodeIndex,
+                                    onClick = { onEpisodeSelect(idx) },
+                                )
+                            }
                         }
                     }
                 }
             }
         } else {
-            // 默认横向滚动（fongmi: adapter_episode_hori）
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // 默认横向滚动（fongmi: adapter_episode_hori），按钮尺寸与展开网格一致
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 itemsIndexed(displayEps) { dispIdx, ep ->
                     val idx = realIdx(dispIdx)
                     EpisodeChip(
@@ -1122,13 +1120,15 @@ private fun EpisodeChip(title: String, selected: Boolean, onClick: () -> Unit, m
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
+            // 收起（横向滚动）与展开（网格）统一固定尺寸，保证大小形状完全一致
+            .width(64.dp)
+            .height(40.dp)
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false)
             .background(
                 if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                 else MaterialTheme.colorScheme.surfaceVariant,
                 shape,
-            )
-            .padding(vertical = 10.dp),
+            ),
     ) {
         Text(
             text = title,
