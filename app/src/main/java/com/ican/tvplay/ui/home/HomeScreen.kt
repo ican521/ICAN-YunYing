@@ -64,6 +64,7 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.ExpressiveLoadingIndicator
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import androidx.tv.material3.Icon
@@ -210,6 +211,15 @@ fun HomeScreen(
                         )
                     }
                 }
+                // 「全部」页空态：新式转圈（数据流式上屏前的加载提示）
+                if (sections.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ExpressiveLoadingIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                }
             } else {
                 // 具体分类页：按 page-1 直接取 categories，独立加载/缓存该分类数据
                 val pageCategory = categories.getOrNull(page - 1)
@@ -252,6 +262,15 @@ fun HomeScreen(
                         }
                         gridItems(pageVideos.value, key = { it.id }) { video ->
                             VideoCardItem(video = video, onClick = { onVideoClick(video) })
+                        }
+                    }
+                    // 分类页空态：新式转圈
+                    if (pageVideos.value.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            ExpressiveLoadingIndicator(color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
