@@ -1,13 +1,13 @@
 package com.ican.tvplay.ui.detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,28 +15,30 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.ican.tvplay.data.model.Episode
 import com.ican.tvplay.data.model.PlayLine
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.ui.DetailViewModel
@@ -48,8 +50,11 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 
 /**
- * 详情页（纵向信息流布局，仿主流视频 App）：
- * 顶部大海报 → 立即播放/收藏 → 线路 chips → 选集卡片列表 → 详情信息
+ * FongMi 式详情页：左侧线路筛选 chips + 右侧卡片网格。
+ * - 顶部栏：返回 + 视频名 + 收藏
+ * - 左栏：全部 + 各线路 chip
+ * - 右栏：卡片网格（每条 PlaySource 一张卡，封面 + 来源标签 + 更新状态 + 视频名）
+ * - 点击卡片 → 弹出该线路选集 → 选集播放
  */
 @Composable
 fun DetailScreen(
@@ -63,7 +68,6 @@ fun DetailScreen(
 
     val video by viewModel.video.collectAsStateWithLifecycle()
     val isFavorite by viewModel.isFavorite.collectAsStateWithLifecycle()
-    val history by viewModel.history.collectAsStateWithLifecycle()
 
     val current = video
     if (current == null) {
@@ -71,409 +75,332 @@ fun DetailScreen(
         return
     }
 
-    var selectedSourceIndex by remember { mutableIntStateOf(0) }
-    val watchedIndex = history?.episodeIndex ?: -1
+    var selectedLineIndex by remember { mutableIntStateOf(-1) } // -1 = 全部
+    var showEpisodePicker by remember { mutableStateOf<PlayLine?>(null) }
 
-    LazyColumn(
+    val allSources = current.playSources.ifEmpty {
+        listOf(PlayLine(flag = "播放", episodes = current.episodes))
+    }
+    val displayedSources = if (selectedLineIndex < 0) allSources else listOf(allSources[selectedLineIndex])
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        // 顶部大海报区域
-        item { DetailHero(
-                video = current,
-                isFavorite = isFavorite,
-                onToggleFavorite = { viewModel.toggleFavorite(current) },
-                onBack = onBack,
-            ) }
+        // 顶部栏
+        DetailTopBar(
+            video = current,
+            isFavorite = isFavorite,
+            onToggleFavorite = { viewModel.toggleFavorite(current) },
+            onBack = onBack,
+        )
 
-        // 操作按钮行
-        item {
-            DetailActions(
-                isFavorite = isFavorite,
-                onPlay = {
-                    val flag = current.playSources.getOrNull(selectedSourceIndex)?.flag.orEmpty()
-                    onPlay(current.id, 0, flag)
-                },
+        // 主体：左 chips + 右卡片
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 100.dp),
+        ) {
+            // 左侧线路筛选 chips（纵向）
+            SourceFilterColumn(
+                allSources = allSources,
+                selectedLineIndex = selectedLineIndex,
+                onSelect = { selectedLineIndex = it },
+                modifier = Modifier.fillMaxHeight(),
             )
-        }
 
-        // 线路 chips
-        if (current.playSources.size > 1) {
-            item {
-                SourceChips(
-                    playSources = current.playSources,
-                    selectedIndex = selectedSourceIndex,
-                    onSelect = { selectedSourceIndex = it },
-                )
+            // 右侧卡片网格
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 132.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                itemsIndexed(displayedSources) { _, source ->
+                    SourceCard(
+                        video = current,
+                        source = source,
+                        onClick = { showEpisodePicker = source },
+                    )
+                }
             }
         }
+    }
 
-        // 选集列表
-        item {
-            val episodes = current.playSources.getOrNull(selectedSourceIndex)?.episodes.orEmpty()
-            val flag = current.playSources.getOrNull(selectedSourceIndex)?.flag.orEmpty()
-            EpisodeList(
-                video = current,
-                episodes = episodes,
-                flag = flag,
-                watchedIndex = watchedIndex,
-                onPlay = { episodeIndex -> onPlay(current.id, episodeIndex, flag) },
-            )
-        }
-
-        // 视频详情信息区
-        item { DetailInfo(video = current) }
+    // 选集弹出层
+    showEpisodePicker?.let { source ->
+        EpisodePickerDialog(
+            video = current,
+            source = source,
+            onSelect = { idx ->
+                showEpisodePicker = null
+                onPlay(current.id, idx, source.flag)
+            },
+            onDismiss = { showEpisodePicker = null },
+        )
     }
 }
 
-/** 顶部大海报：封面横幅 + 渐变遮罩 + 标题/标签/简介 + 左上返回 + 右上收藏 */
+// ========== 顶部栏 ==========
+
 @Composable
-private fun DetailHero(
+private fun DetailTopBar(
     video: Video,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
     onBack: () -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(280.dp),
-    ) {
-        AsyncImage(
-            model = video.cover,
-            contentDescription = video.title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-        )
-        // 底部渐变遮罩融入背景
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color(0x40000000), MaterialTheme.colorScheme.background),
-                    ),
-                ),
-        )
-        // 顶部状态栏按钮行：左返回 + 右收藏
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .statusBarsPadding()
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            CircleIconButton(icon = AppIcons.Back, contentDescription = "返回", onClick = onBack)
-            Spacer(modifier = Modifier.weight(1f))
-            CircleIconButton(
-                icon = if (isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
-                contentDescription = if (isFavorite) "已收藏" else "收藏",
-                onClick = onToggleFavorite,
-                tint = if (isFavorite) Color(0xFFFF5C8A) else Color.White,
-            )
-        }
-        // 海报底部：标题 + 标签
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = video.title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val infoText = buildString {
-                append(video.year)
-                if (video.region.isNotBlank()) append(" · ${video.region}")
-                if (video.categoryName.isNotBlank()) append(" · ${video.categoryName}")
-                if (video.rating.isNotBlank()) append(" · ${video.rating} 分")
-            }
-            Text(
-                text = infoText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFFE0E0E8),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-/** 立即播放主按钮 */
-@Composable
-private fun DetailActions(
-    isFavorite: Boolean,
-    onPlay: () -> Unit,
-) {
     Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .statusBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        CircleIconButton(icon = AppIcons.Back, contentDescription = "返回", onClick = onBack)
+        Text(
+            text = video.title,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
-                .fillMaxWidth()
-                .tvCardEffect(
-                    onClick = onPlay,
-                    shape = RoundedCornerShape(percent = 50),
-                    focusedScale = 1.04f,
-                    glow = false,
-                )
-                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(percent = 50))
-                .padding(vertical = 13.dp),
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Icon(
-                imageVector = AppIcons.Play,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(18.dp),
-            )
-            Text(
-                text = "立即播放",
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-                modifier = Modifier.padding(start = 6.dp),
-            )
-        }
+                .weight(1f)
+                .padding(horizontal = 12.dp),
+        )
+        CircleIconButton(
+            icon = if (isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
+            contentDescription = if (isFavorite) "已收藏" else "收藏",
+            onClick = onToggleFavorite,
+            tint = if (isFavorite) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
-/** 线路 chips（横向滚动） */
+// ========== 左侧线路筛选栏 ==========
+
 @Composable
-private fun SourceChips(
-    playSources: List<PlayLine>,
-    selectedIndex: Int,
+private fun SourceFilterColumn(
+    allSources: List<PlayLine>,
+    selectedLineIndex: Int,
     onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
+        modifier = modifier
+            .width(110.dp)
+            .padding(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = "线路",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
+        FilterChip(
+            text = "全部",
+            selected = selectedLineIndex < 0,
+            onClick = { onSelect(-1) },
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(playSources.size) { index ->
-                val selected = index == selectedIndex
-                val shape = RoundedCornerShape(percent = 50)
-                val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .tvCardEffect(
-                            onClick = { onSelect(index) },
-                            shape = shape,
-                            focusedScale = 1.05f,
-                            glow = false,
-                        )
-                        .background(bg, shape)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                ) {
-                    Text(
-                        text = playSources[index].flag,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = fg,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** 选集列表：纵向卡片，每项左侧小封面 + 右侧标题/信息 */
-@Composable
-private fun EpisodeList(
-    video: Video,
-    episodes: List<Episode>,
-    flag: String,
-    watchedIndex: Int,
-    onPlay: (Int) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(
-            text = "选集（${episodes.size} 集）",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        if (episodes.isEmpty()) {
-            Text(
-                text = "暂无选集",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        allSources.forEachIndexed { idx, source ->
+            FilterChip(
+                text = source.flag,
+                selected = selectedLineIndex == idx,
+                onClick = { onSelect(idx) },
             )
-        } else {
-            episodes.forEach { episode ->
-                EpisodeCard(
-                    video = video,
-                    episode = episode,
-                    isCurrent = episode.index == watchedIndex,
-                    onClick = { onPlay(episode.index) },
-                )
-            }
         }
-        Spacer(Modifier.height(8.dp))
     }
 }
 
-/** 单个选集卡片：左小封面 + 右标题/信息 */
 @Composable
-private fun EpisodeCard(
-    video: Video,
-    episode: Episode,
-    isCurrent: Boolean,
+private fun FilterChip(
+    text: String,
+    selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(14.dp)
-    val bg = if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-    else MaterialTheme.colorScheme.surface
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    val bg = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+    else MaterialTheme.colorScheme.surfaceVariant
+    val fg = if (selected) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.onSurfaceVariant
+    val shape = RoundedCornerShape(percent = 50)
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
-            .fillMaxWidth()
-            .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.02f, glow = false)
+            .padding(horizontal = 8.dp)
+            .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false)
             .background(bg, shape)
-            .padding(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
-        // 左侧小封面缩略图（共用视频封面）
-        val thumbShape = RoundedCornerShape(10.dp)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = fg,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+// ========== 右侧来源卡片 ==========
+
+@Composable
+private fun SourceCard(
+    video: Video,
+    source: PlayLine,
+    onClick: () -> Unit,
+) {
+    val updateState = source.episodes.let { eps ->
+        if (eps.isEmpty()) ""
+        else {
+            val lastTitle = eps.last().title
+            when {
+                lastTitle.contains("完结") -> "已完结"
+                eps.size >= 2 -> "更新至第${eps.size}集"
+                else -> "共${eps.size}集"
+            }
+        }
+    }
+
+    val sourceChipColor = hashColor(source.flag)
+
+    Column(
+        modifier = Modifier.tvCardEffect(
+            onClick = onClick,
+            shape = RoundedCornerShape(14.dp),
+            focusedScale = 1.05f,
+        ),
+    ) {
         Box(
             modifier = Modifier
-                .size(width = 107.dp, height = 60.dp)
-                .clip(thumbShape)
+                .fillMaxWidth()
+                .height(186.dp)
+                .clip(RoundedCornerShape(14.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             AsyncImage(
                 model = video.cover,
-                contentDescription = null,
+                contentDescription = source.flag,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-            // 当前集播放中角标
-            if (isCurrent) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0x66000000), thumbShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = AppIcons.Play,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
+            // 右上角：来源标签
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .background(sourceChipColor, RoundedCornerShape(percent = 50))
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                Text(
+                    text = source.flag,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            // 底部渐变 + 更新状态 + 视频名
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(Color.Transparent, Color(0xE6000000)),
+                        ),
+                    )
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    if (updateState.isNotBlank()) {
+                        Text(
+                            text = updateState,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.9f),
+                        )
+                    }
+                    Text(
+                        text = video.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
-        }
-        // 右侧标题/信息
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = episode.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = if (isCurrent) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = "${video.title} · ${video.year}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (isCurrent) {
-                Text(
-                    text = "正在播放",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
             }
         }
     }
 }
 
-/** 视频详情信息区：完整简介、标签 */
+/** 给线路 flag 生成稳定的半透明标签颜色 */
+private fun hashColor(text: String): Color {
+    val hue = (text.hashCode() % 360 + 360) % 360
+    return androidx.compose.ui.graphics.Color.hsv(hue.toFloat(), 0.55f, 0.75f).copy(alpha = 0.92f)
+}
+
+// ========== 选集弹出对话框 ==========
+
 @Composable
-private fun DetailInfo(video: Video) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(
-            text = "详情",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        // 标签
-        if (video.tags.isNotEmpty()) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+private fun EpisodePickerDialog(
+    video: Video,
+    source: PlayLine,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                .padding(20.dp),
+        ) {
+            Text(
+                text = "${source.flag} · 选集（${source.episodes.size} 集）",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(top = 16.dp),
             ) {
-                video.tags.forEach { tag ->
-                    Text(
-                        text = tag,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFFBDD0FF),
+                items(source.episodes.size) { idx ->
+                    val ep = source.episodes[idx]
+                    val shape = RoundedCornerShape(12.dp)
+                    Box(
+                        contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .background(Color(0x335B8CFF), RoundedCornerShape(percent = 50))
-                            .padding(horizontal = 10.dp, vertical = 3.dp),
-                    )
+                            .tvCardEffect(
+                                onClick = { onSelect(idx) },
+                                shape = shape,
+                                focusedScale = 1.06f,
+                                glow = false,
+                            )
+                            .background(MaterialTheme.colorScheme.surfaceVariant, shape)
+                            .padding(horizontal = 18.dp, vertical = 12.dp),
+                    ) {
+                        Text(
+                            text = ep.title,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }
-        // 简介
-        if (video.description.isNotBlank()) {
-            Text(
-                text = video.description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.height(20.dp))
     }
 }
+
+// ========== 通用组件 ==========
 
 @Composable
 private fun CircleIconButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    tint: Color = Color.White,
+    tint: Color = MaterialTheme.colorScheme.onBackground,
     onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(percent = 50)
@@ -486,7 +413,7 @@ private fun CircleIconButton(
                 focusedScale = 1.08f,
                 glow = false,
             )
-            .background(Color(0x66000000), shape),
+            .background(MaterialTheme.colorScheme.surfaceVariant, shape),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -498,7 +425,6 @@ private fun CircleIconButton(
     }
 }
 
-/** 占位：视频未加载时的返回顶栏 */
 @Composable
 private fun DetailLoading(onBack: () -> Unit) {
     Box(
