@@ -1,6 +1,5 @@
 package com.ican.tvplay.ui.home
 
-import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -78,9 +77,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 
-/** 首页加载转圈调试日志 TAG（验证完可删） */
-private const val TAG = "HomeLoading"
-
 @Composable
 fun HomeScreen(
     onVideoClick: (Video) -> Unit,
@@ -94,6 +90,21 @@ fun HomeScreen(
     val contentPadding = topLevelContentPadding()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+
+    // 首页加载转圈（根级 overlay，不依赖 pager 组合——冷启动时 pager 内容可能延迟数秒才上屏）：
+    // 显示直到第一张卡片封面真正显示（4s 超时兜底），再保持 1.5s 保证可感知
+    var showLoading by remember { mutableStateOf(true) }
+    var firstCardLoaded by remember { mutableStateOf(false) }
+    val sectionsReady = sections.any { it.second.isNotEmpty() }
+    LaunchedEffect(sectionsReady) {
+        if (sectionsReady) {
+            withTimeoutOrNull(4000L) {
+                snapshotFlow { firstCardLoaded }.first { it }
+            }
+            delay(1500)
+            showLoading = false
+        }
+    }
 
     // 顶部分类 pager：第 0 页"全部" + 每个分类一页
     val pagerState = rememberPagerState(pageCount = { categories.size + 1 })
@@ -128,11 +139,12 @@ fun HomeScreen(
         scope.launch { pagerState.animateScrollToPage(index) }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+        ) {
         // 固定顶栏：搜索 + 历史（不透明背景，防止内容透出）
         Box(
             modifier = Modifier
@@ -188,8 +200,6 @@ fun HomeScreen(
             if (page == 0) {
                 // 「全部」页：始终用实时 sections
                 val pageSections = sections
-                var showLoading by remember(page) { mutableStateOf(true) }
-                var firstCardLoaded by remember(page) { mutableStateOf(false) }
                 val listState = remember(page) { LazyListState() }
                 // 离开当前页时立即滚回顶部（currentPage ≠ page）
                 LaunchedEffect(pagerState.currentPage) {
@@ -226,40 +236,16 @@ fun HomeScreen(
                         )
                     }
                 }
-                // 「全部」页：转圈绘制在最表层；等第一张卡片封面真正显示（成功/失败均算，4s 超时兜底）
-                val sectionsReady = sections.any { it.second.isNotEmpty() }
-                LaunchedEffect(page, sectionsReady) {
-                    if (sectionsReady) {
-                        val waited = withTimeoutOrNull(4000L) {
-                            snapshotFlow { firstCardLoaded }.first { it }
-                        }
-                        Log.d(TAG, "all page: sectionsReady, firstCardLoaded=$waited, spinner stops after 1500ms")
-                        delay(1500)
-                        showLoading = false
-                        Log.d(TAG, "all page: spinner stopped")
-                    }
-                }
-                if (showLoading) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        ExpressiveLoadingIndicator(color = MaterialTheme.colorScheme.primary)
-                    }
-                }
             } else {
                 // 具体分类页：按 page-1 直接取 categories，独立加载/缓存该分类数据
                 val pageCategory = categories.getOrNull(page - 1)
                 val pageVideos = remember(page, pageCategory?.id) {
                     mutableStateOf<List<Video>>(emptyList())
                 }
-                var showLoading by remember(pageCategory?.id) { mutableStateOf(true) }
-                var firstCardLoaded by remember(pageCategory?.id) { mutableStateOf(false) }
                 // 首次进入该页或分类变化时，触发加载（协程结果缓存到 pageVideos）
                 LaunchedEffect(pageCategory?.id) {
                     if (pageCategory != null) {
                         pageVideos.value = viewModel.getCategoryVideos(pageCategory.id)
-                        Log.d(TAG, "category ${pageCategory.id}: data loaded, size=${pageVideos.value.size}")
                     }
                 }
                 val gridState = remember(page) { LazyGridState() }
@@ -302,28 +288,18 @@ fun HomeScreen(
                             )
                         }
                     }
-                    // 分类页：转圈绘制在最表层；等第一张卡片封面真正显示（4s 超时兜底）
-                    val videosReady = pageVideos.value.isNotEmpty()
-                    LaunchedEffect(pageCategory?.id, videosReady) {
-                        if (videosReady) {
-                            val waited = withTimeoutOrNull(4000L) {
-                                snapshotFlow { firstCardLoaded }.first { it }
-                            }
-                            Log.d(TAG, "category ${pageCategory?.id}: firstCardLoaded=$waited, spinner stops after 1500ms")
-                            delay(1500)
-                            showLoading = false
-                            Log.d(TAG, "category ${pageCategory?.id}: spinner stopped")
-                        }
-                    }
-                    if (showLoading) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            ExpressiveLoadingIndicator(color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
                 }
+            }
+        }
+        }
+
+        // 加载转圈：根级最表层 overlay，首张卡片封面就绪后停止
+        if (showLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                ExpressiveLoadingIndicator(color = MaterialTheme.colorScheme.primary)
             }
         }
     }
