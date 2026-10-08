@@ -65,11 +65,21 @@ class SettingsRepository(context: Context) {
         _configUrl.value = url
     }
 
+    /** 用户手动选择的站点 key；空表示按默认策略自动选择 */
+    private val _siteKey = MutableStateFlow(prefs.getString(KEY_SITE_KEY, null).orEmpty())
+    val siteKey: StateFlow<String> = _siteKey.asStateFlow()
+
+    fun setSiteKey(key: String) {
+        prefs.edit().putString(KEY_SITE_KEY, key).apply()
+        _siteKey.value = key
+    }
+
     private companion object {
         const val KEY_THEME = "theme_mode"
         const val KEY_DYNAMIC_COLOR = "dynamic_color"
         const val KEY_THEME_COLOR = "theme_color"
         const val KEY_ENABLE_BLUR = "enable_blur"
         const val KEY_CONFIG_URL = "config_url"
+        const val KEY_SITE_KEY = "site_key"
     }
 }

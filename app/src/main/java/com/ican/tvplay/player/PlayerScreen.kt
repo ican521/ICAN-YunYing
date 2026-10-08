@@ -61,6 +61,7 @@ import androidx.tv.material3.Text
 fun PlayerScreen(
     videoId: String,
     startEpisode: Int,
+    startFlag: String = "",
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -78,16 +79,28 @@ fun PlayerScreen(
     var pendingPosition by remember { mutableLongStateOf(0L) }
     var initialized by remember { mutableStateOf(false) }
 
+    /** 当前生效的线路：按传入 flag 匹配，缺省取首条 */
+    val playLine = video?.playSources
+        ?.let { sources -> sources.firstOrNull { it.flag == startFlag } ?: sources.firstOrNull() }
+    // 多线路时用所选线路的选集；单线路/旧数据回退 video.episodes
+    val lineEpisodes = playLine?.episodes ?: video?.episodes.orEmpty()
+    val lineFlag = playLine?.flag ?: video?.playFrom.orEmpty()
+
     // 先取视频信息与历史进度，再开始播放
     LaunchedEffect(videoId) {
         val v = container.videoRepository.getVideo(videoId)
         val history = container.historyDao.observeOne(videoId).first()
         video = v
-        if (v != null && history != null && history.episodeIndex in v.episodes.indices) {
-            episodeIndex = history.episodeIndex
-            val nearEnd = history.durationMs > 0 &&
-                history.durationMs - history.positionMs < RESUME_THRESHOLD_MS
-            pendingPosition = if (nearEnd) 0L else history.positionMs
+        if (v != null && history != null) {
+            val eps = v.playSources
+                .let { s -> s.firstOrNull { it.flag == startFlag } ?: s.firstOrNull() }
+                ?.episodes ?: v.episodes
+            if (history.episodeIndex in eps.indices) {
+                episodeIndex = history.episodeIndex
+                val nearEnd = history.durationMs > 0 &&
+                    history.durationMs - history.positionMs < RESUME_THRESHOLD_MS
+                pendingPosition = if (nearEnd) 0L else history.positionMs
+            }
         }
         initialized = true
     }
@@ -96,11 +109,11 @@ fun PlayerScreen(
     LaunchedEffect(initialized, episodeIndex) {
         if (!initialized) return@LaunchedEffect
         val v = video ?: return@LaunchedEffect
-        val episode = v.episodes.getOrNull(episodeIndex) ?: return@LaunchedEffect
+        val episode = lineEpisodes.getOrNull(episodeIndex) ?: return@LaunchedEffect
         val startPosition = pendingPosition
         pendingPosition = 0L
         // spider 站需先经 playerContent 解析真实 URL（可能带 header）
-        val source = container.videoRepository.resolvePlaySource(v, episode)
+        val source = container.videoRepository.resolvePlaySource(v, episode, lineFlag)
         val mediaItem = MediaItem.Builder()
             .setUri(source.url)
             .apply {
@@ -131,7 +144,7 @@ fun PlayerScreen(
 
     fun saveProgress() {
         val v = video ?: return
-        val episode = v.episodes.getOrNull(episodeIndex) ?: return
+        val episode = lineEpisodes.getOrNull(episodeIndex) ?: return
         val position = exoPlayer.currentPosition
         val duration = exoPlayer.duration.coerceAtLeast(0L)
         scope.launch {
@@ -232,6 +245,8 @@ fun PlayerScreen(
         if (current != null) {
             EpisodePanel(
                 video = current,
+                episodes = lineEpisodes,
+                lineFlag = lineFlag,
                 currentEpisodeIndex = episodeIndex,
                 onSelect = { index ->
                     if (index != episodeIndex) {
@@ -249,6 +264,8 @@ fun PlayerScreen(
 @Composable
 private fun EpisodePanel(
     video: Video,
+    episodes: List<com.ican.tvplay.data.model.Episode>,
+    lineFlag: String,
     currentEpisodeIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -261,18 +278,19 @@ private fun EpisodePanel(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = video.episodes.getOrNull(currentEpisodeIndex)?.title ?: "",
+            text = episodes.getOrNull(currentEpisodeIndex)?.title ?: "",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            text = "${video.year} · ${video.categoryName} · ${video.rating} 分",
+            text = "${video.year} · ${video.categoryName} · ${video.rating} 分" +
+                if (lineFlag.isNotBlank()) " · 线路：$lineFlag" else "",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = "选集（${video.episodes.size} 集）",
+            text = "选集（${episodes.size} 集）",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
@@ -282,7 +300,7 @@ private fun EpisodePanel(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            video.episodes.forEach { episode ->
+            episodes.forEach { episode ->
                 val isCurrent = episode.index == currentEpisodeIndex
                 val shape = RoundedCornerShape(12.dp)
                 val container = if (isCurrent) {
