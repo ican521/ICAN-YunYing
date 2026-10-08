@@ -172,6 +172,28 @@ object Players {
         player?.setVideoSurfaceView(surfaceView)
     }
 
+    /**
+     * 防御性 surface 重新绑定：
+     * 场景：MultiSourceSearchScreen 预启动 Players.start() 时还没 SurfaceView → player.setVideoSurfaceView(null)；
+     *       进入 PlayerScreen 后 AndroidView 创建 SurfaceView 并 attach，但 ExoPlayer 已经在 STATE_READY 播放了一段时间，
+     *       某些设备/ExoPlayer 版本不会自动把后续帧渲染到新 surface。
+     * 做法：setVideoSurfaceView + seekTo(currentPosition) 触发一次渲染刷新。
+     */
+    fun rebindSurface() {
+        val sv = pendingSurfaceView
+        val p = player ?: return
+        if (sv == null) return
+        val pos = p.contentPosition.coerceAtLeast(0L)
+        Log.d(TAG, "rebindSurface sv=$sv pos=$pos playWhenReady=${p.playWhenReady}")
+        p.setVideoSurfaceView(sv)
+        if (!p.playWhenReady) {
+            p.playWhenReady = true
+            p.play()
+        }
+        // 关键：seek 触发 ExoPlayer 重新把视频帧输出到刚绑定的 surface
+        p.seekTo(pos)
+    }
+
     /** 视图销毁时调用：只解绑 surface，不释放播放器 */
     fun detach(surfaceView: SurfaceView) {
         Log.d(TAG, "detach sv=$surfaceView")
