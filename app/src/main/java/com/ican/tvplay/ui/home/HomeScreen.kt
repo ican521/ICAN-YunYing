@@ -43,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -362,8 +361,7 @@ private fun HomeTopBar(
             modifier = Modifier
                 .weight(1f)
                 .height(48.dp)
-                .shadow(6.dp, CircleShape)
-                .tvCardEffect(onClick = onSearchClick, shape = CircleShape, focusedScale = 1.04f, glow = false)
+                .tvCardEffect(onClick = onSearchClick, shape = CircleShape, focusedScale = 1.04f)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(horizontal = 18.dp),
