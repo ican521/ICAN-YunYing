@@ -75,6 +75,7 @@ import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.data.model.Episode
@@ -162,11 +163,11 @@ fun PlayerScreen(
         )
     }
 
-    // 播放保活（设置开关）：开启后退出播放页转交前台服务后台续播（通知栏控制/PiP）
-    var keepAliveEnabled by remember { mutableStateOf(false) }
+    // 后台播放（设置三态：关闭/开启/画中画）：非关闭时退出播放页转交前台服务后台续播
+    var backgroundMode by remember { mutableIntStateOf(BACKGROUND_OFF) }
     LaunchedEffect(Unit) {
-        keepAliveEnabled = container.settingsRepository.playerKeepAlive.first()
-        PlaybackService.startIfNeeded(context, keepAliveEnabled)
+        backgroundMode = container.settingsRepository.playerBackgroundPlay.first()
+        PlaybackService.startIfNeeded(context, backgroundMode)
     }
     // PiP 画中画模式（全屏播放时切后台触发）
     val inPip by Players.pipMode.collectAsStateWithLifecycle()
@@ -422,7 +423,7 @@ fun PlayerScreen(
             } else {
                 // 真正退出：保存进度；保活开启 → 转交前台服务后台续播（不销毁播放器）
                 saveProgress()
-                if (keepAliveEnabled && Players.isAlive()) {
+                if (backgroundMode != BACKGROUND_OFF && Players.isAlive()) {
                     Players.detachForBackground()
                 } else {
                     Players.release()

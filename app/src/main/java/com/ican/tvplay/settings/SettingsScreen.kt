@@ -41,6 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ican.tvplay.data.BACKGROUND_OFF
+import com.ican.tvplay.data.BACKGROUND_ON
+import com.ican.tvplay.data.BACKGROUND_PIP
 import com.ican.tvplay.data.ThemeMode
 import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.SettingsViewModel
@@ -63,7 +66,7 @@ fun SettingsScreen(
     val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
-    val playerKeepAlive by viewModel.playerKeepAlive.collectAsStateWithLifecycle()
+    val backgroundPlay by viewModel.playerBackgroundPlay.collectAsStateWithLifecycle()
     val configUrl by viewModel.configUrl.collectAsStateWithLifecycle()
     val siteName by viewModel.siteName.collectAsStateWithLifecycle()
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
@@ -74,6 +77,19 @@ fun SettingsScreen(
         if (showSiteDialog) siteList = viewModel.listSites()
     }
     val context = LocalContext.current
+
+    // Android 13+ 需要运行时通知权限，后台播放的通知栏控制才能显示
+    val requestNotificationPermission = {
+        if (Build.VERSION.SDK_INT >= 33) {
+            (context as? android.app.Activity)?.let { act ->
+                androidx.core.app.ActivityCompat.requestPermissions(
+                    act,
+                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                    1001,
+                )
+            }
+        }
+    }
 
     val padding = topLevelContentPadding()
     Column(
@@ -156,25 +172,25 @@ fun SettingsScreen(
             )
         }
 
-        SettingsCard(title = "播放", subtitle = "播放行为") {
-            SettingsSwitchRow(
-                label = "播放保活",
-                hint = "播放期间以前台服务保活，切后台/横竖屏不中断（通知栏显示）",
-                checked = playerKeepAlive,
-                enabled = true,
-                onToggle = { enabled ->
-                    viewModel.setPlayerKeepAlive(enabled)
-                    // Android 13+ 需要运行时通知权限，通知栏控制才能显示
-                    if (enabled && Build.VERSION.SDK_INT >= 33) {
-                        (context as? android.app.Activity)?.let { act ->
-                            androidx.core.app.ActivityCompat.requestPermissions(
-                                act,
-                                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-                                1001,
-                            )
-                        }
-                    }
-                },
+        SettingsCard(title = "播放", subtitle = "后台播放") {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ThemeOption("关闭", backgroundPlay == BACKGROUND_OFF) {
+                    viewModel.setPlayerBackgroundPlay(BACKGROUND_OFF)
+                }
+                ThemeOption("开启", backgroundPlay == BACKGROUND_ON) {
+                    viewModel.setPlayerBackgroundPlay(BACKGROUND_ON)
+                    requestNotificationPermission()
+                }
+                ThemeOption("画中画", backgroundPlay == BACKGROUND_PIP) {
+                    viewModel.setPlayerBackgroundPlay(BACKGROUND_PIP)
+                    requestNotificationPermission()
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "开启：退出播放页后继续播放并可通知栏控制；画中画：全屏播放时切后台自动进入小窗",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
