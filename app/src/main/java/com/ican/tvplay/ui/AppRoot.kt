@@ -186,9 +186,9 @@ fun AppRoot() {
                     DetailScreen(
                         videoId = videoId,
                         onBack = { navController.popBackStack() },
-                        onPlay = { id, episodeIndex ->
+                        onPlay = { id, episodeIndex, flag ->
                             if (guardPlay()) {
-                                navController.navigate(Routes.player(id, episodeIndex))
+                                navController.navigate(Routes.player(id, episodeIndex, flag))
                             }
                         },
                     )
@@ -199,11 +199,16 @@ fun AppRoot() {
                     arguments = listOf(
                         navArgument("videoId") { type = NavType.StringType },
                         navArgument("episodeIndex") { type = NavType.IntType },
+                        navArgument("flag") {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
                     ),
                 ) { entry ->
                     PlayerScreen(
                         videoId = entry.arguments?.getString("videoId").orEmpty(),
                         startEpisode = entry.arguments?.getInt("episodeIndex") ?: 0,
+                        startFlag = entry.arguments?.getString("flag").orEmpty(),
                         onBack = { navController.popBackStack() },
                     )
                 }

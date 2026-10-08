@@ -17,8 +17,9 @@ object Routes {
     const val DETAIL_PATTERN = "detail/{videoId}"
     fun detail(videoId: String) = "detail/$videoId"
 
-    const val PLAYER_PATTERN = "player/{videoId}/{episodeIndex}"
-    fun player(videoId: String, episodeIndex: Int) = "player/$videoId/$episodeIndex"
+    const val PLAYER_PATTERN = "player/{videoId}/{episodeIndex}?flag={flag}"
+    fun player(videoId: String, episodeIndex: Int, flag: String = "") =
+        "player/$videoId/$episodeIndex?flag=${android.net.Uri.encode(flag)}"
 }
 
 /** 底部胶囊导航的一个入口 */

@@ -3,10 +3,12 @@ package com.ican.tvplay.data
 import android.content.Context
 import android.util.Log
 import com.ican.tvplay.data.model.Episode
+import com.ican.tvplay.data.model.PlayLine
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.data.model.VideoCategory
 import com.ican.tvplay.data.remote.LoadedSite
 import com.ican.tvplay.data.remote.SpiderManager
+import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.data.remote.VodApiClient
 import com.ican.tvplay.data.remote.VodClass
 import com.ican.tvplay.data.remote.VodItem
@@ -79,7 +81,7 @@ class VideoRepository(
             currentSpider = null
             return
         }
-        val loaded = apiClient.loadHomeSite(url)
+        val loaded = apiClient.loadHomeSite(url, settingsRepository.siteKey.value)
         _currentSite.value = loaded
         if (loaded == null) {
             _categories.value = emptyList()
@@ -112,6 +114,19 @@ class VideoRepository(
     }
 
     fun getCategories(): List<VideoCategory> = _categories.value
+
+    /** 配置中全部可切换站点（spider + HTTP） */
+    suspend fun listSites(): List<TvBoxSite> {
+        val url = settingsRepository.configUrl.value
+        if (url.isBlank()) return emptyList()
+        return apiClient.listSites(url)
+    }
+
+    /** 切换站点：记录选择并重新加载分类 */
+    suspend fun switchSite(siteKey: String) {
+        settingsRepository.setSiteKey(siteKey)
+        loadMutex.withLock { reload() }
+    }
 
     /**
      * 首页分区：categoryId == null 表示「全部」→ 返回所有分类各加载首页视频；
@@ -166,14 +181,15 @@ class VideoRepository(
 
     /**
      * 播放前调用：spider 站经 playerContent 解析真实 URL（可能带 header）；
-     * HTTP 站直接返回原 url。
+     * HTTP 站直接返回原 url。flag 为所选线路标识，缺省用视频首源。
      */
-    suspend fun resolvePlaySource(video: Video, episode: Episode): PlaySource {
+    suspend fun resolvePlaySource(video: Video, episode: Episode, flag: String? = null): PlaySource {
         val loaded = _currentSite.value ?: return PlaySource(episode.playUrl)
         if (!loaded.site.isSpider()) return PlaySource(episode.playUrl)
         val spider = currentSpider ?: return PlaySource(episode.playUrl)
-        val flag = video.playFrom.ifBlank { loaded.site.key }
-        val json = spiderManager.playerContent(spider, flag, episode.playUrl)
+        val resolvedFlag = flag?.takeIf { it.isNotBlank() }
+            ?: video.playFrom.ifBlank { loaded.site.key }
+        val json = spiderManager.playerContent(spider, resolvedFlag, episode.playUrl)
         if (json.isBlank()) return PlaySource(episode.playUrl)
         return runCatching {
             val obj = rawJson.parseToJsonElement(json).jsonObject
@@ -247,8 +263,8 @@ class VideoRepository(
 
     /** 把采集站返回的 VodItem 映射为项目 Video 模型 */
     private fun VodItem.toVideo(category: VideoCategory, withEpisodes: Boolean = false): Video {
-        val episodes = if (withEpisodes && vodPlayUrl.isNotBlank()) {
-            parseEpisodes(vodPlayFrom, vodPlayUrl)
+        val playSources = if (withEpisodes && vodPlayUrl.isNotBlank()) {
+            parsePlayLines(vodPlayFrom, vodPlayUrl)
         } else {
             emptyList()
         }
@@ -264,27 +280,35 @@ class VideoRepository(
             region = vodArea,
             description = vodContent.trim(),
             tags = emptyList(),
-            episodes = episodes,
+            episodes = playSources.firstOrNull()?.episodes.orEmpty(),
             playFrom = firstPlayFrom,
+            playSources = playSources,
         )
     }
 
     /**
-     * 解析 vod_play_url：
-     * 多源用 $$$ 分隔（与 vod_play_from 一一对应），单源内用 # 分隔集数，
+     * 解析 vod_play_from / vod_play_url：
+     * 多线路用 $$$ 分隔（两者一一对应），单线路内选集用 # 分隔，
      * 每集格式 `第01集$https://...m3u8`。
-     * 这里仅取第一个源的选集列表。
+     * 线路数多于选集组时以选集组为准；线路名为空时回退为「线路N」。
      */
-    private fun parseEpisodes(playFrom: String, playUrl: String): List<Episode> {
-        val firstSource = playUrl.split("$$$").firstOrNull().orEmpty()
-        return firstSource.split("#")
-            .mapIndexedNotNull { index, segment ->
-                val parts = segment.split("$")
-                if (parts.size < 2) return@mapIndexedNotNull null
-                val title = parts[0].trim().ifBlank { "第${index + 1}集" }
-                val url = parts.subList(1, parts.size).joinToString("$").trim()
-                if (url.isEmpty()) return@mapIndexedNotNull null
-                Episode(index = index, title = title, playUrl = url)
-            }
+    private fun parsePlayLines(playFrom: String, playUrl: String): List<PlayLine> {
+        val flags = playFrom.split("$$$").map { it.trim() }
+        val urlGroups = playUrl.split("$$$")
+        return urlGroups.mapIndexedNotNull { groupIndex, group ->
+            val episodes = group.split("#")
+                .mapIndexedNotNull { index, segment ->
+                    val parts = segment.split("$")
+                    if (parts.size < 2) return@mapIndexedNotNull null
+                    val title = parts[0].trim().ifBlank { "第${index + 1}集" }
+                    val url = parts.subList(1, parts.size).joinToString("$").trim()
+                    if (url.isEmpty()) return@mapIndexedNotNull null
+                    Episode(index = index, title = title, playUrl = url)
+                }
+            if (episodes.isEmpty()) return@mapIndexedNotNull null
+            val flag = flags.getOrNull(groupIndex)?.takeIf { it.isNotBlank() }
+                ?: "线路${groupIndex + 1}"
+            PlayLine(flag = flag, episodes = episodes)
+        }
     }
 }

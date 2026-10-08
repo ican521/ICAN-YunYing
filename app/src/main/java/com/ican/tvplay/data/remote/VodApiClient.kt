@@ -139,12 +139,13 @@ class VodApiClient(
         })
         .build()
 
-    /**
-     * 拉取配置 URL，返回当前生效的站点。
-     * - 响应经 [Decoder] 解码（支持伪装 JPEG 中的 base64）
-     * - 站点优先选 type=3 且 api=csp_Xxx 的 spider 站；fallback 为 type 0/1 的 HTTP 采集站
-     */
-    suspend fun loadHomeSite(configUrl: String): LoadedSite? = withContext(Dispatchers.IO) {
+    /** 最近一次成功拉取的配置（configUrl to config），供站点列表复用，避免重复请求 */
+    @Volatile
+    private var cachedConfig: Pair<String, TvBoxConfig>? = null
+
+    /** 拉取并解码配置（带缓存）；失败返回 null */
+    suspend fun loadConfig(configUrl: String): TvBoxConfig? = withContext(Dispatchers.IO) {
+        cachedConfig?.takeIf { it.first == configUrl }?.second?.let { return@withContext it }
         runCatching {
             Log.d(TAG, "loadConfig: $configUrl")
             val body = get(configUrl)
@@ -156,35 +157,70 @@ class VodApiClient(
             config.sites.forEachIndexed { i, s ->
                 Log.d(TAG, "site[$i] key=${s.key} name=${s.name} type=${s.type} api=${s.api.take(60)}")
             }
-
-            // 优先纯内容 spider 站（searchable=changeable=1），避免选中云盘/配置类站点
-            val spiderSite = config.sites.firstOrNull { s ->
-                s.isSpider() && s.searchable == 1 && s.changeable == 1 &&
-                    (s.jar.isNotBlank() || config.spider.isNotBlank())
-            } ?: config.sites.firstOrNull { s ->
-                s.isSpider() && (s.searchable != 0 || s.changeable != 0) &&
-                    (s.jar.isNotBlank() || config.spider.isNotBlank())
-            }
-            if (spiderSite != null) {
-                val jar = spiderSite.jar.ifBlank { config.spider }
-                Log.d(TAG, "chosen spider=${spiderSite.name} api=${spiderSite.api} jar=${jar.take(80)}")
-                return@runCatching LoadedSite(spiderSite, jar)
-            }
-
-            // fallback：纯 HTTP JSON 采集站
-            val httpSite = config.sites.firstOrNull { s ->
-                val t = s.type
-                s.api.contains("provide/vod") && (t == null || t <= 1)
-            } ?: config.sites.firstOrNull { s ->
-                val t = s.type
-                s.api.startsWith("http") && (t == null || t <= 1)
-            }
-            Log.d(TAG, "chosen http=${httpSite?.name ?: "<none>"} api=${httpSite?.api ?: ""}")
-            httpSite?.let { LoadedSite(it, "") }
+            cachedConfig = configUrl to config
+            config
         }.onFailure {
-            Log.e(TAG, "loadHomeSite fail: ${it.javaClass.simpleName}: ${it.message}", it)
+            Log.e(TAG, "loadConfig fail: ${it.javaClass.simpleName}: ${it.message}", it)
         }.getOrNull()
     }
+
+    /** 配置中全部可用站点（spider 站 + HTTP 采集站），供用户手动切换 */
+    suspend fun listSites(configUrl: String): List<TvBoxSite> {
+        val config = loadConfig(configUrl) ?: return emptyList()
+        return config.sites.filter { it.isSpider() || it.api.startsWith("http") }
+    }
+
+    /**
+     * 拉取配置 URL，返回当前生效的站点。
+     * - 响应经 [Decoder] 解码（支持伪装 JPEG 中的 base64）
+     * - preferredKey 命中可用站点时直接使用；否则站点优先选 type=3 且 api=csp_Xxx 的 spider 站；
+     *   fallback 为 type 0/1 的 HTTP 采集站
+     */
+    suspend fun loadHomeSite(configUrl: String, preferredKey: String? = null): LoadedSite? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val config = loadConfig(configUrl) ?: return@runCatching null
+
+                // 用户手动指定的站点优先
+                if (!preferredKey.isNullOrBlank()) {
+                    config.sites.firstOrNull { s ->
+                        s.key == preferredKey && (s.isSpider() || s.api.startsWith("http"))
+                    }?.let { s ->
+                        val jar = if (s.isSpider()) s.jar.ifBlank { config.spider } else ""
+                        Log.d(TAG, "chosen preferred=${s.name} api=${s.api.take(60)}")
+                        return@runCatching LoadedSite(s, jar)
+                    }
+                    Log.w(TAG, "preferred site key=$preferredKey not found, fallback auto")
+                }
+
+                // 优先纯内容 spider 站（searchable=changeable=1），避免选中云盘/配置类站点
+                val spiderSite = config.sites.firstOrNull { s ->
+                    s.isSpider() && s.searchable == 1 && s.changeable == 1 &&
+                        (s.jar.isNotBlank() || config.spider.isNotBlank())
+                } ?: config.sites.firstOrNull { s ->
+                    s.isSpider() && (s.searchable != 0 || s.changeable != 0) &&
+                        (s.jar.isNotBlank() || config.spider.isNotBlank())
+                }
+                if (spiderSite != null) {
+                    val jar = spiderSite.jar.ifBlank { config.spider }
+                    Log.d(TAG, "chosen spider=${spiderSite.name} api=${spiderSite.api} jar=${jar.take(80)}")
+                    return@runCatching LoadedSite(spiderSite, jar)
+                }
+
+                // fallback：纯 HTTP JSON 采集站
+                val httpSite = config.sites.firstOrNull { s ->
+                    val t = s.type
+                    s.api.contains("provide/vod") && (t == null || t <= 1)
+                } ?: config.sites.firstOrNull { s ->
+                    val t = s.type
+                    s.api.startsWith("http") && (t == null || t <= 1)
+                }
+                Log.d(TAG, "chosen http=${httpSite?.name ?: "<none>"} api=${httpSite?.api ?: ""}")
+                httpSite?.let { LoadedSite(it, "") }
+            }.onFailure {
+                Log.e(TAG, "loadHomeSite fail: ${it.javaClass.simpleName}: ${it.message}", it)
+            }.getOrNull()
+        }
 
     /** 拉取首页分类（ac=class） */
     suspend fun homeClasses(site: TvBoxSite): List<VodClass> = withContext(Dispatchers.IO) {

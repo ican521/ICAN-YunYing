@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -30,8 +32,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,10 +46,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.data.model.VideoCategory
+import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
@@ -65,6 +71,15 @@ fun HomeScreen(
     val viewModel = appViewModel { HomeViewModel(this) }
     val sections by viewModel.sections.collectAsStateWithLifecycle()
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
+    val siteName by viewModel.siteName.collectAsStateWithLifecycle()
+    val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
+
+    // 站源选择对话框状态：打开时才拉取站点列表
+    var showSiteDialog by remember { mutableStateOf(false) }
+    var siteList by remember { mutableStateOf<List<TvBoxSite>>(emptyList()) }
+    LaunchedEffect(showSiteDialog) {
+        if (showSiteDialog) siteList = viewModel.listSites()
+    }
 
     val contentPadding = topLevelContentPadding()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
@@ -106,7 +121,12 @@ fun HomeScreen(
                     top = contentPadding.calculateTopPadding(),
                 ),
         ) {
-            HomeTopBar(onSearchClick = onSearchClick, onHistoryClick = onHistoryClick)
+            HomeTopBar(
+                siteName = siteName,
+                onSiteClick = { showSiteDialog = true },
+                onSearchClick = onSearchClick,
+                onHistoryClick = onHistoryClick,
+            )
         }
 
         Spacer(Modifier.height(14.dp))
@@ -177,11 +197,8 @@ fun HomeScreen(
                 }
                 val gridState = remember(page) { androidx.compose.foundation.lazy.grid.LazyGridState() }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val columns = if (maxWidth < 600.dp) {
-                        GridCells.Fixed(3)
-                    } else {
-                        GridCells.Adaptive(minSize = 132.dp)
-                    }
+                    // 3:4 卡片宽度自适应列数
+                    val columns = GridCells.Adaptive(minSize = 132.dp)
                     LazyVerticalGrid(
                         state = gridState,
                         columns = columns,
@@ -203,10 +220,109 @@ fun HomeScreen(
             }
         }
     }
+
+    if (showSiteDialog) {
+        SitePickerDialog(
+            sites = siteList,
+            currentKey = currentSiteKey,
+            onSelect = { site ->
+                viewModel.switchSite(site.key)
+                showSiteDialog = false
+            },
+            onDismiss = { showSiteDialog = false },
+        )
+    }
+}
+
+/** 站源选择对话框：列出配置里全部可用站点（spider + HTTP），高亮当前站 */
+@Composable
+private fun SitePickerDialog(
+    sites: List<TvBoxSite>,
+    currentKey: String,
+    onSelect: (TvBoxSite) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(20.dp),
+        ) {
+            Text(
+                text = "选择站源",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(14.dp))
+            if (sites.isEmpty()) {
+                Text(
+                    text = "未获取到可用站点",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.heightIn(max = 380.dp),
+                ) {
+                    items(sites, key = { it.key }) { site ->
+                        val isCurrent = site.key == currentKey
+                        val shape = RoundedCornerShape(14.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .tvCardEffect(
+                                    onClick = { onSelect(site) },
+                                    shape = shape,
+                                    focusedScale = 1.03f,
+                                    glow = false,
+                                )
+                                .background(
+                                    if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                    shape,
+                                )
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = site.name.ifBlank { site.key },
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = if (site.isSpider()) "spider" else "HTTP 采集",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (isCurrent) {
+                                Icon(
+                                    imageVector = AppIcons.Check,
+                                    contentDescription = "当前站源",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
 private fun HomeTopBar(
+    siteName: String,
+    onSiteClick: () -> Unit,
     onSearchClick: () -> Unit,
     onHistoryClick: () -> Unit,
 ) {
@@ -215,6 +331,33 @@ private fun HomeTopBar(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxWidth().height(48.dp),
     ) {
+        // 站源胶囊：显示当前站点名，点击弹出站点选择
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .height(48.dp)
+                .widthIn(max = 132.dp)
+                .tvCardEffect(onClick = onSiteClick, shape = CircleShape, focusedScale = 1.04f, glow = false)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = 14.dp),
+        ) {
+            Icon(
+                imageVector = AppIcons.Site,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = siteName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
         // 胶囊搜索框：点击进入搜索页
         Row(
             verticalAlignment = Alignment.CenterVertically,

@@ -46,13 +46,13 @@ fun VideoCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .height(width * 1.42f),
+                .height(width * 4f / 3f),
         ) {
             AsyncImage(
                 model = video.cover,
                 contentDescription = video.title,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().height(width * 1.42f),
+                modifier = Modifier.fillMaxWidth().height(width * 4f / 3f),
             )
 
             // 底部渐变，保证标题可读

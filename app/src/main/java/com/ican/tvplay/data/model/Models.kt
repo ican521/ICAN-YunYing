@@ -13,6 +13,13 @@ data class Episode(
     val playUrl: String,
 )
 
+/** 一条播放线路（vod_play_from 以 $$$ 分隔的其中一条） */
+data class PlayLine(
+    /** 线路标识（传给 spider playerContent 的 flag） */
+    val flag: String,
+    val episodes: List<Episode>,
+)
+
 /** 视频条目 */
 data class Video(
     val id: String,
@@ -28,4 +35,6 @@ data class Video(
     val episodes: List<Episode>,
     /** 第一源的线路标识（vod_play_from），spider 站 playerContent 需要 */
     val playFrom: String = "",
+    /** 全部播放线路（vod_play_from / vod_play_url 按 $$$ 分隔完整保留） */
+    val playSources: List<PlayLine> = emptyList(),
 )
