@@ -121,4 +121,42 @@ object AppIcons {
             "c1.54 0 3.04.99 3.57 2.36h1.87C13.46 7.99 14.96 7 16.5 7c2 0 3.5 1.5 3.5 3.5 " +
             "0 1.89-3.14 4.74-7.9 9.05z",
     )
+
+    // ---- 播放器控制 ----
+
+    val Speed: ImageVector = vector(
+        "speed",
+        "M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23" +
+            "A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.27-10.43" +
+            "zm-9.79 6.84a2 2 0 0 0 2.83 0l5.66-8.49-8.49 5.66a2 2 0 0 0 0 2.83z",
+    )
+
+    val AspectRatio: ImageVector = vector(
+        "aspect_ratio",
+        "M19 12h-2v3h-3v2h5zM7 9h3V7H5v5h2zm14-6H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18" +
+            "a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16.01H3V4.99h18z",
+    )
+
+    val Memory: ImageVector = vector(
+        "memory",
+        "M15 9H9v6h6zm-2 4h-2v-2h2zm8-2V9h-2V7a2 2 0 0 0-2-2h-2V3h-2v2h-2V3H9v2H7a2 2 0 0 " +
+            "0-2 2v2H3v2h2v2H3v2h2v2a2 2 0 0 0 2 2h2v2h2v-2h2v2h2v-2h2a2 2 0 0 0 2-2v-2h2v-2h-2v-2z" +
+            "m-4 6H7V7h10z",
+    )
+
+    val Buffer: ImageVector = vector(
+        "buffer",
+        "M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z",
+    )
+
+    val AudioTrack: ImageVector = vector(
+        "audio_track",
+        "M12 3v10.55A4 4 0 1 0 14 17V7h4V3z",
+    )
+
+    val Subtitle: ImageVector = vector(
+        "subtitle",
+        "M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM4 12h4v2H4z" +
+            "m14 6H4v-2h14zm6-4h-4v-2h4z",
+    )
 }
