@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.SurfaceView
+import android.view.TextureView
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -94,7 +94,7 @@ object Players {
     private var retryCount = 0
 
     /** 保存最近一次 attach 的 view，player 创建/重建后自动 re-attach（解决 Compose AndroidView.factory 先于 LaunchedEffect 的时序问题） */
-    private var pendingSurfaceView: SurfaceView? = null
+    private var pendingTextureView: TextureView? = null
 
     /** 跨站源场景下：提前 cache 的完整 Video 元数据（解决 VideoRepository 是单站点的 getVideo 查不到的问题） */
     data class CachedVideo(
@@ -172,41 +172,21 @@ object Players {
     // ---- 生命周期 ----
 
     /** 挂接视图：保存到 pending 字段，player 已存在则立即绑定；player 不存在等 ensurePlayer 创建后自动 re-attach */
-    fun attach(surfaceView: SurfaceView, subView: SubtitleView) {
-        pendingSurfaceView = surfaceView
+    fun attach(textureView: TextureView, subView: SubtitleView) {
+        pendingTextureView = textureView
         subtitleView = subView
-        Log.d(TAG, "attach sv=$surfaceView player=$player pending=$pendingSurfaceView")
-        player?.setVideoSurfaceView(surfaceView)
+        Log.d(TAG, "attach texture=$textureView player=$player pending=$pendingTextureView")
+        player?.setVideoTextureView(textureView)
     }
 
     /**
-     * 防御性 surface 重新绑定：
-     * 场景：MultiSourceSearchScreen 预启动 Players.start() 时还没 SurfaceView → player.setVideoSurfaceView(null)；
-     *       进入 PlayerScreen 后 AndroidView 创建 SurfaceView 并 attach，但 ExoPlayer 已经在 STATE_READY 播放了一段时间，
-     *       某些设备/ExoPlayer 版本不会自动把后续帧渲染到新 surface。
-     * 做法：setVideoSurfaceView + seekTo(currentPosition) 触发一次渲染刷新。
+     * 视图销毁时调用：只解绑 surface，不释放播放器
      */
-    fun rebindSurface() {
-        val sv = pendingSurfaceView
-        val p = player ?: return
-        if (sv == null) return
-        val pos = p.contentPosition.coerceAtLeast(0L)
-        Log.d(TAG, "rebindSurface sv=$sv pos=$pos playWhenReady=${p.playWhenReady}")
-        p.setVideoSurfaceView(sv)
-        if (!p.playWhenReady) {
-            p.playWhenReady = true
-            p.play()
-        }
-        // 关键：seek 触发 ExoPlayer 重新把视频帧输出到刚绑定的 surface
-        p.seekTo(pos)
-    }
-
-    /** 视图销毁时调用：只解绑 surface，不释放播放器 */
-    fun detach(surfaceView: SurfaceView) {
-        Log.d(TAG, "detach sv=$surfaceView")
-        pendingSurfaceView = null
+    fun detach(textureView: TextureView) {
+        Log.d(TAG, "detach texture=$textureView")
+        pendingTextureView = null
         if (subtitleView != null) subtitleView = null
-        player?.clearVideoSurfaceView(surfaceView)
+        player?.clearVideoTextureView(textureView)
     }
 
     /** 开始播放（或换源/换线路） */
@@ -229,7 +209,7 @@ object Players {
         player = null
         currentSpec = null
         appContext = null
-        pendingSurfaceView = null
+        pendingTextureView = null
         subtitleView = null
         _state.value = _state.value.copy(
             ready = false, playing = false, buffering = false,
@@ -325,10 +305,10 @@ object Players {
         player = p
         handler.post(ticker)
         // 创建新 player 后立即 re-attach 之前保存的 surfaceView（修复 attach 先于 start 的时序）
-        pendingSurfaceView?.let { sv ->
-            Log.d(TAG, "ensurePlayer re-attach sv=$sv")
-            p.setVideoSurfaceView(sv)
-        }
+        pendingTextureView?.let { tv ->
+                Log.d(TAG, "ensurePlayer re-attach texture=$tv")
+                p.setVideoTextureView(tv)
+            }
         return p
     }
 
@@ -403,7 +383,7 @@ object Players {
         player = p
         handler.post(ticker)
         // 重建后 re-attach surfaceView（可能已 pending 或仍在显示）
-        pendingSurfaceView?.let { p.setVideoSurfaceView(it) }
+        pendingTextureView?.let { p.setVideoTextureView(it) }
         if (spec != null) {
             retryCount = 0    // 重建后重置错误计数
             startInternal(p, spec, pos)

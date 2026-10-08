@@ -2,7 +2,7 @@ package com.ican.tvplay.player
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
-import android.view.SurfaceView
+import android.view.TextureView
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -408,11 +408,11 @@ private fun PortraitPlayLayout(
             factory = { ctx ->
                 AspectRatioFrameLayout(ctx).apply {
                     resizeMode = playerState.scaleMode.resizeMode
-                    val sv = SurfaceView(ctx)
-                    addView(sv, FrameLayout.LayoutParams(-1, -1))
+                    val tv = TextureView(ctx)
+                    addView(tv, FrameLayout.LayoutParams(-1, -1))
                     val sub = SubtitleView(ctx)
                     addView(sub, FrameLayout.LayoutParams(-1, -1))
-                    Players.attach(sv, sub)
+                    Players.attach(tv, sub)
                 }
             },
             update = { view ->
@@ -903,11 +903,11 @@ private fun FullscreenPlayLayout(
             factory = { ctx ->
                 AspectRatioFrameLayout(ctx).apply {
                     resizeMode = playerState.scaleMode.resizeMode
-                    val sv = SurfaceView(ctx)
-                    addView(sv, FrameLayout.LayoutParams(-1, -1))
+                    val tv = TextureView(ctx)
+                    addView(tv, FrameLayout.LayoutParams(-1, -1))
                     val sub = SubtitleView(ctx)
                     addView(sub, FrameLayout.LayoutParams(-1, -1))
-                    Players.attach(sv, sub)
+                    Players.attach(tv, sub)
                 }
             },
             update = { view -> view.resizeMode = playerState.scaleMode.resizeMode },
