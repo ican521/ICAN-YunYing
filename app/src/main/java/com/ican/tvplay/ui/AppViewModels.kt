@@ -62,7 +62,7 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     val selectedCategory: StateFlow<String?> = selectedCategoryId.asStateFlow()
 
     val sections: StateFlow<List<Pair<VideoCategory, List<Video>>>> =
-        combine(selectedCategoryId, repo.categoriesFlow) { categoryId, _ -> categoryId }
+        combine(selectedCategoryId, repo.categoriesFlow, repo.homeCacheVersion) { categoryId, _, _ -> categoryId }
             .flatMapLatest { categoryId -> repo.homeSectionsFlow(categoryId) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

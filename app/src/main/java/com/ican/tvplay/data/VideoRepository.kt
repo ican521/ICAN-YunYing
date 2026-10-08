@@ -75,6 +75,51 @@ class VideoRepository(
     /** 详情缓存（videoId → Video）：重复进详情页秒开，reload 时清空 */
     private val detailCache = java.util.concurrent.ConcurrentHashMap<String, Video>()
 
+    /** 首页磁盘缓存：进程被杀后冷启动秒出上次数据（内存缓存随进程丢失，磁盘不丢） */
+    private val diskCacheFile: java.io.File by lazy {
+        java.io.File(appContext.filesDir, "home_cache.json")
+    }
+
+    /** 内存缓存被后台预热刷新后的版本号；首页监听它实现静默无感刷新 */
+    private val _homeCacheVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val homeCacheVersion: kotlinx.coroutines.flow.StateFlow<Int> = _homeCacheVersion.asStateFlow()
+
+    /** 冷启动：把上次的磁盘缓存读回内存（站点不匹配则丢弃） */
+    private fun loadDiskCacheIntoMemory(siteKey: String) {
+        runCatching {
+            if (!diskCacheFile.exists()) return
+            val cache = rawJson.decodeFromString<HomeDiskCache>(diskCacheFile.readText())
+            if (cache.siteKey != siteKey) {
+                diskCacheFile.delete()
+                return
+            }
+            cache.sections.forEach { s ->
+                homeCache["${siteKey}|${s.catId}"] = s.videos
+            }
+            Log.d(REPO_TAG, "home disk cache loaded sections=${cache.sections.size}")
+        }.onFailure { Log.d(REPO_TAG, "home disk cache miss: ${it.message}") }
+    }
+
+    /** 预热完成后把全部分类首屏数据落盘，供下次冷启动秒出 */
+    private suspend fun persistHomeCache(siteKey: String, cats: List<VideoCategory>) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val sections = cats.mapNotNull { cat ->
+                    homeCache["${siteKey}|${cat.id}"]?.let {
+                        HomeDiskSection(catId = cat.id, catName = cat.name, videos = it)
+                    }
+                }
+                if (sections.isEmpty()) return@withContext
+                diskCacheFile.writeText(
+                    rawJson.encodeToString(
+                        HomeDiskCache.serializer(),
+                        HomeDiskCache(siteKey = siteKey, updatedAt = System.currentTimeMillis(), sections = sections),
+                    ),
+                )
+                Log.d(REPO_TAG, "home disk cache persisted sections=${sections.size}")
+            }
+        }
+
     private val rawJson = Json { ignoreUnknownKeys = true }
 
     /** 当前站点对应的 Spider 实例（仅 type=3 时非空） */
@@ -94,6 +139,7 @@ class VideoRepository(
         // 站点/配置变更后旧缓存全部作废
         homeCache.clear()
         detailCache.clear()
+        diskCacheFile.delete()
         val url = settingsRepository.configUrl.value
         if (url.isBlank()) {
             _currentSite.value = null
@@ -131,6 +177,8 @@ class VideoRepository(
                 VideoCategory(id = it.typeId, name = it.typeName)
             }
         }
+        // 分类就绪后把上次落盘的首页数据读回内存（冷启动秒出）
+        loadDiskCacheIntoMemory(loaded.site.key)
     }
 
     fun getCategories(): List<VideoCategory> = _categories.value
@@ -285,8 +333,15 @@ class VideoRepository(
         val cats = _categories.value
         if (cats.isEmpty()) return
         coroutineScope {
-            cats.map { cat -> async { loadCategoryVideos(loaded, cat, page = 1) } }.awaitAll()
+            cats.map { cat -> async {
+                // 强制网络刷新（不走 loadCategoryVideos 的缓存命中），刷新后写入内存
+                runCatching { fetchCategoryVideos(loaded, cat) }
+                    .getOrNull()
+                    ?.let { homeCache["${loaded.site.key}|${cat.id}"] = it }
+            } }.awaitAll()
         }
+        persistHomeCache(loaded.site.key, cats)
+        _homeCacheVersion.value++
         Log.d(REPO_TAG, "prewarmHome done cats=${cats.size}")
     }
 
@@ -415,3 +470,19 @@ class VideoRepository(
         }
     }
 }
+
+/** 首页磁盘缓存：单个分类的首屏视频列表 */
+@kotlinx.serialization.Serializable
+private data class HomeDiskSection(
+    val catId: String,
+    val catName: String,
+    val videos: List<Video>,
+)
+
+/** 首页磁盘缓存：冷启动秒出上次数据（进程被杀后内存缓存丢失，磁盘不丢） */
+@kotlinx.serialization.Serializable
+private data class HomeDiskCache(
+    val siteKey: String,
+    val updatedAt: Long,
+    val sections: List<HomeDiskSection>,
+)
