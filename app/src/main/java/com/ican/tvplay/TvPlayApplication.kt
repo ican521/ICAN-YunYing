@@ -20,6 +20,8 @@ class TvPlayApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // 屏蔽 spider jar 弹出的杂音 Toast（如「弹幕服务启动失败」）
+        com.ican.tvplay.util.ToastBlocker.install()
 
         // 启动时预加载已保存的接口配置，拉取站点与分类
         appScope.launch {
