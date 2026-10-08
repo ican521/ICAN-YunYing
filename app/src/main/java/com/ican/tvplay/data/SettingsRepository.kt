@@ -112,6 +112,28 @@ class SettingsRepository(context: Context) {
         _playerBuffer.value = tier
     }
 
+    // ---- 搜索历史 ----
+
+    private val _searchHistory = MutableStateFlow(
+        runCatching {
+            prefs.getStringSet(KEY_SEARCH_HISTORY, emptySet()).orEmpty().toList()
+        }.getOrDefault(emptyList()),
+    )
+    val searchHistory: StateFlow<List<String>> = _searchHistory.asStateFlow()
+
+    fun addSearchHistory(query: String) {
+        val q = query.trim()
+        if (q.isEmpty()) return
+        val updated = (_searchHistory.value.filter { it != q } + q).take(MAX_SEARCH_HISTORY)
+        prefs.edit().putStringSet(KEY_SEARCH_HISTORY, updated.toSet()).apply()
+        _searchHistory.value = updated
+    }
+
+    fun clearSearchHistory() {
+        prefs.edit().remove(KEY_SEARCH_HISTORY).apply()
+        _searchHistory.value = emptyList()
+    }
+
     private companion object {
         const val KEY_THEME = "theme_mode"
         const val KEY_DYNAMIC_COLOR = "dynamic_color"
@@ -123,5 +145,7 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_SCALE = "player_scale"
         const val KEY_PLAYER_DECODE = "player_decode"
         const val KEY_PLAYER_BUFFER = "player_buffer"
+        const val KEY_SEARCH_HISTORY = "search_history"
+        const val MAX_SEARCH_HISTORY = 10
     }
 }

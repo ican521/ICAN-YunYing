@@ -79,6 +79,9 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     fun switchSite(siteKey: String) {
         viewModelScope.launch { repo.switchSite(siteKey) }
     }
+
+    /** 按分类 id 独立取该分类下视频（每页独立加载，不依赖 selectedCategory 选中态） */
+    suspend fun getCategoryVideos(categoryId: String): List<Video> = repo.getVideos(categoryId)
 }
 
 /** 详情：视频信息 + 收藏态 + 播放进度 */
@@ -129,21 +132,37 @@ class DetailViewModel(container: AppContainer) : ViewModel() {
     }
 }
 
-/** 搜索：关键词防抖 */
+/** 搜索：关键词防抖 + 历史记录 + 推荐词 */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchViewModel(container: AppContainer) : ViewModel() {
     private val repo = container.videoRepository
+    private val settings = container.settingsRepository
 
     private val query = MutableStateFlow("")
     val queryText: StateFlow<String> = query.asStateFlow()
 
     val results: StateFlow<List<Video>> = query
         .debounce(250)
-        .mapLatest { repo.search(it) }
+        .mapLatest { q ->
+            if (q.isBlank()) emptyList()
+            else {
+                settings.addSearchHistory(q)
+                repo.search(q)
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val history: StateFlow<List<String>> = settings.searchHistory
+
+    /** 热门推荐词（空查询时显示，fongmi 式） */
+    val hotWords = listOf("仙逆", "狂飙", "三体", "庆余年", "繁花", "狂飙", "长风渡")
 
     fun onQueryChange(value: String) {
         query.value = value
+    }
+
+    fun clearHistory() {
+        settings.clearSearchHistory()
     }
 }
 
