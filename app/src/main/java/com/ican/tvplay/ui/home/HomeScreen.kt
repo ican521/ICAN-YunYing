@@ -212,9 +212,9 @@ fun HomeScreen(
                         )
                     }
                 }
-                // 「全部」页：转圈绘制在最表层，卡片数据上屏后停止（最短展示 600ms 保证可感知）
+                // 「全部」页：转圈绘制在最表层；只要界面上还没有任何视频卡片就持续显示（最短 600ms）
                 var showLoading by remember(page) { mutableStateOf(true) }
-                val sectionsReady = sections.isNotEmpty()
+                val sectionsReady = sections.any { it.second.isNotEmpty() }
                 LaunchedEffect(page, sectionsReady) {
                     if (sectionsReady) {
                         delay(600)
