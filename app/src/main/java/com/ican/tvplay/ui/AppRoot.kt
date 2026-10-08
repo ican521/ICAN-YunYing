@@ -53,6 +53,7 @@ import com.ican.tvplay.ui.home.HomeScreen
 import com.ican.tvplay.ui.nav.Routes
 import com.ican.tvplay.ui.nav.topDestinations
 import com.ican.tvplay.player.PlayerScreen
+import com.ican.tvplay.ui.search.MultiSourceSearchScreen
 import com.ican.tvplay.ui.settings.ColorPaletteScreen
 import com.ican.tvplay.ui.settings.SettingsScreen
 import com.ican.tvplay.ui.theme.TvPlayTheme
@@ -137,7 +138,7 @@ fun AppRoot() {
                         when (page) {
                             0 -> HomeScreen(
                                 onVideoClick = { video ->
-                                    navController.navigate(Routes.detail(video.id))
+                                    navController.navigate(Routes.multiSearch(video.title))
                                 },
                                 onSearchClick = { navController.navigate(Routes.SEARCH) },
                                 onHistoryClick = { navController.navigate(Routes.HISTORY) },
@@ -159,6 +160,29 @@ fun AppRoot() {
                 }
                 composable(Routes.COLOR_PALETTE) {
                     ColorPaletteScreen(onBack = { navController.popBackStack() })
+                }
+                composable(Routes.SEARCH) {
+                    MultiSourceSearchScreen(
+                        initialQuery = "",
+                        onBack = { navController.popBackStack() },
+                        onPlay = { videoId, episodeIndex, flag, preInit ->
+                            navController.navigate(Routes.player(videoId, episodeIndex, flag, preInit))
+                        },
+                    )
+                }
+
+                composable(
+                    route = Routes.MULTI_SEARCH_PATTERN,
+                    arguments = listOf(navArgument("query") { type = NavType.StringType }),
+                ) { entry ->
+                    val query = entry.arguments?.getString("query").orEmpty()
+                    MultiSourceSearchScreen(
+                        initialQuery = query,
+                        onBack = { navController.popBackStack() },
+                        onPlay = { videoId, episodeIndex, flag, preInit ->
+                            navController.navigate(Routes.player(videoId, episodeIndex, flag, preInit))
+                        },
+                    )
                 }
                 composable(Routes.HISTORY) {
                     HistoryScreen(
