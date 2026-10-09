@@ -55,6 +55,7 @@ import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.CircleBackButton
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -104,7 +105,7 @@ fun MultiSourceSearchScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
+                .padding(start = Spacing.pageHorizontal, end = Spacing.pageHorizontal, top = Spacing.pageTop, bottom = 6.dp),
         ) {
             CircleBackButton(onClick = onBack)
 
@@ -175,7 +176,7 @@ fun MultiSourceSearchScreen(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = Spacing.pageHorizontal),
         ) {
             // 左侧站源列表（纵向）
             LazyColumn(
@@ -235,8 +236,8 @@ fun MultiSourceSearchScreen(
                         top = 4.dp,
                         bottom = 16.dp,
                     ),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                 ) {
                     items(displayVideos, key = { "${it.video.id}_${it.siteKey}" }) { dv ->
                         CrossSourceVideoCard(
@@ -379,7 +380,7 @@ private fun CrossSourceVideoCard(
     Column(
         modifier = Modifier.tvCardEffect(
             onClick = onClick,
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(Spacing.corner),
             focusedScale = 1.05f,
         ),
     ) {
@@ -387,7 +388,7 @@ private fun CrossSourceVideoCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(3f / 4f)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(Spacing.corner))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             AsyncImage(

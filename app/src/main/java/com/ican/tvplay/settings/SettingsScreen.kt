@@ -51,6 +51,7 @@ import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -96,12 +97,12 @@ fun SettingsScreen(
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(
-                start = 16.dp,
-                end = 16.dp,
+                start = Spacing.pageHorizontal,
+                end = Spacing.pageHorizontal,
                 top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding(),
             ),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -236,9 +237,9 @@ private fun SettingsCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(22.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
             .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.titleContentGap),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
@@ -263,7 +264,7 @@ private fun ThemeOption(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(Spacing.corner)
     val container by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primary
         else MaterialTheme.colorScheme.surfaceVariant,
@@ -344,12 +345,12 @@ private fun SettingsSwitchRow(
             .fillMaxWidth()
             .tvCardEffect(
                 onClick = { onToggle(!checked) },
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(Spacing.corner),
                 focusedScale = 1.02f,
                 glow = false,
                 enabled = enabled,
             )
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -370,7 +371,7 @@ private fun SettingsSwitchRow(
         Box(
             modifier = Modifier
                 .size(width = 42.dp, height = 24.dp)
-                .background(trackColor, RoundedCornerShape(12.dp)),
+                .background(trackColor, RoundedCornerShape(Spacing.corner)),
         ) {
             val thumbOffset by androidx.compose.animation.core.animateDpAsState(
                 targetValue = if (checked) 20.dp else 2.dp,
@@ -401,11 +402,11 @@ private fun SettingsEntryRow(
             .fillMaxWidth()
             .tvCardEffect(
                 onClick = onClick,
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(Spacing.corner),
                 focusedScale = 1.02f,
                 glow = false,
             )
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -450,7 +451,7 @@ private fun ConfigImportDialog(
                 .fillMaxWidth()
                 .background(
                     MaterialTheme.colorScheme.surface,
-                    RoundedCornerShape(22.dp),
+                    RoundedCornerShape(Spacing.corner),
                 )
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -476,7 +477,7 @@ private fun ConfigImportDialog(
                             .fillMaxWidth()
                             .background(
                                 MaterialTheme.colorScheme.surfaceVariant,
-                                RoundedCornerShape(14.dp),
+                                RoundedCornerShape(Spacing.corner),
                             )
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                     ) {
@@ -499,13 +500,13 @@ private fun ConfigImportDialog(
                     modifier = Modifier
                         .tvCardEffect(
                             onClick = onDismiss,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(Spacing.corner),
                             focusedScale = 1.03f,
                             glow = false,
                         )
                         .background(
                             MaterialTheme.colorScheme.surfaceVariant,
-                            RoundedCornerShape(12.dp),
+                            RoundedCornerShape(Spacing.corner),
                         )
                         .padding(horizontal = 20.dp, vertical = 10.dp),
                 ) {
@@ -519,13 +520,13 @@ private fun ConfigImportDialog(
                     modifier = Modifier
                         .tvCardEffect(
                             onClick = { onConfirm(url) },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(Spacing.corner),
                             focusedScale = 1.03f,
                             glow = false,
                         )
                         .background(
                             MaterialTheme.colorScheme.primary,
-                            RoundedCornerShape(12.dp),
+                            RoundedCornerShape(Spacing.corner),
                         )
                         .padding(horizontal = 20.dp, vertical = 10.dp),
                 ) {

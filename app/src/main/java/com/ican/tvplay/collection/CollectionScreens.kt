@@ -40,6 +40,7 @@ import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.CircleBackButton
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -66,8 +67,8 @@ fun FavoritesScreen(
         Row(
             modifier = Modifier.padding(
                 top = topLevelContentPadding().calculateTopPadding(),
-                start = 16.dp,
-                end = 16.dp,
+                start = Spacing.pageHorizontal,
+                end = Spacing.pageHorizontal,
             ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -123,13 +124,13 @@ fun FavoritesScreen(
                 columns = GridCells.Adaptive(132.dp),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 14.dp,
-                    bottom = 120.dp,
+                    start = Spacing.pageHorizontal,
+                    end = Spacing.pageHorizontal,
+                    top = Spacing.titleContentGap,
+                    bottom = Spacing.bottomBarInset,
                 ),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
+                verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
             ) {
                 items(favorites, key = { it.videoId }) { item ->
                     FavoriteCard(
@@ -161,7 +162,7 @@ fun FavoritesScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
                     .padding(24.dp),
             ) {
                 Text(
@@ -223,7 +224,7 @@ private fun FavoriteCard(
     androidx.compose.foundation.layout.Column(
         modifier = Modifier.tvCardEffect(
             onClick = onClick,
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(Spacing.corner),
         ),
     ) {
         Box(
@@ -319,8 +320,8 @@ fun HistoryScreen(
         Row(
             modifier = Modifier.padding(
                 top = topLevelContentPadding().calculateTopPadding(),
-                start = 16.dp,
-                end = 16.dp,
+                start = Spacing.pageHorizontal,
+                end = Spacing.pageHorizontal,
             ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -375,13 +376,13 @@ fun HistoryScreen(
                 columns = GridCells.Adaptive(132.dp),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 14.dp,
-                    bottom = 120.dp,
+                    start = Spacing.pageHorizontal,
+                    end = Spacing.pageHorizontal,
+                    top = Spacing.titleContentGap,
+                    bottom = Spacing.bottomBarInset,
                 ),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
+                verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
             ) {
                 items(histories, key = { it.videoId }) { history ->
                     HistoryCard(
@@ -412,7 +413,7 @@ fun HistoryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
                     .padding(24.dp),
             ) {
                 Text(
@@ -481,8 +482,8 @@ private fun <T> CollectionGridScaffold(
         Row(
             modifier = Modifier.padding(
                 top = topLevelContentPadding().calculateTopPadding(),
-                start = 16.dp,
-                end = 16.dp,
+                start = Spacing.pageHorizontal,
+                end = Spacing.pageHorizontal,
             ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -502,13 +503,13 @@ private fun <T> CollectionGridScaffold(
                 columns = GridCells.Adaptive(132.dp),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 14.dp,
-                    bottom = 120.dp,
+                    start = Spacing.pageHorizontal,
+                    end = Spacing.pageHorizontal,
+                    top = Spacing.titleContentGap,
+                    bottom = Spacing.bottomBarInset,
                 ),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
+                verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
             ) {
                 items(items, key = idOf) { item ->
                     CollectionCard(
@@ -535,7 +536,7 @@ private fun CollectionCard(
     Column(
         modifier = Modifier.tvCardEffect(
             onClick = onClick,
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(Spacing.corner),
         ),
     ) {
         Box(
@@ -622,7 +623,7 @@ private fun HistoryCard(
     Column(
         modifier = Modifier.tvCardEffect(
             onClick = onClick,
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(Spacing.corner),
         ),
     ) {
         Box(

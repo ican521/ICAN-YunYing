@@ -70,6 +70,7 @@ import com.ican.tvplay.ui.components.ExpressiveLoadingIndicator
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -167,7 +168,7 @@ fun HomeScreen(
             )
         }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(Spacing.sectionSpacing))
 
         // 固定分类 chips（不透明背景）
         Box(
@@ -186,7 +187,7 @@ fun HomeScreen(
             )
         }
 
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(Spacing.sectionSpacing))
 
         // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；
         // 每页数据完全独立于 selectedCategory（按 page index 从 categories 直接取对应分类 + 独立缓存），
@@ -220,7 +221,7 @@ fun HomeScreen(
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background),
                     contentPadding = pageContentPadding,
-                    verticalArrangement = Arrangement.spacedBy(22.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
                 ) {
                     pageSections.firstOrNull()?.second?.firstOrNull()?.let { featured ->
                         item {
@@ -270,8 +271,8 @@ fun HomeScreen(
                         columns = columns,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = pageContentPadding,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                     ) {
                         pageVideos.value.firstOrNull()?.let { featured ->
                             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -318,7 +319,7 @@ fun SitePickerDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .clip(RoundedCornerShape(24.dp))
+                .clip(RoundedCornerShape(Spacing.corner))
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(20.dp),
         ) {
@@ -342,7 +343,7 @@ fun SitePickerDialog(
                 ) {
                     items(sites, key = { it.key }) { site ->
                         val isCurrent = site.key == currentKey
-                        val shape = RoundedCornerShape(14.dp)
+                        val shape = RoundedCornerShape(Spacing.corner)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -431,7 +432,7 @@ private fun HomeTopBar(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(48.dp)
+                .size(Spacing.circleButton)
                 .tvCardEffect(onClick = onHistoryClick, shape = CircleShape, focusedScale = 1.1f)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
@@ -547,7 +548,7 @@ private fun FeaturedBanner(
     video: Video,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(Spacing.corner)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -634,7 +635,7 @@ private fun VideoSection(
     videos: List<Video>,
     onVideoClick: (Video) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.titleContentGap)) {
         Text(
             text = category.name,
             style = MaterialTheme.typography.titleLarge,
@@ -642,7 +643,7 @@ private fun VideoSection(
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(start = 2.dp),
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH)) {
             items(videos, key = { it.id }) { video ->
                 VideoCardItem(
                     video = video,

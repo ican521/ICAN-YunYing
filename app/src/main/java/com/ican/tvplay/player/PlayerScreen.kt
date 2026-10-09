@@ -771,12 +771,12 @@ private fun PortraitPlayLayout(
             ),
     )
 
-    // === 可滚动详情信息流 ===
+    // === 可滚动详情信息流（左右边距对齐全局规范） ===
     Column(
         modifier = Modifier
             .weight(1f)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = com.ican.tvplay.ui.theme.Spacing.pageHorizontal, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         val v = current ?: return@Column
@@ -844,7 +844,7 @@ private fun PortraitPlayLayout(
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(v.playSources) { source ->
                 val selected = source.flag == lineFlag
-                val shape = RoundedCornerShape(8.dp)
+                val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
@@ -1370,7 +1370,7 @@ private fun ActionBtn(
 
 @Composable
 private fun EpisodeChip(title: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
