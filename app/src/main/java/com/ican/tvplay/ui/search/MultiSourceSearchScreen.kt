@@ -187,10 +187,10 @@ fun MultiSourceSearchScreen(
                         onClick = { vm.selectSite(idx) },
                     )
                 }
-                if (loading || sites.isEmpty()) {
+                if (loading || (sites.isEmpty() && queryText.isNotBlank())) {
                     item {
                         Text(
-                            text = if (loading) "搜索中…" else if (queryText.isBlank()) "输入关键词搜索" else "暂无可用站点",
+                            text = if (loading) "搜索中…" else "暂无可用站点",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
