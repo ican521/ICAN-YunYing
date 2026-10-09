@@ -405,7 +405,7 @@ private fun CategoryChips(
     }
 
     // 文字行：通栏+contentPadding，内容可滑到屏幕边缘，静止时最左Tab对齐搜索栏左边基准线；
-    // 每个Tab自带与文字等宽的底部小横条（仅选中显示），无独立指示器、无移动动画
+    // 纯文字Tab，无任何指示器
     LazyRow(
         state = listState,
         contentPadding = PaddingValues(horizontal = horizontalPadding),
@@ -430,11 +430,10 @@ private fun CategoryChipPlain(
     else MaterialTheme.colorScheme.onSurfaceVariant
     val fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
 
-    // 文字 + 底部等宽小横条：Column宽度取最宽子项（文字），横条 fillMaxWidth 即与文字等长；
-    // 未选中时横条透明占位，高度一致无跳动；横条只在各自Tab下直接显隐，无移动动画
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
+            .fillMaxSize()
             .tvCardEffect(
                 onClick = { onSelect(index) },
                 shape = RoundedCornerShape(percent = 50),
@@ -448,16 +447,6 @@ private fun CategoryChipPlain(
             style = MaterialTheme.typography.labelLarge,
             color = textColor,
             fontWeight = fontWeight,
-        )
-        Spacer(Modifier.height(2.dp))
-        Box(
-            modifier = Modifier
-                .height(3.dp)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(percent = 50))
-                .background(
-                    if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                ),
         )
     }
 }
