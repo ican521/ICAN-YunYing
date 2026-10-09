@@ -266,6 +266,72 @@ class VideoRepository(
         return apiClient.listSites(url)
     }
 
+    /** 播放失败自动换源候选：站点 + jar 规格 + 带选集的完整视频 */
+    data class FallbackCandidate(
+        val site: TvBoxSite,
+        val jarSpec: String,
+        val video: Video,
+    )
+
+    /**
+     * 播放失败后跨站源找同名影片（fongmi VodFallbackPolicy 语义）：
+     * 仅搜「参与搜索 + 允许换源」的站点，排除已失败站点，片名精确匹配，首个命中即返回。
+     */
+    suspend fun searchFallbackCandidate(
+        title: String,
+        excludeSiteKeys: Set<String>,
+    ): FallbackCandidate? = coroutineScope {
+        val url = settingsRepository.configUrl.value
+        if (url.isBlank()) return@coroutineScope null
+        val config = apiClient.loadConfig(url) ?: return@coroutineScope null
+        val candidates = config.sites.filter { s ->
+            (s.isSpider() || s.api.startsWith("http")) &&
+                s.key !in excludeSiteKeys &&
+                settingsRepository.isSiteSearchable(s) &&
+                settingsRepository.isSiteChangeable(s)
+        }
+        val channel = kotlinx.coroutines.channels.Channel<FallbackCandidate>(
+            kotlinx.coroutines.channels.Channel.UNLIMITED,
+        )
+        val jobs = candidates.map { site ->
+            launch(Dispatchers.IO) {
+                runCatching {
+                    val jarSpec = if (site.isSpider()) site.jar.ifBlank { config.spider } else ""
+                    val items = if (site.isSpider()) {
+                        val spider = spiderManager.getSpider(site, jarSpec) ?: return@runCatching
+                        parseList(spiderManager.searchContent(spider, title, quick = true))
+                    } else {
+                        apiClient.search(site, title)
+                    }
+                    val hit = items.firstOrNull { it.vodName == title } ?: return@runCatching
+                    val detail = if (site.isSpider()) {
+                        val spider = spiderManager.getSpider(site, jarSpec) ?: return@runCatching
+                        parseList(spiderManager.detailContent(spider, listOf(hit.vodId))).firstOrNull()
+                    } else {
+                        apiClient.detail(site, hit.vodId)
+                    } ?: return@runCatching
+                    val video = detail.toVideo(
+                        VideoCategory(id = "", name = detail.typeName.ifBlank { "未知" }),
+                        withEpisodes = true,
+                    )
+                    if (video.playSources.isNotEmpty() || video.episodes.isNotEmpty()) {
+                        channel.send(FallbackCandidate(site, jarSpec, video))
+                    }
+                }.onFailure { Log.e(REPO_TAG, "fallback search site=${site.name} fail", it) }
+            }
+        }
+        var result: FallbackCandidate? = null
+        try {
+            result = runCatching {
+                kotlinx.coroutines.withTimeout(20_000L) { channel.receive() }
+            }.getOrNull()
+        } finally {
+            jobs.forEach { it.cancel() }
+            channel.close()
+        }
+        result
+    }
+
     /** 切换站点：记录选择并重新加载分类 */
     suspend fun switchSite(siteKey: String) {
         settingsRepository.setSiteKey(siteKey)

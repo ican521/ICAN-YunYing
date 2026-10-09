@@ -1,6 +1,7 @@
 package com.ican.tvplay.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -227,13 +228,20 @@ fun HomeScreen(
     }
 }
 
-/** 站源选择对话框：列出配置里全部可用站点（spider + HTTP），高亮当前站 */
+/** 站源选择对话框：列出配置里全部可用站点（spider + HTTP），高亮当前站；
+ *  每项右侧带 fongmi 同款两个开关：放大镜=是否参与搜索，循环箭头=播放失败是否自动换源。
+ *  开=主题色，关=灰色；配置写死不支持（值为0）的开关锁定为灰色不可点。 */
 @Composable
 fun SitePickerDialog(
     sites: List<TvBoxSite>,
     currentKey: String,
     onSelect: (TvBoxSite) -> Unit,
     onDismiss: () -> Unit,
+    isSearchable: (TvBoxSite) -> Boolean = { true },
+    isChangeable: (TvBoxSite) -> Boolean = { true },
+    onToggleSearchable: (TvBoxSite) -> Unit = {},
+    onToggleChangeable: (TvBoxSite) -> Unit = {},
+    toggleVersion: Int = 0,
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -265,6 +273,9 @@ fun SitePickerDialog(
                     items(sites, key = { it.key }) { site ->
                         val isCurrent = site.key == currentKey
                         val shape = RoundedCornerShape(Spacing.corner)
+                        // toggleVersion 仅作重组触发key：开关切换后重读开关状态刷新图标着色
+                        val searchOn = remember(site.key, toggleVersion) { isSearchable(site) }
+                        val changeOn = remember(site.key, toggleVersion) { isChangeable(site) }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -296,7 +307,25 @@ fun SitePickerDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
+                            // 参与搜索开关（放大镜）；配置 searchable=0 锁定不可点
+                            SiteToggleIcon(
+                                icon = AppIcons.Search,
+                                enabled = searchOn,
+                                locked = site.searchable == 0,
+                                desc = if (searchOn) "关闭该源搜索" else "开启该源搜索",
+                                onClick = { onToggleSearchable(site) },
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            // 自动换源开关（循环箭头）；配置 changeable=0 锁定不可点
+                            SiteToggleIcon(
+                                icon = AppIcons.Loop,
+                                enabled = changeOn,
+                                locked = site.changeable == 0,
+                                desc = if (changeOn) "关闭自动换源" else "开启自动换源",
+                                onClick = { onToggleChangeable(site) },
+                            )
                             if (isCurrent) {
+                                Spacer(Modifier.width(6.dp))
                                 Icon(
                                     imageVector = AppIcons.Check,
                                     contentDescription = "当前站源",
@@ -309,6 +338,33 @@ fun SitePickerDialog(
                 }
             }
         }
+    }
+}
+
+/** 站源行内小开关图标：开=主题色，关/锁定=灰色；锁定时不响应点击 */
+@Composable
+private fun SiteToggleIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    enabled: Boolean,
+    locked: Boolean,
+    desc: String,
+    onClick: () -> Unit,
+) {
+    val tint = if (enabled) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (locked) 0.25f else 0.45f)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .clickable(enabled = !locked, onClick = onClick),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = desc,
+            tint = tint,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 

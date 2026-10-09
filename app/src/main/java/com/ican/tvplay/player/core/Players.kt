@@ -363,6 +363,7 @@ object Players {
         appContext = context.applicationContext
         currentSpec = spec
         retryCount = 0  // 新源重置错误计数
+        _state.value = _state.value.copy(error = null)  // 新源开播清除旧错误，避免换源后错误页残留
         val p = ensurePlayer()
         startInternal(p, spec, startPositionMs)
     }

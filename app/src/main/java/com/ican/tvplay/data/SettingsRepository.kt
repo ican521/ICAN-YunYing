@@ -1,6 +1,7 @@
 package com.ican.tvplay.data
 
 import android.content.Context
+import com.ican.tvplay.data.remote.TvBoxSite
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -78,6 +79,46 @@ class SettingsRepository(context: Context) {
         prefs.edit().putString(KEY_SITE_KEY, key).apply()
         _siteKey.value = key
     }
+
+    // ---- 站源开关（fongmi Site.searchable/changeable 同款；0=配置锁定关，1=开，2=用户关） ----
+
+    private fun effectiveFlag(configValue: Int, override: Int): Boolean {
+        if (configValue == 0) return false          // 配置不允许该能力，锁定关
+        if (override != 0) return override == 1     // 用户覆盖：1=开 2=关
+        return true                                  // 默认开（配置 1/2 都视为默认可用）
+    }
+
+    /** 站内是否可搜索（含本地 override 生效后的值） */
+    fun isSiteSearchable(site: TvBoxSite): Boolean =
+        effectiveFlag(site.searchable, prefs.getInt(KEY_SITE_SEARCHABLE_PREFIX + site.key, 0))
+
+    /** 播放失败时是否可自动换源 */
+    fun isSiteChangeable(site: TvBoxSite): Boolean =
+        effectiveFlag(site.changeable, prefs.getInt(KEY_SITE_CHANGEABLE_PREFIX + site.key, 0))
+
+    /** 切换 searchable override：配置为0（锁定）时不变，返回 false */
+    fun toggleSiteSearchable(site: TvBoxSite): Boolean {
+        if (site.searchable == 0) return false
+        val key = KEY_SITE_SEARCHABLE_PREFIX + site.key
+        val next = if (isSiteSearchable(site)) 2 else 1
+        prefs.edit().putInt(key, next).apply()
+        _siteToggleVersion.value += 1
+        return next == 1
+    }
+
+    /** 切换 changeable override：配置为0（锁定）时不变，返回 false */
+    fun toggleSiteChangeable(site: TvBoxSite): Boolean {
+        if (site.changeable == 0) return false
+        val key = KEY_SITE_CHANGEABLE_PREFIX + site.key
+        val next = if (isSiteChangeable(site)) 2 else 1
+        prefs.edit().putInt(key, next).apply()
+        _siteToggleVersion.value += 1
+        return next == 1
+    }
+
+    /** 每次开关切换自增：供弹窗/UI 触发重组刷新 */
+    private val _siteToggleVersion = MutableStateFlow(0)
+    val siteToggleVersion: StateFlow<Int> = _siteToggleVersion.asStateFlow()
 
     // ---- 播放器设置 ----
 
@@ -157,6 +198,8 @@ class SettingsRepository(context: Context) {
         const val KEY_ENABLE_BLUR = "enable_blur"
         const val KEY_CONFIG_URL = "config_url"
         const val KEY_SITE_KEY = "site_key"
+        const val KEY_SITE_SEARCHABLE_PREFIX = "site_searchable_"
+        const val KEY_SITE_CHANGEABLE_PREFIX = "site_changeable_"
         const val KEY_PLAYER_SPEED = "player_speed"
         const val KEY_PLAYER_SCALE = "player_scale"
         const val KEY_PLAYER_DECODE = "player_decode"
