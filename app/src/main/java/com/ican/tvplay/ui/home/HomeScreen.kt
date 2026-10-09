@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -392,11 +393,27 @@ private fun CategoryChips(
         ?: (pagerState.currentPage + pagerState.currentPageOffsetFraction.toInt())
             .coerceIn(0, (categories.size - 1).coerceAtLeast(0))
 
-    // 目标Tab在屏幕外时自动滚回屏幕内（点击与手势翻页均生效）
+    // 目标Tab滚出屏幕边缘时，整栏最小距离滚动让其刚好完整露出；
+    // 目标Tab已完整可见时保持不动（点击与手势翻页均生效）
     val listState = rememberLazyListState()
     LaunchedEffect(colorTargetIndex) {
-        if (categories.isNotEmpty()) {
+        if (categories.isEmpty()) return@LaunchedEffect
+        val layoutInfo = listState.layoutInfo
+        val item = layoutInfo.visibleItemsInfo.firstOrNull { it.index == colorTargetIndex }
+        if (item == null) {
+            // 目标Tab完全未上屏（距离较远）：直接滚过去
             listState.animateScrollToItem(colorTargetIndex)
+        } else {
+            val viewportStart = layoutInfo.viewportStartOffset
+            val viewportEnd = layoutInfo.viewportEndOffset
+            when {
+                // 左边缘被裁切 → 整栏右移，刚好露出
+                item.offset < viewportStart ->
+                    listState.animateScrollBy((item.offset - viewportStart).toFloat())
+                // 右边缘被裁切 → 整栏左移，刚好露出
+                item.offset + item.size > viewportEnd ->
+                    listState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat())
+            }
         }
     }
 
