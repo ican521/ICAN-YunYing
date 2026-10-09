@@ -479,8 +479,31 @@ private fun CategoryChips(
             }
         }
 
-        // === 底部横线指示器（直接贴文字下方） ===
-        Box(modifier = Modifier.fillMaxWidth()) {
+        // === 底部横线指示器（直接贴文字下方，同款左右边缘渐隐遮罩） ===
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val fadePx = edgeFadeWidth.toPx()
+                    val w = size.width
+                    if (w <= 0f || fadePx <= 0f) return@drawWithContent
+                    val leftFrac = if (canScrollBackward) (fadePx / w).coerceAtMost(0.5f) else 0f
+                    val rightFrac = if (canScrollForward) (fadePx / w).coerceAtMost(0.5f) else 0f
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colorStops = arrayOf(
+                                0f to Color.Transparent,
+                                leftFrac to Color.Black,
+                                1f - rightFrac to Color.Black,
+                                1f to Color.Transparent,
+                            ),
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                },
+        ) {
             val pos = indicatorPos
             if (pos != null) {
                 val barHeight = 3.dp
