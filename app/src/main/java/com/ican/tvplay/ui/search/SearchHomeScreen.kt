@@ -1,6 +1,7 @@
 package com.ican.tvplay.ui.search
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,11 +31,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -62,6 +66,7 @@ fun SearchHomeScreen(
     val history by vm.history.collectAsStateWithLifecycle()
 
     var queryText by remember { mutableStateOf("") }
+    var showClearConfirm by remember { mutableStateOf(false) }
 
     fun submit(keyword: String) {
         val q = keyword.trim()
@@ -115,18 +120,6 @@ fun SearchHomeScreen(
                     keyboardActions = KeyboardActions(onSearch = { submit(queryText) }),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier = Modifier.weight(1f),
-                    decorationBox = { inner ->
-                        if (queryText.isEmpty()) {
-                            Text(
-                                text = "跨站源搜索…",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        inner()
-                    },
                 )
                 Box(
                     modifier = Modifier
@@ -176,7 +169,7 @@ fun SearchHomeScreen(
                             modifier = Modifier
                                 .size(32.dp)
                                 .tvCardEffect(
-                                    onClick = { vm.clearHistory() },
+                                    onClick = { showClearConfirm = true },
                                     shape = RoundedCornerShape(percent = 50),
                                     focusedScale = 1.1f,
                                     glow = false,
@@ -205,6 +198,59 @@ fun SearchHomeScreen(
                 )
                 Spacer(Modifier.height(Spacing.titleContentGap))
                 WordFlowRow(words = vm.hotWords, onWordClick = { submit(it) })
+            }
+        }
+    }
+
+    // 清空全部搜索历史确认弹窗（样式与收藏页清空确认弹窗一致）
+    if (showClearConfirm) {
+        Dialog(onDismissRequest = { showClearConfirm = false }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
+                    .padding(24.dp),
+            ) {
+                Text(
+                    text = "清空搜索历史",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "确定要清空所有搜索历史吗？此操作不可恢复。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 20.dp),
+                ) {
+                    Text(
+                        text = "取消",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clickable { showClearConfirm = false }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                    Text(
+                        text = "确定",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF5C5C),
+                        modifier = Modifier
+                            .clickable {
+                                vm.clearHistory()
+                                showClearConfirm = false
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
             }
         }
     }
