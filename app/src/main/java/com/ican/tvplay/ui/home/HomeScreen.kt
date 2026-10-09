@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -111,35 +110,28 @@ fun HomeScreen(
         if (contentReady) Log.d("Startup", "home contentReady (categories+sections)")
     }
 
-    // 顶部分类 pager：第 0 页"全部" + 每个分类一页
-    val pagerState = rememberPagerState(pageCount = { categories.size + 1 })
+    // 「全部」页已删除：分类就绪后默认选中第一个分类
+    LaunchedEffect(categories) {
+        if (selectedCategory == null && categories.isNotEmpty()) {
+            viewModel.selectCategory(categories.first().id)
+        }
+    }
+
+    // 顶部分类 pager：每个分类一页（第 0 页 = 第一个分类）
+    val pagerState = rememberPagerState(pageCount = { categories.size })
 
     // pager 滑动停止后 → 同步分类选中态到 ViewModel
     LaunchedEffect(pagerState.settledPage) {
         val index = pagerState.settledPage
-        val id = if (index == 0) null else categories.getOrNull(index - 1)?.id
+        val id = categories.getOrNull(index)?.id
         if (id != selectedCategory) {
             viewModel.selectCategory(id)
         }
     }
 
-    val selectedIndex = if (selectedCategory == null) 0
-    else categories.indexOfFirst { it.id == selectedCategory }.let { if (it >= 0) it + 1 else 0 }
+    val selectedIndex = categories.indexOfFirst { it.id == selectedCategory }.coerceAtLeast(0)
 
-    // 每页数据缓存：key=null 为「全部」页，其余为分类 id。
-    // 滑动过程中 ViewModel 选中态要等 settle 才同步，若目标页只认实时 sections 会全程空白（黑屏闪现），
-    // 因此命中缓存先渲染旧数据，settle 后新数据到达自动覆盖。
-    val pageCache = remember { mutableStateMapOf<String?, List<Pair<VideoCategory, List<Video>>>>() }
-    LaunchedEffect(sections, selectedCategory) {
-        if (sections.isEmpty()) return@LaunchedEffect
-        pageCache[selectedCategory] = sections
-        if (selectedCategory == null) {
-            // 「全部」页包含所有分类数据，顺带填充各分类页缓存
-            sections.forEach { (cat, videos) -> pageCache[cat.id] = listOf(cat to videos) }
-        }
-    }
-
-    // 点击 chip → pager 平滑翻页（非瞬跳）
+    // 点击 chip → pager 平移翻页（非瞬跳）
     val onChipClick: (Int) -> Unit = { index ->
         scope.launch { pagerState.animateScrollToPage(index) }
     }
@@ -203,91 +195,53 @@ fun HomeScreen(
                 bottom = contentPadding.calculateBottomPadding(),
             )
 
-            if (page == 0) {
-                // 「全部」页：始终用实时 sections
-                val pageSections = sections
-                val listState = remember(page) { LazyListState() }
-                // 离开当前页时立即滚回顶部（currentPage ≠ page）
-                LaunchedEffect(pagerState.currentPage) {
-                    if (pagerState.currentPage != page) listState.scrollToItem(0)
+            // 每页对应一个分类：按 page 直接取 categories，独立加载该分类数据
+            val pageCategory = categories.getOrNull(page)
+            val pageVideos = remember(page, pageCategory?.id) {
+                mutableStateOf<List<Video>>(emptyList())
+            }
+            // 首次进入该页或分类变化时，触发加载（协程结果缓存到 pageVideos）
+            LaunchedEffect(pageCategory?.id) {
+                if (pageCategory != null) {
+                    pageVideos.value = viewModel.getCategoryVideos(pageCategory.id)
                 }
-                // 进入目标页 settle 后再次确保在顶部
-                LaunchedEffect(pagerState.settledPage) {
-                    if (pagerState.settledPage == page) listState.scrollToItem(0)
-                }
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background),
+            }
+            val gridState = remember(page) { LazyGridState() }
+            // 离开当前页时立即滚回顶部（currentPage ≠ page）
+            LaunchedEffect(pagerState.currentPage) {
+                if (pagerState.currentPage != page) gridState.scrollToItem(0)
+            }
+            // 进入目标页 settle 后再次确保在顶部
+            LaunchedEffect(pagerState.settledPage) {
+                if (pagerState.settledPage == page) gridState.scrollToItem(0)
+            }
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
+            ) {
+                val columns = GridCells.Adaptive(minSize = 132.dp)
+                LazyVerticalGrid(
+                    state = gridState,
+                    columns = columns,
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = pageContentPadding,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                 ) {
-                    pageSections.firstOrNull()?.second?.firstOrNull()?.let { featured ->
-                        item {
+                    pageVideos.value.firstOrNull()?.let { featured ->
+                        item(span = { GridItemSpan(maxLineSpan) }) {
                             FeaturedBanner(
                                 video = featured,
                                 onClick = { onVideoClick(featured) },
                             )
                         }
                     }
-                    items(pageSections, key = { it.first.id }) { (category, videos) ->
-                        VideoSection(
-                            category = category,
-                            videos = videos,
-                            onVideoClick = onVideoClick,
+                    gridItems(pageVideos.value, key = { it.id }) { video ->
+                        VideoCardItem(
+                            video = video,
+                            onClick = { onVideoClick(video) },
                         )
-                    }
-                }
-            } else {
-                // 具体分类页：按 page-1 直接取 categories，独立加载/缓存该分类数据
-                val pageCategory = categories.getOrNull(page - 1)
-                val pageVideos = remember(page, pageCategory?.id) {
-                    mutableStateOf<List<Video>>(emptyList())
-                }
-                // 首次进入该页或分类变化时，触发加载（协程结果缓存到 pageVideos）
-                LaunchedEffect(pageCategory?.id) {
-                    if (pageCategory != null) {
-                        pageVideos.value = viewModel.getCategoryVideos(pageCategory.id)
-                    }
-                }
-                val gridState = remember(page) { LazyGridState() }
-                // 离开当前页时立即滚回顶部（currentPage ≠ page）
-                LaunchedEffect(pagerState.currentPage) {
-                    if (pagerState.currentPage != page) gridState.scrollToItem(0)
-                }
-                // 进入目标页 settle 后再次确保在顶部
-                LaunchedEffect(pagerState.settledPage) {
-                    if (pagerState.settledPage == page) gridState.scrollToItem(0)
-                }
-                BoxWithConstraints(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background),
-                ) {
-                    val columns = GridCells.Adaptive(minSize = 132.dp)
-                    LazyVerticalGrid(
-                        state = gridState,
-                        columns = columns,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = pageContentPadding,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
-                    ) {
-                        pageVideos.value.firstOrNull()?.let { featured ->
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                FeaturedBanner(
-                                    video = featured,
-                                    onClick = { onVideoClick(featured) },
-                                )
-                            }
-                        }
-                        gridItems(pageVideos.value, key = { it.id }) { video ->
-                            VideoCardItem(
-                                video = video,
-                                onClick = { onVideoClick(video) },
-                            )
-                        }
                     }
                 }
             }
@@ -475,12 +429,8 @@ private fun CategoryChips(
                 .fillMaxWidth()
                 .onGloballyPositioned { rowLeft = it.boundsInRoot().left },
         ) {
-            item {
-                CategoryChipPlain("全部", 0, selectedIndex == 0, rowLeft, chipOffsets, chipWidths, onSelect)
-            }
             items(categories.size, key = { categories[it].id }) { i ->
-                val idx = i + 1
-                CategoryChipPlain(categories[i].name, idx, selectedIndex == idx, rowLeft, chipOffsets, chipWidths, onSelect)
+                CategoryChipPlain(categories[i].name, i, selectedIndex == i, rowLeft, chipOffsets, chipWidths, onSelect)
             }
         }
 
@@ -623,31 +573,6 @@ private fun FeaturedBanner(
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White,
                     modifier = Modifier.padding(start = 6.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun VideoSection(
-    category: VideoCategory,
-    videos: List<Video>,
-    onVideoClick: (Video) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.titleContentGap)) {
-        Text(
-            text = category.name,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(start = 2.dp),
-        )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH)) {
-            items(videos, key = { it.id }) { video ->
-                VideoCardItem(
-                    video = video,
-                    onClick = { onVideoClick(video) },
                 )
             }
         }
