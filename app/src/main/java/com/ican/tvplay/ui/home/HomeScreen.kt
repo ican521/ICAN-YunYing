@@ -1,8 +1,6 @@
 package com.ican.tvplay.ui.home
 
-import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,7 +63,6 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
-import com.ican.tvplay.ui.components.ExpressiveLoadingIndicator
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
@@ -73,7 +70,6 @@ import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -84,31 +80,11 @@ fun HomeScreen(
     onHistoryClick: () -> Unit,
 ) {
     val viewModel = appViewModel { HomeViewModel(this) }
-    val sections by viewModel.sections.collectAsStateWithLifecycle()
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
 
     val contentPadding = topLevelContentPadding()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-
-    // 首页加载转圈（fongmi ProgressLayout 三态互斥对齐）：
-    // 数据未就绪 → 转圈、内容隐藏；数据就绪 → 转圈消失、内容淡入；10s 兜底防配置失败死转
-    var forceStop by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(10_000L)
-        forceStop = true
-    }
-    val sectionsReady = sections.any { it.second.isNotEmpty() }
-    val contentReady = sectionsReady && categories.isNotEmpty()
-    val showSpinner = !contentReady && !forceStop
-    val contentAlpha by animateFloatAsState(
-        targetValue = if (contentReady) 1f else 0f,
-        animationSpec = tween(durationMillis = 150),
-        label = "homeContentAlpha",
-    )
-    LaunchedEffect(contentReady) {
-        if (contentReady) Log.d("Startup", "home contentReady (categories+sections)")
-    }
 
     // 「全部」页已删除：分类就绪后默认选中第一个分类
     LaunchedEffect(categories) {
@@ -136,13 +112,11 @@ fun HomeScreen(
         scope.launch { pagerState.animateScrollToPage(index) }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = contentAlpha }
-                .background(MaterialTheme.colorScheme.background),
-        ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
         // 固定顶栏：搜索 + 历史（不透明背景，防止内容透出）
         Box(
             modifier = Modifier
@@ -244,17 +218,6 @@ fun HomeScreen(
                         )
                     }
                 }
-            }
-        }
-        }
-
-        // 加载转圈：根级最表层 overlay（互斥：转圈期间内容隐藏，数据就绪后淡入）
-        if (showSpinner) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                ExpressiveLoadingIndicator(color = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -512,11 +475,6 @@ private fun FeaturedBanner(
             contentDescription = video.title,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxWidth().height(200.dp),
-            onState = { state ->
-                if (state is coil3.compose.AsyncImagePainter.State.Success) {
-                    Log.d("Startup", "first banner image success")
-                }
-            },
         )
         Box(
             modifier = Modifier
