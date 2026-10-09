@@ -84,13 +84,10 @@ fun DetailScreen(
     }
     val displayedSources = if (selectedLineIndex < 0) allSources else listOf(allSources[selectedLineIndex])
 
-    // ========== 统一父容器：全局水平内边距由外层 Column 控制，子板块不再单独设水平 padding ==========
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = Spacing.pageHorizontal),
-        horizontalAlignment = Alignment.Start,
+            .background(MaterialTheme.colorScheme.background),
     ) {
         // 顶部栏
         DetailTopBar(
@@ -100,7 +97,7 @@ fun DetailScreen(
             onBack = onBack,
         )
 
-        // 主体：左 chips + 右卡片（继承父容器水平边距，仅设置两栏间距）
+        // 主体：左 chips + 右卡片
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -114,16 +111,13 @@ fun DetailScreen(
                 modifier = Modifier.fillMaxHeight(),
             )
 
-            // 两栏间距：线路筛选与卡片网格之间统一分隔（继承父容器左右边距，外缘边距不变）
-            Spacer(modifier = Modifier.width(Spacing.cardGapH))
-
             // 右侧卡片网格
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 132.dp),
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .padding(vertical = 12.dp),
+                    .padding(horizontal = Spacing.pageHorizontal, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                 verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
             ) {
@@ -166,7 +160,7 @@ private fun DetailTopBar(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(vertical = 8.dp),
+            .padding(start = Spacing.pageHorizontal, end = Spacing.pageHorizontal, top = Spacing.pageTop, bottom = 8.dp),
     ) {
         CircleIconButton(icon = AppIcons.Back, contentDescription = "返回", onClick = onBack)
         Text(
@@ -439,7 +433,7 @@ private fun DetailLoading(onBack: () -> Unit) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
-            .padding(start = 16.dp, top = 8.dp),
+            .padding(start = 16.dp, top = Spacing.pageTop),
     ) {
         CircleIconButton(
             icon = AppIcons.Back,

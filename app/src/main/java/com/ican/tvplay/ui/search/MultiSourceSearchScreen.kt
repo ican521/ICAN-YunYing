@@ -94,21 +94,18 @@ fun MultiSourceSearchScreen(
         if (q.isNotEmpty()) vm.searchAll(q)
     }
 
-    // ========== 统一父容器：全局水平内边距由外层 Column 控制，子板块不再单独设水平 padding ==========
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = Spacing.pageHorizontal),
-        horizontalAlignment = Alignment.Start,
+            .background(MaterialTheme.colorScheme.background),
     ) {
-        // ========== 顶栏（继承父容器水平边距，仅保留顶部状态栏避让与底部间距）==========
+        // ========== 顶栏（左右边距对齐首页 topLevelContentPadding 的 16dp）==========
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(top = Spacing.pageTop, bottom = 6.dp),
+                .padding(start = Spacing.pageHorizontal, end = Spacing.pageHorizontal, top = Spacing.pageTop, bottom = 6.dp),
         ) {
             CircleBackButton(onClick = onBack)
 
@@ -175,9 +172,11 @@ fun MultiSourceSearchScreen(
             }
         }
 
-        // ========== 主体：左站源列表 + 右卡片网格（继承父容器水平边距，仅设置两栏间距）==========
+        // ========== 主体：左站源列表 + 右卡片网格（左右边距对齐首页 16dp）==========
         Row(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = Spacing.pageHorizontal),
         ) {
             // 左侧站源列表（纵向；顶部 4dp 与右侧网格第一行卡片齐平）
             LazyColumn(
@@ -217,7 +216,7 @@ fun MultiSourceSearchScreen(
                 }
             }
 
-            // 两栏间距：站源列表与视频卡片之间统一分隔（继承父容器左右边距，外缘边距不变）
+            // 站源列表与卡片网格之间的间距
             Spacer(modifier = Modifier.width(Spacing.cardGapH))
 
             // 右侧卡片网格：手机强制 2 列，大屏（宽 > 640dp）自适应

@@ -58,18 +58,17 @@ fun FavoritesScreen(
     // 清空确认弹窗
     var showConfirm by remember { mutableStateOf(false) }
 
-    // ========== 统一父容器：全局水平内边距由外层 Column 控制，子板块不再单独设水平 padding ==========
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = Spacing.pageHorizontal),
-        horizontalAlignment = Alignment.Start,
+            .background(MaterialTheme.colorScheme.background),
     ) {
-        // 顶栏：标题 + 右上角圆形删除按钮（Tab 页无返回按钮；继承父容器水平边距，仅保留顶部状态栏避让）
+        // 顶栏：标题 + 右上角圆形删除按钮（Tab 页无返回按钮）
         Row(
             modifier = Modifier.padding(
                 top = topLevelContentPadding().calculateTopPadding(),
+                start = Spacing.pageHorizontal,
+                end = Spacing.pageHorizontal,
             ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -86,7 +85,7 @@ fun FavoritesScreen(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(Spacing.circleButton)
                         .tvCardEffect(
                             onClick = {
                                 if (!editMode) {
@@ -125,6 +124,8 @@ fun FavoritesScreen(
                 columns = GridCells.Adaptive(132.dp),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    start = Spacing.pageHorizontal,
+                    end = Spacing.pageHorizontal,
                     top = Spacing.titleContentGap,
                     bottom = Spacing.bottomBarInset,
                 ),
@@ -311,17 +312,16 @@ fun HistoryScreen(
     // 清空确认弹窗
     var showConfirm by remember { mutableStateOf(false) }
 
-    // ========== 统一父容器：全局水平内边距由外层 Column 控制，子板块不再单独设水平 padding ==========
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = Spacing.pageHorizontal),
-        horizontalAlignment = Alignment.Start,
+            .background(MaterialTheme.colorScheme.background),
     ) {
         Row(
             modifier = Modifier.padding(
                 top = topLevelContentPadding().calculateTopPadding(),
+                start = Spacing.pageHorizontal,
+                end = Spacing.pageHorizontal,
             ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -339,7 +339,7 @@ fun HistoryScreen(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(Spacing.circleButton)
                         .tvCardEffect(
                             onClick = {
                                 if (!editMode) {
@@ -376,6 +376,8 @@ fun HistoryScreen(
                 columns = GridCells.Adaptive(132.dp),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    start = Spacing.pageHorizontal,
+                    end = Spacing.pageHorizontal,
                     top = Spacing.titleContentGap,
                     bottom = Spacing.bottomBarInset,
                 ),
