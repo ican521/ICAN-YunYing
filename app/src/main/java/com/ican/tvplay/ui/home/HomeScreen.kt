@@ -33,7 +33,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,14 +42,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -381,8 +375,6 @@ private fun CategoryChips(
     horizontalPadding: androidx.compose.ui.unit.Dp,
     onSelect: (Int) -> Unit,
 ) {
-    val density = LocalDensity.current
-
     // 文字高亮目标：点击瞬间切换，无动画；手势滑动时跟随 pager 最近页
     val colorTargetIndex = tappedIndex
         ?: (pagerState.currentPage + pagerState.currentPageOffsetFraction.toInt())
@@ -412,107 +404,20 @@ private fun CategoryChips(
         }
     }
 
-    // 指示器位置：直接读 LazyRow 实时布局信息（Tab滑出屏幕被回收时拿到 null →
-    // 指示器随之隐藏，不再残留卡在最后已知位置）；pager 滚动时在相邻两Tab间插值
-    val indicatorPos by remember {
-        derivedStateOf {
-            val infos = listState.layoutInfo.visibleItemsInfo
-            fun posOf(i: Int): Pair<Float, Float>? =
-                infos.firstOrNull { it.index == i }?.let { it.offset.toFloat() to it.size.toFloat() }
-            if (pagerState.isScrollInProgress) {
-                val from = pagerState.currentPage
-                val frac = pagerState.currentPageOffsetFraction
-                val to = if (frac >= 0f) from + 1 else from - 1
-                val p0 = posOf(from)
-                val p1 = posOf(to)
-                when {
-                    p0 != null && p1 != null -> {
-                        val f = kotlin.math.abs(frac)
-                        (p0.first + (p1.first - p0.first) * f) to (p0.second + (p1.second - p0.second) * f)
-                    }
-                    else -> p0 ?: p1
-                }
-            } else {
-                posOf(tappedIndex ?: pagerState.currentPage)
-            }
-        }
-    }
-
-    // 整个 Tab 区域总高度固定 30dp：文字行 27dp + 指示器 3dp（紧贴文字下方）
-    Column(modifier = Modifier.fillMaxWidth().height(30.dp)) {
-        // 文字行（无底色、无 pill，纯文字），高度 27dp，文字垂直居中
-        // 遮罩移到屏幕最边缘，宽度=页面水平边距：Tab滑过搜索栏左边线(16dp)时开始渐隐，
-        // 静止时最左Tab对齐基准线且完全清晰
-        val fadeModifier = Modifier.edgeFade(horizontalPadding)
-        LazyRow(
-            state = listState,
-            // 通栏+contentPadding：内容可滑到屏幕边缘，静止时首尾Tab仍对齐页面基准线
-            contentPadding = PaddingValues(horizontal = horizontalPadding),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(27.dp)
-                .then(fadeModifier),
-        ) {
-            items(categories.size, key = { categories[it].id }) { i ->
-                CategoryChipPlain(categories[i].name, i, colorTargetIndex == i, onSelect)
-            }
-        }
-
-        // === 底部横线指示器（直接贴文字下方，与文字行共享同一渐隐遮罩） ===
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(fadeModifier),
-        ) {
-            val pos = indicatorPos
-            if (pos != null) {
-                val barHeight = 3.dp
-                val barCorner = RoundedCornerShape(percent = 50)
-                val barW = (pos.second * 0.5f).coerceAtLeast(18f)
-                val barOffsetX = pos.first + (pos.second - barW) / 2f
-
-                Box(
-                    modifier = Modifier
-                        .graphicsLayer { translationX = barOffsetX }
-                        .width(with(density) { barW.toDp() })
-                        .height(barHeight)
-                        .clip(barCorner)
-                        .background(
-                            MaterialTheme.colorScheme.primary,
-                            barCorner,
-                        ),
-                )
-            }
+    // 文字行：通栏+contentPadding，内容可滑到屏幕边缘，静止时最左Tab对齐搜索栏左边基准线；
+    // 每个Tab自带与文字等宽的底部小横条（仅选中显示），无独立指示器、无移动动画
+    LazyRow(
+        state = listState,
+        contentPadding = PaddingValues(horizontal = horizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().height(27.dp),
+    ) {
+        items(categories.size, key = { categories[it].id }) { i ->
+            CategoryChipPlain(categories[i].name, i, colorTargetIndex == i, onSelect)
         }
     }
 }
-
-/**
- * 左右边缘水平渐隐遮罩（两侧常显）：内容滑到边缘 [width] 范围内逐渐变淡。
- */
-private fun Modifier.edgeFade(width: androidx.compose.ui.unit.Dp): Modifier =
-    this
-        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-        .drawWithContent {
-            drawContent()
-            val fadePx = width.toPx()
-            val w = size.width
-            if (w <= 0f || fadePx <= 0f) return@drawWithContent
-            val frac = (fadePx / w).coerceAtMost(0.5f)
-            drawRect(
-                brush = Brush.horizontalGradient(
-                    colorStops = arrayOf(
-                        0f to Color.Transparent,
-                        frac to Color.Black,
-                        1f - frac to Color.Black,
-                        1f to Color.Transparent,
-                    ),
-                ),
-                blendMode = BlendMode.DstIn,
-            )
-        }
 
 @Composable
 private fun CategoryChipPlain(
@@ -525,10 +430,11 @@ private fun CategoryChipPlain(
     else MaterialTheme.colorScheme.onSurfaceVariant
     val fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
 
-    Box(
-        contentAlignment = Alignment.Center,
+    // 文字 + 底部等宽小横条：Column宽度取最宽子项（文字），横条 fillMaxWidth 即与文字等长；
+    // 未选中时横条透明占位，高度一致无跳动；横条只在各自Tab下直接显隐，无移动动画
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .fillMaxSize()
             .tvCardEffect(
                 onClick = { onSelect(index) },
                 shape = RoundedCornerShape(percent = 50),
@@ -542,6 +448,16 @@ private fun CategoryChipPlain(
             style = MaterialTheme.typography.labelLarge,
             color = textColor,
             fontWeight = fontWeight,
+        )
+        Spacer(Modifier.height(2.dp))
+        Box(
+            modifier = Modifier
+                .height(3.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(percent = 50))
+                .background(
+                    if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                ),
         )
     }
 }
