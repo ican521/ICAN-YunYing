@@ -449,8 +449,40 @@ private fun CategoryChips(
         val layoutInfo = listState.layoutInfo
         val item = layoutInfo.visibleItemsInfo.firstOrNull { it.index == colorTargetIndex }
         if (item == null) {
-            // 目标Tab完全未上屏（距离较远）：直接滚过去
-            listState.animateScrollToItem(colorTargetIndex)
+            // 目标Tab完全未上屏：按可见项平均宽度估算最小滚动距离，动画滚过去后再按真实位置精确校正（无跳变）
+            val visible = layoutInfo.visibleItemsInfo
+            val avg = visible.map { it.size }.average().toFloat()
+            val gap = if (visible.size > 1) {
+                (visible[1].offset - visible[0].offset - visible[0].size).toFloat()
+            } else 0f
+            val step = avg + gap
+            val viewportStart = layoutInfo.viewportStartOffset
+            val viewportEnd = layoutInfo.viewportEndOffset
+            if (colorTargetIndex > visible.last().index) {
+                // 目标在右侧屏幕外：估算滚动量，让目标右缘刚好露出在视口右缘
+                val lastRight = visible.last().offset + visible.last().size
+                val estDelta = lastRight + (colorTargetIndex - visible.last().index) * step - viewportEnd
+                if (estDelta > 0f) listState.animateScrollBy(estDelta)
+                val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == colorTargetIndex }
+                if (info != null) {
+                    val d = info.offset + info.size - listState.layoutInfo.viewportEndOffset
+                    if (d != 0) listState.animateScrollBy(d.toFloat())
+                } else {
+                    listState.animateScrollToItem(colorTargetIndex)
+                }
+            } else {
+                // 目标在左侧屏幕外：估算滚动量，让目标左缘刚好露出在视口左缘
+                val firstLeft = visible.first().offset
+                val estDelta = firstLeft - (visible.first().index - colorTargetIndex) * step - viewportStart
+                if (estDelta < 0f) listState.animateScrollBy(estDelta)
+                val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == colorTargetIndex }
+                if (info != null) {
+                    val d = info.offset - listState.layoutInfo.viewportStartOffset
+                    if (d != 0) listState.animateScrollBy(d.toFloat())
+                } else {
+                    listState.animateScrollToItem(colorTargetIndex)
+                }
+            }
         } else {
             val viewportStart = layoutInfo.viewportStartOffset
             val viewportEnd = layoutInfo.viewportEndOffset
