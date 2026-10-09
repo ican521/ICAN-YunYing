@@ -178,12 +178,11 @@ fun MultiSourceSearchScreen(
                 .fillMaxSize()
                 .padding(horizontal = Spacing.pageHorizontal),
         ) {
-            // 左侧站源列表（纵向）
+            // 左侧站源列表（纵向；顶部 4dp 与右侧网格第一行卡片齐平）
             LazyColumn(
                 modifier = Modifier
                     .width(100.dp)
-                    .fillMaxHeight()
-                    .padding(vertical = 4.dp),
+                    .fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 4.dp, bottom = 16.dp),
             ) {
@@ -297,10 +296,9 @@ private fun SiteSourceChip(
     else MaterialTheme.colorScheme.onSurfaceVariant
     val shape = RoundedCornerShape(percent = 50)
 
-    // 固定宽度：所有胶囊等宽，不因名字长短变化
+    // 固定宽度：所有胶囊等宽，不因名字长短变化；无水平外边距，左缘与返回圆钮（页面边距 16dp）精确对齐
     Box(
         modifier = Modifier
-            .padding(horizontal = 6.dp)
             .fillMaxWidth()
             .height(40.dp)
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false)
