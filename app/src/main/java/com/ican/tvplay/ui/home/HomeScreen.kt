@@ -1,6 +1,5 @@
 package com.ican.tvplay.ui.home
 
-import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -26,8 +25,6 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -39,7 +36,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,8 +49,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,7 +59,6 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
-import com.ican.tvplay.ui.components.ExpressiveLoadingIndicator
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
@@ -73,9 +66,7 @@ import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 @Composable
 fun HomeScreen(
@@ -84,31 +75,11 @@ fun HomeScreen(
     onHistoryClick: () -> Unit,
 ) {
     val viewModel = appViewModel { HomeViewModel(this) }
-    val sections by viewModel.sections.collectAsStateWithLifecycle()
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
 
     val contentPadding = topLevelContentPadding()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-
-    // 首页加载转圈（fongmi ProgressLayout 三态互斥对齐）：
-    // 数据未就绪 → 转圈、内容隐藏；数据就绪 → 转圈消失、内容淡入；10s 兜底防配置失败死转
-    var forceStop by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(10_000L)
-        forceStop = true
-    }
-    val sectionsReady = sections.any { it.second.isNotEmpty() }
-    val contentReady = sectionsReady && categories.isNotEmpty()
-    val showSpinner = !contentReady && !forceStop
-    val contentAlpha by animateFloatAsState(
-        targetValue = if (contentReady) 1f else 0f,
-        animationSpec = tween(durationMillis = 150),
-        label = "homeContentAlpha",
-    )
-    LaunchedEffect(contentReady) {
-        if (contentReady) Log.d("Startup", "home contentReady (categories+sections)")
-    }
 
     // 「全部」页已删除：分类就绪后默认选中第一个分类
     LaunchedEffect(categories) {
@@ -136,23 +107,20 @@ fun HomeScreen(
         scope.launch { pagerState.animateScrollToPage(index) }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = contentAlpha }
-                .background(MaterialTheme.colorScheme.background),
-        ) {
+    // ========== 统一父容器：全局水平内边距由外层 Column 控制，子板块不再单独设水平 padding ==========
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = Spacing.pageHorizontal),
+        horizontalAlignment = Alignment.Start,
+    ) {
         // 固定顶栏：搜索 + 历史（不透明背景，防止内容透出）
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.background)
-                .padding(
-                    start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-                    top = contentPadding.calculateTopPadding(),
-                ),
+                .padding(top = contentPadding.calculateTopPadding()),
         ) {
             HomeTopBar(
                 onSearchClick = onSearchClick,
@@ -166,11 +134,7 @@ fun HomeScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(
-                    start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-                ),
+                .background(MaterialTheme.colorScheme.background),
         ) {
             CategoryChips(
                 categories = categories,
@@ -189,12 +153,6 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize(),
             beyondViewportPageCount = 1,
         ) { page ->
-            val pageContentPadding = PaddingValues(
-                start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-                bottom = contentPadding.calculateBottomPadding(),
-            )
-
             // 每页对应一个分类：按 page 直接取 categories，独立加载该分类数据
             val pageCategory = categories.getOrNull(page)
             val pageVideos = remember(page, pageCategory?.id) {
@@ -225,7 +183,8 @@ fun HomeScreen(
                     state = gridState,
                     columns = columns,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = pageContentPadding,
+                    // 仅保留底部内边距避让悬浮胶囊；左右由外层统一父容器控制
+                    contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                     verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                 ) {
@@ -244,17 +203,6 @@ fun HomeScreen(
                         )
                     }
                 }
-            }
-        }
-        }
-
-        // 加载转圈：根级最表层 overlay（互斥：转圈期间内容隐藏，数据就绪后淡入）
-        if (showSpinner) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                ExpressiveLoadingIndicator(color = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -512,11 +460,6 @@ private fun FeaturedBanner(
             contentDescription = video.title,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxWidth().height(200.dp),
-            onState = { state ->
-                if (state is coil3.compose.AsyncImagePainter.State.Success) {
-                    Log.d("Startup", "first banner image success")
-                }
-            },
         )
         Box(
             modifier = Modifier
