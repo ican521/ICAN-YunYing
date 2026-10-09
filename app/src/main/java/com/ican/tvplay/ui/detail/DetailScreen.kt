@@ -45,6 +45,7 @@ import com.ican.tvplay.ui.DetailViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -116,9 +117,9 @@ fun DetailScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = Spacing.pageHorizontal, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
+                verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
             ) {
                 itemsIndexed(displayedSources) { _, source ->
                     SourceCard(
@@ -159,7 +160,7 @@ private fun DetailTopBar(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = Spacing.pageHorizontal, vertical = 8.dp),
     ) {
         CircleIconButton(icon = AppIcons.Back, contentDescription = "返回", onClick = onBack)
         Text(
@@ -266,7 +267,7 @@ private fun SourceCard(
     Column(
         modifier = Modifier.tvCardEffect(
             onClick = onClick,
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(Spacing.corner),
             focusedScale = 1.05f,
         ),
     ) {
@@ -274,7 +275,7 @@ private fun SourceCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(186.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(Spacing.corner))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             AsyncImage(
@@ -352,7 +353,7 @@ private fun EpisodePickerDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
                 .padding(20.dp),
         ) {
             Text(
@@ -362,12 +363,12 @@ private fun EpisodePickerDialog(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(top = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
+                modifier = Modifier.padding(top = Spacing.titleContentGap),
             ) {
                 items(source.episodes.size) { idx ->
                     val ep = source.episodes[idx]
-                    val shape = RoundedCornerShape(12.dp)
+                    val shape = RoundedCornerShape(Spacing.corner)
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
@@ -406,7 +407,7 @@ private fun CircleIconButton(
     val shape = RoundedCornerShape(percent = 50)
     Box(
         modifier = modifier
-            .size(42.dp)
+            .size(com.ican.tvplay.ui.theme.Spacing.circleButton)
             .tvCardEffect(
                 onClick = onClick,
                 shape = shape,

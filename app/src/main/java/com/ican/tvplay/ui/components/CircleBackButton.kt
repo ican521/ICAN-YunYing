@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
+import com.ican.tvplay.ui.theme.Spacing
 
 /** 二级页面左上角统一返回按钮：48dp 圆形、surfaceVariant 底色、焦点缩放+按压效果 */
 @Composable
@@ -41,7 +42,7 @@ fun CircleIconButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .size(48.dp)
+            .size(Spacing.circleButton)
             .tvCardEffect(
                 onClick = onClick,
                 shape = CircleShape,

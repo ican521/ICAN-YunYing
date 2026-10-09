@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
+import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -40,7 +41,7 @@ fun VideoCard(
     Column(
         modifier = modifier
             .width(width)
-            .tvCardEffect(onClick = onClick, shape = RoundedCornerShape(16.dp)),
+            .tvCardEffect(onClick = onClick, shape = RoundedCornerShape(Spacing.corner)),
     ) {
         Box(
             modifier = Modifier
@@ -73,7 +74,7 @@ fun VideoCard(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(8.dp)
-                    .background(Color(0x66000000), RoundedCornerShape(8.dp))
+                    .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
                     .padding(horizontal = 6.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
