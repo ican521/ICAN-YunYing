@@ -12,6 +12,7 @@ import com.ican.tvplay.data.remote.SpiderManager
 import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.data.remote.VodApiClient
 import com.ican.tvplay.data.remote.VodItem
+import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.data.SettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.joinAll
@@ -89,7 +90,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                 entry.videos.map { v ->
                     DisplayVideo(
                         video = v,
-                        siteName = entry.site.name.substringBefore("|").ifBlank { entry.site.key },
+                        siteName = siteShortName(entry.site.name, entry.site.key),
                         siteKey = entry.site.key,
                     )
                 }
@@ -99,7 +100,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                 entry.videos.map { v ->
                     DisplayVideo(
                         video = v,
-                        siteName = entry.site.name.substringBefore("|").ifBlank { entry.site.key },
+                        siteName = siteShortName(entry.site.name, entry.site.key),
                         siteKey = entry.site.key,
                     )
                 }
@@ -193,7 +194,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                 }
             }.getOrNull()
             item?.toVideo(withEpisodes = true)?.copy(
-                sourceName = entry.site.name.substringBefore("|").ifBlank { entry.site.key },
+                sourceName = siteShortName(entry.site.name, entry.site.key),
             )
         }
 

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -20,6 +21,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -51,6 +53,7 @@ import com.ican.tvplay.ui.MultiSourceSearchViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.CircleBackButton
+import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
 import kotlinx.coroutines.launch
 import androidx.tv.material3.Icon
@@ -105,40 +108,43 @@ fun MultiSourceSearchScreen(
         ) {
             CircleBackButton(onClick = onBack)
 
-            // 搜索框（紧凑嵌入顶栏）
-            val shape = RoundedCornerShape(percent = 50)
+            // 搜索框：与首页顶部胶囊搜索框同款（48dp 高、全圆角、surfaceVariant 底、20dp 图标、bodyLarge 字号）
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 12.dp)
-                    .clip(shape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, shape)
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .height(48.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 18.dp),
             ) {
                 Icon(
                     imageVector = AppIcons.Search,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(20.dp),
                 )
+                Spacer(Modifier.width(10.dp))
                 BasicTextField(
                     value = queryText,
                     onValueChange = { queryText = it },
                     singleLine = true,
                     textStyle = TextStyle(
                         color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = MaterialTheme.typography.titleSmall.fontSize,
+                        fontSize = MaterialTheme.typography.bodyLarge.fontSize,
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
+                    modifier = Modifier.weight(1f),
                     decorationBox = { inner ->
                         if (queryText.isEmpty()) {
                             Text(
                                 text = "跨站源搜索…",
-                                style = MaterialTheme.typography.titleSmall,
+                                style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                         inner()
@@ -182,15 +188,15 @@ fun MultiSourceSearchScreen(
                 itemsIndexed(sites, key = { _, entry -> entry.site.key }) { _, entry ->
                     val idx = sites.indexOf(entry)
                     SiteSourceChip(
-                        name = entry.site.name.substringBefore("|").ifBlank { entry.site.key },
+                        name = siteShortName(entry.site.name, entry.site.key),
                         selected = idx == selectedIndex,
                         onClick = { vm.selectSite(idx) },
                     )
                 }
-                if (loading || (sites.isEmpty() && queryText.isNotBlank())) {
+                if (loading) {
                     item {
                         Text(
-                            text = if (loading) "搜索中…" else "暂无可用站点",
+                            text = "搜索中…",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,

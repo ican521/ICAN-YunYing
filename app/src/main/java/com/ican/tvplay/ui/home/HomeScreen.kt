@@ -67,6 +67,7 @@ import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.ExpressiveLoadingIndicator
+import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import androidx.tv.material3.Icon
@@ -361,7 +362,7 @@ fun SitePickerDialog(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = site.name.substringBefore("|").ifBlank { site.key },
+                                    text = siteShortName(site.name, site.key),
                                     style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
