@@ -442,13 +442,9 @@ private fun CategoryChips(
     // 整个 Tab 区域总高度固定 30dp：文字行 27dp + 指示器 3dp（紧贴文字下方）
     Column(modifier = Modifier.fillMaxWidth().height(30.dp)) {
         // 文字行（无底色、无 pill，纯文字），高度 27dp，文字垂直居中
-        // 左右渐隐遮罩：文字/指示器滑到边缘时逐渐变淡；滚到尽头的一侧不加遮罩
+        // 左右渐隐遮罩：两侧常显，文字/指示器滑入滑出遮罩区时自然渐隐渐显
         val edgeFadeWidth = 24.dp
-        val fadeModifier = Modifier.edgeFade(
-            width = edgeFadeWidth,
-            fadeLeft = listState.canScrollBackward,
-            fadeRight = listState.canScrollForward,
-        )
+        val fadeModifier = Modifier.edgeFade(edgeFadeWidth)
         LazyRow(
             state = listState,
             horizontalArrangement = Arrangement.spacedBy(18.dp),
@@ -493,10 +489,9 @@ private fun CategoryChips(
 }
 
 /**
- * 左右边缘水平渐隐遮罩：内容滑到边缘 [width] 范围内逐渐变淡。
- * [fadeLeft]/[fadeRight] 控制对应侧是否启用遮罩（滚到尽头的一侧传 false）。
+ * 左右边缘水平渐隐遮罩（两侧常显）：内容滑到边缘 [width] 范围内逐渐变淡。
  */
-private fun Modifier.edgeFade(width: androidx.compose.ui.unit.Dp, fadeLeft: Boolean, fadeRight: Boolean): Modifier =
+private fun Modifier.edgeFade(width: androidx.compose.ui.unit.Dp): Modifier =
     this
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
@@ -504,14 +499,13 @@ private fun Modifier.edgeFade(width: androidx.compose.ui.unit.Dp, fadeLeft: Bool
             val fadePx = width.toPx()
             val w = size.width
             if (w <= 0f || fadePx <= 0f) return@drawWithContent
-            val leftFrac = if (fadeLeft) (fadePx / w).coerceAtMost(0.5f) else 0f
-            val rightFrac = if (fadeRight) (fadePx / w).coerceAtMost(0.5f) else 0f
+            val frac = (fadePx / w).coerceAtMost(0.5f)
             drawRect(
                 brush = Brush.horizontalGradient(
                     colorStops = arrayOf(
                         0f to Color.Transparent,
-                        leftFrac to Color.Black,
-                        1f - rightFrac to Color.Black,
+                        frac to Color.Black,
+                        1f - frac to Color.Black,
                         1f to Color.Transparent,
                     ),
                 ),
