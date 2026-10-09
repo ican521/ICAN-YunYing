@@ -193,7 +193,8 @@ fun MultiSourceSearchScreen(
                             text = if (loading) "搜索中…" else if (queryText.isBlank()) "输入关键词搜索" else "暂无可用站点",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.fillParentMaxWidth().padding(vertical = 8.dp),
                         )
                     }
                 }
