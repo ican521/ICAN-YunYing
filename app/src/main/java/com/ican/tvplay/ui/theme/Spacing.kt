@@ -26,6 +26,9 @@ object Spacing {
     /** 大板块之间的间距（今日推荐/分类Tab/视频网格等模块之间） */
     val sectionSpacing = 20.dp
 
+    /** 首页顶部分类Tab的上下间距（搜索栏→Tab、Tab→内容区） */
+    val categoryTabVertical = 10.dp
+
     /** 板块内部标题与下方内容的间距 */
     val titleContentGap = 12.dp
 
