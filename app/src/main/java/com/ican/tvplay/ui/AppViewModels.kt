@@ -154,10 +154,16 @@ class SearchViewModel(container: AppContainer) : ViewModel() {
     val history: StateFlow<List<String>> = settings.searchHistory
 
     /** 热门推荐词（空查询时显示，fongmi 式） */
-    val hotWords = listOf("仙逆", "狂飙", "三体", "庆余年", "繁花", "狂飙", "长风渡")
+    val hotWords = listOf("仙逆", "狂飙", "三体", "庆余年", "繁花", "凡人修仙传", "长风渡")
 
     fun onQueryChange(value: String) {
         query.value = value
+    }
+
+    /** 记录一条搜索历史（搜索首页提交 / 结果页改词搜索都会调用） */
+    fun addHistory(keyword: String) {
+        val q = keyword.trim()
+        if (q.isNotEmpty()) settings.addSearchHistory(q)
     }
 
     fun clearHistory() {

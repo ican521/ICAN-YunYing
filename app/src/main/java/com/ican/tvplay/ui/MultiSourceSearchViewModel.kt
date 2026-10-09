@@ -120,6 +120,8 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
             _displayVideos.value = emptyList()
             return
         }
+        // 记录搜索历史（搜索首页提交 / 结果页改词搜索都会走这里）
+        settings.addSearchHistory(key)
 
         viewModelScope.launch {
             _loading.value = true

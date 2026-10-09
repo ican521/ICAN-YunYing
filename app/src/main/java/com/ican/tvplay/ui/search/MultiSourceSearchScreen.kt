@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +82,7 @@ fun MultiSourceSearchScreen(
     val selectedIndex by vm.selectedIndex.collectAsStateWithLifecycle()
     val displayVideos by vm.displayVideos.collectAsStateWithLifecycle()
     val loading by vm.loading.collectAsStateWithLifecycle()
+    val searchedQuery by vm.query.collectAsStateWithLifecycle()
 
     var queryText by remember { mutableStateOf(initialQuery) }
 
@@ -136,6 +138,7 @@ fun MultiSourceSearchScreen(
                         fontSize = MaterialTheme.typography.bodyLarge.fontSize,
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { doSearch() }),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier = Modifier.weight(1f),
                     decorationBox = { inner ->
@@ -186,13 +189,15 @@ fun MultiSourceSearchScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 4.dp, bottom = 16.dp),
             ) {
-                // 「全部」合并视图入口（默认选中；大小样式与站源胶囊完全一致）
-                item(key = "all") {
-                    SiteSourceChip(
-                        name = "全部",
-                        selected = selectedIndex == MultiSourceSearchViewModel.ALL_SITES_INDEX,
-                        onClick = { vm.selectSite(MultiSourceSearchViewModel.ALL_SITES_INDEX) },
-                    )
+                // 「全部」合并视图入口（仅在有搜索词时显示；未搜索时本页不出现）
+                if (searchedQuery.isNotBlank()) {
+                    item(key = "all") {
+                        SiteSourceChip(
+                            name = "全部",
+                            selected = selectedIndex == MultiSourceSearchViewModel.ALL_SITES_INDEX,
+                            onClick = { vm.selectSite(MultiSourceSearchViewModel.ALL_SITES_INDEX) },
+                        )
+                    }
                 }
                 // === 具体站源（固定宽度胶囊，仅取 | 前名称，不显示条数）===
                 itemsIndexed(sites, key = { _, entry -> entry.site.key }) { _, entry ->
