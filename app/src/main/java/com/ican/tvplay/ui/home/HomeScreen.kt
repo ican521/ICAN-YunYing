@@ -1,6 +1,5 @@
 package com.ican.tvplay.ui.home
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -107,9 +107,15 @@ fun HomeScreen(
 
     val selectedIndex = categories.indexOfFirst { it.id == selectedCategory }.coerceAtLeast(0)
 
-    // 点击 chip → pager 平移翻页（非瞬跳）
+    // 点击 chip → pager 平移翻页（非瞬跳）；点击瞬间记录目标 index，颜色/指示器立即响应
+    var tappedChipIndex by remember { mutableStateOf<Int?>(null) }
     val onChipClick: (Int) -> Unit = { index ->
+        tappedChipIndex = index
         scope.launch { pagerState.animateScrollToPage(index) }
+    }
+    // pager 滑动停止（含点击翻页完成、手势滑动）→ 清除点击态，指示器回归跟随 pager
+    LaunchedEffect(pagerState.settledPage) {
+        tappedChipIndex = null
     }
 
     Column(
@@ -149,6 +155,8 @@ fun HomeScreen(
             CategoryChips(
                 categories = categories,
                 selectedIndex = selectedIndex,
+                pagerState = pagerState,
+                tappedIndex = tappedChipIndex,
                 onSelect = onChipClick,
             )
         }
@@ -368,6 +376,8 @@ private fun HomeTopBar(
 private fun CategoryChips(
     categories: List<VideoCategory>,
     selectedIndex: Int,
+    pagerState: androidx.compose.foundation.pager.PagerState,
+    tappedIndex: Int?,
     onSelect: (Int) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -376,24 +386,55 @@ private fun CategoryChips(
     val chipWidths = remember { mutableStateMapOf<Int, Float>() }
     var rowLeft by remember { mutableStateOf(0f) }
 
-    val targetX = chipOffsets[selectedIndex] ?: 0f
-    val targetW = chipWidths[selectedIndex] ?: 0f
+    // 文字高亮目标：点击瞬间切换，无动画；手势滑动时跟随 pager 最近页
+    val colorTargetIndex = tappedIndex
+        ?: (pagerState.currentPage + pagerState.currentPageOffsetFraction.toInt())
+            .coerceIn(0, (categories.size - 1).coerceAtLeast(0))
 
-    // 简单平移动画（默认 tween 260ms）
-    val indicatorX by animateFloatAsState(targetValue = targetX, label = "chipX")
-    val indicatorW by animateFloatAsState(targetValue = targetW, label = "chipW")
+    // 指示器位置：点击瞬间先插值到目标 chip（颜色切换后紧随开始移动），
+    // pager 实际滚动后无缝接管跟随手指/滚动进度，无弹簧过冲、无动画回弹
+    val indicatorX by remember {
+        derivedStateOf {
+            if (pagerState.isScrollInProgress) {
+                val from = pagerState.currentPage
+                val offset = pagerState.currentPageOffsetFraction
+                val to = if (offset >= 0f) from + 1 else from - 1
+                val x0 = chipOffsets[from] ?: 0f
+                val x1 = chipOffsets[to] ?: x0
+                x0 + (x1 - x0) * kotlin.math.abs(offset)
+            } else {
+                chipOffsets[tappedIndex ?: pagerState.currentPage] ?: 0f
+            }
+        }
+    }
+    val indicatorW by remember {
+        derivedStateOf {
+            if (pagerState.isScrollInProgress) {
+                val from = pagerState.currentPage
+                val offset = pagerState.currentPageOffsetFraction
+                val to = if (offset >= 0f) from + 1 else from - 1
+                val w0 = chipWidths[from] ?: 0f
+                val w1 = chipWidths[to] ?: w0
+                w0 + (w1 - w0) * kotlin.math.abs(offset)
+            } else {
+                chipWidths[tappedIndex ?: pagerState.currentPage] ?: 0f
+            }
+        }
+    }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // 文字行（无底色、无 pill，纯文字）
+    // 整个 Tab 区域总高度固定 30dp：文字行 27dp + 指示器 3dp（紧贴文字下方）
+    Column(modifier = Modifier.fillMaxWidth().height(30.dp)) {
+        // 文字行（无底色、无 pill，纯文字），高度 27dp，文字垂直居中
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(18.dp),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
+                .height(27.dp)
                 .onGloballyPositioned { rowLeft = it.boundsInRoot().left },
         ) {
             items(categories.size, key = { categories[it].id }) { i ->
-                CategoryChipPlain(categories[i].name, i, selectedIndex == i, rowLeft, chipOffsets, chipWidths, onSelect)
+                CategoryChipPlain(categories[i].name, i, colorTargetIndex == i, rowLeft, chipOffsets, chipWidths, onSelect)
             }
         }
 
@@ -434,7 +475,9 @@ private fun CategoryChipPlain(
     val fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
 
     Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
+            .fillMaxSize()
             .onGloballyPositioned { coords ->
                 chipOffsets[index] = coords.boundsInRoot().left - rowLeft
                 chipWidths[index] = coords.size.width.toFloat()
@@ -445,7 +488,7 @@ private fun CategoryChipPlain(
                 focusedScale = 1.06f,
                 glow = false,
             )
-            .padding(horizontal = 6.dp, vertical = 12.dp),
+            .padding(horizontal = 6.dp),
     ) {
         Text(
             text = text,
