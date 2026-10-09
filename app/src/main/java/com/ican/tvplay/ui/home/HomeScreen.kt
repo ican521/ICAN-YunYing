@@ -83,6 +83,8 @@ fun HomeScreen(
 
     val contentPadding = topLevelContentPadding()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
+    // 当前站源 key：切站后即使新旧站分类 id 完全相同，也要强制各页重新取数（修复切站后首页内容不刷新）
+    val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     // 「全部」页已删除：分类就绪后默认选中第一个分类
@@ -175,12 +177,13 @@ fun HomeScreen(
             )
 
             // 每页对应一个分类：按 page 直接取 categories，独立加载该分类数据
+            // key 含 currentSiteKey：切站后分类 id 相同时也强制重载新站内容
             val pageCategory = categories.getOrNull(page)
-            val pageVideos = remember(page, pageCategory?.id) {
+            val pageVideos = remember(page, pageCategory?.id, currentSiteKey) {
                 mutableStateOf<List<Video>>(emptyList())
             }
-            // 首次进入该页或分类变化时，触发加载（协程结果缓存到 pageVideos）
-            LaunchedEffect(pageCategory?.id) {
+            // 首次进入该页、分类变化或切换站源时，触发加载（协程结果缓存到 pageVideos）
+            LaunchedEffect(pageCategory?.id, currentSiteKey) {
                 if (pageCategory != null) {
                     pageVideos.value = viewModel.getCategoryVideos(pageCategory.id)
                 }
