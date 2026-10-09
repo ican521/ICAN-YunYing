@@ -66,7 +66,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
     /** 站源总数（用于左侧「全部」条目显示总条数） */
     val totalVideoCount: Int get() = _sites.value.sumOf { it.videos.size }
 
-    private val _selectedIndex = MutableStateFlow(0)
+    private val _selectedIndex = MutableStateFlow(ALL_SITES_INDEX)
     val selectedIndex: StateFlow<Int> = _selectedIndex.asStateFlow()
 
     private val _loading = MutableStateFlow(false)
@@ -125,7 +125,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
             _loading.value = true
             _sites.value = emptyList()
             _displayVideos.value = emptyList()
-            _selectedIndex.value = 0
+            _selectedIndex.value = ALL_SITES_INDEX
             try {
                 val configUrl = settings.configUrl.value
                 if (configUrl.isBlank()) return@launch
@@ -139,8 +139,8 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                     for (entry in channel) {
                         _sites.value = _sites.value + entry
                         val sel = _selectedIndex.value
-                        // 选中站点的新结果到达时刷新右侧列表
-                        if (_sites.value.getOrNull(sel)?.site?.key == entry.site.key) {
+                        // 全部视图：每到一个站源即刷新合并列表（流式上屏）；单站视图：仅选中站点到达时刷新
+                        if (sel == ALL_SITES_INDEX || _sites.value.getOrNull(sel)?.site?.key == entry.site.key) {
                             refreshDisplay(sel)
                         }
                     }

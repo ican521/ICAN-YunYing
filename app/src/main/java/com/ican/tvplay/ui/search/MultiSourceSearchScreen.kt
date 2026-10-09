@@ -184,6 +184,14 @@ fun MultiSourceSearchScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 4.dp, bottom = 16.dp),
             ) {
+                // 「全部」合并视图入口（默认选中；大小样式与站源胶囊完全一致）
+                item(key = "all") {
+                    SiteSourceChip(
+                        name = "全部",
+                        selected = selectedIndex == MultiSourceSearchViewModel.ALL_SITES_INDEX,
+                        onClick = { vm.selectSite(MultiSourceSearchViewModel.ALL_SITES_INDEX) },
+                    )
+                }
                 // === 具体站源（固定宽度胶囊，仅取 | 前名称，不显示条数）===
                 itemsIndexed(sites, key = { _, entry -> entry.site.key }) { _, entry ->
                     val idx = sites.indexOf(entry)
