@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -140,7 +141,7 @@ fun HomeScreen(
             )
         }
 
-        Spacer(Modifier.height(Spacing.sectionSpacing))
+        Spacer(Modifier.height(Spacing.categoryTabVertical))
 
         // 固定分类 chips（不透明背景）
         Box(
@@ -161,7 +162,7 @@ fun HomeScreen(
             )
         }
 
-        Spacer(Modifier.height(Spacing.sectionSpacing))
+        Spacer(Modifier.height(Spacing.categoryTabVertical))
 
         // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；
         // 每页数据完全独立于 selectedCategory（按 page index 从 categories 直接取对应分类 + 独立缓存），
@@ -391,6 +392,14 @@ private fun CategoryChips(
         ?: (pagerState.currentPage + pagerState.currentPageOffsetFraction.toInt())
             .coerceIn(0, (categories.size - 1).coerceAtLeast(0))
 
+    // 目标Tab在屏幕外时自动滚回屏幕内（点击与手势翻页均生效）
+    val listState = rememberLazyListState()
+    LaunchedEffect(colorTargetIndex) {
+        if (categories.isNotEmpty()) {
+            listState.animateScrollToItem(colorTargetIndex)
+        }
+    }
+
     // 指示器位置：点击瞬间先插值到目标 chip（颜色切换后紧随开始移动），
     // pager 实际滚动后无缝接管跟随手指/滚动进度，无弹簧过冲、无动画回弹
     val indicatorX by remember {
@@ -426,6 +435,7 @@ private fun CategoryChips(
     Column(modifier = Modifier.fillMaxWidth().height(30.dp)) {
         // 文字行（无底色、无 pill，纯文字），高度 27dp，文字垂直居中
         LazyRow(
+            state = listState,
             horizontalArrangement = Arrangement.spacedBy(18.dp),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
