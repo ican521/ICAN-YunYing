@@ -35,7 +35,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,8 +50,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -387,10 +384,6 @@ private fun CategoryChips(
 ) {
     val density = LocalDensity.current
 
-    val chipOffsets = remember { mutableStateMapOf<Int, Float>() }
-    val chipWidths = remember { mutableStateMapOf<Int, Float>() }
-    var rowLeft by remember { mutableStateOf(0f) }
-
     // 文字高亮目标：点击瞬间切换，无动画；手势滑动时跟随 pager 最近页
     val colorTargetIndex = tappedIndex
         ?: (pagerState.currentPage + pagerState.currentPageOffsetFraction.toInt())
@@ -420,33 +413,28 @@ private fun CategoryChips(
         }
     }
 
-    // 指示器位置：点击瞬间先插值到目标 chip（颜色切换后紧随开始移动），
-    // pager 实际滚动后无缝接管跟随手指/滚动进度，无弹簧过冲、无动画回弹
-    val indicatorX by remember {
+    // 指示器位置：直接读 LazyRow 实时布局信息（Tab滑出屏幕被回收时拿到 null →
+    // 指示器随之隐藏，不再残留卡在最后已知位置）；pager 滚动时在相邻两Tab间插值
+    val indicatorPos by remember {
         derivedStateOf {
+            val infos = listState.layoutInfo.visibleItemsInfo
+            fun posOf(i: Int): Pair<Float, Float>? =
+                infos.firstOrNull { it.index == i }?.let { it.offset.toFloat() to it.size.toFloat() }
             if (pagerState.isScrollInProgress) {
                 val from = pagerState.currentPage
-                val offset = pagerState.currentPageOffsetFraction
-                val to = if (offset >= 0f) from + 1 else from - 1
-                val x0 = chipOffsets[from] ?: 0f
-                val x1 = chipOffsets[to] ?: x0
-                x0 + (x1 - x0) * kotlin.math.abs(offset)
+                val frac = pagerState.currentPageOffsetFraction
+                val to = if (frac >= 0f) from + 1 else from - 1
+                val p0 = posOf(from)
+                val p1 = posOf(to)
+                when {
+                    p0 != null && p1 != null -> {
+                        val f = kotlin.math.abs(frac)
+                        (p0.first + (p1.first - p0.first) * f) to (p0.second + (p1.second - p0.second) * f)
+                    }
+                    else -> p0 ?: p1
+                }
             } else {
-                chipOffsets[tappedIndex ?: pagerState.currentPage] ?: 0f
-            }
-        }
-    }
-    val indicatorW by remember {
-        derivedStateOf {
-            if (pagerState.isScrollInProgress) {
-                val from = pagerState.currentPage
-                val offset = pagerState.currentPageOffsetFraction
-                val to = if (offset >= 0f) from + 1 else from - 1
-                val w0 = chipWidths[from] ?: 0f
-                val w1 = chipWidths[to] ?: w0
-                w0 + (w1 - w0) * kotlin.math.abs(offset)
-            } else {
-                chipWidths[tappedIndex ?: pagerState.currentPage] ?: 0f
+                posOf(tappedIndex ?: pagerState.currentPage)
             }
         }
     }
@@ -465,7 +453,6 @@ private fun CategoryChips(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(27.dp)
-                .onGloballyPositioned { rowLeft = it.boundsInRoot().left }
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
                     drawContent()
@@ -488,28 +475,31 @@ private fun CategoryChips(
                 },
         ) {
             items(categories.size, key = { categories[it].id }) { i ->
-                CategoryChipPlain(categories[i].name, i, colorTargetIndex == i, rowLeft, chipOffsets, chipWidths, onSelect)
+                CategoryChipPlain(categories[i].name, i, colorTargetIndex == i, onSelect)
             }
         }
 
         // === 底部横线指示器（直接贴文字下方） ===
         Box(modifier = Modifier.fillMaxWidth()) {
-            val barHeight = 3.dp
-            val barCorner = RoundedCornerShape(percent = 50)
-            val barW = (indicatorW * 0.5f).coerceAtLeast(18f)
-            val barOffsetX = indicatorX + (indicatorW - barW) / 2f
+            val pos = indicatorPos
+            if (pos != null) {
+                val barHeight = 3.dp
+                val barCorner = RoundedCornerShape(percent = 50)
+                val barW = (pos.second * 0.5f).coerceAtLeast(18f)
+                val barOffsetX = pos.first + (pos.second - barW) / 2f
 
-            Box(
-                modifier = Modifier
-                    .graphicsLayer { translationX = barOffsetX }
-                    .width(with(density) { barW.toDp() })
-                    .height(barHeight)
-                    .clip(barCorner)
-                    .background(
-                        MaterialTheme.colorScheme.primary,
-                        barCorner,
-                    ),
-            )
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer { translationX = barOffsetX }
+                        .width(with(density) { barW.toDp() })
+                        .height(barHeight)
+                        .clip(barCorner)
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            barCorner,
+                        ),
+                )
+            }
         }
     }
 }
@@ -519,9 +509,6 @@ private fun CategoryChipPlain(
     text: String,
     index: Int,
     selected: Boolean,
-    rowLeft: Float,
-    chipOffsets: MutableMap<Int, Float>,
-    chipWidths: MutableMap<Int, Float>,
     onSelect: (Int) -> Unit,
 ) {
     val textColor = if (selected) MaterialTheme.colorScheme.primary
@@ -532,10 +519,6 @@ private fun CategoryChipPlain(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .fillMaxSize()
-            .onGloballyPositioned { coords ->
-                chipOffsets[index] = coords.boundsInRoot().left - rowLeft
-                chipWidths[index] = coords.size.width.toFloat()
-            }
             .tvCardEffect(
                 onClick = { onSelect(index) },
                 shape = RoundedCornerShape(percent = 50),
