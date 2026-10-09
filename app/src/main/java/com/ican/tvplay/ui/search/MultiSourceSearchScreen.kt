@@ -98,13 +98,13 @@ fun MultiSourceSearchScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        // ========== 顶栏 ==========
+        // ========== 顶栏（左右边距对齐首页 topLevelContentPadding 的 16dp）==========
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(start = 8.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
         ) {
             CircleBackButton(onClick = onBack)
 
@@ -171,9 +171,11 @@ fun MultiSourceSearchScreen(
             }
         }
 
-        // ========== 主体：左站源列表 + 右卡片网格 ==========
+        // ========== 主体：左站源列表 + 右卡片网格（左右边距对齐首页 16dp）==========
         Row(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
         ) {
             // 左侧站源列表（纵向）
             LazyColumn(
@@ -230,8 +232,6 @@ fun MultiSourceSearchScreen(
                     columns = columns,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        start = 8.dp,
-                        end = 8.dp,
                         top = 4.dp,
                         bottom = 16.dp,
                     ),
