@@ -332,10 +332,10 @@ class VideoRepository(
         result
     }
 
-    /** 切换站点：记录选择并重新加载分类 */
+    /** 切换站点：记录选择并重新加载分类（reload 内部已加 loadMutex，此处不可重复加锁——Mutex 不可重入会死锁） */
     suspend fun switchSite(siteKey: String) {
         settingsRepository.setSiteKey(siteKey)
-        loadMutex.withLock { reload() }
+        reload()
     }
 
     /**
