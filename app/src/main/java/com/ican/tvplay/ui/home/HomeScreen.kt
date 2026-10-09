@@ -425,12 +425,16 @@ private fun CategoryChips(
         Box(modifier = Modifier.fillMaxWidth().height(3.dp)) {
             val density = LocalDensity.current
             val textPadPx = with(density) { 6.dp.toPx() }
-            val info = listState.layoutInfo.visibleItemsInfo
+            val layoutInfo = listState.layoutInfo
+            val info = layoutInfo.visibleItemsInfo
                 .firstOrNull { it.index == colorTargetIndex }
             if (info != null && info.size > textPadPx * 2) {
+                // item.offset 原点为内容区起点（含contentPadding偏移），
+                // 减去 viewportStartOffset 换算成相对文字行左缘的屏幕坐标，保证横条与文字对齐
+                val barX = info.offset - layoutInfo.viewportStartOffset + textPadPx
                 Box(
                     modifier = Modifier
-                        .graphicsLayer { translationX = info.offset + textPadPx }
+                        .graphicsLayer { translationX = barX }
                         .width(with(density) { (info.size - textPadPx * 2).toDp() })
                         .height(3.dp)
                         .clip(RoundedCornerShape(percent = 50))
