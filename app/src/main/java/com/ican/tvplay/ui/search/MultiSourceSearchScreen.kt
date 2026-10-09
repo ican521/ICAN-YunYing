@@ -56,7 +56,6 @@ import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.CircleBackButton
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
-import com.ican.tvplay.ui.theme.LightSurfaceVariant
 import com.ican.tvplay.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import androidx.tv.material3.Icon
@@ -413,7 +412,7 @@ private fun CrossSourceVideoCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .background(LightSurfaceVariant, RoundedCornerShape(percent = 50))
+                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(percent = 50))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                 ) {
                     Text(
@@ -449,7 +448,7 @@ private fun CrossSourceVideoCard(
                                 Box(
                                     modifier = Modifier
                                         .background(
-                                            LightSurfaceVariant,
+                                            Color.Black.copy(alpha = 0.8f),
                                             RoundedCornerShape(percent = 50),
                                         )
                                         .padding(horizontal = 6.dp, vertical = 1.dp),
