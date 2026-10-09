@@ -44,8 +44,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
@@ -451,6 +454,10 @@ private fun CategoryChips(
     // 整个 Tab 区域总高度固定 30dp：文字行 27dp + 指示器 3dp（紧贴文字下方）
     Column(modifier = Modifier.fillMaxWidth().height(30.dp)) {
         // 文字行（无底色、无 pill，纯文字），高度 27dp，文字垂直居中
+        // 左右渐隐遮罩：文字滑到边缘时逐渐变淡；滚到尽头的一侧不加遮罩
+        val edgeFadeWidth = 24.dp
+        val canScrollBackward = listState.canScrollBackward
+        val canScrollForward = listState.canScrollForward
         LazyRow(
             state = listState,
             horizontalArrangement = Arrangement.spacedBy(18.dp),
@@ -458,7 +465,27 @@ private fun CategoryChips(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(27.dp)
-                .onGloballyPositioned { rowLeft = it.boundsInRoot().left },
+                .onGloballyPositioned { rowLeft = it.boundsInRoot().left }
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val fadePx = edgeFadeWidth.toPx()
+                    val w = size.width
+                    if (w <= 0f || fadePx <= 0f) return@drawWithContent
+                    val leftFrac = if (canScrollBackward) (fadePx / w).coerceAtMost(0.5f) else 0f
+                    val rightFrac = if (canScrollForward) (fadePx / w).coerceAtMost(0.5f) else 0f
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colorStops = arrayOf(
+                                0f to Color.Transparent,
+                                leftFrac to Color.Black,
+                                1f - rightFrac to Color.Black,
+                                1f to Color.Transparent,
+                            ),
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                },
         ) {
             items(categories.size, key = { categories[it].id }) { i ->
                 CategoryChipPlain(categories[i].name, i, colorTargetIndex == i, rowLeft, chipOffsets, chipWidths, onSelect)
