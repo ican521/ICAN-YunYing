@@ -453,9 +453,6 @@ private fun CategoryChips(
         // 文字行（无底色、无 pill，纯文字），高度 27dp，文字垂直居中
         LazyRow(
             state = listState,
-            // 禁止手动拖拽整栏：被裁切的Tab会隐藏，手动拖拽停下后边缘会留空白；
-            // 滚动统一由「目标Tab自动最小滚动」完成
-            userScrollEnabled = false,
             horizontalArrangement = Arrangement.spacedBy(18.dp),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -464,22 +461,7 @@ private fun CategoryChips(
                 .onGloballyPositioned { rowLeft = it.boundsInRoot().left },
         ) {
             items(categories.size, key = { categories[it].id }) { i ->
-                // 只完整显示Tab：被左右边缘裁掉一部分的Tab整体隐藏（不可见也不可点）
-                val layoutInfo = listState.layoutInfo
-                val info = layoutInfo.visibleItemsInfo.firstOrNull { it.index == i }
-                val fullyVisible = info != null &&
-                    info.offset >= layoutInfo.viewportStartOffset &&
-                    info.offset + info.size <= layoutInfo.viewportEndOffset
-                Box(modifier = Modifier.graphicsLayer { alpha = if (fullyVisible) 1f else 0f }) {
-                    CategoryChipPlain(
-                        categories[i].name,
-                        i,
-                        colorTargetIndex == i,
-                        rowLeft,
-                        chipOffsets,
-                        chipWidths,
-                    ) { idx -> if (fullyVisible) onSelect(idx) }
-                }
+                CategoryChipPlain(categories[i].name, i, colorTargetIndex == i, rowLeft, chipOffsets, chipWidths, onSelect)
             }
         }
 
