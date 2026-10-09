@@ -44,7 +44,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -404,17 +406,37 @@ private fun CategoryChips(
         }
     }
 
-    // 文字行：通栏+contentPadding，内容可滑到屏幕边缘，静止时最左Tab对齐搜索栏左边基准线；
-    // 纯文字Tab，无任何指示器
-    LazyRow(
-        state = listState,
-        contentPadding = PaddingValues(horizontal = horizontalPadding),
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().height(27.dp),
-    ) {
-        items(categories.size, key = { categories[it].id }) { i ->
-            CategoryChipPlain(categories[i].name, i, colorTargetIndex == i, onSelect)
+    // 文字行：通栏+contentPadding，内容可滑到屏幕边缘，静止时最左Tab对齐搜索栏左边基准线
+    Column(modifier = Modifier.fillMaxWidth()) {
+        LazyRow(
+            state = listState,
+            contentPadding = PaddingValues(horizontal = horizontalPadding),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().height(27.dp),
+        ) {
+            items(categories.size, key = { categories[it].id }) { i ->
+                CategoryChipPlain(categories[i].name, i, colorTargetIndex == i, onSelect)
+            }
+        }
+
+        // === 底部指示器（贴文字行下方）：高3dp，宽=选中Tab文字宽度（chip宽-两侧6dp内边距），
+        // 仅选中时出现，未选中不出现；切换直接显隐无移动动画；目标Tab滑出屏幕时隐藏
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp)) {
+            val density = LocalDensity.current
+            val textPadPx = with(density) { 6.dp.toPx() }
+            val info = listState.layoutInfo.visibleItemsInfo
+                .firstOrNull { it.index == colorTargetIndex }
+            if (info != null && info.size > textPadPx * 2) {
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer { translationX = info.offset + textPadPx }
+                        .width(with(density) { (info.size - textPadPx * 2).toDp() })
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+            }
         }
     }
 }
