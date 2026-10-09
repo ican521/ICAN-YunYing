@@ -8,6 +8,7 @@ import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.data.model.VideoCategory
+import com.ican.tvplay.data.remote.TvBoxSite
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -238,6 +239,19 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
 
     /** 配置中全部可切换站点 */
     suspend fun listSites() = videoRepository.listSites()
+
+    /** 站源「参与搜索」开关（fongmi 同款；返回切换后是否开启；配置锁定的站点返回 false 且不变） */
+    fun toggleSiteSearchable(site: TvBoxSite): Boolean = settings.toggleSiteSearchable(site)
+
+    /** 站源「播放失败自动换源」开关 */
+    fun toggleSiteChangeable(site: TvBoxSite): Boolean = settings.toggleSiteChangeable(site)
+
+    /** 开关是否开启（弹窗图标着色用） */
+    fun isSiteSearchable(site: TvBoxSite): Boolean = settings.isSiteSearchable(site)
+    fun isSiteChangeable(site: TvBoxSite): Boolean = settings.isSiteChangeable(site)
+
+    /** 开关版本号：弹窗 collect 后每次切换自动重组刷新图标 */
+    val siteToggleVersion: StateFlow<Int> = settings.siteToggleVersion
 
     /** 切换站源：仓库层会保存选择并重新加载分类，随后后台预热首页首屏 */
     fun switchSite(siteKey: String) {

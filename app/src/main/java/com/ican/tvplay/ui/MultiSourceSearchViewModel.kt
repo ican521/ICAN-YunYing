@@ -131,7 +131,10 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                 if (configUrl.isBlank()) return@launch
 
                 val config = apiClient.loadConfig(configUrl) ?: return@launch
-                val validSites = config.sites.filter { it.isSpider() || it.api.startsWith("http") }
+                // fongmi 同款：过滤在站源选择弹窗里被关掉「参与搜索」的站点
+                val validSites = config.sites.filter {
+                    (it.isSpider() || it.api.startsWith("http")) && settings.isSiteSearchable(it)
+                }
 
                 // 收集协程：站点结果到达即合并上屏（单线程合并，避免并发写丢条目）
                 val channel = kotlinx.coroutines.channels.Channel<SiteEntry>(kotlinx.coroutines.channels.Channel.UNLIMITED)

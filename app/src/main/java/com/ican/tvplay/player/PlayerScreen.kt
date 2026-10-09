@@ -88,6 +88,7 @@ import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.CircleBackButton
 import com.ican.tvplay.ui.components.CircleIconButton
+import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -219,8 +220,8 @@ fun PlayerScreen(
         initialized = true
     }
 
-    // 解析并播放
-    LaunchedEffect(initialized, episodeIndex, lineFlag) {
+    // 解析并播放（video 变化也触发：自动换站源后整片替换重解析）
+    LaunchedEffect(initialized, video, episodeIndex, lineFlag) {
         if (!initialized) return@LaunchedEffect
         if (resumeFromBackground) {
             // 后台续播接管：播放器已在播，无需重新解析
@@ -268,6 +269,67 @@ fun PlayerScreen(
         )
     }
 
+    // ---- 播放失败自动切换（fongmi VodFallbackPolicy：先换线路，再换站源） ----
+    // 已失败的线路/站点：本次播放会话内不再重试，避免循环
+    val failedFlags = remember(videoId) { mutableStateOf(setOf<String>()) }
+    val failedSiteKeys = remember(videoId) { mutableStateOf(setOf<String>()) }
+    var fallbackInProgress by remember { mutableStateOf(false) }
+
+    fun toastMsg(msg: String) {
+        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    LaunchedEffect(playerState.error) {
+        if (playerState.error == null || fallbackInProgress) return@LaunchedEffect
+        val v = video ?: return@LaunchedEffect
+        // 当前站点（跨站源缓存优先，兜底首页当前站）
+        val cached = Players.cachedVideo?.takeIf { it.video.id == v.id }
+        val curSite = cached?.site ?: container.videoRepository.currentSite.value?.site
+        // 当前站源未开「自动切换站源」→ 不兜底，走原错误提示
+        if (curSite == null || !container.settingsRepository.isSiteChangeable(curSite)) {
+            return@LaunchedEffect
+        }
+
+        // 1) 换下一条线路（同站源内）
+        val curFlag = playLine?.flag ?: v.playFrom
+        val flags = v.playSources.map { it.flag }
+        if (flags.size > 1) {
+            val nextFlag = flags.dropWhile { it != curFlag }.drop(1)
+                .firstOrNull { it !in failedFlags.value }
+            if (nextFlag != null) {
+                failedFlags.value = failedFlags.value + curFlag
+                toastMsg("播放失败，自动切换线路：$nextFlag")
+                lineFlag = nextFlag
+                return@LaunchedEffect
+            }
+        }
+
+        // 2) 换站源：跨站搜同名影片（仅「参与搜索 + 允许换源」的站点）
+        fallbackInProgress = true
+        try {
+            val curKey = cached?.siteKey ?: curSite.key
+            val candidate = container.videoRepository.searchFallbackCandidate(
+                title = v.title,
+                excludeSiteKeys = failedSiteKeys.value + curKey,
+            )
+            if (candidate != null) {
+                failedSiteKeys.value = failedSiteKeys.value + curKey
+                failedFlags.value = emptySet()
+                val newVideo = candidate.video
+                toastMsg("播放失败，自动切换站源：${siteShortName(candidate.site.name, candidate.site.key)}")
+                // 缓存新站点信息：解析 LaunchedEffect 据此走新站的 playerContent 延迟解析
+                Players.cacheVideo(newVideo, candidate.site.key, candidate.site, candidate.jarSpec)
+                val newEps = newVideo.playSources.firstOrNull()?.episodes ?: newVideo.episodes
+                episodeIndex = episodeIndex.coerceIn(0, (newEps.size - 1).coerceAtLeast(0))
+                lineFlag = ""
+                video = newVideo
+            }
+            // 无候选：保留原错误提示（error 未被清除，effect 不会重复触发）
+        } finally {
+            fallbackInProgress = false
+        }
+    }
+
     fun saveProgress() {
         val v = video ?: return
         val episode = lineEpisodes.getOrNull(episodeIndex) ?: return
@@ -302,10 +364,6 @@ fun PlayerScreen(
         duration < 15 * 60_000L -> 3 * 60_000L
         duration < 30 * 60_000L -> 6 * 60_000L
         else -> 10 * 60_000L
-    }
-
-    fun toastMsg(msg: String) {
-        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
     }
 
     /** 短按片头：把当前进度标记为片头（fongmi: canSetOpening + setOpening(position)） */

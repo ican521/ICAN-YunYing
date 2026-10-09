@@ -70,6 +70,7 @@ fun SettingsScreen(
     val configUrl by viewModel.configUrl.collectAsStateWithLifecycle()
     val siteName by viewModel.siteName.collectAsStateWithLifecycle()
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
+    val siteToggleVersion by viewModel.siteToggleVersion.collectAsStateWithLifecycle()
     var showConfigDialog by remember { mutableStateOf(false) }
     var showSiteDialog by remember { mutableStateOf(false) }
     var siteList by remember { mutableStateOf<List<TvBoxSite>>(emptyList()) }
@@ -224,6 +225,11 @@ fun SettingsScreen(
                 showSiteDialog = false
             },
             onDismiss = { showSiteDialog = false },
+            isSearchable = { viewModel.isSiteSearchable(it) },
+            isChangeable = { viewModel.isSiteChangeable(it) },
+            onToggleSearchable = { viewModel.toggleSiteSearchable(it) },
+            onToggleChangeable = { viewModel.toggleSiteChangeable(it) },
+            toggleVersion = siteToggleVersion,
         )
     }
 }
