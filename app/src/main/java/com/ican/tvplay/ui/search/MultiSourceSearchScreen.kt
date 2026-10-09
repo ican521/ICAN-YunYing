@@ -56,6 +56,7 @@ import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.CircleBackButton
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.theme.LightSurfaceVariant
 import com.ican.tvplay.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import androidx.tv.material3.Icon
@@ -381,7 +382,6 @@ private fun CrossSourceVideoCard(
     onClick: () -> Unit,
 ) {
     val (_, tags) = buildVideoStatus(video)
-    val sourceChipColor = hashColor(video.categoryName.ifBlank { siteName.ifBlank { "未知" } })
 
     Column(
         modifier = Modifier.tvCardEffect(
@@ -413,7 +413,7 @@ private fun CrossSourceVideoCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .background(sourceChipColor, RoundedCornerShape(percent = 50))
+                        .background(LightSurfaceVariant, RoundedCornerShape(percent = 50))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                 ) {
                     Text(
@@ -449,7 +449,7 @@ private fun CrossSourceVideoCard(
                                 Box(
                                     modifier = Modifier
                                         .background(
-                                            Color.White.copy(alpha = 0.2f),
+                                            LightSurfaceVariant,
                                             RoundedCornerShape(percent = 50),
                                         )
                                         .padding(horizontal = 6.dp, vertical = 1.dp),
@@ -476,9 +476,4 @@ private fun CrossSourceVideoCard(
             }
         }
     }
-}
-
-private fun hashColor(text: String): Color {
-    val hue = (text.hashCode() % 360 + 360) % 360
-    return Color.hsv(hue.toFloat(), 0.55f, 0.75f).copy(alpha = 0.92f)
 }
