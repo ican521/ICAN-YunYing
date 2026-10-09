@@ -144,21 +144,19 @@ fun HomeScreen(
 
         Spacer(Modifier.height(Spacing.categoryTabVertical))
 
-        // 固定分类 chips（不透明背景）
+        // 固定分类 chips（不透明背景）：通栏无左右padding，内容可滑到屏幕最边缘；
+        // 水平边距改为 LazyRow 的 contentPadding 传入，保证静止时最左Tab仍对齐页面基准线
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(
-                    start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-                ),
+                .background(MaterialTheme.colorScheme.background),
         ) {
             CategoryChips(
                 categories = categories,
                 selectedIndex = selectedIndex,
                 pagerState = pagerState,
                 tappedIndex = tappedChipIndex,
+                horizontalPadding = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
                 onSelect = onChipClick,
             )
         }
@@ -380,6 +378,7 @@ private fun CategoryChips(
     selectedIndex: Int,
     pagerState: androidx.compose.foundation.pager.PagerState,
     tappedIndex: Int?,
+    horizontalPadding: androidx.compose.ui.unit.Dp,
     onSelect: (Int) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -442,11 +441,13 @@ private fun CategoryChips(
     // 整个 Tab 区域总高度固定 30dp：文字行 27dp + 指示器 3dp（紧贴文字下方）
     Column(modifier = Modifier.fillMaxWidth().height(30.dp)) {
         // 文字行（无底色、无 pill，纯文字），高度 27dp，文字垂直居中
-        // 左右渐隐遮罩：两侧常显，文字/指示器滑入滑出遮罩区时自然渐隐渐显
-        val edgeFadeWidth = 24.dp
-        val fadeModifier = Modifier.edgeFade(edgeFadeWidth)
+        // 遮罩移到屏幕最边缘，宽度=页面水平边距：Tab滑过搜索栏左边线(16dp)时开始渐隐，
+        // 静止时最左Tab对齐基准线且完全清晰
+        val fadeModifier = Modifier.edgeFade(horizontalPadding)
         LazyRow(
             state = listState,
+            // 通栏+contentPadding：内容可滑到屏幕边缘，静止时首尾Tab仍对齐页面基准线
+            contentPadding = PaddingValues(horizontal = horizontalPadding),
             horizontalArrangement = Arrangement.spacedBy(18.dp),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
