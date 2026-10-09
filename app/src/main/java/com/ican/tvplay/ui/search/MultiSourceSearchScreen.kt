@@ -380,7 +380,7 @@ private fun CrossSourceVideoCard(
     siteName: String,
     onClick: () -> Unit,
 ) {
-    val (mainStatus, tags) = buildVideoStatus(video)
+    val (_, tags) = buildVideoStatus(video)
     val sourceChipColor = hashColor(video.categoryName.ifBlank { siteName.ifBlank { "未知" } })
 
     Column(
@@ -404,27 +404,13 @@ private fun CrossSourceVideoCard(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 右上角：站源标签 + 状态标签（如果有）
+            // 右上角：站源标签（黑底「已完结/更新至」状态胶囊已按需求移除）
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                if (mainStatus.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .background(Color(0xCC000000), RoundedCornerShape(percent = 50))
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                    ) {
-                        Text(
-                            text = mainStatus,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
                 Box(
                     modifier = Modifier
                         .background(sourceChipColor, RoundedCornerShape(percent = 50))
