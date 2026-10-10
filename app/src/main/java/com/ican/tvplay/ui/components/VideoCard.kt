@@ -3,11 +3,9 @@ package com.ican.tvplay.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -23,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.ui.theme.Spacing
-import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 
@@ -69,7 +66,19 @@ fun VideoCard(
                     ),
             )
 
-            // 评分角标（仅评分文字，五角星已移除）
+            // 左上角：年份胶囊（与右上角评分胶囊同款，顶部对齐）
+            Text(
+                text = "${video.year}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+
+            // 右上角：评分胶囊
             Text(
                 text = video.rating,
                 style = MaterialTheme.typography.labelSmall,
@@ -94,17 +103,5 @@ fun VideoCard(
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             )
         }
-
-        Text(
-            text = "${video.year} · ${video.categoryName}",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 10.dp, vertical = 7.dp),
-        )
     }
 }
