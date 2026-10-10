@@ -145,6 +145,9 @@ fun HomeScreen(
 
         Spacer(Modifier.height(Spacing.categoryTabVertical))
 
+        // 禁用分类 Tab 栏 + 内容 Pager 的边界 overscroll 回弹效果
+        CompositionLocalProvider(LocalOverscrollFactory provides null) {
+
         // 固定分类 chips（不透明背景）：通栏无左右padding，内容可滑到屏幕最边缘；
         // 水平边距改为 LazyRow 的 contentPadding 传入，保证静止时最左Tab仍对齐页面基准线
         Box(
@@ -167,8 +170,6 @@ fun HomeScreen(
         // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；
         // 每页数据完全独立于 selectedCategory（按 page index 从 categories 直接取对应分类 + 独立缓存），
         // 不再等 settle 同步后才更新 — 避免「目标页先显示旧内容再刷新」
-        // 禁用边界 overscroll 回弹效果
-        CompositionLocalProvider(LocalOverscrollFactory provides null) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
