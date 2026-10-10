@@ -28,11 +28,13 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -165,6 +167,8 @@ fun HomeScreen(
         // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；
         // 每页数据完全独立于 selectedCategory（按 page index 从 categories 直接取对应分类 + 独立缓存），
         // 不再等 settle 同步后才更新 — 避免「目标页先显示旧内容再刷新」
+        // 禁用边界 overscroll 回弹效果
+        CompositionLocalProvider(LocalOverscrollFactory provides null) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
@@ -227,6 +231,7 @@ fun HomeScreen(
                     }
                 }
             }
+        }
         }
     }
 }
