@@ -586,12 +586,11 @@ private fun FeaturedBanner(
             model = video.cover,
             contentDescription = video.title,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().height(200.dp),
+            modifier = Modifier.fillMaxSize(),
         )
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp)
+                .fillMaxSize()
                 .background(
                     Brush.horizontalGradient(
                         listOf(Color(0xE6070710), Color(0x33070710), Color.Transparent),
