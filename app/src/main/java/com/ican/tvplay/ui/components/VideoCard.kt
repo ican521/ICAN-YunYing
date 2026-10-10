@@ -3,6 +3,8 @@ package com.ican.tvplay.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -44,13 +46,13 @@ fun VideoCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .height(width * 4f / 3f),
+                .aspectRatio(3f / 4f),
         ) {
             AsyncImage(
                 model = video.cover,
                 contentDescription = video.title,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().height(width * 4f / 3f),
+                modifier = Modifier.fillMaxSize(),
             )
 
             // 底部渐变，保证标题可读
