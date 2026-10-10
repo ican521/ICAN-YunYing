@@ -19,6 +19,10 @@ data class FavoriteEntity(
     val cover: String,
     val categoryName: String,
     val addedAt: Long,
+    /** 视频所在站源 key：点击收藏时按此站源拉详情并播放（空 = 旧数据，兜底当前站） */
+    val sourceKey: String = "",
+    /** 站源显示名（仅取 | 前名称），收藏卡片右上角标签用 */
+    val sourceName: String = "",
 )
 
 /** 播放历史（含播放进度） */
@@ -82,7 +86,7 @@ interface HistoryDao {
 
 @Database(
     entities = [FavoriteEntity::class, HistoryEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -98,13 +102,21 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v2→v3：favorites 表增加站源 key/显示名列（旧收藏留空，播放时兜底当前站） */
+        private val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE favorites ADD COLUMN sourceKey TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE favorites ADD COLUMN sourceName TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 "tvplay.db",
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build()
     }

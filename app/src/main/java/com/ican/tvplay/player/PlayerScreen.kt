@@ -736,6 +736,15 @@ private fun PortraitPlayLayout(
                     isFav = newFav
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         if (newFav) {
+                            // 记录视频所在站源：点击收藏时按此站源拉详情并播放
+                            val cached = Players.cachedVideo
+                            val favSiteKey = cached?.siteKey ?: ""
+                            val favSiteName = v.sourceName.ifBlank {
+                                com.ican.tvplay.ui.components.siteShortName(
+                                    cached?.site?.name.orEmpty(),
+                                    favSiteKey,
+                                )
+                            }
                             container.favoriteDao.upsert(
                                 com.ican.tvplay.data.local.FavoriteEntity(
                                     videoId = v.id,
@@ -743,6 +752,8 @@ private fun PortraitPlayLayout(
                                     cover = v.cover,
                                     categoryName = v.categoryName,
                                     addedAt = System.currentTimeMillis(),
+                                    sourceKey = favSiteKey,
+                                    sourceName = favSiteName,
                                 ),
                             )
                         } else {
