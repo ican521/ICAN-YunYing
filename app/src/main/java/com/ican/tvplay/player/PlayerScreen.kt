@@ -871,21 +871,24 @@ private fun PortraitPlayLayout(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        // 年份/地区/类型（fongmi: other）
-        val meta = buildString {
-            if (v.year > 0) append("年份：${v.year}")
-            if (v.region.isNotBlank()) {
-                if (isNotEmpty()) append("  ")
-                append("地区：${v.region}")
-            }
-            if (v.categoryName.isNotBlank()) {
-                if (isNotEmpty()) append("  ")
-                append("类型：${v.categoryName}")
-            }
-        }
-        if (meta.isNotBlank()) {
+        // 年份/地区/类型各占一行（fongmi: other）
+        if (v.year > 0) {
             Text(
-                text = meta,
+                text = "年份：${v.year}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (v.region.isNotBlank()) {
+            Text(
+                text = "地区：${v.region}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (v.categoryName.isNotBlank()) {
+            Text(
+                text = "类型：${v.categoryName}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

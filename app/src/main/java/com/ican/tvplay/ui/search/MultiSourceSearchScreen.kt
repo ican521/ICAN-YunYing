@@ -439,11 +439,9 @@ private fun CrossSourceVideoCard(
                     .padding(horizontal = 10.dp, vertical = 10.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // 标签行
+                    // 标签行（标签连在一起排列，省空间）
                     if (tags.isNotEmpty()) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
+                        Row {
                             tags.take(3).forEach { tag ->
                                 Box(
                                     modifier = Modifier
