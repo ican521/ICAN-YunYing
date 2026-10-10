@@ -412,8 +412,8 @@ private fun CrossSourceVideoCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(percent = 50))
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                        .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
                     Text(
                         text = siteName.ifBlank { video.categoryName.ifBlank { "来源" } },
@@ -448,15 +448,15 @@ private fun CrossSourceVideoCard(
                                 Box(
                                     modifier = Modifier
                                         .background(
-                                            Color.Black.copy(alpha = 0.8f),
-                                            RoundedCornerShape(percent = 50),
+                                            Color(0x66000000),
+                                            RoundedCornerShape(Spacing.corner),
                                         )
-                                        .padding(horizontal = 6.dp, vertical = 1.dp),
+                                        .padding(horizontal = 6.dp, vertical = 2.dp),
                                 ) {
                                     Text(
                                         text = tag,
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White.copy(alpha = 0.9f),
+                                        color = Color.White,
                                         fontWeight = FontWeight.Medium,
                                     )
                                 }
