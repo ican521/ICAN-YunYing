@@ -21,14 +21,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.LocalOverscrollFactory
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -45,7 +45,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -74,6 +73,7 @@ import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     onVideoClick: (Video) -> Unit,
@@ -146,7 +146,7 @@ fun HomeScreen(
         Spacer(Modifier.height(Spacing.categoryTabVertical))
 
         // 禁用分类 Tab 栏 + 内容 Pager 的边界 overscroll 回弹效果
-        CompositionLocalProvider(LocalOverscrollFactory provides null) {
+        CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
 
         // 固定分类 chips（不透明背景）：通栏无左右padding，内容可滑到屏幕最边缘；
         // 水平边距改为 LazyRow 的 contentPadding 传入，保证静止时最左Tab仍对齐页面基准线
@@ -216,14 +216,6 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                     verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                 ) {
-                    pageVideos.value.firstOrNull()?.let { featured ->
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            FeaturedBanner(
-                                video = featured,
-                                onClick = { onVideoClick(featured) },
-                            )
-                        }
-                    }
                     gridItems(pageVideos.value, key = { it.id }) { video ->
                         VideoCardItem(
                             video = video,
@@ -455,40 +447,8 @@ private fun CategoryChips(
         val layoutInfo = listState.layoutInfo
         val item = layoutInfo.visibleItemsInfo.firstOrNull { it.index == colorTargetIndex }
         if (item == null) {
-            // 目标Tab完全未上屏：按可见项平均宽度估算最小滚动距离，动画滚过去后再按真实位置精确校正（无跳变）
-            val visible = layoutInfo.visibleItemsInfo
-            val avg = visible.map { it.size }.average().toFloat()
-            val gap = if (visible.size > 1) {
-                (visible[1].offset - visible[0].offset - visible[0].size).toFloat()
-            } else 0f
-            val step = avg + gap
-            val viewportStart = layoutInfo.viewportStartOffset
-            val viewportEnd = layoutInfo.viewportEndOffset
-            if (colorTargetIndex > visible.last().index) {
-                // 目标在右侧屏幕外：估算滚动量，让目标右缘刚好露出在视口右缘
-                val lastRight = visible.last().offset + visible.last().size
-                val estDelta = lastRight + (colorTargetIndex - visible.last().index) * step - viewportEnd
-                if (estDelta > 0f) listState.animateScrollBy(estDelta)
-                val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == colorTargetIndex }
-                if (info != null) {
-                    val d = info.offset + info.size - listState.layoutInfo.viewportEndOffset
-                    if (d != 0) listState.animateScrollBy(d.toFloat())
-                } else {
-                    listState.animateScrollToItem(colorTargetIndex)
-                }
-            } else {
-                // 目标在左侧屏幕外：估算滚动量，让目标左缘刚好露出在视口左缘
-                val firstLeft = visible.first().offset
-                val estDelta = firstLeft - (visible.first().index - colorTargetIndex) * step - viewportStart
-                if (estDelta < 0f) listState.animateScrollBy(estDelta)
-                val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == colorTargetIndex }
-                if (info != null) {
-                    val d = info.offset - listState.layoutInfo.viewportStartOffset
-                    if (d != 0) listState.animateScrollBy(d.toFloat())
-                } else {
-                    listState.animateScrollToItem(colorTargetIndex)
-                }
-            }
+            // 目标Tab完全未上屏：一次 animateScrollToItem 到位，避免"估算+校正"两次动画产生的反向回弹
+            listState.animateScrollToItem(colorTargetIndex)
         } else {
             val viewportStart = layoutInfo.viewportStartOffset
             val viewportEnd = layoutInfo.viewportEndOffset
@@ -571,86 +531,6 @@ private fun CategoryChipPlain(
             color = textColor,
             fontWeight = fontWeight,
         )
-    }
-}
-
-@Composable
-private fun FeaturedBanner(
-    video: Video,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(Spacing.corner)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-            .tvCardEffect(onClick = onClick, shape = shape)
-            // 大图首帧加载前的占位底色，避免切换时透底闪烁
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-    ) {
-        AsyncImage(
-            model = video.cover,
-            contentDescription = video.title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(Color(0xE6070710), Color(0x33070710), Color.Transparent),
-                    ),
-                ),
-        )
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(20.dp)
-                .fillMaxWidth(0.62f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = "今日推荐",
-                style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFF9FC0FF),
-            )
-            Text(
-                text = video.title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = video.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFFD6D6E4),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(percent = 50))
-                    .padding(horizontal = 18.dp, vertical = 8.dp),
-            ) {
-                Icon(
-                    imageVector = AppIcons.Play,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp),
-                )
-                Text(
-                    text = "立即播放",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White,
-                    modifier = Modifier.padding(start = 6.dp),
-                )
-            }
-        }
     }
 }
 
