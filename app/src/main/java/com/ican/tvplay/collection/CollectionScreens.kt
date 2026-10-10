@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -44,14 +46,17 @@ import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.launch
 
 @Composable
 fun FavoritesScreen(
-    onVideoClick: (String) -> Unit,
+    onPlay: (videoId: String, episodeIndex: Int, flag: String, preInitialized: Boolean) -> Unit,
     onBack: () -> Unit = {},
 ) {
     val viewModel = appViewModel { CollectionViewModel(this) }
     val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     // 编辑模式：控制卡片叉号显示 + 右上角按钮变红
     var editMode by remember { mutableStateOf(false) }
@@ -141,7 +146,25 @@ fun FavoritesScreen(
                                 // 编辑模式下点击卡片也触发单条删除（更方便）
                                 viewModel.removeFavorite(item.videoId)
                             } else {
-                                onVideoClick(item.videoId)
+                                // 按收藏记录的站源拉详情并直接进播放页（与搜索页点击卡片同链路）
+                                scope.launch {
+                                    val prepared = viewModel.prepareFavoritePlay(item)
+                                    if (prepared == null) {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "视频加载失败，站源可能已失效",
+                                            android.widget.Toast.LENGTH_SHORT,
+                                        ).show()
+                                    } else {
+                                        com.ican.tvplay.player.core.Players.cacheVideo(
+                                            prepared.video,
+                                            prepared.siteKey,
+                                            prepared.site,
+                                            prepared.jarSpec,
+                                        )
+                                        onPlay(prepared.video.id, 0, prepared.firstFlag, false)
+                                    }
+                                }
                             }
                         },
                         onDelete = { viewModel.removeFavorite(item.videoId) },
@@ -213,7 +236,7 @@ fun FavoritesScreen(
     }
 }
 
-/** 收藏卡片：editMode=true 时才显示右上角叉号 */
+/** 收藏卡片：样式与搜索详情页卡片一致（3:4 海报 + 右上角站源标签 + 底部渐变合并标签 + 标题），编辑模式叉号替换站源标签 */
 @Composable
 private fun FavoriteCard(
     entity: FavoriteEntity,
@@ -225,12 +248,14 @@ private fun FavoriteCard(
         modifier = Modifier.tvCardEffect(
             onClick = onClick,
             shape = RoundedCornerShape(Spacing.corner),
+            focusedScale = 1.05f,
         ),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(186.dp)
+                .aspectRatio(3f / 4f)
+                .clip(RoundedCornerShape(Spacing.corner))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             AsyncImage(
@@ -239,63 +264,93 @@ private fun FavoriteCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
+
+            // 右上角：站源标签（编辑模式下替换为删除叉号）
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))),
-                    ),
-            )
-            Text(
-                text = entity.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(10.dp),
-            )
-            // 仅编辑模式下显示叉号
-            if (editMode) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(30.dp)
-                        .tvCardEffect(
-                            onClick = onDelete,
-                            shape = CircleShape,
-                            focusedScale = 1.15f,
-                            glow = false,
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp),
+            ) {
+                if (editMode) {
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .tvCardEffect(
+                                onClick = onDelete,
+                                shape = CircleShape,
+                                focusedScale = 1.15f,
+                                glow = false,
+                            )
+                            .background(Color(0x88000000), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = AppIcons.Close,
+                            contentDescription = "删除",
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp),
                         )
-                        .background(Color(0x88000000), CircleShape),
-                    contentAlignment = Alignment.Center,
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            text = entity.sourceName.ifBlank { "来源" },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
+            // 底部渐变 + 合并标签胶囊 + 标题
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color(0xE6000000)),
+                        ),
+                    )
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+            ) {
+                androidx.compose.foundation.layout.Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Icon(
-                        imageVector = AppIcons.Close,
-                        contentDescription = "删除",
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp),
+                    if (entity.categoryName.isNotBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                text = entity.categoryName,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    Text(
+                        text = entity.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
         }
-        Text(
-            text = entity.categoryName.ifBlank { "收藏" },
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 10.dp, vertical = 7.dp),
-        )
     }
 }
 

@@ -9,6 +9,7 @@ import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.data.model.VideoCategory
 import com.ican.tvplay.data.remote.TvBoxSite
+import com.ican.tvplay.ui.components.siteShortName
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -117,6 +118,12 @@ class DetailViewModel(container: AppContainer) : ViewModel() {
             if (current) {
                 favoriteDao.delete(video.id)
             } else {
+                // 记录视频所在站源：点击收藏时按此站源拉详情并播放
+                val loaded = repo.currentSite.value
+                val siteKey = loaded?.site?.key.orEmpty()
+                val siteName = video.sourceName.ifBlank {
+                    siteShortName(loaded?.site?.name.orEmpty(), siteKey)
+                }
                 favoriteDao.upsert(
                     FavoriteEntity(
                         videoId = video.id,
@@ -124,6 +131,8 @@ class DetailViewModel(container: AppContainer) : ViewModel() {
                         cover = video.cover,
                         categoryName = video.categoryName,
                         addedAt = System.currentTimeMillis(),
+                        sourceKey = siteKey,
+                        sourceName = siteName,
                     ),
                 )
             }
@@ -175,12 +184,59 @@ class SearchViewModel(container: AppContainer) : ViewModel() {
 class CollectionViewModel(container: AppContainer) : ViewModel() {
     private val favoriteDao = container.favoriteDao
     private val historyDao = container.historyDao
+    private val settings = container.settingsRepository
+    private val spiderManager = container.spiderManager
+    private val apiClient = com.ican.tvplay.data.remote.VodApiClient()
 
     val favorites = favoriteDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val histories = historyDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 收藏点击播放的准备结果：带选集的完整视频 + 所在站点信息（播放页延迟解析需要） */
+    data class PreparedFavoritePlay(
+        val video: Video,
+        val siteKey: String,
+        val site: TvBoxSite?,
+        val jarSpec: String,
+        val firstFlag: String,
+    )
+
+    /**
+     * 点击收藏卡片：按收藏记录的站源 key 拉取完整详情（含选集），返回可缓存进播放器的数据。
+     * 旧收藏没有 sourceKey 时兜底当前站；站源已失效或详情拉取失败返回 null。
+     */
+    suspend fun prepareFavoritePlay(entity: FavoriteEntity): PreparedFavoritePlay? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val configUrl = settings.configUrl.value
+            if (configUrl.isBlank()) return@withContext null
+
+            val config = apiClient.loadConfig(configUrl) ?: return@withContext null
+            val site = config.sites.firstOrNull { it.key == entity.sourceKey }
+                ?: config.sites.firstOrNull { it.key == settings.siteKey.value }
+                ?: return@withContext null
+
+            val jarSpec = if (site.isSpider()) site.jar.ifBlank { config.spider } else ""
+            val item = runCatching {
+                if (site.isSpider()) {
+                    val spider = spiderManager.getSpider(site, jarSpec)
+                    if (spider != null) {
+                        com.ican.tvplay.data.remote.VodParse.parseVodListJson(
+                            spiderManager.detailContent(spider, listOf(entity.videoId)),
+                        ).firstOrNull()
+                    } else null
+                } else {
+                    apiClient.detail(site, entity.videoId)
+                }
+            }.getOrNull() ?: return@withContext null
+
+            val video = with(com.ican.tvplay.data.remote.VodParse) {
+                item.toVideo(withEpisodes = true)
+            }.copy(sourceName = entity.sourceName)
+            val firstFlag = video.playSources.firstOrNull()?.flag ?: video.playFrom
+            PreparedFavoritePlay(video, site.key, site, jarSpec, firstFlag)
+        }
 
     fun removeFavorite(videoId: String) {
         viewModelScope.launch { favoriteDao.delete(videoId) }
