@@ -69,28 +69,17 @@ fun VideoCard(
                     ),
             )
 
-            // 评分角标
-            Row(
+            // 评分角标（仅评分文字，五角星已移除）
+            Text(
+                text = video.rating,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(8.dp)
                     .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
                     .padding(horizontal = 6.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = AppIcons.Star,
-                    contentDescription = null,
-                    tint = Color(0xFFFFC53D),
-                    modifier = Modifier.size(12.dp),
-                )
-                Text(
-                    text = video.rating,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                    modifier = Modifier.padding(start = 2.dp),
-                )
-            }
+            )
 
             Text(
                 text = video.title,
