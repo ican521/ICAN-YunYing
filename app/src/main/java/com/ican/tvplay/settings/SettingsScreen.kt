@@ -49,7 +49,8 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
-import com.ican.tvplay.ui.components.topLevelContentPadding
+import com.ican.tvplay.ui.components.pageHorizontalPadding
+import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
@@ -92,16 +93,17 @@ fun SettingsScreen(
         }
     }
 
-    val padding = topLevelContentPadding()
+    val horizontal = pageHorizontalPadding()
+    val topPadding = topBarPadding().calculateTopPadding()
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(
-                start = Spacing.pageHorizontal,
-                end = Spacing.pageHorizontal,
-                top = padding.calculateTopPadding(),
-                bottom = padding.calculateBottomPadding(),
+                start = horizontal,
+                end = horizontal,
+                top = topPadding,
+                bottom = Spacing.bottomBarInset,
             ),
         verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
     ) {

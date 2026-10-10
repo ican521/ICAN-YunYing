@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.lazy.LazyColumn
@@ -54,7 +53,9 @@ import com.ican.tvplay.ui.MultiSourceSearchViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.CircleBackButton
+import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
+import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
 import kotlinx.coroutines.launch
@@ -101,13 +102,12 @@ fun MultiSourceSearchScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        // ========== 顶栏（左右边距对齐首页 topLevelContentPadding 的 16dp）==========
+        // ========== 顶栏（左右/顶部边距统一走全局基准：手机16dp、平板24dp）==========
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(start = Spacing.pageHorizontal, end = Spacing.pageHorizontal, top = Spacing.pageTop, bottom = 6.dp),
+                .padding(topBarPadding()),
         ) {
             CircleBackButton(onClick = onBack)
 
@@ -175,11 +175,12 @@ fun MultiSourceSearchScreen(
             }
         }
 
-        // ========== 主体：左站源列表 + 右卡片网格（左右边距对齐首页 16dp）==========
+        // ========== 主体：左站源列表 + 右卡片网格（左右边距与顶栏同一基准）==========
+        Spacer(Modifier.height(Spacing.searchBarBottomMargin))
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = Spacing.pageHorizontal),
+                .padding(horizontal = pageHorizontalPadding()),
         ) {
             // 左侧站源列表（纵向；顶部 4dp 与右侧网格第一行卡片齐平）
             LazyColumn(

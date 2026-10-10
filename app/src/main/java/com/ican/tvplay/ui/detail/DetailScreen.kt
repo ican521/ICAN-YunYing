@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -44,9 +42,12 @@ import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.ui.DetailViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.CircleBackButton
+import com.ican.tvplay.ui.components.CircleIconButton
+import com.ican.tvplay.ui.components.pageHorizontalPadding
+import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
-import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 
@@ -97,7 +98,8 @@ fun DetailScreen(
             onBack = onBack,
         )
 
-        // 主体：左 chips + 右卡片
+        // 主体：左 chips + 右卡片（左右基准线统一走全局水平边距）
+        val horizontal = pageHorizontalPadding()
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -108,6 +110,7 @@ fun DetailScreen(
                 allSources = allSources,
                 selectedLineIndex = selectedLineIndex,
                 onSelect = { selectedLineIndex = it },
+                startPadding = horizontal,
                 modifier = Modifier.fillMaxHeight(),
             )
 
@@ -117,7 +120,7 @@ fun DetailScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .padding(horizontal = Spacing.pageHorizontal, vertical = 12.dp),
+                    .padding(horizontal = horizontal, vertical = Spacing.titleContentGap),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                 verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
             ) {
@@ -159,10 +162,9 @@ private fun DetailTopBar(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(start = Spacing.pageHorizontal, end = Spacing.pageHorizontal, top = Spacing.pageTop, bottom = 8.dp),
+            .padding(topBarPadding()),
     ) {
-        CircleIconButton(icon = AppIcons.Back, contentDescription = "返回", onClick = onBack)
+        CircleBackButton(onClick = onBack)
         Text(
             text = video.title,
             style = MaterialTheme.typography.titleLarge,
@@ -190,12 +192,13 @@ private fun SourceFilterColumn(
     allSources: List<PlayLine>,
     selectedLineIndex: Int,
     onSelect: (Int) -> Unit,
+    startPadding: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .width(110.dp)
-            .padding(vertical = 8.dp),
+            .padding(start = startPadding, top = Spacing.titleContentGap),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         FilterChip(
@@ -227,7 +230,6 @@ private fun FilterChip(
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .padding(horizontal = 8.dp)
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false)
             .background(bg, shape)
             .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -397,48 +399,13 @@ private fun EpisodePickerDialog(
 // ========== 通用组件 ==========
 
 @Composable
-private fun CircleIconButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String?,
-    modifier: Modifier = Modifier,
-    tint: Color = MaterialTheme.colorScheme.onBackground,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(percent = 50)
-    Box(
-        modifier = modifier
-            .size(com.ican.tvplay.ui.theme.Spacing.circleButton)
-            .tvCardEffect(
-                onClick = onClick,
-                shape = shape,
-                focusedScale = 1.08f,
-                glow = false,
-            )
-            .background(MaterialTheme.colorScheme.surfaceVariant, shape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = tint,
-            modifier = Modifier.size(20.dp),
-        )
-    }
-}
-
-@Composable
 private fun DetailLoading(onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
-            .padding(start = 16.dp, top = Spacing.pageTop),
+            .padding(topBarPadding()),
     ) {
-        CircleIconButton(
-            icon = AppIcons.Back,
-            contentDescription = "返回",
-            onClick = onBack,
-        )
+        CircleBackButton(onClick = onBack)
     }
 }

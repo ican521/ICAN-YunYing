@@ -40,7 +40,8 @@ import com.ican.tvplay.ui.CollectionViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.CircleBackButton
-import com.ican.tvplay.ui.components.topLevelContentPadding
+import com.ican.tvplay.ui.components.pageHorizontalPadding
+import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
@@ -70,11 +71,7 @@ fun FavoritesScreen(
     ) {
         // 顶栏：标题 + 右上角圆形删除按钮（Tab 页无返回按钮）
         Row(
-            modifier = Modifier.padding(
-                top = topLevelContentPadding().calculateTopPadding(),
-                start = Spacing.pageHorizontal,
-                end = Spacing.pageHorizontal,
-            ),
+            modifier = Modifier.padding(topBarPadding()),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -129,8 +126,8 @@ fun FavoritesScreen(
                 columns = GridCells.Adaptive(132.dp),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = Spacing.pageHorizontal,
-                    end = Spacing.pageHorizontal,
+                    start = pageHorizontalPadding(),
+                    end = pageHorizontalPadding(),
                     top = Spacing.titleContentGap,
                     bottom = Spacing.bottomBarInset,
                 ),
@@ -373,11 +370,7 @@ fun HistoryScreen(
             .background(MaterialTheme.colorScheme.background),
     ) {
         Row(
-            modifier = Modifier.padding(
-                top = topLevelContentPadding().calculateTopPadding(),
-                start = Spacing.pageHorizontal,
-                end = Spacing.pageHorizontal,
-            ),
+            modifier = Modifier.padding(topBarPadding()),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -431,8 +424,8 @@ fun HistoryScreen(
                 columns = GridCells.Adaptive(132.dp),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = Spacing.pageHorizontal,
-                    end = Spacing.pageHorizontal,
+                    start = pageHorizontalPadding(),
+                    end = pageHorizontalPadding(),
                     top = Spacing.titleContentGap,
                     bottom = Spacing.bottomBarInset,
                 ),
@@ -516,150 +509,6 @@ fun HistoryScreen(
                 }
             }
         }
-    }
-}
-
-/** 收藏网格（复用统一骨架） */
-@Composable
-private fun <T> CollectionGridScaffold(
-    title: String,
-    items: List<T>,
-    emptyText: String,
-    onBack: () -> Unit = {},
-    idOf: (T) -> String,
-    coverOf: (T) -> String,
-    titleOf: (T) -> String,
-    subtitleOf: (T) -> String,
-    onClick: (T) -> Unit,
-    onDelete: (T) -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.padding(
-                top = topLevelContentPadding().calculateTopPadding(),
-                start = Spacing.pageHorizontal,
-                end = Spacing.pageHorizontal,
-            ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            CircleBackButton(onClick = onBack)
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-        }
-        if (items.isEmpty()) {
-            EmptyText(text = emptyText)
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(132.dp),
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = Spacing.pageHorizontal,
-                    end = Spacing.pageHorizontal,
-                    top = Spacing.titleContentGap,
-                    bottom = Spacing.bottomBarInset,
-                ),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
-                verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
-            ) {
-                items(items, key = idOf) { item ->
-                    CollectionCard(
-                        cover = coverOf(item),
-                        title = titleOf(item),
-                        subtitle = subtitleOf(item),
-                        onClick = { onClick(item) },
-                        onDelete = { onDelete(item) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CollectionCard(
-    cover: String,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    Column(
-        modifier = Modifier.tvCardEffect(
-            onClick = onClick,
-            shape = RoundedCornerShape(Spacing.corner),
-        ),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(186.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            AsyncImage(
-                model = cover,
-                contentDescription = title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))),
-                    ),
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(10.dp),
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(6.dp)
-                    .size(30.dp)
-                    .tvCardEffect(
-                        onClick = onDelete,
-                        shape = RoundedCornerShape(percent = 50),
-                        focusedScale = 1.1f,
-                        glow = false,
-                    )
-                    .background(Color(0x88000000), RoundedCornerShape(percent = 50)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = AppIcons.Close,
-                    contentDescription = "移除",
-                    tint = Color.White,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
-        }
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 10.dp, vertical = 7.dp),
-        )
     }
 }
 
