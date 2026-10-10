@@ -439,26 +439,24 @@ private fun CrossSourceVideoCard(
                     .padding(horizontal = 10.dp, vertical = 10.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // 标签行（标签连在一起排列，省空间）
+                    // 标签行（全部标签文字合并进同一个胶囊，省空间）
                     if (tags.isNotEmpty()) {
-                        Row {
-                            tags.take(3).forEach { tag ->
-                                Box(
-                                    modifier = Modifier
-                                        .background(
-                                            Color(0x66000000),
-                                            RoundedCornerShape(Spacing.corner),
-                                        )
-                                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                                ) {
-                                    Text(
-                                        text = tag,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Medium,
-                                    )
-                                }
-                            }
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    Color(0x66000000),
+                                    RoundedCornerShape(Spacing.corner),
+                                )
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                text = tags.take(3).joinToString(" "),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                     Text(
