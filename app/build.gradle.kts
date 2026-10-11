@@ -115,4 +115,7 @@ dependencies {
 
     // Gson：spider jar 内解密出的真实站点类依赖宿主提供（与 fongmi catvod 模块一致）
     implementation(libs.gson)
+
+    // NanoHTTPD：本地代理服务器（spider jar 返回 127.0.0.1/proxy 地址时由本服务中转拉流，fongmi 同款）
+    implementation(libs.nanohttpd)
 }

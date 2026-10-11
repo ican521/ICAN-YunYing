@@ -52,6 +52,9 @@ class SpiderManager(private val appContext: Context) {
         /** key = md5(jarUrl) → 已加载的 DexClassLoader */
         private val loaders = ConcurrentHashMap<String, DexClassLoader>()
 
+        /** key = md5(jarUrl) → jar 内 com.github.catvod.spider.Proxy.proxy(Map) 静态方法（可选存在） */
+        private val proxyMethods = ConcurrentHashMap<String, java.lang.reflect.Method>()
+
         /** key = md5(jarUrl) → guard jar 的 native loader 是否就绪（非 guard jar 记 true） */
         private val guardReady = ConcurrentHashMap<String, Boolean>()
 
@@ -210,8 +213,56 @@ class SpiderManager(private val appContext: Context) {
             }.onFailure { Log.e(TAG, "playerContent fail flag=$flag id=$id", it) }.getOrDefault("")
         }
 
+    /** 探测并缓存 jar 内 com.github.catvod.spider.Proxy.proxy(Map) 静态方法（fongmi JarLoader.invokeProxy 同款） */
+    private fun invokeProxy(loaderKey: String, loader: DexClassLoader) {
+        runCatching {
+            val clz = loader.loadClass("com.github.catvod.spider.Proxy")
+            val method = clz.getMethod("proxy", Map::class.java)
+            proxyMethods[loaderKey] = method
+            Log.d(TAG, "jar proxy method found: $loaderKey")
+        }
+    }
+
     /**
-     * 完整播放地址解析：spider 走 playerContent + 可选 jx/parse 二次解析，HTTP 站直接返回原 URL。
+     * 本地代理服务器收到 /proxy 请求时回调：把参数透传给 jar 的 Proxy.proxy(Map)。
+     * 优先调用最近加载的 jar（当前播放的站源），失败则遍历其余已加载 jar。
+     * 返回 jar 约定的 Array：{状态码(Int), MIME类型(String), InputStream, [可选]响应头Map}。
+     */
+    fun callProxy(params: Map<String, String>): Array<*>? {
+        if (proxyMethods.isEmpty()) return null
+        val method = proxyMethods.entries.first().value
+        runCatching {
+            val result = method.invoke(null, params) as? Array<*>
+            if (result != null) return result
+        }.onFailure { Log.w(TAG, "jar proxy fail (primary)", it) }
+        for (m in proxyMethods.values) {
+            if (m === method) continue
+            runCatching {
+                val result = m.invoke(null, params) as? Array<*>
+                if (result != null) return result
+            }
+        }
+        return null
+    }
+
+    /**
+     * 把 jar 返回的代理地址（127.0.0.1:端口 或 127.0.0.1:-1）替换为本机实际端口。
+     * 处理两种情形：
+     * 1. jar 未读取 Proxy.getPort() 直接写死 -1 → 用当前启动端口替换
+     * 2. jar 已拿到端口 → 原样返回（不需要替换）
+     */
+    private fun fixProxyUrl(url: String): String {
+        if (url.isBlank() || !url.startsWith("http://127.0.0.1")) return url
+        val port = com.github.catvod.Proxy.getPort()
+        if (port <= 0) return url
+        return if (url.contains("127.0.0.1:-1")) {
+            url.replace("127.0.0.1:-1", "127.0.0.1:$port")
+        } else {
+            url
+        }
+    }
+
+    /** 完整播放地址解析：spider 走 playerContent + 可选 jx/parse 二次解析，HTTP 站直接返回原 URL。
      * 供播放页延迟解析使用（某些网盘 jar 在 playerContent 时触发扫码弹窗，须在进入播放页后调用）。
      */
     suspend fun resolvePlayUrl(
@@ -240,10 +291,12 @@ class SpiderManager(private val appContext: Context) {
             val parse = obj["parse"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             val jx = obj["jx"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             Log.d(TAG, "resolvePlayUrl rawUrl=$rawUrl parse=$parse jx=$jx")
-            val finalUrl = if (com.ican.tvplay.data.remote.JxParser.needsParse(rawUrl, parse, jx)) {
-                com.ican.tvplay.data.remote.JxParser.resolve(rawUrl, headers).ifBlank { rawUrl }
+            val fixedUrl = fixProxyUrl(rawUrl)
+            if (fixedUrl != rawUrl) Log.d(TAG, "resolvePlayUrl proxy fixed: $fixedUrl")
+            val finalUrl = if (com.ican.tvplay.data.remote.JxParser.needsParse(fixedUrl, parse, jx)) {
+                com.ican.tvplay.data.remote.JxParser.resolve(fixedUrl, headers).ifBlank { fixedUrl }
             } else {
-                rawUrl
+                fixedUrl
             }
             com.ican.tvplay.data.PlaySource(url = finalUrl.ifBlank { playUrl }, headers = headers)
         }.getOrNull() ?: com.ican.tvplay.data.PlaySource(playUrl)
@@ -297,6 +350,7 @@ class SpiderManager(private val appContext: Context) {
                 // 与 fongmi JarLoader 一致：加载后立即调用 com.github.catvod.spider.Init.init(Context)
                 // （饭太硬等 guard jar 需要借此初始化 native loader；普通 jar 无该类则忽略）
                 invokeInit(loader)
+                invokeProxy(loaderKey, loader)
                 guardReady[loaderKey] = checkGuardReady(loader, loaderKey)
                 loaders[loaderKey] = loader
                 Log.d(TAG, "jar loaded: ${jarFile.absolutePath}")
