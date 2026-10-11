@@ -87,9 +87,10 @@ fun MultiSourceSearchScreen(
 
     var queryText by remember { mutableStateOf(initialQuery) }
 
-    // 首次进入时触发跨站搜索（initialQuery 非空才触发）
+    // 首次进入时触发跨站搜索（initialQuery 非空才触发）；
+    // 播放页返回时若已有同词结果则跳过，保持列表与滚动位置不变
     LaunchedEffect(initialQuery) {
-        if (initialQuery.isNotBlank()) vm.searchAll(initialQuery)
+        if (initialQuery.isNotBlank() && !vm.hasResultsFor(initialQuery)) vm.searchAll(initialQuery)
     }
 
     fun doSearch() {
