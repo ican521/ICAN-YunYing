@@ -86,7 +86,6 @@ import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.player.core.SubItem
 import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.components.AppIcons
-import com.ican.tvplay.ui.components.CircleBackButton
 import com.ican.tvplay.ui.components.CircleIconButton
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
@@ -680,7 +679,7 @@ private fun PortraitPlayLayout(
             .background(MaterialTheme.colorScheme.background),
     ) {
 
-    // === 视频播放区（顶部贴状态栏下沿；返回/标题/收藏悬浮叠加在画面顶部） ===
+    // === 视频播放区（顶部贴状态栏下沿；仅返回纯白图标悬浮在画面左上角） ===
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -710,66 +709,18 @@ private fun PortraitPlayLayout(
             onRelease = { view -> Players.unbindPlayerView(view) },
         )
 
-        // 悬浮顶栏：返回圆钮 + 标题 + 收藏圆钮，叠加在视频画面顶部（背景为画面，标题用白字+阴影）
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        // 悬浮顶栏：仅返回纯图标（无圆形底色，白色图标叠加在画面上）；
+        // 标题与收藏入口已移至下方信息流标题行
+        CircleIconButton(
+            icon = AppIcons.Back,
+            contentDescription = "返回",
+            tint = Color.White,
+            containerColor = Color.Transparent,
+            onClick = onBack,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 12.dp, end = 12.dp, top = 6.dp),
-        ) {
-            CircleBackButton(onClick = onBack)
-            Text(
-                text = current?.title.orEmpty(),
-                style = MaterialTheme.typography.titleMedium.copy(
-                    shadow = androidx.compose.ui.graphics.Shadow(
-                        color = Color.Black.copy(alpha = 0.6f),
-                        blurRadius = 8f,
-                    ),
-                ),
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-            )
-            // 收藏圆钮（与返回圆钮同尺寸同样式）
-            CircleIconButton(
-                icon = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
-                contentDescription = if (isFav) "取消收藏" else "收藏",
-                tint = if (isFav) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
-                onClick = {
-                    val v = current ?: return@CircleIconButton
-                    val newFav = !isFav
-                    isFav = newFav
-                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                        if (newFav) {
-                            // 记录视频所在站源：点击收藏时按此站源拉详情并播放
-                            val cached = Players.cachedVideo
-                            val favSiteKey = cached?.siteKey ?: ""
-                            val favSiteName = v.sourceName.ifBlank {
-                                com.ican.tvplay.ui.components.siteShortName(
-                                    cached?.site?.name.orEmpty(),
-                                    favSiteKey,
-                                )
-                            }
-                            container.favoriteDao.upsert(
-                                com.ican.tvplay.data.local.FavoriteEntity(
-                                    videoId = v.id,
-                                    title = v.title,
-                                    cover = v.cover,
-                                    categoryName = v.categoryName,
-                                    addedAt = System.currentTimeMillis(),
-                                    sourceKey = favSiteKey,
-                                    sourceName = favSiteName,
-                                ),
-                            )
-                        } else {
-                            container.favoriteDao.delete(v.id)
-                        }
-                    }
-                },
-            )
-        }
+                .align(Alignment.TopStart)
+                .padding(start = 12.dp, top = 6.dp),
+        )
 
         // 预览小窗控制层：单击视频区显示/隐藏（fongmi 同款交互）
         // 视频区已做 statusBarsPadding，控制层天然避让；全屏按钮独立常显在右下角
@@ -782,7 +733,7 @@ private fun PortraitPlayLayout(
                         indication = null,
                     ) { onToggleControls() },
             ) {
-                // 控制层：中部播放控制 + 底部进度条/全屏（返回/标题/收藏在视频区上方顶栏，不再覆盖画面）
+                // 控制层：中部播放控制 + 底部进度条/全屏（返回纯图标常驻视频区左上角，标题/收藏在下方信息流）
 
                 // 中部：上一集 / 播放暂停 / 下一集
                 Row(
@@ -866,15 +817,57 @@ private fun PortraitPlayLayout(
     ) {
         val v = current ?: return@Column
 
-        // 标题（fongmi: name，20sp 粗体，最多 3 行）
-        Text(
-            text = v.title,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // 标题 + 收藏按钮（收藏入口自视频区顶栏移至标题右侧，圆钮尺寸/样式不变）
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = v.title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            CircleIconButton(
+                icon = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
+                contentDescription = if (isFav) "取消收藏" else "收藏",
+                tint = if (isFav) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = {
+                    val newFav = !isFav
+                    isFav = newFav
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        if (newFav) {
+                            // 记录视频所在站源：点击收藏时按此站源拉详情并播放
+                            val cached = Players.cachedVideo
+                            val favSiteKey = cached?.siteKey ?: ""
+                            val favSiteName = v.sourceName.ifBlank {
+                                com.ican.tvplay.ui.components.siteShortName(
+                                    cached?.site?.name.orEmpty(),
+                                    favSiteKey,
+                                )
+                            }
+                            container.favoriteDao.upsert(
+                                FavoriteEntity(
+                                    videoId = v.id,
+                                    title = v.title,
+                                    cover = v.cover,
+                                    categoryName = v.categoryName,
+                                    addedAt = System.currentTimeMillis(),
+                                    sourceKey = favSiteKey,
+                                    sourceName = favSiteName,
+                                ),
+                            )
+                        } else {
+                            container.favoriteDao.delete(v.id)
+                        }
+                    }
+                },
+            )
+        }
 
         // 更新备注（fongmi: remark）
         val eps = v.playSources.firstOrNull()?.episodes ?: v.episodes
@@ -1288,7 +1281,7 @@ private fun FullscreenPlayLayout(
                         .statusBarsPadding()
                         .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp),
                 ) {
-                    CircleBtn(AppIcons.Back, "返回") { onExitFullscreen() }
+                    PlainTopBtn(AppIcons.Back, "返回") { onExitFullscreen() }
                     Text(
                         text = "${current?.title.orEmpty()} · 第${episodeIndex + 1}集",
                         style = MaterialTheme.typography.titleMedium,
@@ -1536,13 +1529,13 @@ private fun ControlChip(text: String, onClick: () -> Unit) {
     )
 }
 
+/** 全屏顶栏纯图标按钮：无圆形底色，仅白色图标（与同栏白色标题一致），保留点击热区与焦点缩放 */
 @Composable
-private fun CircleBtn(icon: ImageVector, desc: String, onClick: () -> Unit) {
+private fun PlainTopBtn(icon: ImageVector, desc: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(40.dp)
-            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.08f, glow = false)
-            .background(Color(0x55000000), CircleShape),
+            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.08f, glow = false),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, desc, tint = Color.White, modifier = Modifier.size(20.dp)) }
 }
