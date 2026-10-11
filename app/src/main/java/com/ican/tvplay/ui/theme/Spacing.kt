@@ -29,6 +29,13 @@ object Spacing {
     /** 首页顶部分类Tab的上下间距（搜索栏→Tab、Tab→内容区） */
     val categoryTabVertical = 10.dp
 
+    /**
+     * 搜索栏底部到下方第一个内容板块的垂直间距（全局统一，不随屏幕尺寸缩放）。
+     * 所有带搜索栏的页面（首页、搜索首页、搜索结果页等）必须复用此常量，
+     * 禁止各页面写死不同 dp 值。
+     */
+    val searchBarBottomMargin = 10.dp
+
     /** 板块内部标题与下方内容的间距 */
     val titleContentGap = 12.dp
 

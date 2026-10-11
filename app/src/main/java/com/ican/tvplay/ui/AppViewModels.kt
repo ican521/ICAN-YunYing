@@ -178,6 +178,10 @@ class SearchViewModel(container: AppContainer) : ViewModel() {
     fun clearHistory() {
         settings.clearSearchHistory()
     }
+
+    fun removeHistory(keyword: String) {
+        settings.removeSearchHistory(keyword)
+    }
 }
 
 /** 收藏 / 播放历史列表 */
