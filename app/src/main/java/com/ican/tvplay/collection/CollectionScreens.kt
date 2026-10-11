@@ -1,5 +1,6 @@
 package com.ican.tvplay.ui.collection
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -63,6 +64,9 @@ fun FavoritesScreen(
     var editMode by remember { mutableStateOf(false) }
     // 清空确认弹窗
     var showConfirm by remember { mutableStateOf(false) }
+
+    // 编辑模式下按返回 = 取消编辑（不退出页面）；清空弹窗打开时返回由弹窗自行消费
+    BackHandler(enabled = editMode && !showConfirm) { editMode = false }
 
     Column(
         modifier = Modifier
@@ -364,6 +368,10 @@ fun HistoryScreen(
     // 清空确认弹窗
     var showConfirm by remember { mutableStateOf(false) }
 
+    // 编辑模式下按返回 = 取消编辑（留在页面）；清空弹窗打开时返回由弹窗自行消费，
+    // 非编辑模式不拦截，保持原有返回上一页行为
+    BackHandler(enabled = editMode && !showConfirm) { editMode = false }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -374,7 +382,7 @@ fun HistoryScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            CircleBackButton(onClick = onBack)
+            CircleBackButton(onClick = { if (editMode) editMode = false else onBack() })
             Text(
                 text = "播放历史",
                 style = MaterialTheme.typography.headlineMedium,
