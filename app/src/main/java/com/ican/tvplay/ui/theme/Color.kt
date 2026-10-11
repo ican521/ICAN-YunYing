@@ -8,8 +8,8 @@ val BrandBlueDeep = Color(0xFF3361D8)
 val BrandTeal = Color(0xFF00E0C8)
 val BrandViolet = Color(0xFFB48CFF)
 
-// 深色主题
-val DarkBackground = Color(0xFF0B0B12)
+// 深色主题（全局背景纯黑）
+val DarkBackground = Color(0xFF000000)
 val DarkSurface = Color(0xFF16161F)
 val DarkSurfaceVariant = Color(0xFF1F1F2E)
 val DarkOnSurface = Color(0xFFEDEDF5)
