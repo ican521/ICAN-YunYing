@@ -512,6 +512,10 @@ fun HistoryScreen(
     }
 }
 
+/**
+ * 历史卡片：海报比例/圆角/渐变底/编辑叉号与 [FavoriteCard] 完全同款；
+ * 差异点：底部标签胶囊显示「看到的集数」（位于标题上方），标题下方保留播放进度细条。
+ */
 @Composable
 private fun HistoryCard(
     history: HistoryEntity,
@@ -524,16 +528,18 @@ private fun HistoryCard(
     } else {
         0f
     }
-    Column(
+    androidx.compose.foundation.layout.Column(
         modifier = Modifier.tvCardEffect(
             onClick = onClick,
             shape = RoundedCornerShape(Spacing.corner),
+            focusedScale = 1.05f,
         ),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(186.dp)
+                .aspectRatio(3f / 4f)
+                .clip(RoundedCornerShape(Spacing.corner))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             AsyncImage(
@@ -542,12 +548,13 @@ private fun HistoryCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-            // 仅编辑模式下显示叉号（与收藏卡片一致）
+
+            // 右上角：仅编辑模式显示删除叉号（与收藏卡片一致）
             if (editMode) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(6.dp)
+                        .padding(8.dp)
                         .size(30.dp)
                         .tvCardEffect(
                             onClick = onDelete,
@@ -566,36 +573,44 @@ private fun HistoryCard(
                     )
                 }
             }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(72.dp)
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6000000))),
-                    ),
-            )
+
+            // 底部渐变 + 集数胶囊（标题上方） + 标题 + 播放进度条
             Column(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
+                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color(0xE6000000)),
+                        ),
+                    )
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
+                // 看到的集数：胶囊样式与收藏卡片站源标签一致
+                Box(
+                    modifier = Modifier
+                        .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = history.episodeTitle.ifBlank { "第${history.episodeIndex + 1}集" },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Text(
                     text = history.title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    text = history.episodeTitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFFB9C6F0),
-                    maxLines = 1,
-                )
+                // 播放进度细条
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -611,16 +626,6 @@ private fun HistoryCard(
                 }
             }
         }
-        Text(
-            text = history.categoryName,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 10.dp, vertical = 7.dp),
-        )
     }
 }
 

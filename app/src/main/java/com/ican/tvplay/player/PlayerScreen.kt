@@ -344,22 +344,28 @@ fun PlayerScreen(
         Players.playbackContext?.takeIf { it.video.id == v.id }?.let {
             Players.playbackContext = it.copy(openingMs = openingMs, endingMs = endingMs)
         }
-        scope.launch {
-            container.historyDao.upsert(
-                HistoryEntity(
-                    videoId = v.id,
-                    title = v.title,
-                    cover = v.cover,
-                    categoryName = v.categoryName,
-                    episodeIndex = episodeIndex,
-                    episodeTitle = episode.title,
-                    positionMs = st.positionMs,
-                    durationMs = st.durationMs,
-                    updatedAt = System.currentTimeMillis(),
-                    openingMs = openingMs,
-                    endingMs = endingMs,
-                ),
-            )
+        // 必须走应用级 scope：onDispose（退出页面/切后台）时 rememberCoroutineScope 已取消，
+        // 用它 launch 会导致最后一次历史保存被静默丢弃（历史页空记录的根因）
+        container.appScope.launch {
+            runCatching {
+                container.historyDao.upsert(
+                    HistoryEntity(
+                        videoId = v.id,
+                        title = v.title,
+                        cover = v.cover,
+                        categoryName = v.categoryName,
+                        episodeIndex = episodeIndex,
+                        episodeTitle = episode.title,
+                        positionMs = st.positionMs,
+                        durationMs = st.durationMs,
+                        updatedAt = System.currentTimeMillis(),
+                        openingMs = openingMs,
+                        endingMs = endingMs,
+                    ),
+                )
+            }.onFailure {
+                android.util.Log.e("PlayerScreen", "history upsert failed: ${v.id} ep=$episodeIndex", it)
+            }
         }
     }
 
@@ -418,6 +424,20 @@ fun PlayerScreen(
         while (isActive) {
             delay(PROGRESS_SAVE_INTERVAL_MS)
             if (initialized) saveProgress()
+        }
+    }
+
+    // 开播即落一条历史（进度可为 0）：防止停留不足一个保存周期就退出导致历史页无记录。
+    // 每集只锚定一次；saveProgress 内部走应用级 scope，composition 销毁也能写完。
+    var historyAnchorKey by remember { mutableStateOf("") }
+    LaunchedEffect(initialized, video?.id, episodeIndex, lineFlag, playerState.playing) {
+        val v = video
+        if (initialized && v != null && playerState.playing) {
+            val key = "${v.id}#$episodeIndex#${lineFlag}"
+            if (historyAnchorKey != key) {
+                historyAnchorKey = key
+                saveProgress()
+            }
         }
     }
 
