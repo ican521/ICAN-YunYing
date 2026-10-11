@@ -89,6 +89,11 @@ dependencies {
 
     // Media3 / ExoPlayer：视频播放
     implementation(libs.androidx.media3.exoplayer)
+    // HLS(m3u8)/DASH(mpd)/SmoothStreaming：TVBox 站源绝大多数为 m3u8，
+    // DefaultMediaSourceFactory 靠反射加载这三个模块的 MediaSource.Factory，缺失即 ClassNotFoundException 闪退
+    implementation(libs.androidx.media3.exoplayer.hls)
+    implementation(libs.androidx.media3.exoplayer.dash)
+    implementation(libs.androidx.media3.exoplayer.smoothstreaming)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.common)
     // MediaSession + MediaStyle 通知栏控制（后台续播）

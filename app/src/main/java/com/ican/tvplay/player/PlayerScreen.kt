@@ -234,39 +234,46 @@ fun PlayerScreen(
         pendingPosition = 0L
 
         // 优先用上游（DetailScreen）提前解析好的 PlaySpec
-        val preResolved = Players.pendingPreStartSpec?.also { Players.pendingPreStartSpec = null }
-        val spec = if (preResolved != null) {
-            preResolved
-        } else {
-            val cached = Players.cachedVideo?.takeIf { it.video.id == v.id }
-            val source = if (cached?.site != null) {
-                // 跨站源：在播放页内解析（某些网盘 jar 在 playerContent 时触发扫码弹窗，
-                // 解析必须发生在进入播放页之后，弹窗时机才正确）
-                container.spiderManager.resolvePlayUrl(
-                    site = cached.site,
-                    jarSpec = cached.jarSpec,
-                    playUrl = episode.playUrl,
-                    flag = playLine?.flag ?: v.playFrom,
-                )
+        try {
+            val preResolved = Players.pendingPreStartSpec?.also { Players.pendingPreStartSpec = null }
+            val spec = if (preResolved != null) {
+                preResolved
             } else {
-                container.videoRepository.resolvePlaySource(v, episode, playLine?.flag ?: v.playFrom)
+                val cached = Players.cachedVideo?.takeIf { it.video.id == v.id }
+                val source = if (cached?.site != null) {
+                    // 跨站源：在播放页内解析（某些网盘 jar 在 playerContent 时触发扫码弹窗，
+                    // 解析必须发生在进入播放页之后，弹窗时机才正确）
+                    container.spiderManager.resolvePlayUrl(
+                        site = cached.site,
+                        jarSpec = cached.jarSpec,
+                        playUrl = episode.playUrl,
+                        flag = playLine?.flag ?: v.playFrom,
+                    )
+                } else {
+                    container.videoRepository.resolvePlaySource(v, episode, playLine?.flag ?: v.playFrom)
+                }
+                PlaySpec(url = source.url, headers = source.headers)
             }
-            PlaySpec(url = source.url, headers = source.headers)
+            // 注册播放上下文：通知栏展示 / 上一集下一集 / 后台片尾自动切集依赖
+            Players.playbackContext = Players.PlaybackContext(
+                video = v,
+                lineFlag = playLine?.flag ?: v.playFrom,
+                episodes = lineEpisodes,
+                episodeIndex = episodeIndex,
+                openingMs = openingMs,
+                endingMs = endingMs,
+            )
+            // start 内部已兜底同步异常；这里再包一层防止 spider/jx 解析或上下文构造异常导致闪退
+            Players.start(
+                context = context,
+                spec = spec,
+                startPositionMs = pos,
+            )
+        } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            android.util.Log.e("PlayerScreen", "resolve/play fail: ${v.id} ep=$episodeIndex", t)
+            Players.notifyError("播放地址解析失败，该站源可能不支持此影片，请切换线路或站源重试")
         }
-        // 注册播放上下文：通知栏展示 / 上一集下一集 / 后台片尾自动切集依赖
-        Players.playbackContext = Players.PlaybackContext(
-            video = v,
-            lineFlag = playLine?.flag ?: v.playFrom,
-            episodes = lineEpisodes,
-            episodeIndex = episodeIndex,
-            openingMs = openingMs,
-            endingMs = endingMs,
-        )
-        Players.start(
-            context = context,
-            spec = spec,
-            startPositionMs = pos,
-        )
     }
 
     // ---- 播放失败自动切换（fongmi VodFallbackPolicy：先换线路，再换站源） ----
@@ -826,6 +833,15 @@ private fun PortraitPlayLayout(
                 modifier = Modifier.align(Alignment.Center).size(36.dp),
             )
         }
+
+        // 播放/解析错误轻量提示（替代黑屏卡死；自动换源失败后停留在此提示）
+        if (playerState.error != null && !playerState.buffering) {
+            PlayerErrorOverlay(
+                message = playerState.error!!,
+                onBack = onBack,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
     }
 
     // === 阴影分割线 ===
@@ -1382,6 +1398,15 @@ private fun FullscreenPlayLayout(
             }
         }
 
+        // 播放/解析错误浮层（锁定状态下也显示，点击返回先退出全屏）
+        if (playerState.error != null && !playerState.buffering) {
+            PlayerErrorOverlay(
+                message = playerState.error!!,
+                onBack = onBack,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+
         // 动作栏对话框（与竖屏同款）
         if (showSpeed) {
             OptionDialog("倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
@@ -1736,6 +1761,61 @@ private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
 // ========== 视频加载失败全屏错误态 ==========
 
 /**
+ * 视频区内的轻量错误浮层（竖屏小窗 / 全屏共用）：
+ * 播放或解析失败时在画面中央显示具体原因 + 返回按钮，替代黑屏卡死，绝不闪退。
+ */
+@Composable
+private fun PlayerErrorOverlay(
+    message: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .padding(24.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xCC000000))
+            .padding(horizontal = 24.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            imageVector = AppIcons.Close,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(40.dp),
+        )
+        Text(
+            text = "无法播放",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
+        )
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.85f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Box(
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(MaterialTheme.colorScheme.primary)
+                .clickable { onBack() }
+                .padding(horizontal = 24.dp, vertical = 9.dp),
+        ) {
+            Text(
+                text = "返回",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+    }
+}
+
+/**
  * 当 VideoRepository.getVideo + Players.consumeCachedVideo 都查不到时，
  * 渲染这个全屏错误界面替代残缺的 PortraitPlayLayout（纯白底+只有控制按钮）。
  */
@@ -1770,12 +1850,11 @@ private fun PlayerErrorScreen(
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Text(
-                text = when {
-                    playerError != null -> "播放器错误：$playerError"
-                    else -> "未找到该视频（ID: $videoId），请返回重试或检查站源是否可用"
-                },
+                text = playerError
+                    ?: "未找到该视频（ID: $videoId），请返回重试或检查站源是否可用",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             Box(
                 modifier = Modifier
