@@ -4,9 +4,18 @@ import android.content.Context
 import com.ican.tvplay.data.local.AppDatabase
 import com.ican.tvplay.data.local.FavoriteDao
 import com.ican.tvplay.data.local.HistoryDao
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /** 应用级简易依赖容器 */
 class AppContainer(context: Context) {
+
+    /**
+     * 应用级协程域：退出播放页等 composition 销毁场景下，
+     * 进度/历史落库不能用 rememberCoroutineScope（会随页面取消），必须走这里
+     */
+    val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val database: AppDatabase by lazy { AppDatabase.create(context) }
 
