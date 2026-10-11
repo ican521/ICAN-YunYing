@@ -73,6 +73,7 @@ import com.ican.tvplay.ui.components.liquid.innerShadow
 import com.ican.tvplay.ui.components.liquid.lens
 import com.ican.tvplay.ui.components.liquid.rememberCombinedBackdrop
 import com.ican.tvplay.ui.components.liquid.vibrancy
+import com.ican.tvplay.ui.theme.DarkSurface
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.blur
@@ -222,7 +223,7 @@ fun FloatingBottomBar(
     // 深色模式关闭毛玻璃时：胶囊本体用不透明深灰 rgb(36,36,36)；
     // 毛玻璃开启保持半透明玻璃色，浅色模式保持主题 surfaceVariant
     val containerColor = when {
-        isInDark && !isBlurEnabled -> Color(0xFF242424)
+        isInDark && !isBlurEnabled -> DarkSurface
         isBlurEnabled -> surfaceContainer.copy(0.4f)
         else -> surfaceContainer
     }
