@@ -9,16 +9,20 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.ParserException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -335,7 +339,7 @@ object Players {
                 _state.value = _state.value.copy(error = null)  // 重试成功后清掉错误提示
                 return
             }
-            _state.value = _state.value.copy(error = error.errorCodeName)
+            _state.value = _state.value.copy(error = describeError(error))
         }
     }
 
@@ -364,8 +368,20 @@ object Players {
         currentSpec = spec
         retryCount = 0  // 新源重置错误计数
         _state.value = _state.value.copy(error = null)  // 新源开播清除旧错误，避免换源后错误页残留
-        val p = ensurePlayer()
-        startInternal(p, spec, startPositionMs)
+        try {
+            val p = ensurePlayer()
+            startInternal(p, spec, startPositionMs)
+        } catch (t: Throwable) {
+            // 流媒体模块缺失（ClassNotFound）、MediaSource 构造失败等同步异常一律转错误页，禁止闪退
+            Log.e(TAG, "start fail url=${spec.url.take(120)}", t)
+            notifyError(describeError(t))
+        }
+    }
+
+    /** 播放页解析阶段（spider playerContent / jx 二次解析）致命错误上报：转错误页提示而不是崩溃 */
+    fun notifyError(message: String) {
+        Log.e(TAG, "notifyError: $message")
+        _state.value = _state.value.copy(error = message)
     }
 
     /** 退出播放页但继续后台播放（保活开关开启）：解绑视图，播放器保持，转交前台服务 */
@@ -581,7 +597,13 @@ object Players {
         playerView?.let { it.player = p }
         if (spec != null) {
             retryCount = 0    // 重建后重置错误计数
-            startInternal(p, spec, pos)
+            try {
+                startInternal(p, spec, pos)
+            } catch (t: Throwable) {
+                Log.e(TAG, "rebuild startInternal fail", t)
+                notifyError(describeError(t))
+                return
+            }
             if (!wasPlaying) p.pause()
         }
     }
@@ -609,8 +631,10 @@ object Players {
                 retryCount++
                 Log.w(TAG, "container error, retry as m3u8")
                 currentSpec = spec.copy(format = MimeTypes.APPLICATION_M3U8)
-                player?.let { startInternal(it, currentSpec!!, it.currentPosition) }
-                return true
+                val p = player ?: return false
+                return runCatching { startInternal(p, currentSpec!!, p.currentPosition) }
+                    .onFailure { Log.e(TAG, "retry as m3u8 fail", it); notifyError(describeError(it)) }
+                    .isSuccess
             }
             PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
             PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
@@ -620,8 +644,10 @@ object Players {
                 retryCount++
                 Log.w(TAG, "manifest error, retry without mimeType")
                 currentSpec = spec.copy(format = null)
-                player?.let { startInternal(it, currentSpec!!, it.currentPosition) }
-                return true
+                val p = player ?: return false
+                return runCatching { startInternal(p, currentSpec!!, p.currentPosition) }
+                    .onFailure { Log.e(TAG, "retry without mimeType fail", it); notifyError(describeError(it)) }
+                    .isSuccess
             }
             PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> {
                 player?.seekToDefaultPosition()
@@ -630,6 +656,59 @@ object Players {
             }
         }
         return false
+    }
+
+    /**
+     * 把任意播放/解析异常归类成用户可读的具体中文提示。
+     * 先沿 cause 链识别网络层具体异常（HTTP 状态码/DNS/超时/内容类型/解析器），
+     * 再按 PlaybackException.errorCode 兜底。
+     */
+    private fun describeError(t: Throwable): String {
+        var c: Throwable? = t
+        while (c != null) {
+            when (c) {
+                is HttpDataSource.InvalidResponseCodeException -> return when (c.responseCode) {
+                    401, 403 -> "视频地址鉴权失败（HTTP ${c.responseCode}），该站源可能需要权限、Cookie 或已失效"
+                    404 -> "视频地址不存在（HTTP 404），该资源可能已下架"
+                    in 500..599 -> "源站服务器异常（HTTP ${c.responseCode}），请稍后重试或切换站源"
+                    else -> "源站拒绝访问（HTTP ${c.responseCode}），请切换线路或站源"
+                }
+                is UnknownHostException -> return "无法连接视频源站（域名解析失败），请检查网络后重试"
+                is SocketTimeoutException -> return "连接视频源站超时，请切换网络或站源后重试"
+                is ParserException -> return "视频内容解析失败，地址可能已失效或不是真实播放地址"
+                is ClassNotFoundException, is NoClassDefFoundError ->
+                    return "当前视频格式缺少播放组件支持，请更新 App 后重试"
+            }
+            c = c.cause
+        }
+        val pe = t as? PlaybackException
+        return when (pe?.errorCode) {
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+            -> "网络连接失败，请检查网络或稍后重试"
+            PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE ->
+                "返回内容不是视频流（可能是网页或验证页），该站源解析失败"
+            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
+                "源站拒绝访问该视频地址，请切换线路或站源"
+            PlaybackException.ERROR_CODE_IO_NO_PERMISSION ->
+                "没有网络访问权限，请检查 App 联网设置"
+            PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED ->
+                "该站源使用不安全的明文 HTTP 地址，无法播放"
+            PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+            PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
+            -> "当前视频格式暂不支持，请切换线路或站源"
+            PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+            PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
+            -> "视频数据损坏或地址已失效，请切换线路重试"
+            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+            PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
+            PlaybackException.ERROR_CODE_DECODING_FAILED,
+            -> "视频解码失败，可在播放菜单切换为软解后重试"
+            PlaybackException.ERROR_CODE_TIMEOUT -> "视频加载超时，请切换网络或站源后重试"
+            else -> pe?.errorCodeName?.let { "播放失败：$it" }
+                ?: (t.message?.takeIf { it.isNotBlank() }?.let { "播放失败：${it.take(60)}" }
+                    ?: "播放失败，请切换线路或站源重试")
+        }
     }
 
     private fun collectOptions(tracks: Tracks, trackType: @C.TrackType Int): List<TrackOption> {
