@@ -191,6 +191,14 @@ class SettingsRepository(context: Context) {
         _searchHistory.value = emptyList()
     }
 
+    fun removeSearchHistory(query: String) {
+        val q = query.trim()
+        if (q.isEmpty()) return
+        val updated = _searchHistory.value.filter { it != q }
+        prefs.edit().putStringSet(KEY_SEARCH_HISTORY, updated.toSet()).apply()
+        _searchHistory.value = updated
+    }
+
     private companion object {
         const val KEY_THEME = "theme_mode"
         const val KEY_DYNAMIC_COLOR = "dynamic_color"

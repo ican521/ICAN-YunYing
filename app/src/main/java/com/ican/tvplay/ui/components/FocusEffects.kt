@@ -4,10 +4,11 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -22,6 +23,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
+import com.ican.tvplay.ui.theme.LocalDarkTheme
 
 /** 按下立刻渐显时长（毫秒） */
 const val PRESS_FADE_IN_MS = 200
@@ -36,6 +38,7 @@ const val PRESS_FADE_OUT_MS = 250
  * 2. 触摸按压：高亮蒙层 200ms 渐显，按住保持，松手 250ms 渐隐；
  * 3. indication = null，彻底禁用系统默认水波纹。
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Modifier.tvCardEffect(
     onClick: () -> Unit,
@@ -43,6 +46,7 @@ fun Modifier.tvCardEffect(
     focusedScale: Float = 1.07f,
     glow: Boolean = true,
     enabled: Boolean = true,
+    onLongClick: (() -> Unit)? = null,
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -69,11 +73,12 @@ fun Modifier.tvCardEffect(
     )
 
     val accent = MaterialTheme.colorScheme.primary
+    val isDark = LocalDarkTheme.current
 
     return this
         .scale(scale)
         .then(
-            if (glow) {
+            if (glow && !isDark) {
                 Modifier.shadow(
                     elevation = if (focused) 18.dp else 6.dp,
                     shape = shape,
@@ -86,11 +91,12 @@ fun Modifier.tvCardEffect(
             },
         )
         .clip(shape)
-        .clickable(
+        .combinedClickable(
             interactionSource = interactionSource,
             indication = null,
             enabled = enabled,
             onClick = onClick,
+            onLongClick = onLongClick,
         )
         .drawWithContent {
             drawContent()

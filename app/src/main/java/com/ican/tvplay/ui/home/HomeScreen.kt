@@ -143,7 +143,7 @@ fun HomeScreen(
             )
         }
 
-        Spacer(Modifier.height(Spacing.categoryTabVertical))
+        Spacer(Modifier.height(Spacing.searchBarBottomMargin))
 
         // 禁用分类 Tab 栏 + 内容 Pager 的边界 overscroll 回弹效果
         CompositionLocalProvider(LocalOverscrollConfiguration provides null) {

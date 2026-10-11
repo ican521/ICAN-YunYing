@@ -7,7 +7,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -17,6 +19,9 @@ import androidx.tv.material3.MaterialTheme as TvMaterialTheme
 import androidx.tv.material3.darkColorScheme
 import androidx.tv.material3.lightColorScheme
 import com.ican.tvplay.data.ThemeMode
+
+/** 当前是否为深色主题（跟随用户选择的 ThemeMode，而非仅系统设置） */
+val LocalDarkTheme = compositionLocalOf { false }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 private val TvDarkColors = darkColorScheme(
@@ -109,5 +114,7 @@ fun TvPlayTheme(
         }
     }
 
-    TvMaterialTheme(colorScheme = colors, content = content)
+    TvMaterialTheme(colorScheme = colors) {
+        CompositionLocalProvider(LocalDarkTheme provides dark, content = content)
+    }
 }
