@@ -10,7 +10,8 @@ val BrandViolet = Color(0xFFB48CFF)
 
 // 深色主题（全局背景纯黑）
 val DarkBackground = Color(0xFF000000)
-val DarkSurface = Color(0xFF16161F)
+// 深色模式板块/弹窗统一容器色 rgb(36,36,36)（设置板块、各类 Dialog、关闭毛玻璃时的底栏胶囊均引用此色）
+val DarkSurface = Color(0xFF242424)
 val DarkSurfaceVariant = Color(0xFF1F1F2E)
 val DarkOnSurface = Color(0xFFEDEDF5)
 val DarkOnSurfaceMuted = Color(0xFFA6A6BA)
