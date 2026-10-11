@@ -109,6 +109,15 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
     }
 
     /**
+     * 是否已有该关键词的有效搜索结果：播放页返回本页时用于跳过重复搜索，
+     * 避免清空列表导致重新加载与滚动位置丢失
+     */
+    fun hasResultsFor(keyword: String): Boolean {
+        val key = keyword.trim()
+        return key.isNotEmpty() && _query.value == key && (_sites.value.isNotEmpty() || _loading.value)
+    }
+
+    /**
      * 跨全部站点并行搜索，结果流式上屏：每个站点一返回立即合入列表（fongmi 式"边搜边出"），
      * 慢站/坏站不拖住其他站点结果的展示。
      */
