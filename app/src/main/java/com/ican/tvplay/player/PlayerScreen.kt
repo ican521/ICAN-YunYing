@@ -35,6 +35,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -148,6 +150,17 @@ fun PlayerScreen(
     var controlsTick by remember { mutableIntStateOf(0) }
     var locked by remember { mutableStateOf(false) }
     var fullscreen by remember { mutableStateOf(false) }
+    // 全屏挂起状态（fongmi 同款时序：先请求系统旋转，旋转完成后再切换布局）
+    // true=等待旋转进全屏 false=等待旋转退全屏 null=无挂起，
+    // 避免"竖屏先铺满再旋转"的割裂感
+    var pendingFullscreen by remember { mutableStateOf<Boolean?>(null) }
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    LaunchedEffect(isLandscape) {
+        when {
+            pendingFullscreen == true && isLandscape -> { fullscreen = true; pendingFullscreen = null }
+            pendingFullscreen == false && !isLandscape -> { fullscreen = false; pendingFullscreen = null }
+        }
+    }
 
     // 共享 PlayerView（fongmi 同思路：全屏/竖屏只是改容器尺寸，PlayerView 从不销毁重建）。
     // 常驻唯一 AndroidView，竖屏↔全屏↔画中画切换时 Surface 不销毁，消除切换黑屏
@@ -480,18 +493,16 @@ fun PlayerScreen(
         }
     }
 
-    // 全屏切换时请求横屏 + 自动收起/恢复状态栏
+    // 全屏布局切换时自动收起/恢复状态栏（旋转请求在挂起触发处先行发出）
     LaunchedEffect(fullscreen) {
         Players.isFullscreen = fullscreen
         val activity = context as? Activity ?: return@LaunchedEffect
         val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         if (fullscreen) {
-            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             // 沉浸式：隐藏状态栏，从边缘上滑可临时唤出
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             controller.hide(WindowInsetsCompat.Type.statusBars())
         } else {
-            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             controller.show(WindowInsetsCompat.Type.statusBars())
         }
     }
@@ -550,7 +561,9 @@ fun PlayerScreen(
 
     fun handleBack() {
         if (fullscreen) {
-            fullscreen = false
+            // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
+            (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            pendingFullscreen = false
             return
         }
         // release / 后台续播转交由 onDispose 统一处理（popBackStack 后触发）
@@ -667,7 +680,12 @@ fun PlayerScreen(
             onTogglePlay = { Players.playPause() },
             onPrev = { if (episodeIndex > 0) episodeIndex-- },
             onNext = { if (episodeIndex < lineEpisodes.size - 1) episodeIndex++ },
-            onEnterFullscreen = { controlsTick++; fullscreen = true },
+            onEnterFullscreen = {
+                controlsTick++
+                // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
+                (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                pendingFullscreen = true
+            },
             onLockToggle = { locked = true; controlsVisible = false },
             onUnlock = { locked = false; controlsVisible = true },
             onBack = { handleBack() },
