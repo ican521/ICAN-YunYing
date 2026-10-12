@@ -52,13 +52,11 @@ object Players {
     /** 解码内核 */
     enum class Decode(val label: String) { HARD("硬解"), SOFT("软解") }
 
-    /** 画面缩放（resizeMode 用 AspectRatioFrameLayout 常量；ratio=0 表示跟随视频原始比例） */
+    /** 画面缩放（resizeMode 用 AspectRatioFrameLayout 常量；ratio=0 表示跟随视频原始比例），命名对齐 fongmi select_scale */
     enum class ScaleMode(val label: String, val resizeMode: Int, val ratio: Float) {
-        FIT("适应", androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT, 0f),
+        FIT("原始", androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT, 0f),
         FILL("填充", androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL, 0f),
-        ZOOM("原始", androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM, 0f),
-        R16_9("16:9", androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT, 16f / 9f),
-        R4_3("4:3", androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT, 4f / 3f),
+        ZOOM("裁剪", androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM, 0f),
     }
 
     /** 缓冲档位（默认缓冲时长倍率） */

@@ -144,6 +144,8 @@ fun PlayerScreen(
 
     // 控制层状态
     var controlsVisible by remember { mutableStateOf(true) }
+    // 控制层交互计数：动作栏按钮点击时自增，重置 5 秒自动隐藏计时（fongmi setR1Callback 同款）
+    var controlsTick by remember { mutableIntStateOf(0) }
     var locked by remember { mutableStateOf(false) }
     var fullscreen by remember { mutableStateOf(false) }
 
@@ -457,8 +459,8 @@ fun PlayerScreen(
         }
     }
 
-    // 自动隐藏控制层
-    LaunchedEffect(controlsVisible, locked, playerState.playing) {
+    // 自动隐藏控制层（fongmi 同款：显示后 5 秒无操作隐藏，交互重置计时）
+    LaunchedEffect(controlsVisible, locked, playerState.playing, controlsTick) {
         if (!controlsVisible || locked) return@LaunchedEffect
         if (playerState.playing) {
             delay(HIDE_DELAY_MS)
@@ -599,6 +601,7 @@ fun PlayerScreen(
             controlsVisible = controlsVisible,
             locked = locked,
             onToggleControls = { controlsVisible = !controlsVisible },
+            onControlInteract = { controlsTick++ },
             onTogglePlay = { Players.playPause() },
             onPrev = { if (episodeIndex > 0) episodeIndex-- },
             onNext = { if (episodeIndex < lineEpisodes.size - 1) episodeIndex++ },
@@ -1119,6 +1122,7 @@ private fun FullscreenPlayLayout(
     controlsVisible: Boolean,
     locked: Boolean,
     onToggleControls: () -> Unit,
+    onControlInteract: () -> Unit,
     onTogglePlay: () -> Unit,
     onPrev: () -> Unit,
     onNext: () -> Unit,
@@ -1382,32 +1386,35 @@ private fun FullscreenPlayLayout(
                             .padding(horizontal = 8.dp),
                     ) {
                         // 左组：解码（显示当前值，点击直接切换）/ 缓冲 / 重播 / 倍速 / 缩放（点击循环切换）
+                        // 点击动作栏按钮重置 5 秒自动隐藏计时（fongmi setR1Callback 同款），不立即消失
                         ActionBtn(playerState.decode.label) {
                             onDecodeChange(
                                 if (playerState.decode == Players.Decode.HARD) Players.Decode.SOFT
                                 else Players.Decode.HARD,
                             )
+                            onControlInteract()
                         }
-                        ActionBtn("缓冲") { showBuffer = true }
-                        ActionBtn("重播") { Players.seekTo(0) }
-                        ActionBtn("倍速") { showSpeed = true }
+                        ActionBtn("缓冲") { showBuffer = true; onControlInteract() }
+                        ActionBtn("重播") { Players.seekTo(0); onControlInteract() }
+                        ActionBtn("倍速") { showSpeed = true; onControlInteract() }
                         ActionBtn(playerState.scaleMode.label) {
                             val modes = Players.ScaleMode.entries
                             onScaleChange(modes[(playerState.scaleMode.ordinal + 1) % modes.size])
+                            onControlInteract()
                         }
                         Spacer(modifier = Modifier.weight(1f))
                         // 右组：字幕 / 音轨 / 片头 / 片尾（点击标记当前位置，长按清除）
-                        ActionBtn("字幕") { showText = true }
-                        ActionBtn("音轨") { showAudio = true }
+                        ActionBtn("字幕") { showText = true; onControlInteract() }
+                        ActionBtn("音轨") { showAudio = true; onControlInteract() }
                         ActionBtn(
                             if (openingMs > 0) formatMs(openingMs) else "片头",
                             onLongClick = onClearOpening,
-                            onClick = onMarkOpening,
+                            onClick = { onMarkOpening(); onControlInteract() },
                         )
                         ActionBtn(
                             if (endingMs > 0) formatMs(endingMs) else "片尾",
                             onLongClick = onClearEnding,
-                            onClick = onMarkEnding,
+                            onClick = { onMarkEnding(); onControlInteract() },
                         )
                     }
                 }
@@ -1894,4 +1901,4 @@ private fun PlayerErrorScreen(
         }
     }
 }
-private const val HIDE_DELAY_MS = 4_000L
+private const val HIDE_DELAY_MS = 5_000L
