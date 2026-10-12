@@ -528,7 +528,7 @@ fun PlayerScreen(
     }
     BackHandler(enabled = true) { handleBack() }
 
-    // PiP 画中画：窗口是整个 Activity 缩小画面，渲染视频 + 暂停/上下集控件
+    // PiP 画中画：窗口是整个 Activity 缩小画面，只渲染纯视频（隐藏全部 UI）
     if (inPip) {
         Box(
             modifier = Modifier
@@ -548,41 +548,6 @@ fun PlayerScreen(
                 onRelease = { view -> Players.unbindPlayerView(view) },
                 modifier = Modifier.fillMaxSize(),
             )
-            // 半透明控制层：上一集 / 播放暂停 / 下一集
-            Row(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val canPrev = episodeIndex > 0
-                val canNext = episodeIndex < lineEpisodes.size - 1
-                Icon(
-                    imageVector = AppIcons.SkipPrev,
-                    contentDescription = "上一集",
-                    tint = if (canPrev) Color.White else Color.White.copy(alpha = 0.3f),
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clickable { if (canPrev) episodeIndex-- },
-                )
-                Icon(
-                    imageVector = if (playerState.playing) AppIcons.Pause else AppIcons.Play,
-                    contentDescription = if (playerState.playing) "暂停" else "播放",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clickable { Players.playPause() },
-                )
-                Icon(
-                    imageVector = AppIcons.SkipNext,
-                    contentDescription = "下一集",
-                    tint = if (canNext) Color.White else Color.White.copy(alpha = 0.3f),
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clickable { if (canNext) episodeIndex++ },
-                )
-            }
         }
         return
     }
