@@ -14,9 +14,6 @@ object Routes {
     const val SETTINGS = "settings"
     const val COLOR_PALETTE = "color_palette"
 
-    const val DETAIL_PATTERN = "detail/{videoId}"
-    fun detail(videoId: String) = "detail/$videoId"
-
     /** 跨站源搜索结果页：query 参数是搜索关键词 */
     const val MULTI_SEARCH_PATTERN = "multi_search?query={query}"
     fun multiSearch(query: String) = "multi_search?query=${android.net.Uri.encode(query)}"

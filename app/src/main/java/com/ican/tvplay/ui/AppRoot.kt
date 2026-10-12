@@ -48,7 +48,6 @@ import com.ican.tvplay.ui.collection.HistoryScreen
 import com.ican.tvplay.ui.components.FloatingBottomBar
 import com.ican.tvplay.ui.components.FloatingBottomBarItem
 import com.ican.tvplay.ui.components.rememberMainPagerState
-import com.ican.tvplay.ui.detail.DetailScreen
 import com.ican.tvplay.ui.home.HomeScreen
 import com.ican.tvplay.ui.nav.Routes
 import com.ican.tvplay.ui.nav.topDestinations
@@ -203,22 +202,6 @@ fun AppRoot() {
                             }
                         },
                         onBack = { navController.popBackStack() },
-                    )
-                }
-
-                composable(
-                    route = Routes.DETAIL_PATTERN,
-                    arguments = listOf(navArgument("videoId") { type = NavType.StringType }),
-                ) { entry ->
-                    val videoId = entry.arguments?.getString("videoId").orEmpty()
-                    DetailScreen(
-                        videoId = videoId,
-                        onBack = { navController.popBackStack() },
-                        onPlay = { id, episodeIndex, flag ->
-                            if (guardPlay()) {
-                                navController.navigate(Routes.player(id, episodeIndex, flag))
-                            }
-                        },
                     )
                 }
 
