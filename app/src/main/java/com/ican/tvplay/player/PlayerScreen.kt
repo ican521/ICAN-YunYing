@@ -65,6 +65,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
@@ -753,10 +754,10 @@ private fun PortraitPlayLayout(
                     PlainTopBtn(AppIcons.Cast, "投屏") { }
                 }
 
-                // 中部：上一集 / 播放暂停 / 下一集
+                // 中部：上一集 / 播放暂停 / 下一集（fongmi: play 与两侧各 40dp 间距）
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(40.dp),
                     modifier = Modifier.align(Alignment.Center),
                 ) {
                     MiniLargeBtn(AppIcons.SkipPrev, "上集", onClick = { onPrev() })
@@ -769,7 +770,7 @@ private fun PortraitPlayLayout(
                     MiniLargeBtn(AppIcons.SkipNext, "下集", onClick = { onNext() })
                 }
 
-                // 底部：进度条
+                // 底部：进度条（fongmi: PlayerSeekView 左右 16dp padding，容器 paddingBottom 8dp）
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -780,15 +781,15 @@ private fun PortraitPlayLayout(
                                 listOf(Color.Transparent, Color(0xAA000000)),
                             ),
                         )
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                        .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
                 ) {
-                    Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
                     LineSlider(
                         progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
                         onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                     )
-                    Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
                     // 全屏按钮：随控制层显示/隐藏（与播放暂停按钮同机制），位于小窗右下角，纯图标无背景
                     PlainTopBtn(AppIcons.Fullscreen, "全屏") { onEnterFullscreen() }
                 }
@@ -1450,17 +1451,18 @@ private fun PlainTopBtn(icon: ImageVector, desc: String, onClick: () -> Unit) {
     ) { Icon(icon, desc, tint = Color.White, modifier = Modifier.size(24.dp)) }
 }
 
+/** 预览小窗中部控制按钮（fongmi: shape_control 40/48dp 圆形 + 30% 黑底 + 24dp 白图标），按压用 tvCardEffect 变浅灰 */
 @Composable
 private fun MiniLargeBtn(icon: ImageVector, desc: String, onClick: () -> Unit, isPrimary: Boolean = false) {
-    val size = if (isPrimary) 44.dp else 36.dp
+    val size = if (isPrimary) 48.dp else 40.dp
     Box(
         modifier = Modifier
             .size(size)
             .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = if (isPrimary) 1.12f else 1.08f, glow = false)
-            .background(Color(0x55000000), CircleShape),
+            .background(Color(0x4D000000), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, desc, tint = Color.White, modifier = Modifier.size(if (isPrimary) 24.dp else 18.dp))
+        Icon(icon, desc, tint = Color.White, modifier = Modifier.size(24.dp))
     }
 }
 
