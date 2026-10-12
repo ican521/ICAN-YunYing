@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -154,6 +155,8 @@ fun PlayerScreen(
     // true=等待旋转进全屏 false=等待旋转退全屏 null=无挂起，
     // 避免"竖屏先铺满再旋转"的割裂感
     var pendingFullscreen by remember { mutableStateOf<Boolean?>(null) }
+    // 平板已处于横屏时进入全屏：不会触发方向配置变化，无需等待旋转，退出时也不请求旋转
+    var landscapeFullscreen by remember { mutableStateOf(false) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
@@ -561,9 +564,14 @@ fun PlayerScreen(
 
     fun handleBack() {
         if (fullscreen) {
-            // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
-            (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            pendingFullscreen = false
+            if (landscapeFullscreen) {
+                // 平板横屏直进的全屏：直接退回横版小窗，不请求旋转
+                fullscreen = false
+            } else {
+                // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
+                (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                pendingFullscreen = false
+            }
             return
         }
         // release / 后台续播转交由 onDispose 统一处理（popBackStack 后触发）
@@ -631,13 +639,21 @@ fun PlayerScreen(
                 view.resizeMode = playerState.scaleMode.resizeMode
                 if (view.player !== Players.player) Players.bindPlayerView(view)
             },
-            modifier = (if (fullscreen) {
-                Modifier.fillMaxSize()
-            } else {
-                Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f)
-            }).background(Color.Black),
+            modifier = when {
+                fullscreen -> Modifier.fillMaxSize()
+                // 旋转挂起期间统一沿用竖屏尺寸，避免转屏中途露出横版或画面拉伸
+                pendingFullscreen != null ->
+                    Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f)
+                // 自然横屏（平板）：fongmi 横版，播放器仅占左侧 38% 宽
+                isLandscape ->
+                    Modifier.fillMaxWidth(LAND_PLAYER_WIDTH_FRACTION)
+                        .statusBarsPadding().aspectRatio(16f / 9f)
+                else ->
+                    Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f)
+            }.background(Color.Black),
         )
-        if (fullscreen) {
+        when {
+        fullscreen -> {
         FullscreenPlayLayout(
             current = current,
             episodeIndex = episodeIndex,
@@ -650,7 +666,7 @@ fun PlayerScreen(
             onTogglePlay = { Players.playPause() },
             onPrev = { if (episodeIndex > 0) episodeIndex-- },
             onNext = { if (episodeIndex < lineEpisodes.size - 1) episodeIndex++ },
-            onExitFullscreen = { fullscreen = false },
+            onExitFullscreen = { handleBack() },
             onLockToggle = { locked = true; controlsVisible = false },
             onUnlock = { locked = false; controlsVisible = true },
             onBack = { handleBack() },
@@ -674,8 +690,42 @@ fun PlayerScreen(
                 saveProgress()
             },
         )
-    } else if (pendingFullscreen != true) {
-        // 进全屏旋转过渡期不渲染竖屏布局（白底信息流会露出来），旋转完成后直接切全屏
+        }
+        // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
+        pendingFullscreen == true -> Unit
+        else -> if (pendingFullscreen == null && isLandscape) {
+            // 自然横屏（平板）：fongmi activity_detail_land 横版布局
+            LandscapePlayLayout(
+                current = current,
+                episodeIndex = episodeIndex,
+                lineEpisodes = lineEpisodes,
+                lineFlag = lineFlag,
+                playerState = playerState,
+                controlsVisible = controlsVisible,
+                locked = locked,
+                onToggleControls = { controlsVisible = !controlsVisible },
+                onTogglePlay = { Players.playPause() },
+                onPrev = { if (episodeIndex > 0) episodeIndex-- },
+                onNext = { if (episodeIndex < lineEpisodes.size - 1) episodeIndex++ },
+                onEnterFullscreen = {
+                    // 已在横屏：无旋转事件，直接铺满全屏
+                    controlsTick++
+                    landscapeFullscreen = true
+                    fullscreen = true
+                },
+                onBack = { handleBack() },
+                onLineChange = { flag ->
+                    if (flag != lineFlag) {
+                        saveProgress()
+                        lineFlag = flag
+                    }
+                },
+                onEpisodeSelect = { idx ->
+                    if (idx != episodeIndex) episodeIndex = idx
+                },
+            )
+        } else {
+        // 竖屏手机 / 退全屏旋转过渡期：统一竖屏布局
         PortraitPlayLayout(
             current = current,
             episodeIndex = episodeIndex,
@@ -690,9 +740,17 @@ fun PlayerScreen(
             onNext = { if (episodeIndex < lineEpisodes.size - 1) episodeIndex++ },
             onEnterFullscreen = {
                 controlsTick++
-                // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
-                (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                pendingFullscreen = true
+                if (isLandscape) {
+                    // 平板已横屏：不会触发 Configuration 变化，直接切全屏布局
+                    landscapeFullscreen = true
+                    fullscreen = true
+                } else {
+                    // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
+                    landscapeFullscreen = false
+                    (context as? Activity)?.requestedOrientation =
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    pendingFullscreen = true
+                }
             },
             onLockToggle = { locked = true; controlsVisible = false },
             onUnlock = { locked = false; controlsVisible = true },
@@ -711,6 +769,7 @@ fun PlayerScreen(
             onDecodeChange = { settings.setPlayerDecode(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
         )
+        }
         }
     }
 }
@@ -741,10 +800,6 @@ private fun PortraitPlayLayout(
     onDecodeChange: (Players.Decode) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
 ) {
-    val context = LocalContext.current
-    val container = appContainer()
-    val scope = rememberCoroutineScope()
-
     var showSpeed by remember { mutableStateOf(false) }
     var showScale by remember { mutableStateOf(false) }
     var showDecode by remember { mutableStateOf(false) }
@@ -752,16 +807,6 @@ private fun PortraitPlayLayout(
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
     var showAddSub by remember { mutableStateOf(false) }
-    var expandedDesc by remember { mutableStateOf(false) }
-    var showAllEps by remember { mutableStateOf(false) }
-    var reversedEp by remember { mutableStateOf(false) }
-    var isFav by remember { mutableStateOf(false) }
-
-    LaunchedEffect(current?.id) {
-        if (current != null) {
-            isFav = container.favoriteDao.isFavorite(current.id)
-        }
-    }
 
     // 单一 Column 根：NavHost 目的地容器会给多个顶层子元素传播 fill 约束，
     // 多顶层发射会让底部标签栏被拉伸成全屏、白色背景盖住视频区（"纯白底+只有按钮"的根因）
@@ -772,15 +817,217 @@ private fun PortraitPlayLayout(
     ) {
 
     // === 视频播放区占位（PlayerView 常驻于根 Box 最底层，此处仅放控制层/加载/错误覆盖层） ===
-    Box(
+    PreviewPlayerArea(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .aspectRatio(16f / 9f)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onToggleControls() },
+            .aspectRatio(16f / 9f),
+        playerState = playerState,
+        controlsVisible = controlsVisible,
+        locked = locked,
+        onToggleControls = onToggleControls,
+        onBack = onBack,
+        onTogglePlay = onTogglePlay,
+        onPrev = onPrev,
+        onNext = onNext,
+        onEnterFullscreen = onEnterFullscreen,
+    )
+
+    // === 阴影分割线 ===
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0x33000000), Color.Transparent),
+                ),
+            ),
+    )
+
+    // === 可滚动详情信息流（左右边距对齐全局规范；区块组件与横屏布局共用） ===
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = com.ican.tvplay.ui.theme.Spacing.pageHorizontal, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        val v = current ?: return@Column
+
+        // 标题+收藏 / 更新备注 / 站源 / 年份·地区·类型
+        VideoMetaSection(v = v, lineFlag = lineFlag)
+
+        // 线路
+        LineSection(v = v, lineFlag = lineFlag, onLineChange = onLineChange)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 选集（倒序/更多，横滑↔网格）
+        EpisodeSection(
+            lineEpisodes = lineEpisodes,
+            episodeIndex = episodeIndex,
+            onEpisodeSelect = onEpisodeSelect,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 简介
+        DescriptionSection(v = v)
+
+        Spacer(modifier = Modifier.height(60.dp))
+    }
+
+    // === 对话框 ===
+    if (showSpeed) {
+        OptionDialog("倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
+    }
+    if (showScale) {
+        OptionDialog("画面缩放", Players.ScaleMode.entries, playerState.scaleMode, { it.label }, { onScaleChange(it); showScale = false }) { showScale = false }
+    }
+    if (showDecode) {
+        OptionDialog("解码内核", Players.Decode.entries, playerState.decode, { it.label }, { onDecodeChange(it); showDecode = false }) { showDecode = false }
+    }
+    if (showBuffer) {
+        OptionDialog("缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
+    }
+    if (showAudio) {
+        OptionDialog("音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }) { showAudio = false }
+    }
+    if (showText) {
+        SubtitleDialog(
+            tracks = playerState.textTracks,
+            textDisabled = playerState.textDisabled,
+            onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
+            onDisable = { Players.selectTrack(null, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
+            onAddExternal = { showAddSub = true },
+            onDismiss = { showText = false },
+        )
+    }
+    if (showAddSub) {
+        AddSubtitleDialog(
+            onAdd = { n, u -> Players.addSubtitle(SubItem(name = n, url = u)); showAddSub = false },
+            onDismiss = { showAddSub = false },
+        )
+    }
+    } // Column 根结束
+}
+
+// ========== 横屏（平板）布局：对齐 fongmi activity_detail_land ==========
+
+/** 横版播放器占屏宽比例（fongmi 38:62） */
+private const val LAND_PLAYER_WIDTH_FRACTION = 0.38f
+
+@Composable
+private fun LandscapePlayLayout(
+    current: Video?,
+    episodeIndex: Int,
+    lineEpisodes: List<Episode>,
+    lineFlag: String,
+    playerState: Players.PlayerState,
+    controlsVisible: Boolean,
+    locked: Boolean,
+    onToggleControls: () -> Unit,
+    onTogglePlay: () -> Unit,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onEnterFullscreen: () -> Unit,
+    onBack: () -> Unit,
+    onLineChange: (String) -> Unit,
+    onEpisodeSelect: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        // 背景由根 Box 提供（Column 若带背景会盖住常驻 PlayerView）
+    ) {
+        // === 上部：左侧播放器（38% 宽 16:9）+ 右侧影片信息（fongmi detail_land 上半区） ===
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+        ) {
+            PreviewPlayerArea(
+                modifier = Modifier
+                    .fillMaxWidth(LAND_PLAYER_WIDTH_FRACTION)
+                    .statusBarsPadding()
+                    .aspectRatio(16f / 9f),
+                playerState = playerState,
+                controlsVisible = controlsVisible,
+                locked = locked,
+                onToggleControls = onToggleControls,
+                onBack = onBack,
+                onTogglePlay = onTogglePlay,
+                onPrev = onPrev,
+                onNext = onNext,
+                onEnterFullscreen = onEnterFullscreen,
+            )
+
+            // 右侧信息列：标题/更新备注/站源/年份·地区·类型（导演/演员无数据字段，按约定不展示）
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .statusBarsPadding()
+                    .padding(
+                        start = com.ican.tvplay.ui.theme.Spacing.sectionSpacing,
+                        end = com.ican.tvplay.ui.theme.Spacing.pageHorizontal,
+                        top = 12.dp,
+                        bottom = com.ican.tvplay.ui.theme.Spacing.pageHorizontal,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (current != null) {
+                    VideoMetaSection(v = current, lineFlag = lineFlag, itemSpacing = 10.dp)
+                }
+            }
+        }
+
+        // === 下部：线路 / 选集 / 简介（通栏，占满剩余高度独立滚动） ===
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = com.ican.tvplay.ui.theme.Spacing.pageHorizontal),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            val v = current ?: return@Column
+
+            LineSection(v = v, lineFlag = lineFlag, onLineChange = onLineChange)
+            Spacer(modifier = Modifier.height(com.ican.tvplay.ui.theme.Spacing.titleContentGap))
+            EpisodeSection(
+                lineEpisodes = lineEpisodes,
+                episodeIndex = episodeIndex,
+                onEpisodeSelect = onEpisodeSelect,
+            )
+            Spacer(modifier = Modifier.height(com.ican.tvplay.ui.theme.Spacing.sectionSpacing))
+            DescriptionSection(v = v)
+
+            Spacer(modifier = Modifier.height(60.dp))
+        }
+    }
+}
+
+// ========== 非全屏播放器区与信息区块（竖屏 / 横屏共用） ==========
+
+/**
+ * 非全屏播放器区域（竖屏通栏 16:9 / 横屏左侧 38% 共用）：
+ * PlayerView 常驻根 Box 最底层、从不销毁重建，这里只承载小窗控制层/加载/错误覆盖层，
+ * 区域尺寸完全由 [modifier] 决定，保证覆盖层与底层 PlayerView 像素对齐。
+ */
+@Composable
+private fun PreviewPlayerArea(
+    modifier: Modifier,
+    playerState: Players.PlayerState,
+    controlsVisible: Boolean,
+    locked: Boolean,
+    onToggleControls: () -> Unit,
+    onBack: () -> Unit,
+    onTogglePlay: () -> Unit,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onEnterFullscreen: () -> Unit,
+) {
+    Box(
+        modifier = modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+        ) { onToggleControls() },
     ) {
         // 预览小窗控制层：单击视频区显示/隐藏（fongmi 同款交互）
         // 返回键随控制层显隐（fongmi 同款：控制层隐藏时返回键一起消失），48dp 纯图标无背景
@@ -865,30 +1112,24 @@ private fun PortraitPlayLayout(
             )
         }
     }
+}
 
-    // === 阴影分割线 ===
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(4.dp)
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0x33000000), Color.Transparent),
-                ),
-            ),
-    )
-
-    // === 可滚动详情信息流（左右边距对齐全局规范） ===
+/**
+ * 影片基础信息区块（竖屏信息流 / 横屏右侧信息列共用）：
+ * 标题+收藏 / 更新备注 / 站源 / 年份·地区·类型
+ */
+@Composable
+private fun VideoMetaSection(
+    v: Video,
+    lineFlag: String,
+    modifier: Modifier = Modifier,
+    itemSpacing: Dp = 6.dp,
+) {
     Column(
-        modifier = Modifier
-            .weight(1f)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = com.ican.tvplay.ui.theme.Spacing.pageHorizontal, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(itemSpacing),
     ) {
-        val v = current ?: return@Column
-
-        // 标题 + 收藏按钮（收藏入口自视频区顶栏移至标题右侧，圆钮尺寸/样式不变）
+        // 标题 + 收藏按钮（收藏入口在标题右侧，圆钮尺寸/样式不变）
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth(),
@@ -903,41 +1144,7 @@ private fun PortraitPlayLayout(
                 modifier = Modifier.weight(1f),
             )
             Spacer(modifier = Modifier.width(8.dp))
-            CircleIconButton(
-                icon = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
-                contentDescription = if (isFav) "取消收藏" else "收藏",
-                tint = if (isFav) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
-                onClick = {
-                    val newFav = !isFav
-                    isFav = newFav
-                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                        if (newFav) {
-                            // 记录视频所在站源：点击收藏时按此站源拉详情并播放
-                            val cached = Players.cachedVideo
-                            val favSiteKey = cached?.siteKey ?: ""
-                            val favSiteName = v.sourceName.ifBlank {
-                                com.ican.tvplay.ui.components.siteShortName(
-                                    cached?.site?.name.orEmpty(),
-                                    favSiteKey,
-                                )
-                            }
-                            container.favoriteDao.upsert(
-                                FavoriteEntity(
-                                    videoId = v.id,
-                                    title = v.title,
-                                    cover = v.cover,
-                                    categoryName = v.categoryName,
-                                    addedAt = System.currentTimeMillis(),
-                                    sourceKey = favSiteKey,
-                                    sourceName = favSiteName,
-                                ),
-                            )
-                        } else {
-                            container.favoriteDao.delete(v.id)
-                        }
-                    }
-                },
-            )
+            FavoriteButton(v = v)
         }
 
         // 更新备注（fongmi: remark）
@@ -957,7 +1164,7 @@ private fun PortraitPlayLayout(
 
         // 站源（fongmi: site）
         Text(
-            text = "站源：${current?.sourceName?.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")}",
+            text = "站源：${v.sourceName.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -984,164 +1191,194 @@ private fun PortraitPlayLayout(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
 
-        // === 线路（fongmi: detail_flag 区块）===
-        Text(
-            text = "线路",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(v.playSources) { source ->
-                val selected = source.flag == lineFlag
-                val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .tvCardEffect(
-                            onClick = { onLineChange(source.flag) },
-                            shape = shape, focusedScale = 1.06f, glow = false,
+/** 标题行收藏圆钮（竖屏/横屏共用）：已收藏心形粉色，点击切换收藏并携带站源信息 */
+@Composable
+private fun FavoriteButton(v: Video) {
+    val container = appContainer()
+    val scope = rememberCoroutineScope()
+    var isFav by remember { mutableStateOf(false) }
+
+    LaunchedEffect(v.id) {
+        isFav = container.favoriteDao.isFavorite(v.id)
+    }
+
+    CircleIconButton(
+        icon = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
+        contentDescription = if (isFav) "取消收藏" else "收藏",
+        tint = if (isFav) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
+        onClick = {
+            val newFav = !isFav
+            isFav = newFav
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                if (newFav) {
+                    // 记录视频所在站源：点击收藏时按此站源拉详情并播放
+                    val cached = Players.cachedVideo
+                    val favSiteKey = cached?.siteKey ?: ""
+                    val favSiteName = v.sourceName.ifBlank {
+                        com.ican.tvplay.ui.components.siteShortName(
+                            cached?.site?.name.orEmpty(),
+                            favSiteKey,
                         )
-                        .background(
-                            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            else MaterialTheme.colorScheme.surfaceVariant,
-                            shape,
-                        )
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                ) {
-                    Text(
-                        text = source.flag,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (selected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                        maxLines = 1,
+                    }
+                    container.favoriteDao.upsert(
+                        FavoriteEntity(
+                            videoId = v.id,
+                            title = v.title,
+                            cover = v.cover,
+                            categoryName = v.categoryName,
+                            addedAt = System.currentTimeMillis(),
+                            sourceKey = favSiteKey,
+                            sourceName = favSiteName,
+                        ),
                     )
+                } else {
+                    container.favoriteDao.delete(v.id)
                 }
             }
-        }
+        },
+    )
+}
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // === 选集（fongmi: detail_episode 标题行 + 倒序 + 更多）===
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "选集",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            Text(
-                text = if (reversedEp) "正序" else "倒序",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
+/** 线路区块（fongmi: detail_flag）：横向滚动 chips */
+@Composable
+private fun LineSection(
+    v: Video,
+    lineFlag: String,
+    onLineChange: (String) -> Unit,
+) {
+    Text(
+        text = "线路",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onBackground,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(v.playSources) { source ->
+            val selected = source.flag == lineFlag
+            val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .padding(start = 12.dp)
-                    .clickable { reversedEp = !reversedEp },
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-                text = if (showAllEps) "收起 ▾" else "更多 ▸",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { showAllEps = !showAllEps },
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-
-        val displayEps = if (reversedEp) lineEpisodes.asReversed() else lineEpisodes
-        fun realIdx(displayIdx: Int) = if (reversedEp) lineEpisodes.size - 1 - displayIdx else displayIdx
-
-        if (showAllEps) {
-            // 网格模式：与收起状态同一自适应按钮（最小正方形、随文字变长），FlowRow 自动换行
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxWidth(),
+                    .tvCardEffect(
+                        onClick = { onLineChange(source.flag) },
+                        shape = shape, focusedScale = 1.06f, glow = false,
+                    )
+                    .background(
+                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                        shape,
+                    )
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
             ) {
-                displayEps.forEachIndexed { dispIdx, ep ->
-                    val idx = realIdx(dispIdx)
-                    EpisodeChip(
-                        title = ep.title,
-                        selected = idx == episodeIndex,
-                        onClick = { onEpisodeSelect(idx) },
-                    )
-                }
-            }
-        } else {
-            // 默认横向滚动（fongmi: adapter_episode_hori），按钮尺寸与展开网格一致
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                itemsIndexed(displayEps) { dispIdx, ep ->
-                    val idx = realIdx(dispIdx)
-                    EpisodeChip(
-                        title = ep.title,
-                        selected = idx == episodeIndex,
-                        onClick = { onEpisodeSelect(idx) },
-                    )
-                }
+                Text(
+                    text = source.flag,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                )
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(16.dp))
+/** 选集区块（fongmi: detail_episode）：标题+倒序/正序+更多；默认横向滚动，点更多切 FlowRow 网格 */
+@Composable
+private fun EpisodeSection(
+    lineEpisodes: List<Episode>,
+    episodeIndex: Int,
+    onEpisodeSelect: (Int) -> Unit,
+) {
+    var showAllEps by remember { mutableStateOf(false) }
+    var reversedEp by remember { mutableStateOf(false) }
 
-        // === 简介 ===
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
-            text = "简介",
+            text = "选集",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Spacer(modifier = Modifier.height(4.dp))
-        Box(modifier = Modifier.fillMaxWidth().clickable { expandedDesc = !expandedDesc }) {
-            Text(
-                text = v.description.ifBlank { "暂无简介" },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = if (expandedDesc) Int.MAX_VALUE else 4,
-            )
+        Text(
+            text = if (reversedEp) "正序" else "倒序",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .padding(start = 12.dp)
+                .clickable { reversedEp = !reversedEp },
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = if (showAllEps) "收起 ▾" else "更多 ▸",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable { showAllEps = !showAllEps },
+        )
+    }
+    Spacer(modifier = Modifier.height(6.dp))
+
+    val displayEps = if (reversedEp) lineEpisodes.asReversed() else lineEpisodes
+    fun realIdx(displayIdx: Int) = if (reversedEp) lineEpisodes.size - 1 - displayIdx else displayIdx
+
+    if (showAllEps) {
+        // 网格模式：与收起状态同一自适应按钮（最小正方形、随文字变长），FlowRow 自动换行
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            displayEps.forEachIndexed { dispIdx, ep ->
+                val idx = realIdx(dispIdx)
+                EpisodeChip(
+                    title = ep.title,
+                    selected = idx == episodeIndex,
+                    onClick = { onEpisodeSelect(idx) },
+                )
+            }
         }
+    } else {
+        // 默认横向滚动（fongmi: adapter_episode_hori），按钮尺寸与展开网格一致
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            itemsIndexed(displayEps) { dispIdx, ep ->
+                val idx = realIdx(dispIdx)
+                EpisodeChip(
+                    title = ep.title,
+                    selected = idx == episodeIndex,
+                    onClick = { onEpisodeSelect(idx) },
+                )
+            }
+        }
+    }
+}
 
-        Spacer(modifier = Modifier.height(60.dp))
-    }
+/** 简介区块：默认 4 行，点击展开全部 */
+@Composable
+private fun DescriptionSection(v: Video) {
+    var expandedDesc by remember { mutableStateOf(false) }
 
-    // === 对话框 ===
-    if (showSpeed) {
-        OptionDialog("倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
-    }
-    if (showScale) {
-        OptionDialog("画面缩放", Players.ScaleMode.entries, playerState.scaleMode, { it.label }, { onScaleChange(it); showScale = false }) { showScale = false }
-    }
-    if (showDecode) {
-        OptionDialog("解码内核", Players.Decode.entries, playerState.decode, { it.label }, { onDecodeChange(it); showDecode = false }) { showDecode = false }
-    }
-    if (showBuffer) {
-        OptionDialog("缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
-    }
-    if (showAudio) {
-        OptionDialog("音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }) { showAudio = false }
-    }
-    if (showText) {
-        SubtitleDialog(
-            tracks = playerState.textTracks,
-            textDisabled = playerState.textDisabled,
-            onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
-            onDisable = { Players.selectTrack(null, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
-            onAddExternal = { showAddSub = true },
-            onDismiss = { showText = false },
+    Text(
+        text = "简介",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onBackground,
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    Box(modifier = Modifier.fillMaxWidth().clickable { expandedDesc = !expandedDesc }) {
+        Text(
+            text = v.description.ifBlank { "暂无简介" },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = if (expandedDesc) Int.MAX_VALUE else 4,
         )
     }
-    if (showAddSub) {
-        AddSubtitleDialog(
-            onAdd = { n, u -> Players.addSubtitle(SubItem(name = n, url = u)); showAddSub = false },
-            onDismiss = { showAddSub = false },
-        )
-    }
-    } // Column 根结束
 }
 
 // ========== 全屏布局 ==========
