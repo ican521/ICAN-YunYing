@@ -41,6 +41,10 @@ data class HistoryEntity(
     val openingMs: Long = 0,
     /** 片尾标记：距结尾的时长，播到该点自动切下一集（fongmi: History.ending） */
     val endingMs: Long = 0,
+    /** 视频所在站源 key：点击历史时按此站源拉详情并续播（空 = 旧数据，兜底当前站） */
+    val sourceKey: String = "",
+    /** 站源显示名（仅取 | 前名称），历史卡片与播放页站源行用 */
+    val sourceName: String = "",
 )
 
 @Dao
@@ -86,7 +90,7 @@ interface HistoryDao {
 
 @Database(
     entities = [FavoriteEntity::class, HistoryEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -110,13 +114,21 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v3→v4：history 表增加站源 key/显示名列（旧历史留空，续播时兜底当前站） */
+        private val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE history ADD COLUMN sourceKey TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE history ADD COLUMN sourceName TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 "tvplay.db",
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .build()
     }

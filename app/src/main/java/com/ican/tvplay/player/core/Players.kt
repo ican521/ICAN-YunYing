@@ -249,6 +249,8 @@ object Players {
                         updatedAt = System.currentTimeMillis(),
                         openingMs = ctx.openingMs,
                         endingMs = ctx.endingMs,
+                        sourceKey = cachedVideo?.takeIf { it.video.id == ctx.video.id }?.siteKey ?: "",
+                        sourceName = ctx.video.sourceName,
                     ),
                 )
             }
@@ -278,6 +280,8 @@ object Players {
                         updatedAt = System.currentTimeMillis(),
                         openingMs = ctx.openingMs,
                         endingMs = ctx.endingMs,
+                        sourceKey = cachedVideo?.takeIf { it.video.id == ctx.video.id }?.siteKey ?: "",
+                        sourceName = ctx.video.sourceName,
                     ),
                 )
             }

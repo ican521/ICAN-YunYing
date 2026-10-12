@@ -357,11 +357,13 @@ private fun FavoriteCard(
 
 @Composable
 fun HistoryScreen(
-    onVideoClick: (String) -> Unit,
+    onPlay: (videoId: String, episodeIndex: Int, flag: String, preInit: Boolean) -> Unit,
     onBack: () -> Unit = {},
 ) {
     val viewModel = appViewModel { CollectionViewModel(this) }
     val histories by viewModel.histories.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     // 编辑模式：控制卡片叉号显示 + 右上角按钮变红（与收藏页同款交互）
     var editMode by remember { mutableStateOf(false) }
@@ -449,7 +451,25 @@ fun HistoryScreen(
                                 // 编辑模式下点击卡片也触发单条删除（更方便）
                                 viewModel.removeHistory(history.videoId)
                             } else {
-                                onVideoClick(history.videoId)
+                                // 按历史记录的站源拉详情并直接续播（与收藏页同链路），进度/集数由播放页自动恢复
+                                scope.launch {
+                                    val prepared = viewModel.prepareHistoryPlay(history)
+                                    if (prepared == null) {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "视频加载失败，站源可能已失效",
+                                            android.widget.Toast.LENGTH_SHORT,
+                                        ).show()
+                                    } else {
+                                        com.ican.tvplay.player.core.Players.cacheVideo(
+                                            prepared.video,
+                                            prepared.siteKey,
+                                            prepared.site,
+                                            prepared.jarSpec,
+                                        )
+                                        onPlay(prepared.video.id, 0, prepared.firstFlag, false)
+                                    }
+                                }
                             }
                         },
                         onDelete = { viewModel.removeHistory(history.videoId) },
