@@ -753,20 +753,17 @@ private fun PortraitPlayLayout(
                     PlainTopBtn(AppIcons.Cast, "投屏") { }
                 }
 
-                // 中部：上一集 / 播放暂停 / 下一集
+                // 中部：播放/暂停（预览小窗仅保留单个按钮，不加上下集）
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.align(Alignment.Center),
                 ) {
-                    MiniLargeBtn(AppIcons.SkipPrev, "上集", onClick = { onPrev() })
                     MiniLargeBtn(
                         if (playerState.playing) AppIcons.Pause else AppIcons.Play,
                         if (playerState.playing) "暂停" else "播放",
                         onClick = { onTogglePlay() },
                         isPrimary = true,
                     )
-                    MiniLargeBtn(AppIcons.SkipNext, "下集", onClick = { onNext() })
                 }
 
                 // 底部：进度条
@@ -1281,7 +1278,10 @@ private fun FullscreenPlayLayout(
                     .size(44.dp)
                     .clip(CircleShape)
                     .background(Color.Black.copy(alpha = 0.45f))
-                    .clickable { onLockToggle() },
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onLockToggle() },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(AppIcons.LockOpen, "锁屏", tint = Color.White, modifier = Modifier.size(20.dp))
@@ -1295,7 +1295,10 @@ private fun FullscreenPlayLayout(
                     .size(44.dp)
                     .clip(CircleShape)
                     .background(Color.Black.copy(alpha = 0.45f))
-                    .clickable { onUnlock() },
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onUnlock() },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(AppIcons.Lock, "解锁", tint = Color.White, modifier = Modifier.size(20.dp))
@@ -1359,7 +1362,12 @@ private fun ActionBtn(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .clip(shape)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
             .background(MaterialTheme.colorScheme.surfaceVariant, shape)
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
@@ -1419,7 +1427,11 @@ private fun ControlChip(text: String, onClick: () -> Unit) {
         color = Color.White,
         maxLines = 1,
         modifier = Modifier
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
             .padding(horizontal = 8.dp, vertical = 6.dp),
     )
 }
@@ -1690,7 +1702,10 @@ private fun PlayerErrorOverlay(
                 .padding(top = 4.dp)
                 .clip(RoundedCornerShape(percent = 50))
                 .background(MaterialTheme.colorScheme.primary)
-                .clickable { onBack() }
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { onBack() }
                 .padding(horizontal = 24.dp, vertical = 9.dp),
         ) {
             Text(
@@ -1749,7 +1764,10 @@ private fun PlayerErrorScreen(
                     .padding(top = 12.dp)
                     .clip(RoundedCornerShape(percent = 50))
                     .background(MaterialTheme.colorScheme.primary)
-                    .clickable { onBack() }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onBack() }
                     .padding(horizontal = 24.dp, vertical = 12.dp),
             ) {
                 Text(
