@@ -616,7 +616,14 @@ fun PlayerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (fullscreen) Color.Black else MaterialTheme.colorScheme.background),
+            // 旋转过渡期（挂起中）用黑底，避免浅色模式旋转中途露出白色背景
+            .background(
+                if (fullscreen || pendingFullscreen != null) {
+                    Color.Black
+                } else {
+                    MaterialTheme.colorScheme.background
+                },
+            ),
     ) {
         AndroidView(
             factory = { sharedPlayerView },
@@ -667,7 +674,8 @@ fun PlayerScreen(
                 saveProgress()
             },
         )
-    } else {
+    } else if (pendingFullscreen != true) {
+        // 进全屏旋转过渡期不渲染竖屏布局（白底信息流会露出来），旋转完成后直接切全屏
         PortraitPlayLayout(
             current = current,
             episodeIndex = episodeIndex,
