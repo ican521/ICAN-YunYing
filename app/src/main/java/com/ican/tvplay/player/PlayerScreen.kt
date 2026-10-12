@@ -1240,7 +1240,7 @@ private fun FullscreenPlayLayout(
                         )
                         Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
                     }
-                    // 动作栏（fongmi: HorizontalScrollView 左右 8dp）：纯图标按钮
+                    // 动作栏（fongmi: HorizontalScrollView 左右 8dp）：纯文字按钮（14sp 黄色）
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1249,26 +1249,16 @@ private fun FullscreenPlayLayout(
                             .padding(horizontal = 8.dp)
                             .horizontalScroll(rememberScrollState()),
                     ) {
-                        ActionBtn(AppIcons.Memory, "解码") { showDecode = true }
-                        ActionBtn(AppIcons.Buffer, "缓冲") { showBuffer = true }
-                        ActionBtn(AppIcons.Speed, "倍速") { showSpeed = true }
-                        ActionBtn(AppIcons.AspectRatio, "缩放") { showScale = true }
-                        ActionBtn(AppIcons.Subtitle, "字幕") { showText = true }
-                        ActionBtn(AppIcons.AudioTrack, "音轨") { showAudio = true }
+                        ActionBtn("解码") { showDecode = true }
+                        ActionBtn("缓冲") { showBuffer = true }
+                        ActionBtn("倍速") { showSpeed = true }
+                        ActionBtn("缩放") { showScale = true }
+                        ActionBtn("字幕") { showText = true }
+                        ActionBtn("音轨") { showAudio = true }
                         // 片头/片尾：短按标记，长按清除（fongmi 同款）
-                        ActionBtn(
-                            AppIcons.SkipPrev,
-                            "片头",
-                            onLongClick = onClearOpening,
-                            onClick = onMarkOpening,
-                        )
-                        ActionBtn(
-                            AppIcons.SkipNext,
-                            "片尾",
-                            onLongClick = onClearEnding,
-                            onClick = onMarkEnding,
-                        )
-                        ActionBtn(AppIcons.Refresh, "重播") { Players.seekTo(0) }
+                        ActionBtn("片头", onLongClick = onClearOpening, onClick = onMarkOpening)
+                        ActionBtn("片尾", onLongClick = onClearEnding, onClick = onMarkEnding)
+                        ActionBtn("重播") { Players.seekTo(0) }
                     }
                 }
             }
@@ -1346,27 +1336,27 @@ private fun FullscreenPlayLayout(
 
 // ========== 通用 UI 组件 ==========
 
-/** 全屏动作栏纯图标按钮（fongmi 无背景样式 + 我们自己的按压变浅灰特效），desc 仅作无障碍描述 */
+/** 全屏动作栏纯文字按钮（fongmi style/Control：14sp 黄色 #FFEB3B + 8dp padding 无背景），按压用我们自己的变浅灰特效 */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ActionBtn(
-    icon: ImageVector, desc: String,
+    text: String,
     onLongClick: (() -> Unit)? = null, onClick: () -> Unit,
 ) {
-    Box(
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
+        color = Color(0xFFFFEB3B),
         modifier = Modifier
-            .size(40.dp)
             .tvCardEffect(
                 onClick = onClick,
                 onLongClick = onLongClick,
-                shape = CircleShape,
+                shape = RoundedCornerShape(percent = 50),
                 focusedScale = 1.08f,
                 glow = false,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, desc, tint = Color.White, modifier = Modifier.size(24.dp))
-    }
+            )
+            .padding(8.dp),
+    )
 }
 
 @Composable
