@@ -667,7 +667,7 @@ fun PlayerScreen(
             onTogglePlay = { Players.playPause() },
             onPrev = { if (episodeIndex > 0) episodeIndex-- },
             onNext = { if (episodeIndex < lineEpisodes.size - 1) episodeIndex++ },
-            onEnterFullscreen = { controlsVisible = false; fullscreen = true },
+            onEnterFullscreen = { controlsTick++; fullscreen = true },
             onLockToggle = { locked = true; controlsVisible = false },
             onUnlock = { locked = false; controlsVisible = true },
             onBack = { handleBack() },
