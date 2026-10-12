@@ -197,8 +197,10 @@ fun AppRoot() {
                 }
                 composable(Routes.HISTORY) {
                     HistoryScreen(
-                        onVideoClick = { videoId ->
-                            navController.navigate(Routes.detail(videoId))
+                        onPlay = { videoId, episodeIndex, flag, preInit ->
+                            if (guardPlay()) {
+                                navController.navigate(Routes.player(videoId, episodeIndex, flag, preInit))
+                            }
                         },
                         onBack = { navController.popBackStack() },
                     )

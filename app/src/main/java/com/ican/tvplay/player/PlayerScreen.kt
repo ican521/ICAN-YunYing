@@ -348,6 +348,15 @@ fun PlayerScreen(
         // 用它 launch 会导致最后一次历史保存被静默丢弃（历史页空记录的根因）
         container.appScope.launch {
             runCatching {
+                // 记录视频所在站源：点击历史时按此站源拉详情并续播（与收藏同款）
+                val cached = Players.cachedVideo
+                val siteKey = cached?.takeIf { it.video.id == v.id }?.siteKey ?: ""
+                val siteName = v.sourceName.ifBlank {
+                    com.ican.tvplay.ui.components.siteShortName(
+                        cached?.takeIf { it.video.id == v.id }?.site?.name.orEmpty(),
+                        siteKey,
+                    )
+                }
                 container.historyDao.upsert(
                     HistoryEntity(
                         videoId = v.id,
@@ -361,6 +370,8 @@ fun PlayerScreen(
                         updatedAt = System.currentTimeMillis(),
                         openingMs = openingMs,
                         endingMs = endingMs,
+                        sourceKey = siteKey,
+                        sourceName = siteName,
                     ),
                 )
             }.onFailure {

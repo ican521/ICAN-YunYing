@@ -208,16 +208,20 @@ class CollectionViewModel(container: AppContainer) : ViewModel() {
     )
 
     /**
-     * 点击收藏卡片：按收藏记录的站源 key 拉取完整详情（含选集），返回可缓存进播放器的数据。
-     * 旧收藏没有 sourceKey 时兜底当前站；站源已失效或详情拉取失败返回 null。
+     * 按记录的站源 key 拉取完整详情（含选集），返回可缓存进播放器的数据（收藏/历史通用）。
+     * 旧记录没有 sourceKey 时兜底当前站；站源已失效或详情拉取失败返回 null。
      */
-    suspend fun prepareFavoritePlay(entity: FavoriteEntity): PreparedFavoritePlay? =
+    suspend fun preparePlay(
+        videoId: String,
+        sourceKey: String,
+        sourceName: String,
+    ): PreparedFavoritePlay? =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val configUrl = settings.configUrl.value
             if (configUrl.isBlank()) return@withContext null
 
             val config = apiClient.loadConfig(configUrl) ?: return@withContext null
-            val site = config.sites.firstOrNull { it.key == entity.sourceKey }
+            val site = config.sites.firstOrNull { it.key == sourceKey }
                 ?: config.sites.firstOrNull { it.key == settings.siteKey.value }
                 ?: return@withContext null
 
@@ -227,20 +231,28 @@ class CollectionViewModel(container: AppContainer) : ViewModel() {
                     val spider = spiderManager.getSpider(site, jarSpec)
                     if (spider != null) {
                         com.ican.tvplay.data.remote.VodParse.parseVodListJson(
-                            spiderManager.detailContent(spider, listOf(entity.videoId)),
+                            spiderManager.detailContent(spider, listOf(videoId)),
                         ).firstOrNull()
                     } else null
                 } else {
-                    apiClient.detail(site, entity.videoId)
+                    apiClient.detail(site, videoId)
                 }
             }.getOrNull() ?: return@withContext null
 
             val video = with(com.ican.tvplay.data.remote.VodParse) {
                 item.toVideo(withEpisodes = true)
-            }.copy(sourceName = entity.sourceName)
+            }.copy(sourceName = sourceName)
             val firstFlag = video.playSources.firstOrNull()?.flag ?: video.playFrom
             PreparedFavoritePlay(video, site.key, site, jarSpec, firstFlag)
         }
+
+    /** 点击收藏卡片：按收藏记录的站源 key 拉详情 */
+    suspend fun prepareFavoritePlay(entity: FavoriteEntity): PreparedFavoritePlay? =
+        preparePlay(entity.videoId, entity.sourceKey, entity.sourceName)
+
+    /** 点击历史卡片：按历史记录的站源 key 拉详情并续播 */
+    suspend fun prepareHistoryPlay(entity: HistoryEntity): PreparedFavoritePlay? =
+        preparePlay(entity.videoId, entity.sourceKey, entity.sourceName)
 
     fun removeFavorite(videoId: String) {
         viewModelScope.launch { favoriteDao.delete(videoId) }
