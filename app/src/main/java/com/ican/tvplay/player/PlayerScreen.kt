@@ -753,17 +753,20 @@ private fun PortraitPlayLayout(
                     PlainTopBtn(AppIcons.Cast, "投屏") { }
                 }
 
-                // 中部：播放/暂停（预览小窗仅保留单个按钮，不加上下集）
+                // 中部：上一集 / 播放暂停 / 下一集
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.align(Alignment.Center),
                 ) {
+                    MiniLargeBtn(AppIcons.SkipPrev, "上集", onClick = { onPrev() })
                     MiniLargeBtn(
                         if (playerState.playing) AppIcons.Pause else AppIcons.Play,
                         if (playerState.playing) "暂停" else "播放",
                         onClick = { onTogglePlay() },
                         isPrimary = true,
                     )
+                    MiniLargeBtn(AppIcons.SkipNext, "下集", onClick = { onNext() })
                 }
 
                 // 底部：进度条
