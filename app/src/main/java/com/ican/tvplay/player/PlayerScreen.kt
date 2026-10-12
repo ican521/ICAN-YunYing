@@ -149,6 +149,18 @@ fun PlayerScreen(
     var locked by remember { mutableStateOf(false) }
     var fullscreen by remember { mutableStateOf(false) }
 
+    // 共享 PlayerView（fongmi 同思路：全屏/竖屏只是改容器尺寸，PlayerView 从不销毁重建）。
+    // 常驻唯一 AndroidView，竖屏↔全屏↔画中画切换时 Surface 不销毁，消除切换黑屏
+    val sharedPlayerView = remember {
+        PlayerView(context).apply {
+            useController = false
+            Players.bindPlayerView(this)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose { Players.unbindPlayerView(sharedPlayerView) }
+    }
+
     // 应用持久化设置到 Players
     LaunchedEffect(savedSpeed) { Players.setSpeed(savedSpeed) }
     LaunchedEffect(savedScale) {
@@ -554,16 +566,10 @@ fun PlayerScreen(
                 .background(Color.Black),
         ) {
             AndroidView(
-                factory = { pctx ->
-                    PlayerView(pctx).apply {
-                        useController = false
-                        Players.bindPlayerView(this)
-                    }
-                },
+                factory = { sharedPlayerView },
                 update = { view ->
                     if (view.player !== Players.player) Players.bindPlayerView(view)
                 },
-                onRelease = { view -> Players.unbindPlayerView(view) },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -592,7 +598,26 @@ fun PlayerScreen(
         return
     }
 
-    if (fullscreen) {
+    // 根：视频 View 常驻最底层，不随布局切换重建（Surface 不销毁 → 切换无黑屏），
+    // 竖屏控制层/信息流、全屏控制层作为覆盖层画在其上
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(if (fullscreen) Color.Black else MaterialTheme.colorScheme.background),
+    ) {
+        AndroidView(
+            factory = { sharedPlayerView },
+            update = { view ->
+                view.resizeMode = playerState.scaleMode.resizeMode
+                if (view.player !== Players.player) Players.bindPlayerView(view)
+            },
+            modifier = (if (fullscreen) {
+                Modifier.fillMaxSize()
+            } else {
+                Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f)
+            }).background(Color.Black),
+        )
+        if (fullscreen) {
         FullscreenPlayLayout(
             current = current,
             episodeIndex = episodeIndex,
@@ -660,6 +685,7 @@ fun PlayerScreen(
             onDecodeChange = { settings.setPlayerDecode(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
         )
+        }
     }
 }
 
@@ -715,40 +741,21 @@ private fun PortraitPlayLayout(
     // 多顶层发射会让底部标签栏被拉伸成全屏、白色背景盖住视频区（"纯白底+只有按钮"的根因）
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .fillMaxSize(),
+        // 背景由根 Box 提供（Column 若带背景会盖住常驻 PlayerView）
     ) {
 
-    // === 视频播放区（顶部贴状态栏下沿；仅返回纯白图标悬浮在画面左上角） ===
+    // === 视频播放区占位（PlayerView 常驻于根 Box 最底层，此处仅放控制层/加载/错误覆盖层） ===
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .aspectRatio(16f / 9f)
-            .background(Color.Black)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
             ) { onToggleControls() },
     ) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                // fongmi 同款：Surface 全权交给 PlayerView 内部管理
-                PlayerView(ctx).apply {
-                    useController = false
-                    resizeMode = playerState.scaleMode.resizeMode
-                    Players.bindPlayerView(this)
-                }
-            },
-            update = { view ->
-                view.resizeMode = playerState.scaleMode.resizeMode
-                // 播放器重建（切换解码/缓冲档位）后 player 实例变化 → 重新绑定
-                if (view.player !== Players.player) Players.bindPlayerView(view)
-            },
-            onRelease = { view -> Players.unbindPlayerView(view) },
-        )
-
         // 预览小窗控制层：单击视频区显示/隐藏（fongmi 同款交互）
         // 返回键随控制层显隐（fongmi 同款：控制层隐藏时返回键一起消失），48dp 纯图标无背景
         if (controlsVisible && !locked) {
@@ -1170,7 +1177,7 @@ private fun FullscreenPlayLayout(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            // 背景由根 Box 提供（此处若带背景会盖住常驻 PlayerView）
             .pointerInput(locked) {
                 // fongmi CustomKeyDown 同款手势：单击显隐控制层、双击播放暂停、长按 2 倍速快进、横向拖动快进快退
                 awaitEachGesture {
@@ -1258,23 +1265,6 @@ private fun FullscreenPlayLayout(
                 }
             },
     ) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                // fongmi 同款：Surface 全权交给 PlayerView 内部管理
-                PlayerView(ctx).apply {
-                    useController = false
-                    resizeMode = playerState.scaleMode.resizeMode
-                    Players.bindPlayerView(this)
-                }
-            },
-            update = { view ->
-                view.resizeMode = playerState.scaleMode.resizeMode
-                if (view.player !== Players.player) Players.bindPlayerView(view)
-            },
-            onRelease = { view -> Players.unbindPlayerView(view) },
-        )
-
         // fongmi 手势反馈浮层：顶部居中 50% 黑底 28dp 圆角胶囊（view_widget_vod seek/message 同款）
         if (seekPreview != null) {
             Row(
