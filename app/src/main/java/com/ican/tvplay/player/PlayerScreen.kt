@@ -753,7 +753,16 @@ private fun PortraitPlayLayout(
                         indication = null,
                     ) { onToggleControls() },
             ) {
-                // 控制层：中部播放控制 + 底部进度条/全屏（返回纯图标常驻视频区左上角，标题/收藏在下方信息流）
+                // 顶栏右侧：投屏 + 信息（fongmi 同款 48dp 纯图标，无圆形底色）
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 4.dp, top = 4.dp),
+                ) {
+                    PlainTopBtn(AppIcons.Cast, "投屏") { }
+                    PlainTopBtn(AppIcons.Info, "信息") { }
+                }
 
                 // 中部：上一集 / 播放暂停 / 下一集
                 Row(
@@ -1093,114 +1102,6 @@ private fun PortraitPlayLayout(
     } // Column 根结束
 }
 
-// ========== 视频叠加控制层（竖屏） ==========
-
-@Composable
-private fun VideoOverlay(
-    title: String,
-    positionMs: Long,
-    durationMs: Long,
-    playing: Boolean,
-    isFav: Boolean,
-    onFav: () -> Unit,
-    onSeek: (Long) -> Unit,
-    onBack: () -> Unit,
-    onFullscreen: () -> Unit,
-    onLock: () -> Unit,
-    onPrev: () -> Unit,
-    onNext: () -> Unit,
-    onTogglePlay: () -> Unit,
-    bottomActions: @Composable () -> Unit,
-) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        // 顶部栏（fongmi: 返回 + 标题 + 收藏）
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xCC000000), Color.Transparent),
-                    ),
-                )
-                .statusBarsPadding()
-                .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 20.dp),
-        ) {
-            MiniCircleBtn(AppIcons.Back, "返回") { onBack() }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(start = 8.dp),
-            )
-            MiniCircleBtn(
-                if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
-                if (isFav) "已收藏" else "收藏",
-                tint = if (isFav) Color(0xFFFF5C8A) else Color.White,
-            ) { onFav() }
-            MiniCircleBtn(AppIcons.Fullscreen, "全屏") { onFullscreen() }
-            MiniCircleBtn(AppIcons.Lock, "锁屏") { onLock() }
-        }
-
-        // 中部播放控制
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
-            modifier = Modifier.align(Alignment.Center),
-        ) {
-            MiniLargeBtn(AppIcons.SkipPrev, "上集", onClick = { onPrev() })
-            MiniLargeBtn(
-                if (playing) AppIcons.Pause else AppIcons.Play,
-                if (playing) "暂停" else "播放",
-                onClick = { onTogglePlay() },
-                isPrimary = true,
-            )
-            MiniLargeBtn(AppIcons.SkipNext, "下集", onClick = { onNext() })
-        }
-
-        // 底部：进度条 + 动作栏（fongmi: seek + view_control_vod_action）
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color(0xAA000000)),
-                    ),
-                )
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = formatMs(positionMs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                )
-                LineSlider(
-                    progress = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f,
-                    onSeek = { onSeek((it * durationMs).toLong()) },
-                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                )
-                Text(
-                    text = formatMs(durationMs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                )
-            }
-            // 动作栏：横向滚动文字按钮（fongmi: 解码/倍速/缩放/字幕/音轨…）
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            ) {
-                bottomActions()
-            }
-        }
-    }
-}
-
 // ========== 全屏布局 ==========
 
 @Composable
@@ -1309,6 +1210,8 @@ private fun FullscreenPlayLayout(
                         modifier = Modifier.padding(start = 12.dp),
                     )
                     Spacer(modifier = Modifier.weight(1f))
+                    PlainTopBtn(AppIcons.Cast, "投屏") { }
+                    PlainTopBtn(AppIcons.Info, "信息") { }
                 }
 
                 Row(
@@ -1549,15 +1452,15 @@ private fun ControlChip(text: String, onClick: () -> Unit) {
     )
 }
 
-/** 全屏顶栏纯图标按钮：无圆形底色，仅白色图标（与同栏白色标题一致），保留点击热区与焦点缩放 */
+/** 顶栏纯图标按钮（fongmi 同款）：48dp 无圆形底色，仅白色图标，保留点击热区与焦点缩放 */
 @Composable
 private fun PlainTopBtn(icon: ImageVector, desc: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(40.dp)
+            .size(48.dp)
             .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.08f, glow = false),
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, desc, tint = Color.White, modifier = Modifier.size(20.dp)) }
+    ) { Icon(icon, desc, tint = Color.White, modifier = Modifier.size(24.dp)) }
 }
 
 @Composable
