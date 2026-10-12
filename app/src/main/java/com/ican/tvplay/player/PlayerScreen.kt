@@ -407,7 +407,7 @@ fun PlayerScreen(
         val st = Players.state.value
         val remain = st.durationMs - st.positionMs
         val limit = opEdLimit(st.durationMs)
-        if (st.durationMs > 0 && st.positionMs > 0 && remain in 1 until limit) {
+        if (st.durationMs > 0 && st.positionMs > 0 && remain in 1..limit) {
             endingMs = remain
             toastMsg("已标记片尾，播到此处自动下一集")
             saveProgress()
@@ -605,6 +605,8 @@ fun PlayerScreen(
             onScaleChange = { settings.setPlayerScale(it.name) },
             onDecodeChange = { settings.setPlayerDecode(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
+            openingMs = openingMs,
+            endingMs = endingMs,
             onMarkOpening = { markOpening() },
             onMarkEnding = { markEnding() },
             onClearOpening = {
@@ -1122,6 +1124,8 @@ private fun FullscreenPlayLayout(
     onScaleChange: (Players.ScaleMode) -> Unit,
     onDecodeChange: (Players.Decode) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
+    openingMs: Long,
+    endingMs: Long,
     onMarkOpening: () -> Unit,
     onMarkEnding: () -> Unit,
     onClearOpening: () -> Unit,
@@ -1138,8 +1142,6 @@ private fun FullscreenPlayLayout(
     }
     // 动作栏对话框状态
     var showSpeed by remember { mutableStateOf(false) }
-    var showScale by remember { mutableStateOf(false) }
-    var showDecode by remember { mutableStateOf(false) }
     var showBuffer by remember { mutableStateOf(false) }
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
@@ -1251,25 +1253,41 @@ private fun FullscreenPlayLayout(
                         )
                         Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
                     }
-                    // 动作栏（fongmi: HorizontalScrollView 左右 8dp）：纯文字按钮（14sp 黄色）
+                    // 动作栏（fongmi: 左组功能 + 右侧字幕/音轨/片头/片尾，白色 14sp 文字）
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp)
-                            .horizontalScroll(rememberScrollState()),
+                            .padding(horizontal = 8.dp),
                     ) {
-                        ActionBtn("解码") { showDecode = true }
+                        // 左组：解码（显示当前值，点击直接切换）/ 缓冲 / 重播 / 倍速 / 缩放（点击循环切换）
+                        ActionBtn(playerState.decode.label) {
+                            onDecodeChange(
+                                if (playerState.decode == Players.Decode.HARD) Players.Decode.SOFT
+                                else Players.Decode.HARD,
+                            )
+                        }
                         ActionBtn("缓冲") { showBuffer = true }
+                        ActionBtn("重播") { Players.seekTo(0) }
                         ActionBtn("倍速") { showSpeed = true }
-                        ActionBtn("缩放") { showScale = true }
+                        ActionBtn(playerState.scaleMode.label) {
+                            val modes = Players.ScaleMode.entries
+                            onScaleChange(modes[(playerState.scaleMode.ordinal + 1) % modes.size])
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        // 右组：字幕 / 音轨 / 片头 / 片尾（点击标记当前位置，长按清除）
                         ActionBtn("字幕") { showText = true }
                         ActionBtn("音轨") { showAudio = true }
-                        // 片头/片尾：短按标记，长按清除（fongmi 同款）
-                        ActionBtn("片头", onLongClick = onClearOpening, onClick = onMarkOpening)
-                        ActionBtn("片尾", onLongClick = onClearEnding, onClick = onMarkEnding)
-                        ActionBtn("重播") { Players.seekTo(0) }
+                        ActionBtn(
+                            if (openingMs > 0) formatMs(openingMs) else "片头",
+                            onLongClick = onClearOpening,
+                            onClick = onMarkOpening,
+                        )
+                        ActionBtn(
+                            if (endingMs > 0) formatMs(endingMs) else "片尾",
+                            onLongClick = onClearEnding,
+                            onClick = onMarkEnding,
+                        )
                     }
                 }
             }
@@ -1314,12 +1332,6 @@ private fun FullscreenPlayLayout(
         if (showSpeed) {
             OptionDialog("倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
         }
-        if (showScale) {
-            OptionDialog("画面缩放", Players.ScaleMode.entries, playerState.scaleMode, { it.label }, { onScaleChange(it); showScale = false }) { showScale = false }
-        }
-        if (showDecode) {
-            OptionDialog("解码内核", Players.Decode.entries, playerState.decode, { it.label }, { onDecodeChange(it); showDecode = false }) { showDecode = false }
-        }
         if (showBuffer) {
             OptionDialog("缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
         }
@@ -1347,7 +1359,7 @@ private fun FullscreenPlayLayout(
 
 // ========== 通用 UI 组件 ==========
 
-/** 全屏动作栏纯文字按钮（fongmi style/Control：14sp 黄色 #FFEB3B + 8dp padding 无背景），按压用我们自己的变浅灰特效 */
+/** 全屏动作栏纯文字按钮（fongmi style/Control：14sp 白色文字 + 8dp padding 无背景），按压用我们自己的变浅灰特效 */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ActionBtn(
@@ -1357,7 +1369,8 @@ private fun ActionBtn(
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-        color = Color(0xFFFFEB3B),
+        color = Color.White,
+        maxLines = 1,
         modifier = Modifier
             .tvCardEffect(
                 onClick = onClick,
