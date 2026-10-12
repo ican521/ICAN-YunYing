@@ -98,20 +98,6 @@ class MainActivity : ComponentActivity() {
         val playing = Players.state.value.playing
         val actions = ArrayList<RemoteAction>()
 
-        // 上一集
-        actions.add(
-            RemoteAction(
-                Icon.createWithResource(this, android.R.drawable.ic_media_previous),
-                "上一集", "",
-                PendingIntent.getService(
-                    this, 0,
-                    Intent(this, PlaybackService::class.java)
-                        .setAction(PlaybackService.ACTION_SKIP_PREV),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                ),
-            ),
-        )
-
         // 播放 / 暂停（根据状态切换图标）
         actions.add(
             RemoteAction(
@@ -125,20 +111,6 @@ class MainActivity : ComponentActivity() {
                     this, 1,
                     Intent(this, PlaybackService::class.java)
                         .setAction(PlaybackService.ACTION_PLAY_PAUSE),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                ),
-            ),
-        )
-
-        // 下一集
-        actions.add(
-            RemoteAction(
-                Icon.createWithResource(this, android.R.drawable.ic_media_next),
-                "下一集", "",
-                PendingIntent.getService(
-                    this, 2,
-                    Intent(this, PlaybackService::class.java)
-                        .setAction(PlaybackService.ACTION_SKIP_NEXT),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 ),
             ),
