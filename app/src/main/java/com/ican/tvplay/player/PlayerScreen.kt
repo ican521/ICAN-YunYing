@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.tween
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -108,6 +110,7 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 
 /**
@@ -167,6 +170,8 @@ fun PlayerScreen(
     var landscapeFullscreen by remember { mutableStateOf(false) }
     // 横屏小窗↔全屏放大/缩回动画进行中：期间只渲染纯视频，不挂任何覆盖层
     var landZooming by remember { mutableStateOf(false) }
+    // 横版界面其他元素（信息列/线路/选集/简介）是否显示：缩回后渐显，进页面初始不播动画
+    var landChromeVisible by remember { mutableStateOf(true) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
@@ -644,19 +649,22 @@ fun PlayerScreen(
     // 根：视频 View 常驻最底层，不随布局切换重建（Surface 不销毁 → 切换无黑屏），
     // 竖屏控制层/信息流、全屏控制层作为覆盖层画在其上。
     // BoxWithConstraints 提供整屏尺寸，供横屏小窗→全屏放大动画插值。
+    // 旋转过渡期 / 放大动画期间为黑底；缩回后柔和渐变回主题背景，避免硬切
+    val rootBackground by animateColorAsState(
+        targetValue = if (fullscreen || pendingFullscreen != null ||
+            landscapeFullscreen || landZooming
+        ) {
+            Color.Black
+        } else {
+            MaterialTheme.colorScheme.background
+        },
+        animationSpec = tween(LAND_ZOOM_DURATION_MS),
+        label = "rootBackground",
+    )
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            // 旋转过渡期 / 放大动画期间用黑底，避免露出白色背景
-            .background(
-                if (fullscreen || pendingFullscreen != null ||
-                    landscapeFullscreen || landZooming
-                ) {
-                    Color.Black
-                } else {
-                    MaterialTheme.colorScheme.background
-                },
-            ),
+            .background(rootBackground),
     ) {
         val density = LocalDensity.current
         val screenW = maxWidth
@@ -700,16 +708,35 @@ fun PlayerScreen(
                     !expandTransition.isRunning &&
                         expandTransition.currentState == expandTransition.targetState
                 }.first { it }
-                landZooming = false
                 if (landscapeFullscreen) {
                     // 放大完成：挂全屏布局，工具栏默认隐藏
+                    landZooming = false
                     fullscreen = true
                     controlsVisible = false
                 } else {
-                    // 缩回完成：恢复方向自由，回到横版小窗，不弹工具栏
+                    // 缩回完成：先恢复方向自由并显示状态栏，等 inset 回灌后再挂横版界面，
+                    // 否则播放器/信息列先按 inset=0 布局（上跳），inset 到达后又被顶下来
                     controlsVisible = false
-                    (context as? Activity)?.requestedOrientation =
+                    val activity = context as? Activity
+                    activity?.requestedOrientation =
                         ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    if (activity != null) {
+                        WindowCompat.getInsetsController(
+                            activity.window, activity.window.decorView,
+                        ).show(WindowInsetsCompat.Type.statusBars())
+                    }
+                    val topPx = with(density) { statusBarTop.roundToPx() }
+                    if (topPx > 0) {
+                        withTimeoutOrNull(500) {
+                            snapshotFlow { statusBarInsets.getTop(density) >= topPx }
+                                .first { it }
+                        }
+                    }
+                    // 挂载横版界面（chrome 先隐藏），下一帧再渐显信息列/线路/选集/简介
+                    landChromeVisible = false
+                    landZooming = false
+                    delay(60)
+                    landChromeVisible = true
                 }
             }
         }
@@ -723,19 +750,18 @@ fun PlayerScreen(
             modifier = when {
                 // 手机旋转进入的全屏：直接铺满
                 fullscreen && !landscapeFullscreen -> Modifier.fillMaxSize()
-                // 平板放大动画期间 / 已放大：动画尺寸（收敛后恰为整屏，与 fillMaxSize 等尺寸）
-                landscapeFullscreen || landZooming ->
+                // 旋转挂起期间统一沿用竖屏尺寸，避免转屏中途露出横版或画面拉伸
+                // （必须排在 isLandscape 前：旋转中途配置已翻为横屏但挂起仍未结束）
+                pendingFullscreen != null ->
+                    Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f)
+                // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
+                // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
+                // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
+                isLandscape ->
                     Modifier
                         .offset(y = animTop)
                         .width(animWidth)
                         .height(animHeight)
-                // 旋转挂起期间统一沿用竖屏尺寸，避免转屏中途露出横版或画面拉伸
-                pendingFullscreen != null ->
-                    Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f)
-                // 自然横屏（平板）：fongmi 横版，播放器仅占左侧 38% 宽
-                isLandscape ->
-                    Modifier.fillMaxWidth(LAND_PLAYER_WIDTH_FRACTION)
-                        .statusBarsPadding().aspectRatio(16f / 9f)
                 else ->
                     Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f)
             }.background(Color.Black),
@@ -793,6 +819,7 @@ fun PlayerScreen(
                 playerState = playerState,
                 controlsVisible = controlsVisible,
                 locked = locked,
+                chromeVisible = landChromeVisible,
                 onToggleControls = { controlsVisible = !controlsVisible },
                 onTogglePlay = { Players.playPause() },
                 onPrev = { if (episodeIndex > 0) episodeIndex-- },
@@ -802,6 +829,7 @@ fun PlayerScreen(
                     // 动画结束（LaunchedEffect）后再挂全屏布局且工具栏默认隐藏
                     controlsTick++
                     controlsVisible = false
+                    landChromeVisible = false
                     (context as? Activity)?.requestedOrientation =
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     landscapeFullscreen = true
@@ -1013,6 +1041,12 @@ private const val LAND_PLAYER_WIDTH_FRACTION = 0.38f
 /** 横屏小窗↔全屏放大/缩回动画时长 */
 private const val LAND_ZOOM_DURATION_MS = 300
 
+/** 缩回小窗后信息/线路等界面元素渐显时长 */
+private const val LAND_CHROME_FADE_MS = 320
+
+/** 下方区块相对右侧信息列的渐显延迟（轻微错开） */
+private const val LAND_CHROME_STAGGER_MS = 90
+
 @Composable
 private fun LandscapePlayLayout(
     current: Video?,
@@ -1022,6 +1056,8 @@ private fun LandscapePlayLayout(
     playerState: Players.PlayerState,
     controlsVisible: Boolean,
     locked: Boolean,
+    // 缩回小窗后信息列/线路/选集/简介是否渐显（进页面初始为 true，不播入场动画）
+    chromeVisible: Boolean,
     onToggleControls: () -> Unit,
     onTogglePlay: () -> Unit,
     onPrev: () -> Unit,
@@ -1057,45 +1093,61 @@ private fun LandscapePlayLayout(
             )
 
             // 右侧信息列：标题/更新备注/站源/年份·地区·类型（导演/演员无数据字段，按约定不展示）
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .statusBarsPadding()
-                    .padding(
-                        start = com.ican.tvplay.ui.theme.Spacing.sectionSpacing,
-                        end = com.ican.tvplay.ui.theme.Spacing.pageHorizontal,
-                        top = 12.dp,
-                        bottom = com.ican.tvplay.ui.theme.Spacing.pageHorizontal,
-                    ),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+            // 缩回小窗后与下方区块错开 90ms 渐显，放大时随布局一起移除
+            AnimatedVisibility(
+                visible = chromeVisible,
+                modifier = Modifier.weight(1f),
+                enter = fadeIn(animationSpec = tween(LAND_CHROME_FADE_MS)),
             ) {
-                if (current != null) {
-                    VideoMetaSection(v = current, lineFlag = lineFlag, itemSpacing = 10.dp)
+                Column(
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .padding(
+                            start = com.ican.tvplay.ui.theme.Spacing.sectionSpacing,
+                            end = com.ican.tvplay.ui.theme.Spacing.pageHorizontal,
+                            top = 12.dp,
+                            bottom = com.ican.tvplay.ui.theme.Spacing.pageHorizontal,
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    if (current != null) {
+                        VideoMetaSection(v = current, lineFlag = lineFlag, itemSpacing = 10.dp)
+                    }
                 }
             }
         }
 
         // === 下部：线路 / 选集 / 简介（通栏，占满剩余高度独立滚动） ===
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = com.ican.tvplay.ui.theme.Spacing.pageHorizontal),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+        AnimatedVisibility(
+            visible = chromeVisible,
+            modifier = Modifier.weight(1f),
+            enter = fadeIn(
+                animationSpec = tween(
+                    durationMillis = LAND_CHROME_FADE_MS,
+                    delayMillis = LAND_CHROME_STAGGER_MS,
+                ),
+            ),
         ) {
-            val v = current ?: return@Column
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = com.ican.tvplay.ui.theme.Spacing.pageHorizontal),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                val v = current ?: return@Column
 
-            LineSection(v = v, lineFlag = lineFlag, onLineChange = onLineChange)
-            Spacer(modifier = Modifier.height(com.ican.tvplay.ui.theme.Spacing.titleContentGap))
-            EpisodeSection(
-                lineEpisodes = lineEpisodes,
-                episodeIndex = episodeIndex,
-                onEpisodeSelect = onEpisodeSelect,
-            )
-            Spacer(modifier = Modifier.height(com.ican.tvplay.ui.theme.Spacing.sectionSpacing))
-            DescriptionSection(v = v)
+                LineSection(v = v, lineFlag = lineFlag, onLineChange = onLineChange)
+                Spacer(modifier = Modifier.height(com.ican.tvplay.ui.theme.Spacing.titleContentGap))
+                EpisodeSection(
+                    lineEpisodes = lineEpisodes,
+                    episodeIndex = episodeIndex,
+                    onEpisodeSelect = onEpisodeSelect,
+                )
+                Spacer(modifier = Modifier.height(com.ican.tvplay.ui.theme.Spacing.sectionSpacing))
+                DescriptionSection(v = v)
 
-            Spacer(modifier = Modifier.height(60.dp))
+                Spacer(modifier = Modifier.height(60.dp))
+            }
         }
     }
 }
