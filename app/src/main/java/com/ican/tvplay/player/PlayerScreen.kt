@@ -49,6 +49,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.abs
+import kotlin.math.hypot
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.defaultMinSize
@@ -602,6 +607,7 @@ fun PlayerScreen(
             onUnlock = { locked = false; controlsVisible = true },
             onBack = { handleBack() },
             onSpeedChange = { settings.setPlayerSpeed(it) },
+            playbackSpeed = settings.playerSpeed.collectAsStateWithLifecycle().value,
             onScaleChange = { settings.setPlayerScale(it.name) },
             onDecodeChange = { settings.setPlayerDecode(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
@@ -1121,6 +1127,7 @@ private fun FullscreenPlayLayout(
     onUnlock: () -> Unit,
     onBack: () -> Unit,
     onSpeedChange: (Float) -> Unit,
+    playbackSpeed: Float,
     onScaleChange: (Players.ScaleMode) -> Unit,
     onDecodeChange: (Players.Decode) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
@@ -1146,26 +1153,101 @@ private fun FullscreenPlayLayout(
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
     var showAddSub by remember { mutableStateOf(false) }
+    // fongmi 同款手势反馈浮层：拖动 seek 预览目标 / 长按倍速提示
+    var seekPreview by remember { mutableStateOf<Long?>(null) }
+    var speedUpHint by remember { mutableStateOf(false) }
+    LaunchedEffect(locked) {
+        if (locked) {
+            seekPreview = null
+            speedUpHint = false
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
             .pointerInput(locked) {
-                detectTapGestures(
-                    onTap = {
-                        if (locked) {
-                            // 锁定中：单击只唤出解锁按钮，不触发任何其他控制
+                // fongmi CustomKeyDown 同款手势：单击显隐控制层、双击播放暂停、长按 2 倍速快进、横向拖动快进快退
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val downTime = down.uptimeMillis
+                    val downX = down.position.x
+                    val downY = down.position.y
+                    var axis = 0 // 0 未定 | 1 横向seek | 2 纵向/放弃
+                    var isLong = false
+                    var seekTarget: Long? = null
+
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.changes.all { !it.pressed }) break // 手指抬起
+                        if (locked) continue // 锁定：拖动/长按失效，仅保留单击/双击
+                        val change = event.changes.firstOrNull() ?: continue
+                        val now = change.uptimeMillis
+
+                        // 长按快进（fongmi onLongPress → onSpeedUp：2 倍速播放）
+                        if (!isLong && axis == 0 &&
+                            now - downTime >= viewConfiguration.longPressTimeoutMillis &&
+                            hypot(change.position.x - downX, change.position.y - downY) <= viewConfiguration.touchSlop
+                        ) {
+                            val st = Players.state.value
+                            if (st.playing && st.durationMs > 0) {
+                                isLong = true
+                                Players.setSpeed(2f)
+                                speedUpHint = true
+                            } else {
+                                axis = 2 // 未在播放：不再触发长按
+                            }
+                            continue
+                        }
+
+                        if (isLong) continue // 长按快进期间忽略移动
+                        // 方向判定（fongmi checkFunc：累计位移 ≥20dp，横向优先）
+                        if (axis == 0) {
+                            val adx = abs(change.position.x - downX)
+                            val ady = abs(change.position.y - downY)
+                            if (hypot(adx, ady) >= 20.dp.toPx()) axis = if (adx >= ady) 1 else 2
+                        }
+                        // 横向拖动快进/快退（fongmi onScroll：time = deltaX * 50ms，实时预览不真 seek）
+                        if (axis == 1) {
+                            val st = Players.state.value
+                            if (st.durationMs > 0) {
+                                val delta = ((change.position.x - downX) * 50).toLong()
+                                seekTarget = (st.positionMs + delta).coerceIn(0L, st.durationMs)
+                                seekPreview = seekTarget
+                            }
+                        }
+                    }
+
+                    // 抬起（fongmi onTouchEvent ACTION_UP）
+                    if (isLong) {
+                        // fongmi onSpeedEnd：恢复用户设定倍速
+                        Players.setSpeed(playbackSpeed)
+                        speedUpHint = false
+                    } else if (axis == 1 && seekTarget != null) {
+                        // fongmi onSeekEnd：真正 seek 到预览位置
+                        Players.seekTo(seekTarget)
+                        seekPreview = null
+                    } else if (axis == 0) {
+                        // 未移动未长按：单击/双击判定（fongmi GestureDetector）
+                        val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+                            awaitFirstDown(requireUnconsumed = false)
+                        }
+                        if (second != null) {
+                            // 双击：等待第二次抬起后切换播放/暂停
+                            while (true) {
+                                val e2 = awaitPointerEvent()
+                                if (e2.changes.all { !it.pressed }) break
+                            }
+                            onTogglePlay()
+                        } else if (locked) {
                             unlockHint = true
                         } else {
                             onToggleControls()
                         }
-                    },
-                    onDoubleTap = {
-                        // 双击：任何状态下都切换播放/暂停
-                        onTogglePlay()
-                    },
-                )
+                    }
+                    seekPreview = null
+                }
             },
     ) {
         AndroidView(
@@ -1184,6 +1266,45 @@ private fun FullscreenPlayLayout(
             },
             onRelease = { view -> Players.unbindPlayerView(view) },
         )
+
+        // fongmi 手势反馈浮层：顶部居中 50% 黑底 28dp 圆角胶囊（view_widget_vod seek/message 同款）
+        if (seekPreview != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 24.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(start = 12.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+            ) {
+                Icon(
+                    imageVector = if ((seekPreview ?: 0L) >= playerState.positionMs) AppIcons.Forward else AppIcons.Rewind,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = formatMs(seekPreview ?: 0L),
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
+                    color = Color.White,
+                )
+            }
+        }
+        if (speedUpHint) {
+            Text(
+                text = "2.0倍速快进中",
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 24.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+        }
 
         if (controlsVisible && !locked) {
             Box(modifier = Modifier.fillMaxSize()) {
