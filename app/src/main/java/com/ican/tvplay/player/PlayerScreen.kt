@@ -1181,11 +1181,15 @@ private fun FullscreenPlayLayout(
                     var axis = 0 // 0 未定 | 1 横向seek | 2 纵向/放弃
                     var isLong = false
                     var seekTarget: Long? = null
+                    // 点在控制层按钮等可点击控件上（事件被消费）：手势全程让位，
+                    // 不触发长按快进/拖动seek/单击双击（否则点动作栏按钮会被误判为视频区单击而收起控制层）
+                    var gestureBlocked = false
 
                     while (true) {
                         val event = awaitPointerEvent()
+                        if (event.changes.any { it.isConsumed }) gestureBlocked = true
                         if (event.changes.all { !it.pressed }) break // 手指抬起
-                        if (locked) continue // 锁定：拖动/长按失效，仅保留单击/双击
+                        if (locked || gestureBlocked) continue // 锁定：拖动/长按失效，仅保留单击/双击
                         val change = event.changes.firstOrNull() ?: continue
                         val now = change.uptimeMillis
 
@@ -1232,8 +1236,8 @@ private fun FullscreenPlayLayout(
                         // fongmi onSeekEnd：真正 seek 到预览位置
                         Players.seekTo(seekTarget)
                         seekPreview = null
-                    } else if (axis == 0) {
-                        // 未移动未长按：单击/双击判定（fongmi GestureDetector）
+                    } else if (axis == 0 && !gestureBlocked) {
+                        // 未移动未长按（且未点在控件上）：单击/双击判定（fongmi GestureDetector）
                         val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
                             awaitFirstDown(requireUnconsumed = false)
                         }
