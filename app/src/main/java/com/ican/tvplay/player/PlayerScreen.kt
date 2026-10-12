@@ -729,21 +729,8 @@ private fun PortraitPlayLayout(
             onRelease = { view -> Players.unbindPlayerView(view) },
         )
 
-        // 悬浮顶栏：仅返回纯图标（无圆形底色，白色图标叠加在画面上）；
-        // 标题与收藏入口已移至下方信息流标题行
-        CircleIconButton(
-            icon = AppIcons.Back,
-            contentDescription = "返回",
-            tint = Color.White,
-            containerColor = Color.Transparent,
-            onClick = onBack,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 12.dp, top = 6.dp),
-        )
-
         // 预览小窗控制层：单击视频区显示/隐藏（fongmi 同款交互）
-        // 视频区已做 statusBarsPadding，控制层天然避让；全屏按钮独立常显在右下角
+        // 返回键随控制层显隐（fongmi 同款：控制层隐藏时返回键一起消失），48dp 纯图标无背景
         if (controlsVisible && !locked) {
             Box(
                 modifier = Modifier
@@ -753,15 +740,17 @@ private fun PortraitPlayLayout(
                         indication = null,
                     ) { onToggleControls() },
             ) {
-                // 顶栏右侧：投屏 + 信息（fongmi 同款 48dp 纯图标，无圆形底色）
+                // 顶栏：返回（左） + 投屏（右），fongmi 同款 48dp 纯图标，无圆形底色
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(end = 4.dp, top = 4.dp),
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, end = 4.dp, top = 4.dp),
                 ) {
+                    PlainTopBtn(AppIcons.Back, "返回") { onBack() }
+                    Spacer(modifier = Modifier.weight(1f))
                     PlainTopBtn(AppIcons.Cast, "投屏") { }
-                    PlainTopBtn(AppIcons.Info, "信息") { }
                 }
 
                 // 中部：上一集 / 播放暂停 / 下一集
@@ -800,8 +789,8 @@ private fun PortraitPlayLayout(
                         modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                     )
                     Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
-                    // 全屏按钮：随控制层显示/隐藏（与播放暂停按钮同机制），位于小窗右下角
-                    MiniCircleBtn(AppIcons.Fullscreen, "全屏") { onEnterFullscreen() }
+                    // 全屏按钮：随控制层显示/隐藏（与播放暂停按钮同机制），位于小窗右下角，纯图标无背景
+                    PlainTopBtn(AppIcons.Fullscreen, "全屏") { onEnterFullscreen() }
                 }
             }
         }
@@ -1211,7 +1200,6 @@ private fun FullscreenPlayLayout(
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     PlainTopBtn(AppIcons.Cast, "投屏") { }
-                    PlainTopBtn(AppIcons.Info, "信息") { }
                 }
 
                 Row(
@@ -1420,22 +1408,6 @@ private fun MiniTag(text: String, onClick: () -> Unit = {}) {
     ) {
         Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-}
-
-@Composable
-private fun MiniCircleBtn(
-    icon: ImageVector,
-    desc: String,
-    tint: Color = Color.White,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .size(32.dp)
-            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.08f, glow = false)
-            .background(Color(0x55000000), CircleShape),
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, desc, tint = tint, modifier = Modifier.size(16.dp)) }
 }
 
 /** 播放器底部动作栏文字按钮（fongmi: style/Control，白色小字横向滚动） */
