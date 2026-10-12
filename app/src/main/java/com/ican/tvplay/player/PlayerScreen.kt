@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -595,8 +594,6 @@ fun PlayerScreen(
             onScaleChange = { settings.setPlayerScale(it.name) },
             onDecodeChange = { settings.setPlayerDecode(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
-            openingMs = openingMs,
-            endingMs = endingMs,
             onMarkOpening = { markOpening() },
             onMarkEnding = { markEnding() },
             onClearOpening = {
@@ -1114,8 +1111,6 @@ private fun FullscreenPlayLayout(
     onScaleChange: (Players.ScaleMode) -> Unit,
     onDecodeChange: (Players.Decode) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
-    openingMs: Long,
-    endingMs: Long,
     onMarkOpening: () -> Unit,
     onMarkEnding: () -> Unit,
     onClearOpening: () -> Unit,
@@ -1179,6 +1174,7 @@ private fun FullscreenPlayLayout(
 
         if (controlsVisible && !locked) {
             Box(modifier = Modifier.fillMaxSize()) {
+                // 顶栏（fongmi: 56dp 行高 + 左右 4dp padding，返回 48dp / 标题 16sp 占中间 / 右侧投屏 48dp）
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -1190,35 +1186,37 @@ private fun FullscreenPlayLayout(
                             ),
                         )
                         .statusBarsPadding()
-                        .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp),
+                        .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 24.dp),
                 ) {
                     PlainTopBtn(AppIcons.Back, "返回") { onExitFullscreen() }
                     Text(
                         text = "${current?.title.orEmpty()} · 第${episodeIndex + 1}集",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
                         color = Color.White,
-                        modifier = Modifier.padding(start = 12.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     )
-                    Spacer(modifier = Modifier.weight(1f))
                     PlainTopBtn(AppIcons.Cast, "投屏") { }
                 }
 
+                // 中部（fongmi: 40/48dp shape_control 按钮，play 与两侧各 40dp 间距）
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(32.dp),
+                    horizontalArrangement = Arrangement.spacedBy(40.dp),
                     modifier = Modifier.align(Alignment.Center),
                 ) {
-                    BigBtn(AppIcons.SkipPrev, "上集", onClick = { onPrev() })
-                    BigBtn(
+                    MiniLargeBtn(AppIcons.SkipPrev, "上集", onClick = { onPrev() })
+                    MiniLargeBtn(
                         if (playerState.playing) AppIcons.Pause else AppIcons.Play,
                         if (playerState.playing) "暂停" else "播放",
                         onClick = { onTogglePlay() },
                         isPrimary = true,
                     )
-                    BigBtn(AppIcons.SkipNext, "下集", onClick = { onNext() })
+                    MiniLargeBtn(AppIcons.SkipNext, "下集", onClick = { onNext() })
                 }
 
-                // 底部：进度条 + 动作栏（fongmi: seek + view_control_vod_action）
+                // 底部（fongmi: 容器 paddingBottom 8dp，seek 左右 16dp，动作栏左右 8dp）
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -1228,42 +1226,45 @@ private fun FullscreenPlayLayout(
                                 listOf(Color.Transparent, Color(0xCC000000)),
                             ),
                         )
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(bottom = 8.dp),
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
                         LineSlider(
                             progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
                             onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
                             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                         )
-                        Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
+                        Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
                     }
-                    // 动作栏：解码/缓冲/倍速/缩放/字幕/音轨/重播
+                    // 动作栏（fongmi: HorizontalScrollView 左右 8dp）：纯图标按钮
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 4.dp)
+                            .padding(horizontal = 8.dp)
                             .horizontalScroll(rememberScrollState()),
                     ) {
-                        ActionBtn(AppIcons.Memory, playerState.decode.label) { showDecode = true }
-                        ActionBtn(AppIcons.Buffer, playerState.bufferTier.label) { showBuffer = true }
-                        ActionBtn(AppIcons.Speed, formatSpeed(playerState.speed)) { showSpeed = true }
-                        ActionBtn(AppIcons.AspectRatio, playerState.scaleMode.label) { showScale = true }
+                        ActionBtn(AppIcons.Memory, "解码") { showDecode = true }
+                        ActionBtn(AppIcons.Buffer, "缓冲") { showBuffer = true }
+                        ActionBtn(AppIcons.Speed, "倍速") { showSpeed = true }
+                        ActionBtn(AppIcons.AspectRatio, "缩放") { showScale = true }
                         ActionBtn(AppIcons.Subtitle, "字幕") { showText = true }
                         ActionBtn(AppIcons.AudioTrack, "音轨") { showAudio = true }
                         // 片头/片尾：短按标记，长按清除（fongmi 同款）
                         ActionBtn(
                             AppIcons.SkipPrev,
-                            if (openingMs > 0) formatMs(openingMs) else "片头",
+                            "片头",
                             onLongClick = onClearOpening,
                             onClick = onMarkOpening,
                         )
                         ActionBtn(
                             AppIcons.SkipNext,
-                            if (endingMs > 0) formatMs(endingMs) else "片尾",
+                            "片尾",
                             onLongClick = onClearEnding,
                             onClick = onMarkEnding,
                         )
@@ -1273,39 +1274,29 @@ private fun FullscreenPlayLayout(
             }
         }
 
-        // 右侧居中：锁定按钮（未锁定时随控制层显示）与解锁按钮（锁定中单击唤出）
+        // 右侧居中（fongmi: view_control_right 48dp 纯图标无背景 + marginEnd 4dp）
         if (!locked && controlsVisible) {
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .padding(end = 10.dp)
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onLockToggle() },
+                    .padding(end = 4.dp)
+                    .size(48.dp)
+                    .tvCardEffect(onClick = { onLockToggle() }, shape = CircleShape, focusedScale = 1.08f, glow = false),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(AppIcons.LockOpen, "锁屏", tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(AppIcons.LockOpen, "锁屏", tint = Color.White, modifier = Modifier.size(24.dp))
             }
         }
         if (locked && unlockHint) {
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .padding(end = 10.dp)
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onUnlock() },
+                    .padding(end = 4.dp)
+                    .size(48.dp)
+                    .tvCardEffect(onClick = { onUnlock() }, shape = CircleShape, focusedScale = 1.08f, glow = false),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(AppIcons.Lock, "解锁", tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(AppIcons.Lock, "解锁", tint = Color.White, modifier = Modifier.size(24.dp))
             }
         }
 
@@ -1355,29 +1346,26 @@ private fun FullscreenPlayLayout(
 
 // ========== 通用 UI 组件 ==========
 
+/** 全屏动作栏纯图标按钮（fongmi 无背景样式 + 我们自己的按压变浅灰特效），desc 仅作无障碍描述 */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ActionBtn(
-    icon: ImageVector, text: String, tint: Color = MaterialTheme.colorScheme.onSurface,
+    icon: ImageVector, desc: String,
     onLongClick: (() -> Unit)? = null, onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(percent = 50)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    Box(
         modifier = Modifier
-            .clip(shape)
-            .combinedClickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
+            .size(40.dp)
+            .tvCardEffect(
                 onClick = onClick,
                 onLongClick = onLongClick,
-            )
-            .background(MaterialTheme.colorScheme.surfaceVariant, shape)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+                shape = CircleShape,
+                focusedScale = 1.08f,
+                glow = false,
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(16.dp))
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(text, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = FontWeight.Medium)
+        Icon(icon, desc, tint = Color.White, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -1463,20 +1451,6 @@ private fun MiniLargeBtn(icon: ImageVector, desc: String, onClick: () -> Unit, i
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, desc, tint = Color.White, modifier = Modifier.size(24.dp))
-    }
-}
-
-@Composable
-private fun BigBtn(icon: ImageVector, desc: String, onClick: () -> Unit, isPrimary: Boolean = false) {
-    val size = if (isPrimary) 56.dp else 44.dp
-    Box(
-        modifier = Modifier
-            .size(size)
-            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = if (isPrimary) 1.12f else 1.08f, glow = false)
-            .background(Color(0x55000000), CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, desc, tint = Color.White, modifier = Modifier.size(if (isPrimary) 28.dp else 22.dp))
     }
 }
 
