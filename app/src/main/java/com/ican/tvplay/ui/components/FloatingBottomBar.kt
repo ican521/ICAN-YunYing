@@ -221,13 +221,12 @@ fun FloatingBottomBar(
     val tabContentColor = MaterialTheme.colorScheme.onSurface
     val surfaceContainer = MaterialTheme.colorScheme.surfaceVariant
     // 深色模式关闭毛玻璃时：胶囊本体用不透明深灰 rgb(36,36,36)；
-    // 毛玻璃开启保持半透明玻璃色，浅色模式保持主题 surfaceVariant
+    // 其余情况（毛玻璃开启、浅色关闭毛玻璃）统一用开毛玻璃同款半透明玻璃色
     val containerColor = when {
         isInDark && !isBlurEnabled -> DarkSurface
-        isBlurEnabled -> surfaceContainer.copy(0.4f)
-        else -> surfaceContainer
+        else -> surfaceContainer.copy(0.4f)
     }
-    // 关闭毛玻璃时：选中指示器统一用主题色 15% 透明（与 KernelSU 一致）
+    // 关闭毛玻璃时指示器：深色用主题色 15% 透明（与 KernelSU 一致）；浅色对齐开毛玻璃的黑 10% 蒙层
     val plainIndicatorColor = accentColor.copy(alpha = 0.15f)
 
     val tabsBackdrop = rememberLayerBackdrop()
@@ -498,7 +497,11 @@ fun FloatingBottomBar(
                             translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
                         }
                         .clip(pillShape)
-                        .background(plainIndicatorColor, pillShape)
+                        // 浅色关闭毛玻璃：指示器对齐开毛玻璃同款黑 10% 蒙层；深色保持主题色 15%
+                        .background(
+                            if (isInDark) plainIndicatorColor else Color.Black.copy(alpha = 0.1f),
+                            pillShape,
+                        )
                         .height(56.dp)
                         .width(tabWidthDp),
                     contentAlignment = Alignment.CenterStart,
