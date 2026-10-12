@@ -7,7 +7,6 @@ import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,6 +73,7 @@ import com.ican.tvplay.ui.components.liquid.lens
 import com.ican.tvplay.ui.components.liquid.rememberCombinedBackdrop
 import com.ican.tvplay.ui.components.liquid.vibrancy
 import com.ican.tvplay.ui.theme.DarkSurface
+import com.ican.tvplay.ui.theme.LocalDarkTheme
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.blur
@@ -215,7 +215,8 @@ fun FloatingBottomBar(
     isBlurEnabled: Boolean = true,
     content: @Composable RowScope.((Int) -> Unit) -> Unit
 ) {
-    val isInDark = isSystemInDarkTheme()
+    // 用 App 内主题模式的实际深浅色状态，而非系统深浅色（App 内可独立切换浅色/深色）
+    val isInDark = LocalDarkTheme.current
     val pillShape = remember { CircleShape }
     val accentColor = MaterialTheme.colorScheme.primary
     // 浅色模式关闭毛玻璃时：未选中图标文字用纯黑（对齐 KernelSU 浅色模式）
