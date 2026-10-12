@@ -84,62 +84,6 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     suspend fun getCategoryVideos(categoryId: String): List<Video> = repo.getVideos(categoryId)
 }
 
-/** 详情：视频信息 + 收藏态 + 播放进度 */
-@OptIn(ExperimentalCoroutinesApi::class)
-class DetailViewModel(container: AppContainer) : ViewModel() {
-    private val repo = container.videoRepository
-    private val favoriteDao = container.favoriteDao
-    private val historyDao = container.historyDao
-
-    private val videoId = MutableStateFlow<String?>(null)
-
-    val video: StateFlow<Video?> = videoId
-        .filterNotNull()
-        .map { repo.getVideo(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    val isFavorite: StateFlow<Boolean> = videoId
-        .filterNotNull()
-        .flatMapLatest { favoriteDao.observeIsFavorite(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
-    val history: StateFlow<HistoryEntity?> = videoId
-        .filterNotNull()
-        .flatMapLatest { historyDao.observeOne(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    fun load(id: String) {
-        if (videoId.value != id) videoId.value = id
-    }
-
-    fun toggleFavorite(video: Video) {
-        viewModelScope.launch {
-            val current = favoriteDao.isFavorite(video.id)
-            if (current) {
-                favoriteDao.delete(video.id)
-            } else {
-                // 记录视频所在站源：点击收藏时按此站源拉详情并播放
-                val loaded = repo.currentSite.value
-                val siteKey = loaded?.site?.key.orEmpty()
-                val siteName = video.sourceName.ifBlank {
-                    siteShortName(loaded?.site?.name.orEmpty(), siteKey)
-                }
-                favoriteDao.upsert(
-                    FavoriteEntity(
-                        videoId = video.id,
-                        title = video.title,
-                        cover = video.cover,
-                        categoryName = video.categoryName,
-                        addedAt = System.currentTimeMillis(),
-                        sourceKey = siteKey,
-                        sourceName = siteName,
-                    ),
-                )
-            }
-        }
-    }
-}
-
 /** 搜索：关键词防抖 + 历史记录 + 推荐词 */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchViewModel(container: AppContainer) : ViewModel() {
