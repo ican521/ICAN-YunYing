@@ -227,8 +227,8 @@ fun FloatingBottomBar(
         isBlurEnabled -> surfaceContainer.copy(0.4f)
         else -> surfaceContainer
     }
-    // 深色模式关闭毛玻璃时：选中指示器用 rgb(37,50,69)；浅色保持主题色 15% 透明
-    val plainIndicatorColor = if (isInDark) Color(0xFF253245) else accentColor.copy(alpha = 0.15f)
+    // 关闭毛玻璃时：选中指示器统一用主题色 15% 透明（与 KernelSU 一致）
+    val plainIndicatorColor = accentColor.copy(alpha = 0.15f)
 
     val tabsBackdrop = rememberLayerBackdrop()
     val density = LocalDensity.current
