@@ -19,8 +19,11 @@ object Routes {
     fun multiSearch(query: String) = "multi_search?query=${android.net.Uri.encode(query)}"
 
     const val PLAYER_PATTERN = "player/{videoId}/{episodeIndex}?flag={flag}&preInit={preInit}"
+
+    // videoId 必须 URL 编码：部分站源 id 形如 "movie/8858.html" 含斜杠，
+    // 不编码会打乱 path 段数导致 NavGraph 匹配失败闪退
     fun player(videoId: String, episodeIndex: Int, flag: String = "", preInit: Boolean = false) =
-        "player/$videoId/$episodeIndex?flag=${android.net.Uri.encode(flag)}&preInit=$preInit"
+        "player/${android.net.Uri.encode(videoId)}/$episodeIndex?flag=${android.net.Uri.encode(flag)}&preInit=$preInit"
 }
 
 /** 底部胶囊导航的一个入口 */
