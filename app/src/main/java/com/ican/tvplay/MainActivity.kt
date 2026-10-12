@@ -98,13 +98,13 @@ class MainActivity : ComponentActivity() {
         val playing = Players.state.value.playing
         val actions = ArrayList<RemoteAction>()
 
-        // 播放 / 暂停（根据状态切换图标）
+        // 播放 / 暂停（根据状态切换图标；自定义纯白矢量，去除系统自带图标的描边）
         actions.add(
             RemoteAction(
                 Icon.createWithResource(
                     this,
-                    if (playing) android.R.drawable.ic_media_pause
-                    else android.R.drawable.ic_media_play,
+                    if (playing) R.drawable.ic_pip_pause
+                    else R.drawable.ic_pip_play,
                 ),
                 if (playing) "暂停" else "播放", "",
                 PendingIntent.getService(
