@@ -4,6 +4,10 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -16,12 +20,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -68,6 +74,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -97,6 +104,7 @@ import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.CircleIconButton
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
@@ -157,11 +165,18 @@ fun PlayerScreen(
     var pendingFullscreen by remember { mutableStateOf<Boolean?>(null) }
     // 平板已处于横屏时进入全屏：不会触发方向配置变化，无需等待旋转，退出时也不请求旋转
     var landscapeFullscreen by remember { mutableStateOf(false) }
+    // 横屏小窗↔全屏放大/缩回动画进行中：期间只渲染纯视频，不挂任何覆盖层
+    var landZooming by remember { mutableStateOf(false) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
-            pendingFullscreen == true && isLandscape -> { fullscreen = true; pendingFullscreen = null }
-            pendingFullscreen == false && !isLandscape -> { fullscreen = false; pendingFullscreen = null }
+            // 旋转进入/退出全屏后都保持纯净画面，工具栏由用户单击唤出
+            pendingFullscreen == true && isLandscape -> {
+                fullscreen = true; pendingFullscreen = null; controlsVisible = false
+            }
+            pendingFullscreen == false && !isLandscape -> {
+                fullscreen = false; pendingFullscreen = null; controlsVisible = false
+            }
         }
     }
 
@@ -496,12 +511,13 @@ fun PlayerScreen(
         }
     }
 
-    // 全屏布局切换时自动收起/恢复状态栏（旋转请求在挂起触发处先行发出）
-    LaunchedEffect(fullscreen) {
-        Players.isFullscreen = fullscreen
+    // 全屏/放大动画期间自动收起状态栏，缩回小窗收敛后恢复（旋转请求在挂起触发处先行发出）
+    val immersive = fullscreen || landscapeFullscreen || landZooming
+    LaunchedEffect(immersive) {
+        Players.isFullscreen = immersive
         val activity = context as? Activity ?: return@LaunchedEffect
         val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
-        if (fullscreen) {
+        if (immersive) {
             // 沉浸式：隐藏状态栏，从边缘上滑可临时唤出
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             controller.hide(WindowInsetsCompat.Type.statusBars())
@@ -565,8 +581,12 @@ fun PlayerScreen(
     fun handleBack() {
         if (fullscreen) {
             if (landscapeFullscreen) {
-                // 平板横屏直进的全屏：直接退回横版小窗，不请求旋转
+                // 平板横屏直进的全屏：立即卸载全屏覆盖层，PlayerView 执行缩回动画，
+                // 动画期间只有纯视频，结束后恢复横版小窗（同样不弹工具栏）
                 fullscreen = false
+                controlsVisible = false
+                landscapeFullscreen = false
+                landZooming = true
             } else {
                 // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
                 (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -574,6 +594,8 @@ fun PlayerScreen(
             }
             return
         }
+        // 放大/缩回动画进行中忽略返回，避免动画中途退出页面
+        if (landZooming) return
         // release / 后台续播转交由 onDispose 统一处理（popBackStack 后触发）
         onBack()
     }
@@ -620,19 +642,78 @@ fun PlayerScreen(
     }
 
     // 根：视频 View 常驻最底层，不随布局切换重建（Surface 不销毁 → 切换无黑屏），
-    // 竖屏控制层/信息流、全屏控制层作为覆盖层画在其上
-    Box(
+    // 竖屏控制层/信息流、全屏控制层作为覆盖层画在其上。
+    // BoxWithConstraints 提供整屏尺寸，供横屏小窗→全屏放大动画插值。
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            // 旋转过渡期（挂起中）用黑底，避免浅色模式旋转中途露出白色背景
+            // 旋转过渡期 / 放大动画期间用黑底，避免露出白色背景
             .background(
-                if (fullscreen || pendingFullscreen != null) {
+                if (fullscreen || pendingFullscreen != null ||
+                    landscapeFullscreen || landZooming
+                ) {
                     Color.Black
                 } else {
                     MaterialTheme.colorScheme.background
                 },
             ),
     ) {
+        val density = LocalDensity.current
+        val screenW = maxWidth
+        val screenH = maxHeight
+        // 状态栏高度：取进入页面时的固定值。放大后系统会隐藏状态栏，实时 inset 会归零，
+        // 若用实时值会导致缩回终点 y=0、收敛恢复状态栏时画面跳一下
+        val statusBarInsets = WindowInsets.statusBars
+        val statusBarTop = remember(density) {
+            with(density) { statusBarInsets.getTop(this).toDp() }
+        }
+
+        // 横屏小窗↔全屏放大/缩回过渡：宽/高/顶部偏移连续插值，
+        // PlayerView 全程不重建，只有画面在放大，不挂任何控制层
+        val expandTransition = updateTransition(
+            targetState = landscapeFullscreen,
+            label = "landPlayerExpand",
+        )
+        val animWidth by expandTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "animWidth",
+        ) { expanded ->
+            if (expanded) screenW else screenW * LAND_PLAYER_WIDTH_FRACTION
+        }
+        val animHeight by expandTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "animHeight",
+        ) { expanded ->
+            if (expanded) screenH
+            else screenW * LAND_PLAYER_WIDTH_FRACTION * (9f / 16f)
+        }
+        val animTop by expandTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "animTop",
+        ) { expanded -> if (expanded) 0.dp else statusBarTop }
+
+        // 动画收敛后挂载/卸载覆盖层：放大结束才挂全屏布局（纯净画面起手），
+        // 缩回动画播放期间横版布局也不渲染（只剩纯视频在缩小）
+        LaunchedEffect(landZooming) {
+            if (landZooming) {
+                snapshotFlow {
+                    !expandTransition.isRunning &&
+                        expandTransition.currentState == expandTransition.targetState
+                }.first { it }
+                landZooming = false
+                if (landscapeFullscreen) {
+                    // 放大完成：挂全屏布局，工具栏默认隐藏
+                    fullscreen = true
+                    controlsVisible = false
+                } else {
+                    // 缩回完成：恢复方向自由，回到横版小窗，不弹工具栏
+                    controlsVisible = false
+                    (context as? Activity)?.requestedOrientation =
+                        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                }
+            }
+        }
+
         AndroidView(
             factory = { sharedPlayerView },
             update = { view ->
@@ -640,7 +721,14 @@ fun PlayerScreen(
                 if (view.player !== Players.player) Players.bindPlayerView(view)
             },
             modifier = when {
-                fullscreen -> Modifier.fillMaxSize()
+                // 手机旋转进入的全屏：直接铺满
+                fullscreen && !landscapeFullscreen -> Modifier.fillMaxSize()
+                // 平板放大动画期间 / 已放大：动画尺寸（收敛后恰为整屏，与 fillMaxSize 等尺寸）
+                landscapeFullscreen || landZooming ->
+                    Modifier
+                        .offset(y = animTop)
+                        .width(animWidth)
+                        .height(animHeight)
                 // 旋转挂起期间统一沿用竖屏尺寸，避免转屏中途露出横版或画面拉伸
                 pendingFullscreen != null ->
                     Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f)
@@ -693,6 +781,8 @@ fun PlayerScreen(
         }
         // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
         pendingFullscreen == true -> Unit
+        // 平板放大/缩回动画期：不渲染任何覆盖层，画面上只有视频在缩放
+        landZooming -> Unit
         else -> if (pendingFullscreen == null && isLandscape) {
             // 自然横屏（平板）：fongmi activity_detail_land 横版布局
             LandscapePlayLayout(
@@ -708,10 +798,14 @@ fun PlayerScreen(
                 onPrev = { if (episodeIndex > 0) episodeIndex-- },
                 onNext = { if (episodeIndex < lineEpisodes.size - 1) episodeIndex++ },
                 onEnterFullscreen = {
-                    // 已在横屏：无旋转事件，直接铺满全屏
+                    // 已在横屏：无旋转事件，启动小窗→全屏放大动画，
+                    // 动画结束（LaunchedEffect）后再挂全屏布局且工具栏默认隐藏
                     controlsTick++
+                    controlsVisible = false
+                    (context as? Activity)?.requestedOrientation =
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     landscapeFullscreen = true
-                    fullscreen = true
+                    landZooming = true
                 },
                 onBack = { handleBack() },
                 onLineChange = { flag ->
@@ -915,6 +1009,9 @@ private fun PortraitPlayLayout(
 
 /** 横版播放器占屏宽比例（fongmi 38:62） */
 private const val LAND_PLAYER_WIDTH_FRACTION = 0.38f
+
+/** 横屏小窗↔全屏放大/缩回动画时长 */
+private const val LAND_ZOOM_DURATION_MS = 300
 
 @Composable
 private fun LandscapePlayLayout(
