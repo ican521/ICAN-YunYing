@@ -2,6 +2,8 @@ package com.ican.tvplay.ui.components
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
@@ -112,15 +114,24 @@ object AppIcons {
             "1.31.26 2s-.1 1.36-.26 2h-3.38z",
     )
 
-    val FavoriteBorder: ImageVector = vector(
-        "favorite_border",
-        "M16.5 5c-1.74 0-3.41.81-4.5 2.09C10.91 5.81 9.24 5 7.5 5 4.42 5 2 7.42 2 10.5" +
-            "c0 3.78 3.4 6.86 8.55 11.54L12 23.55l1.45-1.32C18.6 17.36 22 14.28 22 10.5 " +
-            "22 7.42 19.58 5 16.5 5z" +
-            "M12 19.55l-.1.1-.1-.1C7.14 15.24 4 12.39 4 10.5 4 8.5 5.5 7 7.5 7" +
-            "c1.54 0 3.04.99 3.57 2.36h1.87C13.46 7.99 14.96 7 16.5 7c2 0 3.5 1.5 3.5 3.5 " +
-            "0 1.89-3.14 4.74-7.9 9.05z",
-    )
+    // 空心心形：实心轮廓均匀描边（stroke）绘制，避免 fill 挖空画法底部交汇处线条偏粗
+    val FavoriteBorder: ImageVector = ImageVector.Builder(
+        name = "favorite_border",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).addPath(
+        pathData = addPathNodes(
+            "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3" +
+                "c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5" +
+                "c0 3.78-3.4 6.86-8.55 11.54z",
+        ),
+        stroke = SolidColor(Color.Black),
+        strokeLineWidth = 1.9f,
+        strokeLineCap = StrokeCap.Round,
+        strokeLineJoin = StrokeJoin.Round,
+    ).build()
 
     // ---- 播放器控制 ----
 
