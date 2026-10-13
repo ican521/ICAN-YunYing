@@ -442,6 +442,7 @@ private fun CategoryChips(
             .coerceIn(0, (categories.size - 1).coerceAtLeast(0))
 
     // miuix 原生分段 Tab（KernelSU 模块仓库页同款）：等宽 tab + 滑动药丸指示器 + 选中自动居中
+    // cornerRadius 取高度一半（42/2=21dp）→ 完美药丸圆角，与搜索栏/底栏胶囊圆角一致
     TabRow(
         tabs = categories.map { it.name },
         selectedTabIndex = colorTargetIndex,
@@ -449,6 +450,7 @@ private fun CategoryChips(
         colors = TabRowDefaults.tabRowColors(
             backgroundColor = MaterialTheme.colorScheme.background,
         ),
+        cornerRadius = 21.dp,
         modifier = Modifier.padding(horizontal = horizontalPadding),
     )
 }
