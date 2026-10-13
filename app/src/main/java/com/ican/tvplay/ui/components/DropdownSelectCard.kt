@@ -55,6 +55,10 @@ fun DropdownSelectCard(
     hint: String? = null,
 ) {
     var show by remember { mutableStateOf(false) }
+    // 弹窗存活期（含退出动画）冻结卡片焦点缩放：miuix 锚点取自行内 Spacer 的实时窗口坐标，
+    // 卡片一旦播放 1→1.02 弹簧缩放，弹窗会跟随锚点连续位移（表现为选项跳动）。
+    // KernelSU 的 BasicComponent 无缩放，靠 onDismissFinished 覆盖整个进出场周期保持锚点静止。
+    var anchorFrozen by remember { mutableStateOf(false) }
     val hapticFeedback = LocalHapticFeedback.current
     val shape = RoundedCornerShape(Spacing.corner)
 
@@ -77,11 +81,16 @@ fun DropdownSelectCard(
             .tvCardEffect(
                 onClick = {
                     // KernelSU handleClick：展开时触感反馈（HapticFeedbackType.ContextClick）
-                    show = !show
-                    if (show) hapticFeedback.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    val expanding = !show
+                    show = expanding
+                    if (expanding) {
+                        anchorFrozen = true
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    }
                 },
                 shape = shape,
                 focusedScale = 1.02f,
+                freezeScale = anchorFrozen,
                 glow = false,
             )
             .background(MaterialTheme.colorScheme.surface, shape)
@@ -126,7 +135,7 @@ fun DropdownSelectCard(
                     entry = entry,
                     show = show,
                     onDismiss = { show = false },
-                    onDismissFinished = { },
+                    onDismissFinished = { anchorFrozen = false },
                     maxHeight = null,
                     dropdownColors = DropdownDefaults.dropdownColors(),
                     renderInRootScaffold = true,
