@@ -56,6 +56,15 @@ class SettingsRepository(context: Context) {
         _enableBlur.value = enabled
     }
 
+    /** 预测性返回手势（KernelSU 同款，默认关闭；切换后立即生效，需 recreate Activity） */
+    private val _enablePredictiveBack = MutableStateFlow(prefs.getBoolean(KEY_PREDICTIVE_BACK, false))
+    val enablePredictiveBack: StateFlow<Boolean> = _enablePredictiveBack.asStateFlow()
+
+    fun setEnablePredictiveBack(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_PREDICTIVE_BACK, enabled).apply()
+        _enablePredictiveBack.value = enabled
+    }
+
     /** 首页网格布局大小（默认中） */
     private val _homeLayoutSize = MutableStateFlow(
         runCatching {
@@ -212,6 +221,7 @@ class SettingsRepository(context: Context) {
         const val KEY_THEME = "theme_mode"
         const val KEY_THEME_COLOR = "theme_color"
         const val KEY_ENABLE_BLUR = "enable_blur"
+        const val KEY_PREDICTIVE_BACK = "enable_predictive_back"
         const val KEY_HOME_LAYOUT_SIZE = "home_layout_size"
         const val KEY_CONFIG_URL = "config_url"
         const val KEY_SITE_KEY = "site_key"

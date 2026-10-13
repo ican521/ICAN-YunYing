@@ -232,6 +232,7 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
+    val enablePredictiveBack: StateFlow<Boolean> = settings.enablePredictiveBack
     val homeLayoutSize: StateFlow<com.ican.tvplay.data.HomeLayoutSize> = settings.homeLayoutSize
     val playerBackgroundPlay: StateFlow<Int> = settings.playerBackgroundPlay
     val configUrl: StateFlow<String> = settings.configUrl
@@ -249,6 +250,7 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
     fun setEnableBlur(enabled: Boolean) = settings.setEnableBlur(enabled)
+    fun setEnablePredictiveBack(enabled: Boolean) = settings.setEnablePredictiveBack(enabled)
     fun setHomeLayoutSize(size: com.ican.tvplay.data.HomeLayoutSize) =
         settings.setHomeLayoutSize(size)
     fun setPlayerBackgroundPlay(mode: Int) = settings.setPlayerBackgroundPlay(mode)

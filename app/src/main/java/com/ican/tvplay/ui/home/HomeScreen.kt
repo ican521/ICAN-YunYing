@@ -32,7 +32,12 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
+import top.yukonga.miuix.kmp.utils.PagerGestureNestedScrollConnection
+import top.yukonga.miuix.kmp.utils.PagerInterceptionMode
+import top.yukonga.miuix.kmp.utils.PagerNavigationSpringSpec
+import top.yukonga.miuix.kmp.utils.pagerGestureOverride
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -179,10 +184,18 @@ fun HomeScreen(
         // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；
         // 每页数据完全独立于 selectedCategory（按 page index 从 categories 直接取对应分类 + 独立缓存），
         // 不再等 settle 同步后才更新 — 避免「目标页先显示旧内容再刷新」
+        // 手势照搬 KernelSU：miuix 跨轴拦截（CrossAxis）— pager 自带手势关闭，
+        // 由 miuix 识别器按滑动角度仲裁横/纵向；列表纵向 fling 中横向滑动可立即打断翻页
+        val pagerFling = PagerDefaults.flingBehavior(pagerState, snapAnimationSpec = PagerNavigationSpringSpec)
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .pagerGestureOverride(pagerState, PagerInterceptionMode.CrossAxisInterceptor),
             beyondViewportPageCount = 1,
+            userScrollEnabled = false,
+            flingBehavior = pagerFling,
+            pageNestedScrollConnection = PagerGestureNestedScrollConnection,
         ) { page ->
             val pageContentPadding = PaddingValues(
                 start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
