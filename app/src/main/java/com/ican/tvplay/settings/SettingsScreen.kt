@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
@@ -64,6 +65,7 @@ import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
+import com.ican.tvplay.ui.theme.LocalDarkTheme
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -328,6 +330,7 @@ private fun SettingsDropdownCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val density = LocalDensity.current
+    val isDark = LocalDarkTheme.current
     val shape = RoundedCornerShape(Spacing.corner)
 
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -397,8 +400,10 @@ private fun SettingsDropdownCard(
                         layoutDirection: LayoutDirection,
                         popupContentSize: IntSize,
                     ): IntOffset {
+                        // KernelSU 同款：弹窗不贴卡片右缘，向左留出一段距离
                         val gap = with(density) { 8.dp.roundToPx() }
-                        val x = (anchorBounds.right - popupContentSize.width)
+                        val rightInset = with(density) { 12.dp.roundToPx() }
+                        val x = (anchorBounds.right - popupContentSize.width - rightInset)
                             .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
                         val y = (anchorBounds.bottom + gap)
                             .coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0))
@@ -410,6 +415,14 @@ private fun SettingsDropdownCard(
             ) {
                 Column(
                     modifier = Modifier
+                        .then(
+                            // 深色模式下隐藏所有阴影（全局规范）
+                            if (!isDark) {
+                                Modifier.shadow(elevation = 6.dp, shape = shape, clip = false)
+                            } else {
+                                Modifier
+                            },
+                        )
                         .width(IntrinsicSize.Max)
                         .background(MaterialTheme.colorScheme.surface, shape)
                         .padding(vertical = 6.dp),
