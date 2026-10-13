@@ -47,6 +47,10 @@ class AppViewModel(container: AppContainer) : ViewModel() {
 class HomeViewModel(container: AppContainer) : ViewModel() {
     private val repo = container.videoRepository
 
+    /** 首页网格布局大小（小/中/大） */
+    val homeLayoutSize: StateFlow<com.ican.tvplay.data.HomeLayoutSize> =
+        container.settingsRepository.homeLayoutSize
+
     /** 分类列表：响应式，配置异步加载完成后自动推送 */
     val categories: StateFlow<List<VideoCategory>> = repo.categoriesFlow
 
@@ -230,6 +234,7 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val dynamicColor: StateFlow<Boolean> = settings.dynamicColor
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
+    val homeLayoutSize: StateFlow<com.ican.tvplay.data.HomeLayoutSize> = settings.homeLayoutSize
     val playerBackgroundPlay: StateFlow<Int> = settings.playerBackgroundPlay
     val configUrl: StateFlow<String> = settings.configUrl
 
@@ -247,6 +252,8 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setDynamicColor(enabled: Boolean) = settings.setDynamicColor(enabled)
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
     fun setEnableBlur(enabled: Boolean) = settings.setEnableBlur(enabled)
+    fun setHomeLayoutSize(size: com.ican.tvplay.data.HomeLayoutSize) =
+        settings.setHomeLayoutSize(size)
     fun setPlayerBackgroundPlay(mode: Int) = settings.setPlayerBackgroundPlay(mode)
 
     /** 保存配置 URL 后立即重新拉取站点与分类，并后台预热首页各分类首屏（fongmi 式） */

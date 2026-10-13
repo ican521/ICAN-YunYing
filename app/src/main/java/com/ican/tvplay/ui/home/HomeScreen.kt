@@ -85,6 +85,7 @@ fun HomeScreen(
 
     val contentPadding = topLevelContentPadding()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     // 当前站源 key：切站后即使新旧站分类 id 完全相同，也要强制各页重新取数（修复切站后首页内容不刷新）
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -207,7 +208,23 @@ fun HomeScreen(
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background),
             ) {
-                val columns = GridCells.Adaptive(minSize = 132.dp)
+                // 列数由「设置-首页布局大小」驱动：手机（<600dp）小=3列/中=2列（大不开放），
+                // 平板沿用自适应最小卡宽：小≈7列、中≈5列、大≈3列
+                val columns = if (maxWidth < 600.dp) {
+                    if (homeLayoutSize == com.ican.tvplay.data.HomeLayoutSize.SMALL) {
+                        GridCells.Fixed(3)
+                    } else {
+                        GridCells.Fixed(2)
+                    }
+                } else {
+                    GridCells.Adaptive(
+                        minSize = when (homeLayoutSize) {
+                            com.ican.tvplay.data.HomeLayoutSize.SMALL -> 132.dp
+                            com.ican.tvplay.data.HomeLayoutSize.MEDIUM -> 200.dp
+                            com.ican.tvplay.data.HomeLayoutSize.LARGE -> 300.dp
+                        },
+                    )
+                }
                 LazyVerticalGrid(
                     state = gridState,
                     columns = columns,

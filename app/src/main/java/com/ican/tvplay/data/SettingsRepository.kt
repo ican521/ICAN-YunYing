@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
 /** 主题模式：跟随系统 / 浅色 / 深色 */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/** 首页网格布局大小：小（手机3列/平板~7列）/ 中（手机2列/平板~5列）/ 大（仅平板可选，~3列） */
+enum class HomeLayoutSize { SMALL, MEDIUM, LARGE }
+
 /** 后台播放模式（fongmi「后台播放」三态） */
 const val BACKGROUND_OFF = 0 // 关闭：退出播放页即停止（默认）
 const val BACKGROUND_ON = 1  // 开启：后台续播 + 通知栏控制
@@ -60,6 +63,21 @@ class SettingsRepository(context: Context) {
     fun setEnableBlur(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_ENABLE_BLUR, enabled).apply()
         _enableBlur.value = enabled
+    }
+
+    /** 首页网格布局大小（默认中） */
+    private val _homeLayoutSize = MutableStateFlow(
+        runCatching {
+            HomeLayoutSize.valueOf(
+                prefs.getString(KEY_HOME_LAYOUT_SIZE, null) ?: HomeLayoutSize.MEDIUM.name,
+            )
+        }.getOrDefault(HomeLayoutSize.MEDIUM),
+    )
+    val homeLayoutSize: StateFlow<HomeLayoutSize> = _homeLayoutSize.asStateFlow()
+
+    fun setHomeLayoutSize(size: HomeLayoutSize) {
+        prefs.edit().putString(KEY_HOME_LAYOUT_SIZE, size.name).apply()
+        _homeLayoutSize.value = size
     }
 
     /** 导入配置的 URL 链接（仅保存，不解析） */
@@ -204,6 +222,7 @@ class SettingsRepository(context: Context) {
         const val KEY_DYNAMIC_COLOR = "dynamic_color"
         const val KEY_THEME_COLOR = "theme_color"
         const val KEY_ENABLE_BLUR = "enable_blur"
+        const val KEY_HOME_LAYOUT_SIZE = "home_layout_size"
         const val KEY_CONFIG_URL = "config_url"
         const val KEY_SITE_KEY = "site_key"
         const val KEY_SITE_SEARCHABLE_PREFIX = "site_searchable_"
