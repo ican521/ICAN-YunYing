@@ -40,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -50,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -516,10 +518,13 @@ private fun UnderlineTabRow(
         val hasScrollRange by remember {
             derivedStateOf { listState.canScrollBackward || listState.canScrollForward }
         }
-        val indicatorWidthPx = with(density) { 20.dp.toPx() }
+        // 各 tab 文字的实际渲染宽度（选中加粗后由 onGloballyPositioned 重新记录）
+        val textWidths = remember { mutableStateMapOf<Int, Int>() }
+        val fallbackIndicatorPx = with(density) { 20.dp.toPx() }
+        val indicatorWidthPx = textWidths[selectedTabIndex]?.toFloat() ?: fallbackIndicatorPx
 
         Box(Modifier.fillMaxSize()) {
-            // 主题色小横条：与 miuix 药丸同款位移公式，居中于选中 tab 底部
+            // 主题色小横条：宽度=选中文字实际宽度（文字左缘→右缘），随选中切换即时变化
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -531,7 +536,7 @@ private fun UnderlineTabRow(
                             0,
                         )
                     }
-                    .width(20.dp)
+                    .width(with(density) { indicatorWidthPx.toDp() })
                     .height(3.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary),
@@ -570,6 +575,9 @@ private fun UnderlineTabRow(
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.onGloballyPositioned { coords ->
+                                textWidths[index] = coords.size.width
+                            },
                         )
                     }
                 }
