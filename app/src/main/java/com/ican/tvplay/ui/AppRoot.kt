@@ -96,15 +96,14 @@ fun AppRoot() {
         themeColor = themeColor,
     ) {
         // miuix 主题：为 KernelSU 同款下拉弹窗提供色板。
-        // 覆写 surfaceContainer（弹窗容器色，须比板块色亮一档以区分层级）；
-        // windowDimming 遮罩统一为黑 30%（miuix 默认深色为 60%，用户要求统一看效果）。
+        // 仅覆写 surfaceContainer（弹窗容器色，须比板块色亮一档以区分层级），
+        // 其余沿用 miuix 默认（含 windowDimming 遮罩：浅色黑30% / 深色黑60%，与 KernelSU 一致未覆盖）。
         val isDark = LocalDarkTheme.current
-        val dimColor = Color.Black.copy(alpha = 0.30f)
         MiuixTheme(
             colors = if (isDark) {
-                darkColorScheme(surfaceContainer = DarkSurfaceElevated, windowDimming = dimColor)
+                darkColorScheme(surfaceContainer = DarkSurfaceElevated)
             } else {
-                lightColorScheme(surfaceContainer = LightSurface, windowDimming = dimColor)
+                lightColorScheme(surfaceContainer = LightSurface)
             },
         ) {
         val navController = rememberNavController()
