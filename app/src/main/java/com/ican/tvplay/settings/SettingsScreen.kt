@@ -52,8 +52,8 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.BACKGROUND_PIP
@@ -476,7 +476,7 @@ private fun ConfigImportDialog(
     onDismiss: () -> Unit,
 ) {
     var url by remember { mutableStateOf(initialUrl) }
-    WindowDialog(
+    OverlayDialog(
         show = true,
         title = "导入配置",
         titleColor = MiuixTheme.colorScheme.onBackground,
