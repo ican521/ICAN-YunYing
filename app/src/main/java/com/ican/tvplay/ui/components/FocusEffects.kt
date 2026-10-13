@@ -102,6 +102,10 @@ fun Modifier.tvCardEffect(
     // KernelSU 同款按压特效：miuix 库 MiuixIndication，蒙层色取主题文字色（深浅色模式自动适配）
     val pressIndicationColor = MaterialTheme.colorScheme.onSurface
     val pressIndication = remember(pressIndicationColor) { MiuixIndication(color = pressIndicationColor) }
+    // 深色模式补强：弹窗展开期间暗遮罩（60% 黑）会把 MiuixIndication 的 10% 白蒙层压到不可见，
+    // 保持态再叠一层同色 10% 蒙层（仅深色），保证「弹窗存活期卡片持续按压变色」肉眼可见
+    val holdOverlayColor = pressIndicationColor
+    val showHoldOverlay = holdDownState && isDark
 
     return this
         .scale(scale)
@@ -128,6 +132,10 @@ fun Modifier.tvCardEffect(
         )
         .drawWithContent {
             drawContent()
+
+            if (showHoldOverlay) {
+                drawRect(color = holdOverlayColor, alpha = 0.10f, size = size)
+            }
 
             if (focused) {
                 val strokeWidth = 2.dp.toPx()
