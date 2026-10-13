@@ -131,7 +131,6 @@ fun SettingsScreen(
                 )
             }
         },
-        popupHost = { },
         contentWindowInsets = WindowInsets.systemBars
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
