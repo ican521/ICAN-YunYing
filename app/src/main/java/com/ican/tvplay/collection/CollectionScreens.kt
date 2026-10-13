@@ -204,6 +204,7 @@ fun FavoritesScreen(
         show = showConfirm,
         title = "删除全部收藏",
         content = "确定要清空所有收藏吗？此操作不可恢复。",
+        danger = true,
         onConfirm = {
             viewModel.clearFavorites()
             showConfirm = false
@@ -477,6 +478,7 @@ fun HistoryScreen(
         show = showConfirm,
         title = "删除全部播放历史",
         content = "确定要清空所有播放记录吗？此操作不可恢复。",
+        danger = true,
         onConfirm = {
             viewModel.clearHistory()
             showConfirm = false
