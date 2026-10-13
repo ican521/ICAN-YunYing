@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
@@ -34,10 +35,14 @@ fun MiuixConfirmDialog(
     WindowDialog(
         show = show,
         title = title,
+        // WindowDialog 渲染在独立 Dialog 窗口，内部 CompositionLocal 可能回退浅色默认值，
+        // 关键文字色在此处（页面组合上下文，主题正确）取值后显式传入
+        titleColor = MiuixTheme.colorScheme.onBackground,
+        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         onDismissRequest = onDismiss,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Text(text = content)
+            Text(text = content, color = MiuixTheme.colorScheme.onBackground)
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.padding(top = 12.dp),
