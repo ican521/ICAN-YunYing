@@ -66,6 +66,7 @@ import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.LocalDarkTheme
+import com.ican.tvplay.ui.theme.DarkSurfaceElevated
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -400,9 +401,9 @@ private fun SettingsDropdownCard(
                         layoutDirection: LayoutDirection,
                         popupContentSize: IntSize,
                     ): IntOffset {
-                        // KernelSU 同款：弹窗不贴卡片右缘，向左留出一段距离
+                        // KernelSU 同款：弹窗右上角对齐到点击的上下箭头位置（卡片内容区内边距）
                         val gap = with(density) { 8.dp.roundToPx() }
-                        val rightInset = with(density) { 12.dp.roundToPx() }
+                        val rightInset = with(density) { 18.dp.roundToPx() }
                         val x = (anchorBounds.right - popupContentSize.width - rightInset)
                             .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
                         val y = (anchorBounds.bottom + gap)
@@ -424,7 +425,11 @@ private fun SettingsDropdownCard(
                             },
                         )
                         .width(IntrinsicSize.Max)
-                        .background(MaterialTheme.colorScheme.surface, shape)
+                        // 深色模式用抬升色区分卡片层级（KernelSU 同款），浅色模式保持白色 + 阴影
+                        .background(
+                            if (isDark) DarkSurfaceElevated else MaterialTheme.colorScheme.surface,
+                            shape,
+                        )
                         .padding(vertical = 6.dp),
                 ) {
                     options.forEachIndexed { index, option ->
