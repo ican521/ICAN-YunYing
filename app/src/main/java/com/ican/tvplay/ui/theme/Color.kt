@@ -14,6 +14,8 @@ val DarkBackground = Color(0xFF000000)
 val DarkSurface = Color(0xFF242424)
 // 深色模式次级容器色（搜索栏、圆钮、胶囊、开关槽等），与板块/弹窗容器色统一为 rgb(36,36,36)
 val DarkSurfaceVariant = Color(0xFF242424)
+// 深色模式浮层抬升色（KernelSU 风格下拉弹窗等悬浮层），比板块色亮一档以区分层级
+val DarkSurfaceElevated = Color(0xFF2C2C2C)
 val DarkOnSurface = Color(0xFFEDEDF5)
 val DarkOnSurfaceMuted = Color(0xFFA6A6BA)
 val DarkGlassTint = Color(0x33FFFFFF)
