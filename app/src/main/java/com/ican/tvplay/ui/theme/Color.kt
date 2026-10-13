@@ -16,8 +16,6 @@ val DarkSurface = Color(0xFF242424)
 val DarkSurfaceVariant = Color(0xFF242424)
 // 深色模式浮层抬升色（KernelSU 风格下拉弹窗等悬浮层），比板块色亮一档以区分层级
 val DarkSurfaceElevated = Color(0xFF2C2C2C)
-// 点击选项弹出下拉菜单时的全屏黑色遮罩（KernelSU 同款 40% 黑）
-val PopupScrim = Color(0x66000000)
 val DarkOnSurface = Color(0xFFEDEDF5)
 val DarkOnSurfaceMuted = Color(0xFFA6A6BA)
 val DarkGlassTint = Color(0x33FFFFFF)

@@ -57,7 +57,14 @@ import com.ican.tvplay.ui.search.MultiSourceSearchScreen
 import com.ican.tvplay.ui.search.SearchHomeScreen
 import com.ican.tvplay.ui.settings.ColorPaletteScreen
 import com.ican.tvplay.ui.settings.SettingsScreen
+import com.ican.tvplay.ui.theme.DarkSurfaceElevated
+import com.ican.tvplay.ui.theme.LightSurface
+import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.TvPlayTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.darkColorScheme
+import top.yukonga.miuix.kmp.theme.lightColorScheme
+import top.yukonga.miuix.kmp.utils.MiuixPopupUtils
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 
@@ -87,6 +94,17 @@ fun AppRoot() {
         dynamicColor = dynamicColor,
         themeColor = themeColor,
     ) {
+        // miuix 主题：为 KernelSU 同款下拉弹窗提供色板。
+        // 仅覆写 surfaceContainer（弹窗容器色，须比板块色亮一档以区分层级），
+        // 其余沿用 miuix 默认（含 windowDimming 遮罩：浅色黑30% / 深色黑60%，与 KernelSU 一致未覆盖）。
+        val isDark = LocalDarkTheme.current
+        MiuixTheme(
+            colors = if (isDark) {
+                darkColorScheme(surfaceContainer = DarkSurfaceElevated)
+            } else {
+                lightColorScheme(surfaceContainer = LightSurface)
+            },
+        ) {
         val navController = rememberNavController()
 
         // 通知栏点击 → 恢复播放页（后台续播场景）
@@ -275,6 +293,11 @@ fun AppRoot() {
                     }
                 }
             }
+
+            // miuix 弹窗宿主：KernelSU 同款——弹窗/遮罩渲染在 App 自身窗口的全屏覆盖层
+            //（MiuixPopupHost，非独立 Dialog 窗口），坐标空间与页面一致
+            MiuixPopupUtils.MiuixPopupHost()
+        }
         }
     }
 }

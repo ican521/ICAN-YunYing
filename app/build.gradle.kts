@@ -105,6 +105,10 @@ dependencies {
     // miuix-blur：液态玻璃悬浮底栏的 Backdrop 模糊 / 折射
     implementation(libs.miuix.blur)
 
+    // miuix UI + preference：KernelSU 同款下拉弹窗（OverlayDropdownPopup，同窗口覆盖层渲染）
+    implementation(libs.miuix.ui)
+    implementation(libs.miuix.preference)
+
     // Coil 3：网络封面加载
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
