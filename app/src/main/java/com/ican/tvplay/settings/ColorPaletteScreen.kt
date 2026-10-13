@@ -82,7 +82,6 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
                 )
             }
         },
-        popupHost = { },
         contentWindowInsets = WindowInsets.systemBars
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),

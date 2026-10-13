@@ -138,7 +138,6 @@ fun FavoritesScreen(
                 )
             }
         },
-        popupHost = { },
         contentWindowInsets = WindowInsets.systemBars
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
@@ -456,7 +455,6 @@ fun HistoryScreen(
                 )
             }
         },
-        popupHost = { },
         contentWindowInsets = WindowInsets.systemBars
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
