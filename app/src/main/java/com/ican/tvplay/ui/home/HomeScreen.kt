@@ -2,6 +2,7 @@ package com.ican.tvplay.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -557,11 +558,11 @@ private fun UnderlineTabRow(
                         modifier = Modifier
                             .fillMaxHeight()
                             .width(tabWidth)
-                            .tvCardEffect(
+                            // 纯点击无任何按压/长按特效（无水波纹、无蒙层、无缩放）
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
                                 onClick = { onTabSelected(index) },
-                                shape = CircleShape,
-                                focusedScale = 1.06f,
-                                glow = false,
                             )
                             .padding(horizontal = 12.dp),
                     ) {
