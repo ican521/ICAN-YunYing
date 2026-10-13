@@ -32,6 +32,7 @@ class AppViewModel(container: AppContainer) : ViewModel() {
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
+    val enableSwipeDismiss: StateFlow<Boolean> = settings.enableSwipeDismiss
 
     /** 接口配置是否已就绪（已导入并成功加载站点） */
     val configReady: StateFlow<Boolean> = videoRepository.currentSite
@@ -233,6 +234,7 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
     val enablePredictiveBack: StateFlow<Boolean> = settings.enablePredictiveBack
+    val enableSwipeDismiss: StateFlow<Boolean> = settings.enableSwipeDismiss
     val homeLayoutSize: StateFlow<com.ican.tvplay.data.HomeLayoutSize> = settings.homeLayoutSize
     val playerBackgroundPlay: StateFlow<Int> = settings.playerBackgroundPlay
     val configUrl: StateFlow<String> = settings.configUrl
@@ -251,6 +253,7 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
     fun setEnableBlur(enabled: Boolean) = settings.setEnableBlur(enabled)
     fun setEnablePredictiveBack(enabled: Boolean) = settings.setEnablePredictiveBack(enabled)
+    fun setEnableSwipeDismiss(enabled: Boolean) = settings.setEnableSwipeDismiss(enabled)
     fun setHomeLayoutSize(size: com.ican.tvplay.data.HomeLayoutSize) =
         settings.setHomeLayoutSize(size)
     fun setPlayerBackgroundPlay(mode: Int) = settings.setPlayerBackgroundPlay(mode)
