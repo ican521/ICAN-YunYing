@@ -9,19 +9,25 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +47,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.BACKGROUND_PIP
@@ -48,9 +59,11 @@ import com.ican.tvplay.data.ThemeMode
 import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
+import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.DropdownSelectCard
+import com.ican.tvplay.ui.components.LocalEnableBlur
 import com.ican.tvplay.ui.components.pageHorizontalPadding
-import com.ican.tvplay.ui.components.topBarPadding
+import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.MaterialTheme
@@ -93,31 +106,50 @@ fun SettingsScreen(
     }
 
     val horizontal = pageHorizontalPadding()
-    val topPadding = topBarPadding().calculateTopPadding()
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(
+    // 手机（<600dp）只提供小/中两档；平板额外提供大（约3列）
+    val layoutOptions = if (LocalContext.current.resources.configuration.screenWidthDp >= 600) {
+        listOf("小", "中", "大")
+    } else {
+        listOf("小", "中")
+    }
+    // KernelSU 同款：折叠顶栏 + 毛玻璃（关闭毛玻璃时顶栏退化为页面背景色）
+    val scrollBehavior = MiuixScrollBehavior()
+    val enableBlurState = LocalEnableBlur.current
+    val backdrop = rememberBlurBackdrop(enableBlurState)
+    val blurActive = backdrop != null
+    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
+
+    Scaffold(
+        topBar = {
+            BlurredBar(backdrop) {
+                TopAppBar(
+                    color = barColor,
+                    title = "设置",
+                    titleColor = MaterialTheme.colorScheme.onBackground,
+                    largeTitleColor = MaterialTheme.colorScheme.onBackground,
+                    scrollBehavior = scrollBehavior,
+                )
+            }
+        },
+        popupHost = { },
+        contentWindowInsets = WindowInsets.systemBars
+            .add(WindowInsets.displayCutout)
+            .only(WindowInsetsSides.Horizontal),
+    ) { innerPadding ->
+        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
+            contentPadding = PaddingValues(
                 start = horizontal,
                 end = horizontal,
-                top = topPadding,
+                top = innerPadding.calculateTopPadding() + Spacing.pageTop,
                 bottom = Spacing.bottomBarInset,
             ),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
         ) {
-            Text(
-                text = "设置",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-        }
-
+        item {
         DropdownSelectCard(
             title = "外观",
             subtitle = "主题模式",
@@ -137,13 +169,9 @@ fun SettingsScreen(
                 )
             },
         )
-
-        // 手机（<600dp）只提供小/中两档；平板额外提供大（约3列）
-        val layoutOptions = if (LocalContext.current.resources.configuration.screenWidthDp >= 600) {
-            listOf("小", "中", "大")
-        } else {
-            listOf("小", "中")
         }
+
+        item {
         DropdownSelectCard(
             title = "布局",
             subtitle = "首页网格大小",
@@ -163,7 +191,9 @@ fun SettingsScreen(
                 )
             },
         )
+        }
 
+        item {
         SettingsCard(title = "主题", subtitle = "自定义更多主题选项") {
             SettingsEntryRow(
                 label = "主题色板",
@@ -180,7 +210,9 @@ fun SettingsScreen(
                 onToggle = { viewModel.setEnableBlur(it) },
             )
         }
+        }
 
+        item {
         SettingsCard(title = "数据", subtitle = "配置来源") {
             SettingsEntryRow(
                 label = "导入配置",
@@ -196,7 +228,9 @@ fun SettingsScreen(
                 onClick = { showSiteDialog = true },
             )
         }
+        }
 
+        item {
         DropdownSelectCard(
             title = "播放",
             subtitle = "后台播放",
@@ -221,7 +255,9 @@ fun SettingsScreen(
             },
             hint = "开启：退出播放页后继续播放并可通知栏控制；画中画：全屏播放时切后台自动进入小窗",
         )
+        }
 
+        item {
         SettingsCard(title = "关于", subtitle = "版本与运行环境") {
             val isTv = LocalContext.current.resources.configuration.uiMode.let { uiMode ->
                 (uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION
@@ -229,6 +265,9 @@ fun SettingsScreen(
             InfoLine("应用名称", "ICAN云影")
             InfoLine("版本", "0.1.0")
             InfoLine("运行设备", if (isTv) "Android TV" else "手机 / 平板")
+        }
+        }
+        }
         }
     }
 
