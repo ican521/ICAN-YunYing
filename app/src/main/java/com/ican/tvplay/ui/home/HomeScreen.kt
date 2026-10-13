@@ -63,6 +63,7 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.MiuixSearchInput
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
@@ -396,30 +397,22 @@ private fun HomeTopBar(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxWidth().height(48.dp),
     ) {
-        // 胶囊搜索框：点击进入搜索页（站源入口已迁移至设置页，搜索框占满剩余空间）
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        // 胶囊搜索框：miuix 原生假胶囊（KernelSU SearchBarFake 同款），点击进入搜索页
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
                 .weight(1f)
-                .height(48.dp)
                 .tvCardEffect(onClick = onSearchClick, shape = CircleShape, focusedScale = 1.04f)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 18.dp),
+                .clip(CircleShape),
         ) {
-            Icon(
-                imageVector = AppIcons.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = "搜索影片、剧集",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            MiuixSearchInput(
+                query = "",
+                onQueryChange = {},
+                onSearch = {},
+                label = "搜索影片、剧集",
+                enabled = false,
+                expanded = false,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
 
