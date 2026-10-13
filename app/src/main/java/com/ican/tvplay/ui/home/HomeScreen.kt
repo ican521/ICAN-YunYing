@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -567,6 +568,7 @@ private fun UnderlineTabRow(
                         Text(
                             text = tabText,
                             style = MaterialTheme.typography.labelLarge,
+                            fontSize = 16.sp,
                             color = if (selected) {
                                 MaterialTheme.colorScheme.onBackground
                             } else {
