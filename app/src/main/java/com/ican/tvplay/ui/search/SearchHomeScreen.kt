@@ -8,11 +8,17 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -29,20 +35,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.ican.tvplay.ui.SearchViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
-import com.ican.tvplay.ui.components.CircleBackButton
+import com.ican.tvplay.ui.components.BlurredBar
+import com.ican.tvplay.ui.components.LocalEnableBlur
+import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
+import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
@@ -71,19 +83,23 @@ fun SearchHomeScreen(
         onSearch(q)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
-        // ========== 顶栏（与搜索结果页顶栏同款，边距走全局统一基准）==========
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(topBarPadding()),
-        ) {
-            CircleBackButton(onClick = onBack)
+    // KernelSU 同款：固定毛玻璃顶栏（搜索栏不适合折叠，保持固定高度）
+    val enableBlurState = LocalEnableBlur.current
+    val backdrop = rememberBlurBackdrop(enableBlurState)
+    val blurActive = backdrop != null
+    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
+
+    Scaffold(
+        topBar = {
+            BlurredBar(backdrop) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(barColor)
+                        .padding(topBarPadding()),
+                ) {
+                    MiuixBackButton(onClick = onBack)
 
             // 搜索框：48dp 高、全圆角、surfaceVariant 底、20dp 图标、bodyLarge 字号
             Row(
@@ -135,10 +151,16 @@ fun SearchHomeScreen(
                     )
                 }
             }
-        }
-
+                }
+            }
+        },
+        popupHost = { },
+        contentWindowInsets = WindowInsets.systemBars
+            .add(WindowInsets.displayCutout)
+            .only(WindowInsetsSides.Horizontal),
+    ) { innerPadding ->
+        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
         // ========== 内容区：历史搜索 + 热搜推荐 ==========
-        Spacer(Modifier.height(Spacing.searchBarBottomMargin))
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -146,6 +168,7 @@ fun SearchHomeScreen(
                 .padding(horizontal = pageHorizontalPadding()),
             verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
         ) {
+            Spacer(Modifier.height(innerPadding.calculateTopPadding() + Spacing.searchBarBottomMargin))
             // 上半部分：历史搜索（无历史整块隐藏；长按单个词删除）
             if (history.isNotEmpty()) {
                 Column {
@@ -174,6 +197,7 @@ fun SearchHomeScreen(
                 Spacer(Modifier.height(Spacing.titleContentGap))
                 WordFlowRow(words = vm.hotWords, onWordClick = { submit(it) })
             }
+        }
         }
     }
 }

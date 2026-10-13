@@ -5,14 +5,20 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.lazy.LazyColumn
@@ -45,6 +51,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.player.core.PlaySpec
@@ -52,8 +60,11 @@ import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.ui.MultiSourceSearchViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
-import com.ican.tvplay.ui.components.CircleBackButton
+import com.ican.tvplay.ui.components.BlurredBar
+import com.ican.tvplay.ui.components.LocalEnableBlur
+import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
+import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
@@ -98,19 +109,23 @@ fun MultiSourceSearchScreen(
         if (q.isNotEmpty()) vm.searchAll(q)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
-        // ========== 顶栏（左右/顶部边距统一走全局基准：手机16dp、平板24dp）==========
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(topBarPadding()),
-        ) {
-            CircleBackButton(onClick = onBack)
+    // KernelSU 同款：固定毛玻璃顶栏（搜索栏不适合折叠，保持固定高度）
+    val enableBlurState = LocalEnableBlur.current
+    val backdrop = rememberBlurBackdrop(enableBlurState)
+    val blurActive = backdrop != null
+    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
+
+    Scaffold(
+        topBar = {
+            BlurredBar(backdrop) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(barColor)
+                        .padding(topBarPadding()),
+                ) {
+                    MiuixBackButton(onClick = onBack)
 
             // 搜索框：与首页顶部胶囊搜索框同款（48dp 高、全圆角、surfaceVariant 底、20dp 图标、bodyLarge 字号）
             Row(
@@ -174,10 +189,22 @@ fun MultiSourceSearchScreen(
                     )
                 }
             }
-        }
-
+                }
+            }
+        },
+        popupHost = { },
+        contentWindowInsets = WindowInsets.systemBars
+            .add(WindowInsets.displayCutout)
+            .only(WindowInsetsSides.Horizontal),
+    ) { innerPadding ->
+        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+        ) {
+            Spacer(Modifier.height(innerPadding.calculateTopPadding() + Spacing.searchBarBottomMargin))
         // ========== 主体：左站源列表 + 右卡片网格（左右边距与顶栏同一基准）==========
-        Spacer(Modifier.height(Spacing.searchBarBottomMargin))
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -261,6 +288,8 @@ fun MultiSourceSearchScreen(
                     }
                 }
             }
+        }
+        }
         }
     }
 }

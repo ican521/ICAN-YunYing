@@ -6,13 +6,20 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -28,21 +35,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.ui.CollectionViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
-import com.ican.tvplay.ui.components.CircleBackButton
+import com.ican.tvplay.ui.components.BlurredBar
+import com.ican.tvplay.ui.components.LocalEnableBlur
+import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
-import com.ican.tvplay.ui.components.topBarPadding
+import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
@@ -68,76 +82,85 @@ fun FavoritesScreen(
     // 编辑模式下按返回 = 取消编辑（不退出页面）；清空弹窗打开时返回由弹窗自行消费
     BackHandler(enabled = editMode && !showConfirm) { editMode = false }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
-        // 顶栏：标题 + 右上角圆形删除按钮（Tab 页无返回按钮）
-        Row(
-            modifier = Modifier.padding(topBarPadding()),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = "我的收藏",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.weight(1f),
-            )
-            // 右上角圆形删除按钮（与 CircleBackButton 完全同尺寸同样式）
-            if (favorites.isNotEmpty()) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(Spacing.circleButton)
-                        .tvCardEffect(
-                            onClick = {
-                                if (!editMode) {
-                                    // 进入编辑模式
-                                    editMode = true
-                                } else {
-                                    // 编辑模式 → 弹出清空确认
-                                    showConfirm = true
-                                }
-                            },
-                            shape = CircleShape,
-                            focusedScale = 1.1f,
-                            glow = false,
-                        )
-                        .background(
-                            if (editMode) Color(0xFFFF5C5C)
-                            else MaterialTheme.colorScheme.surfaceVariant,
-                            CircleShape,
-                        ),
-                ) {
-                    Icon(
-                        imageVector = AppIcons.Delete,
-                        contentDescription = if (editMode) "清空全部" else "编辑",
-                        tint = if (editMode) Color.White
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
-        }
+    // KernelSU 同款：折叠顶栏 + 毛玻璃
+    val scrollBehavior = MiuixScrollBehavior()
+    val enableBlurState = LocalEnableBlur.current
+    val backdrop = rememberBlurBackdrop(enableBlurState)
+    val blurActive = backdrop != null
+    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
 
-        if (favorites.isEmpty()) {
-            EmptyText(text = "还没有收藏，去首页发现好片吧")
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(132.dp),
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = pageHorizontalPadding(),
-                    end = pageHorizontalPadding(),
-                    top = Spacing.titleContentGap,
-                    bottom = Spacing.bottomBarInset,
-                ),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
-                verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
-            ) {
+    Scaffold(
+        topBar = {
+            BlurredBar(backdrop) {
+                TopAppBar(
+                    color = barColor,
+                    title = "我的收藏",
+                    titleColor = MaterialTheme.colorScheme.onBackground,
+                    largeTitleColor = MaterialTheme.colorScheme.onBackground,
+                    actions = {
+                        // 右上角圆形删除按钮（保留项目圆钮样式，与历史页完全一致）
+                        if (favorites.isNotEmpty()) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(Spacing.circleButton)
+                                    .tvCardEffect(
+                                        onClick = {
+                                            if (!editMode) {
+                                                // 进入编辑模式
+                                                editMode = true
+                                            } else {
+                                                // 编辑模式 → 弹出清空确认
+                                                showConfirm = true
+                                            }
+                                        },
+                                        shape = CircleShape,
+                                        focusedScale = 1.1f,
+                                        glow = false,
+                                    )
+                                    .background(
+                                        if (editMode) Color(0xFFFF5C5C)
+                                        else MaterialTheme.colorScheme.surfaceVariant,
+                                        CircleShape,
+                                    ),
+                            ) {
+                                Icon(
+                                    imageVector = AppIcons.Delete,
+                                    contentDescription = if (editMode) "清空全部" else "编辑",
+                                    tint = if (editMode) Color.White
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+                        }
+                    },
+                    scrollBehavior = scrollBehavior,
+                )
+            }
+        },
+        popupHost = { },
+        contentWindowInsets = WindowInsets.systemBars
+            .add(WindowInsets.displayCutout)
+            .only(WindowInsetsSides.Horizontal),
+    ) { innerPadding ->
+        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+            if (favorites.isEmpty()) {
+                EmptyText(text = "还没有收藏，去首页发现好片吧")
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(132.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    contentPadding = PaddingValues(
+                        start = pageHorizontalPadding(),
+                        end = pageHorizontalPadding(),
+                        top = innerPadding.calculateTopPadding() + Spacing.titleContentGap,
+                        bottom = Spacing.bottomBarInset,
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
+                ) {
                 items(favorites, key = { it.videoId }) { item ->
                     FavoriteCard(
                         entity = item,
@@ -170,6 +193,7 @@ fun FavoritesScreen(
                         },
                         onDelete = { viewModel.removeFavorite(item.videoId) },
                     )
+                }
                 }
             }
         }
@@ -374,74 +398,87 @@ fun HistoryScreen(
     // 非编辑模式不拦截，保持原有返回上一页行为
     BackHandler(enabled = editMode && !showConfirm) { editMode = false }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
-        Row(
-            modifier = Modifier.padding(topBarPadding()),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            CircleBackButton(onClick = { if (editMode) editMode = false else onBack() })
-            Text(
-                text = "播放历史",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.weight(1f),
-            )
-            // 右上角圆形删除按钮（与收藏页完全同款：两段式 编辑→清空确认）
-            if (histories.isNotEmpty()) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(Spacing.circleButton)
-                        .tvCardEffect(
-                            onClick = {
-                                if (!editMode) {
-                                    editMode = true
-                                } else {
-                                    showConfirm = true
-                                }
-                            },
-                            shape = CircleShape,
-                            focusedScale = 1.1f,
-                            glow = false,
-                        )
-                        .background(
-                            if (editMode) Color(0xFFFF5C5C)
-                            else MaterialTheme.colorScheme.surfaceVariant,
-                            CircleShape,
-                        ),
-                ) {
-                    Icon(
-                        imageVector = AppIcons.Delete,
-                        contentDescription = if (editMode) "清空全部" else "编辑",
-                        tint = if (editMode) Color.White
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
-        }
+    // KernelSU 同款：折叠顶栏 + 毛玻璃
+    val scrollBehavior = MiuixScrollBehavior()
+    val enableBlurState = LocalEnableBlur.current
+    val backdrop = rememberBlurBackdrop(enableBlurState)
+    val blurActive = backdrop != null
+    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
 
-        if (histories.isEmpty()) {
-            EmptyText(text = "还没有播放记录")
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(132.dp),
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = pageHorizontalPadding(),
-                    end = pageHorizontalPadding(),
-                    top = Spacing.titleContentGap,
-                    bottom = Spacing.bottomBarInset,
-                ),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
-                verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
-            ) {
+    Scaffold(
+        topBar = {
+            BlurredBar(backdrop) {
+                TopAppBar(
+                    color = barColor,
+                    title = "播放历史",
+                    titleColor = MaterialTheme.colorScheme.onBackground,
+                    largeTitleColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIcon = {
+                        // 编辑模式下返回 = 取消编辑
+                        MiuixBackButton(onClick = { if (editMode) editMode = false else onBack() })
+                    },
+                    actions = {
+                        // 右上角圆形删除按钮（与收藏页完全同款：两段式 编辑→清空确认）
+                        if (histories.isNotEmpty()) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(Spacing.circleButton)
+                                    .tvCardEffect(
+                                        onClick = {
+                                            if (!editMode) {
+                                                editMode = true
+                                            } else {
+                                                showConfirm = true
+                                            }
+                                        },
+                                        shape = CircleShape,
+                                        focusedScale = 1.1f,
+                                        glow = false,
+                                    )
+                                    .background(
+                                        if (editMode) Color(0xFFFF5C5C)
+                                        else MaterialTheme.colorScheme.surfaceVariant,
+                                        CircleShape,
+                                    ),
+                            ) {
+                                Icon(
+                                    imageVector = AppIcons.Delete,
+                                    contentDescription = if (editMode) "清空全部" else "编辑",
+                                    tint = if (editMode) Color.White
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+                        }
+                    },
+                    scrollBehavior = scrollBehavior,
+                )
+            }
+        },
+        popupHost = { },
+        contentWindowInsets = WindowInsets.systemBars
+            .add(WindowInsets.displayCutout)
+            .only(WindowInsetsSides.Horizontal),
+    ) { innerPadding ->
+        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+            if (histories.isEmpty()) {
+                EmptyText(text = "还没有播放记录")
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(132.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    contentPadding = PaddingValues(
+                        start = pageHorizontalPadding(),
+                        end = pageHorizontalPadding(),
+                        top = innerPadding.calculateTopPadding() + Spacing.titleContentGap,
+                        bottom = Spacing.bottomBarInset,
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
+                ) {
                 items(histories, key = { it.videoId }) { history ->
                     HistoryCard(
                         history = history,
@@ -474,6 +511,7 @@ fun HistoryScreen(
                         },
                         onDelete = { viewModel.removeHistory(history.videoId) },
                     )
+                }
                 }
             }
         }

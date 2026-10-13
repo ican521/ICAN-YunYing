@@ -6,9 +6,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -21,17 +27,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
-import com.ican.tvplay.ui.components.CircleBackButton
-import com.ican.tvplay.ui.components.topBarPadding
+import com.ican.tvplay.ui.components.BlurredBar
+import com.ican.tvplay.ui.components.LocalEnableBlur
+import com.ican.tvplay.ui.components.MiuixBackButton
+import com.ican.tvplay.ui.components.pageHorizontalPadding
+import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.BrandBlue
 import com.ican.tvplay.ui.theme.BrandBlueDeep
@@ -48,32 +62,46 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
     val viewModel = appViewModel { SettingsViewModel(this) }
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(topBarPadding()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            CircleBackButton(onClick = onBack)
-            Text(
-                text = "主题色板",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-        }
+    // KernelSU 同款：折叠顶栏 + 毛玻璃
+    val scrollBehavior = MiuixScrollBehavior()
+    val enableBlurState = LocalEnableBlur.current
+    val backdrop = rememberBlurBackdrop(enableBlurState)
+    val blurActive = backdrop != null
+    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
 
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 64.dp),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
+    Scaffold(
+        topBar = {
+            BlurredBar(backdrop) {
+                TopAppBar(
+                    color = barColor,
+                    title = "主题色板",
+                    titleColor = MaterialTheme.colorScheme.onBackground,
+                    largeTitleColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIcon = { MiuixBackButton(onClick = onBack) },
+                    scrollBehavior = scrollBehavior,
+                )
+            }
+        },
+        popupHost = { },
+        contentWindowInsets = WindowInsets.systemBars
+            .add(WindowInsets.displayCutout)
+            .only(WindowInsetsSides.Horizontal),
+    ) { innerPadding ->
+        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 64.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(
+                    start = pageHorizontalPadding(),
+                    end = pageHorizontalPadding(),
+                    top = innerPadding.calculateTopPadding() + 16.dp,
+                    bottom = 24.dp,
+                ),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
             item {
                 ColorButton(
                     selected = themeColor == 0,
@@ -103,6 +131,7 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
                             .background(Color(colorInt)),
                     )
                 }
+            }
             }
         }
     }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -47,6 +48,7 @@ import com.ican.tvplay.ui.collection.FavoritesScreen
 import com.ican.tvplay.ui.collection.HistoryScreen
 import com.ican.tvplay.ui.components.FloatingBottomBar
 import com.ican.tvplay.ui.components.FloatingBottomBarItem
+import com.ican.tvplay.ui.components.LocalEnableBlur
 import com.ican.tvplay.ui.components.rememberMainPagerState
 import com.ican.tvplay.ui.home.HomeScreen
 import com.ican.tvplay.ui.nav.Routes
@@ -104,6 +106,9 @@ fun AppRoot() {
             },
         ) {
         val navController = rememberNavController()
+
+        // 毛玻璃开关下发：顶栏/底栏统一从 LocalEnableBlur 读取（KernelSU 同款机制）
+        CompositionLocalProvider(LocalEnableBlur provides enableBlur) {
 
         // 通知栏点击 → 恢复播放页（后台续播场景）
         LaunchedEffect(Unit) {
@@ -295,6 +300,7 @@ fun AppRoot() {
             // miuix 弹窗宿主：KernelSU 同款——弹窗/遮罩渲染在 App 自身窗口的全屏覆盖层
             //（MiuixPopupHost，非独立 Dialog 窗口），坐标空间与页面一致
             MiuixPopupUtils.MiuixPopupHost()
+        }
         }
         }
     }
