@@ -2,7 +2,7 @@ package com.ican.tvplay.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,10 +25,20 @@ import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.utils.SinkFeedback
+import top.yukonga.miuix.kmp.utils.pressable
 
 /**
  * 首页 / 搜索 / 收藏复用的视频卡片（海报 + 评分角标 + 标题）。
- * 交互统一走 [tvCardEffect]：焦点放大、按压渐变、无水波纹。
+ *
+ * 容器为 miuix Card（insideMargin=0，16dp 统一圆角：API 33+ 为 squircle shader 裁剪，
+ * 低版本自动回退 RoundedCornerShape；底色由 Card colors 提供，兼作海报加载占位色）。
+ *
+ * 交互分两层，与 miuix Card 可点版内部结构同构：
+ * - [tvCardEffect]：焦点放大/发光描边 + MiuixIndication 按压蒙层（无水波纹）+ 遥控器点击；
+ * - [pressable] + SinkFeedback：按压形变（缩放 0.94，spring(0.8f, 600f)，delay=null 立即下沉）。
  */
 @Composable
 fun VideoCard(
@@ -37,15 +47,21 @@ fun VideoCard(
     modifier: Modifier = Modifier,
     width: Dp = 148.dp,
 ) {
-    Column(
+    Card(
         modifier = modifier
             .width(width)
-            .tvCardEffect(onClick = onClick, shape = RoundedCornerShape(Spacing.corner)),
+            .tvCardEffect(onClick = onClick, shape = RoundedCornerShape(Spacing.corner))
+            .pressable(
+                interactionSource = null,
+                indication = SinkFeedback(),
+                delay = null,
+            ),
+        insideMargin = PaddingValues(0.dp),
+        colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .aspectRatio(3f / 4f),
         ) {
             AsyncImage(
