@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -33,7 +37,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,15 +50,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import top.yukonga.miuix.kmp.basic.TabRow
-import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.data.model.VideoCategory
 import com.ican.tvplay.data.remote.TvBoxSite
@@ -441,18 +449,133 @@ private fun CategoryChips(
         ?: (pagerState.currentPage + pagerState.currentPageOffsetFraction.toInt())
             .coerceIn(0, (categories.size - 1).coerceAtLeast(0))
 
-    // miuix 原生分段 Tab（KernelSU 模块仓库页同款）：等宽 tab + 滑动药丸指示器 + 选中自动居中
-    // cornerRadius 取高度一半（42/2=21dp）→ 完美药丸圆角，与搜索栏/底栏胶囊圆角一致
-    TabRow(
+    // 下划线式分段 Tab：等宽布局 + 选中自动居中照搬 miuix TabRow 源码，
+    // 指示器改为文字底部主题色小横条（无容器底色、无未选中边框、无选中填充）
+    UnderlineTabRow(
         tabs = categories.map { it.name },
         selectedTabIndex = colorTargetIndex,
         onTabSelected = onSelect,
-        colors = TabRowDefaults.tabRowColors(
-            backgroundColor = MaterialTheme.colorScheme.background,
-        ),
-        cornerRadius = 21.dp,
         modifier = Modifier.padding(horizontal = horizontalPadding),
     )
+}
+
+/** miuix TabRow 的下划线变体：尺寸/等宽计算/自动居中滚动与 miuix 源码一致 */
+@Composable
+private fun UnderlineTabRow(
+    tabs: List<String>,
+    selectedTabIndex: Int,
+    onTabSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    minWidth: Dp = 76.dp,
+    maxWidth: Dp = 98.dp,
+    height: Dp = 42.dp,
+    itemSpacing: Dp = 9.dp,
+) {
+    BoxWithConstraints(modifier = modifier.fillMaxWidth().height(height)) {
+        val availableWidth = this.maxWidth
+        // 照搬 miuix calculateTabWidth：均分可用宽度，钳制在 [minWidth, maxWidth]
+        val tabWidth = remember(tabs.size, availableWidth) {
+            val totalSpacing = if (tabs.size > 1) itemSpacing * (tabs.size - 1) else 0.dp
+            val contentWidth = availableWidth - totalSpacing
+            if (tabs.isEmpty() || contentWidth <= 0.dp) {
+                minWidth
+            } else {
+                val ideal = contentWidth / tabs.size
+                when {
+                    ideal < minWidth -> minWidth
+                    ideal > maxWidth ->
+                        if (maxWidth * tabs.size.toFloat() + totalSpacing < availableWidth) ideal else maxWidth
+                    else -> ideal
+                }
+            }
+        }
+        val listState = rememberLazyListState()
+        val density = LocalDensity.current
+        val tabWidthPx = with(density) { tabWidth.toPx() }
+        val spacingPx = with(density) { itemSpacing.toPx() }
+        var lastSettledIndex by remember { mutableIntStateOf(-1) }
+
+        // 照搬 miuix：选中 tab 自动滚动居中（首次/回退瞬移，前进动画滚动）
+        LaunchedEffect(selectedTabIndex, availableWidth, tabWidth) {
+            val centerOffset = (availableWidth - tabWidth) / 2
+            val offsetPx = with(density) { -centerOffset.toPx() }.fastRoundToInt()
+            if (lastSettledIndex < 0 || lastSettledIndex == selectedTabIndex) {
+                listState.scrollToItem(selectedTabIndex, offsetPx)
+            } else {
+                listState.animateScrollToItem(selectedTabIndex, offsetPx)
+            }
+            lastSettledIndex = selectedTabIndex
+        }
+
+        val scrollOffset by remember {
+            derivedStateOf {
+                listState.firstVisibleItemIndex * (tabWidthPx + spacingPx) +
+                    listState.firstVisibleItemScrollOffset
+            }
+        }
+        val hasScrollRange by remember {
+            derivedStateOf { listState.canScrollBackward || listState.canScrollForward }
+        }
+        val indicatorWidthPx = with(density) { 20.dp.toPx() }
+
+        Box(Modifier.fillMaxSize()) {
+            // 主题色小横条：与 miuix 药丸同款位移公式，居中于选中 tab 底部
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(bottom = 3.dp)
+                    .offset {
+                        IntOffset(
+                            ((selectedTabIndex * (tabWidthPx + spacingPx)) - scrollOffset +
+                                (tabWidthPx - indicatorWidthPx) / 2).fastRoundToInt(),
+                            0,
+                        )
+                    }
+                    .width(20.dp)
+                    .height(3.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+            LazyRow(
+                state = listState,
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+                overscrollEffect = null,
+                userScrollEnabled = hasScrollRange,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                itemsIndexed(tabs) { index, tabText ->
+                    val selected = selectedTabIndex == index
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(tabWidth)
+                            .tvCardEffect(
+                                onClick = { onTabSelected(index) },
+                                shape = CircleShape,
+                                focusedScale = 1.06f,
+                                glow = false,
+                            )
+                            .padding(horizontal = 12.dp),
+                    ) {
+                        Text(
+                            text = tabText,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.onBackground
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
