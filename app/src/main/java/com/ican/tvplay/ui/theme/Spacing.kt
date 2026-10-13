@@ -27,7 +27,7 @@ object Spacing {
     val sectionSpacing = 20.dp
 
     /** 首页顶部分类Tab的上下间距（搜索栏→Tab、Tab→内容区） */
-    val categoryTabVertical = 10.dp
+    val categoryTabVertical = 3.dp
 
     /**
      * 搜索栏底部到下方第一个内容板块的垂直间距（全局统一，不随屏幕尺寸缩放）。
