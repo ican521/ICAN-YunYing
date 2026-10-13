@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -35,11 +37,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
@@ -69,6 +79,7 @@ fun SettingsScreen(
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
     val backgroundPlay by viewModel.playerBackgroundPlay.collectAsStateWithLifecycle()
+    val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     val configUrl by viewModel.configUrl.collectAsStateWithLifecycle()
     val siteName by viewModel.siteName.collectAsStateWithLifecycle()
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
@@ -120,38 +131,51 @@ fun SettingsScreen(
             )
         }
 
-        SettingsCard(title = "外观", subtitle = "主题模式") {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ThemeOption("跟随系统", themeMode == ThemeMode.SYSTEM) {
-                    viewModel.setThemeMode(ThemeMode.SYSTEM)
-                }
-                ThemeOption("浅色", themeMode == ThemeMode.LIGHT) {
-                    viewModel.setThemeMode(ThemeMode.LIGHT)
-                }
-                ThemeOption("深色", themeMode == ThemeMode.DARK) {
-                    viewModel.setThemeMode(ThemeMode.DARK)
-                }
-            }
-        }
+        SettingsDropdownCard(
+            title = "外观",
+            subtitle = "主题模式",
+            options = listOf("跟随系统", "浅色", "深色"),
+            selectedIndex = when (themeMode) {
+                ThemeMode.SYSTEM -> 0
+                ThemeMode.LIGHT -> 1
+                ThemeMode.DARK -> 2
+            },
+            onSelect = { index ->
+                viewModel.setThemeMode(
+                    when (index) {
+                        0 -> ThemeMode.SYSTEM
+                        1 -> ThemeMode.LIGHT
+                        else -> ThemeMode.DARK
+                    },
+                )
+            },
+        )
 
-        SettingsCard(title = "布局", subtitle = "首页网格大小") {
-            // 手机（<600dp）只提供小/中两档；平板额外提供大（约3列）
-            val isTablet = LocalContext.current.resources.configuration.screenWidthDp >= 600
-            val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ThemeOption("小", homeLayoutSize == HomeLayoutSize.SMALL) {
-                    viewModel.setHomeLayoutSize(HomeLayoutSize.SMALL)
-                }
-                ThemeOption("中", homeLayoutSize == HomeLayoutSize.MEDIUM) {
-                    viewModel.setHomeLayoutSize(HomeLayoutSize.MEDIUM)
-                }
-                if (isTablet) {
-                    ThemeOption("大", homeLayoutSize == HomeLayoutSize.LARGE) {
-                        viewModel.setHomeLayoutSize(HomeLayoutSize.LARGE)
-                    }
-                }
-            }
+        // 手机（<600dp）只提供小/中两档；平板额外提供大（约3列）
+        val layoutOptions = if (LocalContext.current.resources.configuration.screenWidthDp >= 600) {
+            listOf("小", "中", "大")
+        } else {
+            listOf("小", "中")
         }
+        SettingsDropdownCard(
+            title = "布局",
+            subtitle = "首页网格大小",
+            options = layoutOptions,
+            selectedIndex = when (homeLayoutSize) {
+                HomeLayoutSize.SMALL -> 0
+                HomeLayoutSize.MEDIUM -> 1
+                HomeLayoutSize.LARGE -> 2
+            }.coerceAtMost(layoutOptions.lastIndex),
+            onSelect = { index ->
+                viewModel.setHomeLayoutSize(
+                    when (index) {
+                        0 -> HomeLayoutSize.SMALL
+                        1 -> HomeLayoutSize.MEDIUM
+                        else -> HomeLayoutSize.LARGE
+                    },
+                )
+            },
+        )
 
         SettingsCard(title = "主题", subtitle = "取色与效果") {
             val supportsDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -194,27 +218,30 @@ fun SettingsScreen(
             )
         }
 
-        SettingsCard(title = "播放", subtitle = "后台播放") {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ThemeOption("关闭", backgroundPlay == BACKGROUND_OFF) {
-                    viewModel.setPlayerBackgroundPlay(BACKGROUND_OFF)
+        SettingsDropdownCard(
+            title = "播放",
+            subtitle = "后台播放",
+            options = listOf("关闭", "开启", "画中画"),
+            selectedIndex = when (backgroundPlay) {
+                BACKGROUND_OFF -> 0
+                BACKGROUND_ON -> 1
+                else -> 2
+            },
+            onSelect = { index ->
+                when (index) {
+                    0 -> viewModel.setPlayerBackgroundPlay(BACKGROUND_OFF)
+                    1 -> {
+                        viewModel.setPlayerBackgroundPlay(BACKGROUND_ON)
+                        requestNotificationPermission()
+                    }
+                    else -> {
+                        viewModel.setPlayerBackgroundPlay(BACKGROUND_PIP)
+                        requestNotificationPermission()
+                    }
                 }
-                ThemeOption("开启", backgroundPlay == BACKGROUND_ON) {
-                    viewModel.setPlayerBackgroundPlay(BACKGROUND_ON)
-                    requestNotificationPermission()
-                }
-                ThemeOption("画中画", backgroundPlay == BACKGROUND_PIP) {
-                    viewModel.setPlayerBackgroundPlay(BACKGROUND_PIP)
-                    requestNotificationPermission()
-                }
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "开启：退出播放页后继续播放并可通知栏控制；画中画：全屏播放时切后台自动进入小窗",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+            },
+            hint = "开启：退出播放页后继续播放并可通知栏控制；画中画：全屏播放时切后台自动进入小窗",
+        )
 
         SettingsCard(title = "关于", subtitle = "版本与运行环境") {
             val isTv = LocalContext.current.resources.configuration.uiMode.let { uiMode ->
@@ -286,48 +313,145 @@ private fun SettingsCard(
     }
 }
 
+/**
+ * KernelSU 风格下拉设置卡：整卡可点击，右侧显示当前值 + 上下箭头，
+ * 点击在卡片下方弹出右对齐选项弹窗，选中项为主题色 + 对勾，点击外部关闭。
+ */
 @Composable
-private fun ThemeOption(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit,
+private fun SettingsDropdownCard(
+    title: String,
+    subtitle: String,
+    options: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    hint: String? = null,
 ) {
+    var expanded by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
     val shape = RoundedCornerShape(Spacing.corner)
-    val container by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.surfaceVariant,
-        animationSpec = tween(200),
-        label = "themeOption",
-    )
-    val content = if (selected) MaterialTheme.colorScheme.onPrimary
-    else MaterialTheme.colorScheme.onSurfaceVariant
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .tvCardEffect(
-                onClick = onClick,
-                shape = shape,
-                focusedScale = 1.05f,
-                glow = false,
-            )
-            .background(container, shape)
-            .padding(horizontal = 18.dp, vertical = 11.dp),
-    ) {
-        if (selected) {
-            Icon(
-                imageVector = AppIcons.Check,
-                contentDescription = null,
-                tint = content,
-                modifier = Modifier.size(15.dp),
-            )
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .tvCardEffect(
+                    onClick = { expanded = true },
+                    shape = shape,
+                    focusedScale = 1.02f,
+                    glow = false,
+                )
+                .background(MaterialTheme.colorScheme.surface, shape)
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.titleContentGap),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = options.getOrElse(selectedIndex) { "" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Icon(
+                        imageVector = AppIcons.Unfold,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+            if (hint != null) {
+                Text(
+                    text = hint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = content,
-            modifier = Modifier.padding(start = if (selected) 6.dp else 0.dp),
-        )
+
+        if (expanded) {
+            Popup(
+                popupPositionProvider = object : PopupPositionProvider {
+                    override fun calculatePosition(
+                        anchorBounds: IntRect,
+                        windowSize: IntSize,
+                        layoutDirection: LayoutDirection,
+                        popupContentSize: IntSize,
+                    ): IntOffset {
+                        val gap = with(density) { 8.dp.roundToPx() }
+                        val x = (anchorBounds.right - popupContentSize.width)
+                            .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+                        val y = (anchorBounds.bottom + gap)
+                            .coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0))
+                        return IntOffset(x, y)
+                    }
+                },
+                onDismissRequest = { expanded = false },
+                properties = PopupProperties(focusable = true),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .width(IntrinsicSize.Max)
+                        .background(MaterialTheme.colorScheme.surface, shape)
+                        .padding(vertical = 6.dp),
+                ) {
+                    options.forEachIndexed { index, option ->
+                        val selected = index == selectedIndex
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .tvCardEffect(
+                                    onClick = {
+                                        expanded = false
+                                        if (!selected) onSelect(index)
+                                    },
+                                    shape = shape,
+                                    focusedScale = 1f,
+                                    glow = false,
+                                )
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = option,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                                color = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurface,
+                            )
+                            if (selected) {
+                                Icon(
+                                    imageVector = AppIcons.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
