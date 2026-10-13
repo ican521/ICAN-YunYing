@@ -55,6 +55,7 @@ import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.LocalEnableBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
+import com.ican.tvplay.ui.components.MiuixConfirmDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
@@ -198,66 +199,22 @@ fun FavoritesScreen(
         }
     }
 
-    // 清空全部确认弹窗
-    if (showConfirm) {
-        Dialog(onDismissRequest = {
+    // 清空全部确认弹窗（KernelSU 同款 miuix WindowDialog）
+    MiuixConfirmDialog(
+        show = showConfirm,
+        title = "删除全部收藏",
+        content = "确定要清空所有收藏吗？此操作不可恢复。",
+        onConfirm = {
+            viewModel.clearFavorites()
+            showConfirm = false
+            editMode = false
+        },
+        onDismiss = {
             // 取消 → 关闭弹窗 + 退出编辑模式
             showConfirm = false
             editMode = false
-        }) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
-                    .padding(24.dp),
-            ) {
-                Text(
-                    text = "删除全部收藏",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "确定要清空所有收藏吗？此操作不可恢复。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 10.dp),
-                )
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 20.dp),
-                ) {
-                    Text(
-                        text = "取消",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .clickable {
-                                showConfirm = false
-                                editMode = false
-                            }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                    Text(
-                        text = "确定",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFF5C5C),
-                        modifier = Modifier
-                            .clickable {
-                                viewModel.clearFavorites()
-                                showConfirm = false
-                                editMode = false
-                            }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
-            }
-        }
-    }
+        },
+    )
 }
 
 /** 收藏卡片：样式与搜索详情页卡片一致（3:4 海报 + 右上角站源标签 + 底部渐变合并标签 + 标题），编辑模式叉号替换站源标签 */
@@ -515,65 +472,21 @@ fun HistoryScreen(
         }
     }
 
-    // 清空全部确认弹窗（与收藏页同款）
-    if (showConfirm) {
-        Dialog(onDismissRequest = {
+    // 清空全部确认弹窗（与收藏页同款，KernelSU miuix WindowDialog）
+    MiuixConfirmDialog(
+        show = showConfirm,
+        title = "删除全部播放历史",
+        content = "确定要清空所有播放记录吗？此操作不可恢复。",
+        onConfirm = {
+            viewModel.clearHistory()
             showConfirm = false
             editMode = false
-        }) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
-                    .padding(24.dp),
-            ) {
-                Text(
-                    text = "删除全部播放历史",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "确定要清空所有播放记录吗？此操作不可恢复。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 10.dp),
-                )
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 20.dp),
-                ) {
-                    Text(
-                        text = "取消",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .clickable {
-                                showConfirm = false
-                                editMode = false
-                            }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                    Text(
-                        text = "确定",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFF5C5C),
-                        modifier = Modifier
-                            .clickable {
-                                viewModel.clearHistory()
-                                showConfirm = false
-                                editMode = false
-                            }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
-            }
-        }
-    }
+        },
+        onDismiss = {
+            showConfirm = false
+            editMode = false
+        },
+    )
 }
 
 /**

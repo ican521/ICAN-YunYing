@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.window.Dialog
+import top.yukonga.miuix.kmp.window.WindowDialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
@@ -267,22 +268,12 @@ fun SitePickerDialog(
     onToggleChangeable: (TvBoxSite) -> Unit = {},
     toggleVersion: Int = 0,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .clip(RoundedCornerShape(Spacing.corner))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(20.dp),
-        ) {
-            Text(
-                text = "选择站源",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(14.dp))
+    WindowDialog(
+        show = true,
+        title = "选择站源",
+        onDismissRequest = onDismiss,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             if (sites.isEmpty()) {
                 Text(
                     text = "未获取到可用站点",

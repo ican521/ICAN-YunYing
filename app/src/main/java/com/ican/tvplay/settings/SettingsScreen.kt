@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -51,6 +52,7 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.window.WindowDialog
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.BACKGROUND_PIP
@@ -464,7 +466,7 @@ private fun SettingsEntryRow(
     }
 }
 
-/** 导入配置对话框：输入 URL 并保存到 SharedPreferences */
+/** 导入配置对话框：miuix WindowDialog + TextField，照搬 KernelSU 弹窗结构 */
 @Composable
 private fun ConfigImportDialog(
     initialUrl: String,
@@ -472,97 +474,36 @@ private fun ConfigImportDialog(
     onDismiss: () -> Unit,
 ) {
     var url by remember { mutableStateOf(initialUrl) }
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    MaterialTheme.colorScheme.surface,
-                    RoundedCornerShape(Spacing.corner),
-                )
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = "导入配置",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            BasicTextField(
+    WindowDialog(
+        show = true,
+        title = "导入配置",
+        onDismissRequest = onDismiss,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            top.yukonga.miuix.kmp.basic.TextField(
                 value = url,
                 onValueChange = { url = it },
+                label = "输入配置链接（http/https）…",
+                useLabelAsPlaceholder = true,
                 singleLine = true,
-                textStyle = TextStyle(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = MaterialTheme.typography.bodyLarge.fontSize,
-                ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                decorationBox = { innerTextField ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant,
-                                RoundedCornerShape(Spacing.corner),
-                            )
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                    ) {
-                        if (url.isEmpty()) {
-                            Text(
-                                text = "输入配置链接（http/https）…",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        innerTextField()
-                    }
-                },
+                modifier = Modifier.fillMaxWidth(),
             )
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
-                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.padding(top = 12.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .tvCardEffect(
-                            onClick = onDismiss,
-                            shape = RoundedCornerShape(Spacing.corner),
-                            focusedScale = 1.03f,
-                            glow = false,
-                        )
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant,
-                            RoundedCornerShape(Spacing.corner),
-                        )
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
-                ) {
-                    Text(
-                        text = "取消",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .tvCardEffect(
-                            onClick = { onConfirm(url) },
-                            shape = RoundedCornerShape(Spacing.corner),
-                            focusedScale = 1.03f,
-                            glow = false,
-                        )
-                        .background(
-                            MaterialTheme.colorScheme.primary,
-                            RoundedCornerShape(Spacing.corner),
-                        )
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
-                ) {
-                    Text(
-                        text = "确认",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                }
+                top.yukonga.miuix.kmp.basic.TextButton(
+                    text = "取消",
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(20.dp))
+                top.yukonga.miuix.kmp.basic.TextButton(
+                    text = "确认",
+                    onClick = { onConfirm(url) },
+                    modifier = Modifier.weight(1f),
+                    colors = top.yukonga.miuix.kmp.basic.ButtonDefaults.textButtonColorsPrimary(),
+                )
             }
         }
     }
