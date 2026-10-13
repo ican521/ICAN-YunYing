@@ -3,8 +3,8 @@ package com.ican.tvplay.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // 品牌色
-val BrandBlue = Color(0xFF5B8CFF)
-val BrandBlueDeep = Color(0xFF3361D8)
+val BrandBlue = Color(0xFF3482FF)
+val BrandBlueDeep = Color(0xFF277AF7)
 val BrandTeal = Color(0xFF00E0C8)
 val BrandViolet = Color(0xFFB48CFF)
 
