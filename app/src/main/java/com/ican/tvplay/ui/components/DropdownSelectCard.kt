@@ -91,6 +91,8 @@ fun DropdownSelectCard(
                 shape = shape,
                 focusedScale = 1.02f,
                 freezeScale = anchorFrozen,
+                // KernelSU OverlayDropdownPreference 同款：弹窗展开期间保持按压变色，关闭动画结束后恢复
+                holdDownState = anchorFrozen,
                 glow = false,
             )
             .background(MaterialTheme.colorScheme.surface, shape)
