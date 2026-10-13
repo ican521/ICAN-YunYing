@@ -3,12 +3,10 @@ package com.ican.tvplay.ui.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,26 +18,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import com.ican.tvplay.ui.theme.LocalDarkTheme
-
-/** 按下立刻渐显时长（毫秒） */
-const val PRESS_FADE_IN_MS = 200
-
-/** 松手渐隐时长（毫秒） */
-const val PRESS_FADE_OUT_MS = 250
+import top.yukonga.miuix.kmp.utils.MiuixIndication
 
 /**
  * 全局统一的卡片交互效果（手机触屏 + TV 遥控器同一套）：
  *
  * 1. 遥控器/键盘聚焦：弹簧放大 + 主题色发光描边；
- * 2. 触摸按压：高亮蒙层 200ms 渐显，按住保持，松手 250ms 渐隐；
- * 3. indication = null，彻底禁用系统默认水波纹。
+ * 2. 触摸按压：MiuixIndication 纯色蒙层（与 KernelSU 同款实现，来自 miuix 库）——
+ *    按压 alpha +0.10，folmeSpring(1.0, 0.2) 渐显、folmeSpring(0.95, 0.35) 渐隐，无水波纹；
+ * 3. 蒙层颜色取主题文字色（onSurface），浅色模式下为深灰、深色模式下为浅白。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -54,7 +46,6 @@ fun Modifier.tvCardEffect(
     freezeScale: Boolean = false,
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
     val focused by interactionSource.collectIsFocusedAsState()
 
     val animatedScale by animateFloatAsState(
@@ -72,19 +63,12 @@ fun Modifier.tvCardEffect(
     }
     val scale = frozenAt ?: animatedScale
 
-    // 按下 / 松手使用不同时长的补间
-    val highlight by animateFloatAsState(
-        targetValue = if (pressed) 1f else 0f,
-        animationSpec = if (pressed) {
-            tween(durationMillis = PRESS_FADE_IN_MS)
-        } else {
-            tween(durationMillis = PRESS_FADE_OUT_MS)
-        },
-        label = "tvCardHighlight",
-    )
-
     val accent = MaterialTheme.colorScheme.primary
     val isDark = LocalDarkTheme.current
+
+    // KernelSU 同款按压特效：miuix 库 MiuixIndication，蒙层色取主题文字色（深浅色模式自动适配）
+    val pressIndicationColor = MaterialTheme.colorScheme.onSurface
+    val pressIndication = remember(pressIndicationColor) { MiuixIndication(color = pressIndicationColor) }
 
     return this
         .scale(scale)
@@ -104,24 +88,13 @@ fun Modifier.tvCardEffect(
         .clip(shape)
         .combinedClickable(
             interactionSource = interactionSource,
-            indication = null,
+            indication = pressIndication,
             enabled = enabled,
             onClick = onClick,
             onLongClick = onLongClick,
         )
         .drawWithContent {
             drawContent()
-
-            if (highlight > 0f) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.08f * highlight),
-                            Color.White.copy(alpha = 0.22f * highlight),
-                        ),
-                    ),
-                )
-            }
 
             if (focused) {
                 val strokeWidth = 2.dp.toPx()
