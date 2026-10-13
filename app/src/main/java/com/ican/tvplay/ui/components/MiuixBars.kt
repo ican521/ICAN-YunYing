@@ -27,7 +27,8 @@ val LocalEnableBlur = staticCompositionLocalOf { false }
 @Composable
 fun rememberBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
     if (!enableBlur || !isRenderEffectSupported()) return null
-    val surfaceColor = MaterialTheme.colorScheme.surface
+    // 基色用项目 background（深色纯黑），不用 miuix surface（深灰），保证深色下毛玻璃与全局底色一致
+    val surfaceColor = MaterialTheme.colorScheme.background
     return rememberLayerBackdrop {
         drawRect(surfaceColor)
         drawContent()
@@ -52,7 +53,7 @@ fun BlurredBar(
                 blurRadius = 25f,
                 colors = BlurColors(
                     blendColors = listOf(
-                        BlendColorEntry(color = MaterialTheme.colorScheme.surface.copy(alpha = 0.87f)),
+                        BlendColorEntry(color = MaterialTheme.colorScheme.background.copy(alpha = 0.87f)),
                     ),
                 ),
             )
