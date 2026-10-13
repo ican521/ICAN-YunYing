@@ -47,12 +47,14 @@ fun Modifier.tvCardEffect(
     glow: Boolean = true,
     enabled: Boolean = true,
     onLongClick: (() -> Unit)? = null,
+    /** 冻结缩放：为 true 时立即无动画恢复 1f（供下拉弹窗等依赖实时窗口坐标锚点的场景，避免缩放期间锚点漂移） */
+    freezeScale: Boolean = false,
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val focused by interactionSource.collectIsFocusedAsState()
 
-    val scale by animateFloatAsState(
+    val animatedScale by animateFloatAsState(
         targetValue = if (focused) focusedScale else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -60,6 +62,8 @@ fun Modifier.tvCardEffect(
         ),
         label = "tvCardScale",
     )
+    // 冻结时绕过动画瞬时归位，保证弹窗出现首帧锚点已静止
+    val scale = if (freezeScale) 1f else animatedScale
 
     // 按下 / 松手使用不同时长的补间
     val highlight by animateFloatAsState(
