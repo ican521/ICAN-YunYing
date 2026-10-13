@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -173,8 +174,6 @@ fun PlayerScreen(
     // 缩放会话令牌：每次进入/退出全屏自增，作为收敛监听 LaunchedEffect 的 key，
     // 避免协程体内把 landZooming 置 false 导致自身被取消、渐显逻辑丢失
     var landZoomToken by remember { mutableIntStateOf(0) }
-    // 横版界面其他元素（信息列/线路/选集/简介）是否显示：缩回后渐显，进页面初始不播动画
-    var landChromeVisible by remember { mutableStateOf(true) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
@@ -668,7 +667,9 @@ fun PlayerScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(rootBackground),
+            .background(rootBackground)
+            // 横屏缩放时信息列/下方区块滑出屏幕的部分需要裁剪（等价 ViewGroup 默认 clipChildren）
+            .clipToBounds(),
     ) {
         val density = LocalDensity.current
         val screenW = maxWidth
@@ -704,8 +705,8 @@ fun PlayerScreen(
             label = "animTop",
         ) { expanded -> if (expanded) 0.dp else statusBarTop }
 
-        // 动画收敛后挂载/卸载覆盖层：放大结束才挂全屏布局（纯净画面起手），
-        // 缩回动画播放期间横版布局也不渲染（只剩纯视频在缩小）
+        // 动画收敛后处理：放大结束挂全屏布局（纯净画面起手）；
+        // 缩回期间横版布局全程渲染，信息列/下方区块锚定视频边缘跟随滑入滑出（fongmi ChangeBounds）
         LaunchedEffect(landZoomToken) {
             if (landZooming) {
                 snapshotFlow {
@@ -718,8 +719,7 @@ fun PlayerScreen(
                     fullscreen = true
                     controlsVisible = false
                 } else {
-                    // 缩回完成：先恢复方向自由并显示状态栏，等 inset 回灌后再挂横版界面，
-                    // 否则播放器/信息列先按 inset=0 布局（上跳），inset 到达后又被顶下来
+                    // 缩回完成：恢复方向自由并显示状态栏（组件位置均由动画值驱动，无 inset 跳变）
                     controlsVisible = false
                     val activity = context as? Activity
                     activity?.requestedOrientation =
@@ -729,18 +729,7 @@ fun PlayerScreen(
                             activity.window, activity.window.decorView,
                         ).show(WindowInsetsCompat.Type.statusBars())
                     }
-                    val topPx = with(density) { statusBarTop.roundToPx() }
-                    if (topPx > 0) {
-                        withTimeoutOrNull(500) {
-                            snapshotFlow { statusBarInsets.getTop(density) >= topPx }
-                                .first { it }
-                        }
-                    }
-                    // 挂载横版界面（chrome 先隐藏），下一帧再渐显信息列/线路/选集/简介
-                    landChromeVisible = false
                     landZooming = false
-                    delay(60)
-                    landChromeVisible = true
                 }
             }
         }
@@ -811,10 +800,9 @@ fun PlayerScreen(
         }
         // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
         pendingFullscreen == true -> Unit
-        // 平板放大/缩回动画期：不渲染任何覆盖层，画面上只有视频在缩放
-        landZooming -> Unit
         else -> if (pendingFullscreen == null && isLandscape) {
-            // 自然横屏（平板）：fongmi activity_detail_land 横版布局
+            // 自然横屏（平板）：fongmi activity_detail_land 横版布局，
+            // 信息列/下方区块锚定动画中的播放器边界，随缩放一起滑出滑入（ChangeBounds 效果）
             LandscapePlayLayout(
                 current = current,
                 episodeIndex = episodeIndex,
@@ -823,7 +811,12 @@ fun PlayerScreen(
                 playerState = playerState,
                 controlsVisible = controlsVisible,
                 locked = locked,
-                chromeVisible = landChromeVisible,
+                playerTop = animTop,
+                playerWidth = animWidth,
+                playerHeight = animHeight,
+                smallPlayerWidth = screenW * LAND_PLAYER_WIDTH_FRACTION,
+                screenWidth = screenW,
+                screenHeight = screenH,
                 onToggleControls = { controlsVisible = !controlsVisible },
                 onTogglePlay = { Players.playPause() },
                 onPrev = { if (episodeIndex > 0) episodeIndex-- },
@@ -833,7 +826,6 @@ fun PlayerScreen(
                     // 动画结束（LaunchedEffect）后再挂全屏布局且工具栏默认隐藏
                     controlsTick++
                     controlsVisible = false
-                    landChromeVisible = false
                     (context as? Activity)?.requestedOrientation =
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     landscapeFullscreen = true
@@ -1043,15 +1035,15 @@ private fun PortraitPlayLayout(
 /** 横版播放器占屏宽比例（fongmi 38:62） */
 private const val LAND_PLAYER_WIDTH_FRACTION = 0.38f
 
-/** 横屏小窗↔全屏放大/缩回动画时长 */
-private const val LAND_ZOOM_DURATION_MS = 300
+/** 横屏小窗↔全屏放大/缩回动画时长（对齐 fongmi ChangeBounds 150ms） */
+private const val LAND_ZOOM_DURATION_MS = 150
 
-/** 缩回小窗后信息/线路等界面元素渐显时长 */
-private const val LAND_CHROME_FADE_MS = 320
-
-/** 下方区块相对右侧信息列的渐显延迟（轻微错开） */
-private const val LAND_CHROME_STAGGER_MS = 90
-
+/**
+ * 横版布局（fongmi activity_detail_land + ChangeBounds 联动）：
+ * 全部元素以动画中的播放器边界为锚绝对定位——信息列锚视频右缘（放大时被推出屏幕右侧），
+ * 线路/选集/简介锚视频下缘（被推出屏幕下缘），缩放全程跟随，无渐隐渐显切换。
+ * 组件始终渲染，超出屏幕的部分由根容器 clipToBounds 裁剪。
+ */
 @Composable
 private fun LandscapePlayLayout(
     current: Video?,
@@ -1061,8 +1053,13 @@ private fun LandscapePlayLayout(
     playerState: Players.PlayerState,
     controlsVisible: Boolean,
     locked: Boolean,
-    // 缩回小窗后信息列/线路/选集/简介是否渐显（进页面初始为 true，不播入场动画）
-    chromeVisible: Boolean,
+    // 动画中的播放器边界（小窗静止值 = 38% 宽 16:9 + 状态栏顶部偏移）
+    playerTop: Dp,
+    playerWidth: Dp,
+    playerHeight: Dp,
+    smallPlayerWidth: Dp,
+    screenWidth: Dp,
+    screenHeight: Dp,
     onToggleControls: () -> Unit,
     onTogglePlay: () -> Unit,
     onPrev: () -> Unit,
@@ -1072,76 +1069,53 @@ private fun LandscapePlayLayout(
     onLineChange: (String) -> Unit,
     onEpisodeSelect: (Int) -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        // 背景由根 Box 提供（Column 若带背景会盖住常驻 PlayerView）
-    ) {
-        // === 上部：左侧播放器（38% 宽 16:9）+ 右侧影片信息（fongmi detail_land 上半区） ===
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-        ) {
-            PreviewPlayerArea(
-                modifier = Modifier
-                    .fillMaxWidth(LAND_PLAYER_WIDTH_FRACTION)
-                    .statusBarsPadding()
-                    .aspectRatio(16f / 9f),
-                playerState = playerState,
-                controlsVisible = controlsVisible,
-                locked = locked,
-                onToggleControls = onToggleControls,
-                onBack = onBack,
-                onTogglePlay = onTogglePlay,
-                onPrev = onPrev,
-                onNext = onNext,
-                onEnterFullscreen = onEnterFullscreen,
-            )
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 播放器覆盖层：与底层常驻 PlayerView 同位同尺寸（尺寸由根 AndroidView 动画值驱动）
+        PreviewPlayerArea(
+            modifier = Modifier
+                .offset(y = playerTop)
+                .width(playerWidth)
+                .height(playerHeight),
+            playerState = playerState,
+            controlsVisible = controlsVisible,
+            locked = locked,
+            onToggleControls = onToggleControls,
+            onBack = onBack,
+            onTogglePlay = onTogglePlay,
+            onPrev = onPrev,
+            onNext = onNext,
+            onEnterFullscreen = onEnterFullscreen,
+        )
 
-            // 右侧信息列：标题/更新备注/站源/年份·地区·类型（导演/演员无数据字段，按约定不展示）
-            // 缩回小窗后与下方区块错开 90ms 渐显，放大时随布局一起移除
-            AnimatedVisibility(
-                visible = chromeVisible,
-                modifier = Modifier.weight(1f),
-                enter = fadeIn(animationSpec = tween(LAND_CHROME_FADE_MS)),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .statusBarsPadding()
-                        .padding(
-                            start = com.ican.tvplay.ui.theme.Spacing.sectionSpacing,
-                            end = com.ican.tvplay.ui.theme.Spacing.pageHorizontal,
-                            top = 12.dp,
-                            bottom = com.ican.tvplay.ui.theme.Spacing.pageHorizontal,
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    if (current != null) {
-                        VideoMetaSection(v = current, lineFlag = lineFlag, itemSpacing = 10.dp)
-                    }
-                }
+        // 右侧信息列：锚在视频右缘，宽度固定（小窗时的剩余宽度），随放大向右滑出屏幕
+        Column(
+            modifier = Modifier
+                .offset(x = playerWidth, y = playerTop)
+                .width(screenWidth - smallPlayerWidth)
+                .padding(
+                    start = com.ican.tvplay.ui.theme.Spacing.sectionSpacing,
+                    end = com.ican.tvplay.ui.theme.Spacing.pageHorizontal,
+                    top = 12.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (current != null) {
+                VideoMetaSection(v = current, lineFlag = lineFlag, itemSpacing = 10.dp)
             }
         }
 
-        // === 下部：线路 / 选集 / 简介（通栏，占满剩余高度独立滚动） ===
-        AnimatedVisibility(
-            visible = chromeVisible,
-            modifier = Modifier.weight(1f),
-            enter = fadeIn(
-                animationSpec = tween(
-                    durationMillis = LAND_CHROME_FADE_MS,
-                    delayMillis = LAND_CHROME_STAGGER_MS,
-                ),
-            ),
+        // 下方区块：锚在视频下缘，高度为视频下方的剩余空间（放大时随视频增高收缩到 0）
+        Column(
+            modifier = Modifier
+                .offset(y = playerTop + playerHeight)
+                .fillMaxWidth()
+                .height(screenHeight - playerTop - playerHeight)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = com.ican.tvplay.ui.theme.Spacing.pageHorizontal),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = com.ican.tvplay.ui.theme.Spacing.pageHorizontal),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                val v = current ?: return@Column
-
-                LineSection(v = v, lineFlag = lineFlag, onLineChange = onLineChange)
+            if (current != null) {
+                LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange)
                 Spacer(modifier = Modifier.height(com.ican.tvplay.ui.theme.Spacing.titleContentGap))
                 EpisodeSection(
                     lineEpisodes = lineEpisodes,
@@ -1149,7 +1123,7 @@ private fun LandscapePlayLayout(
                     onEpisodeSelect = onEpisodeSelect,
                 )
                 Spacer(modifier = Modifier.height(com.ican.tvplay.ui.theme.Spacing.sectionSpacing))
-                DescriptionSection(v = v)
+                DescriptionSection(v = current)
 
                 Spacer(modifier = Modifier.height(60.dp))
             }
