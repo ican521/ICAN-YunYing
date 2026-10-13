@@ -9,15 +9,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -34,23 +31,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
@@ -60,14 +48,11 @@ import com.ican.tvplay.data.ThemeMode
 import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
-import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.DropdownSelectCard
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
-import com.ican.tvplay.ui.theme.LocalDarkTheme
-import com.ican.tvplay.ui.theme.DarkSurfaceElevated
-import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 
@@ -134,7 +119,7 @@ fun SettingsScreen(
             )
         }
 
-        SettingsDropdownCard(
+        DropdownSelectCard(
             title = "外观",
             subtitle = "主题模式",
             options = listOf("跟随系统", "浅色", "深色"),
@@ -160,7 +145,7 @@ fun SettingsScreen(
         } else {
             listOf("小", "中")
         }
-        SettingsDropdownCard(
+        DropdownSelectCard(
             title = "布局",
             subtitle = "首页网格大小",
             options = layoutOptions,
@@ -221,7 +206,7 @@ fun SettingsScreen(
             )
         }
 
-        SettingsDropdownCard(
+        DropdownSelectCard(
             title = "播放",
             subtitle = "后台播放",
             options = listOf("关闭", "开启", "画中画"),
@@ -313,163 +298,6 @@ private fun SettingsCard(
             )
         }
         content()
-    }
-}
-
-/**
- * KernelSU 风格下拉设置卡：整卡可点击，右侧显示当前值 + 上下箭头，
- * 点击在卡片下方弹出右对齐选项弹窗，选中项为主题色 + 对勾，点击外部关闭。
- */
-@Composable
-private fun SettingsDropdownCard(
-    title: String,
-    subtitle: String,
-    options: List<String>,
-    selectedIndex: Int,
-    onSelect: (Int) -> Unit,
-    hint: String? = null,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
-    val isDark = LocalDarkTheme.current
-    val shape = RoundedCornerShape(Spacing.corner)
-
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .tvCardEffect(
-                    onClick = { expanded = true },
-                    shape = shape,
-                    focusedScale = 1.02f,
-                    glow = false,
-                )
-                .background(MaterialTheme.colorScheme.surface, shape)
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(Spacing.titleContentGap),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = options.getOrElse(selectedIndex) { "" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Icon(
-                        imageVector = AppIcons.Unfold,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-            }
-            if (hint != null) {
-                Text(
-                    text = hint,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        if (expanded) {
-            Popup(
-                popupPositionProvider = object : PopupPositionProvider {
-                    override fun calculatePosition(
-                        anchorBounds: IntRect,
-                        windowSize: IntSize,
-                        layoutDirection: LayoutDirection,
-                        popupContentSize: IntSize,
-                    ): IntOffset {
-                        // KernelSU 同款：弹窗右上角对齐到点击的上下箭头位置（卡片内容区内边距）
-                        val gap = with(density) { 8.dp.roundToPx() }
-                        val rightInset = with(density) { 18.dp.roundToPx() }
-                        val x = (anchorBounds.right - popupContentSize.width - rightInset)
-                            .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-                        val y = (anchorBounds.bottom + gap)
-                            .coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0))
-                        return IntOffset(x, y)
-                    }
-                },
-                onDismissRequest = { expanded = false },
-                properties = PopupProperties(focusable = true),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .then(
-                            // 深色模式下隐藏所有阴影（全局规范）
-                            if (!isDark) {
-                                Modifier.shadow(elevation = 6.dp, shape = shape, clip = false)
-                            } else {
-                                Modifier
-                            },
-                        )
-                        .width(IntrinsicSize.Max)
-                        // 深色模式用抬升色区分卡片层级（KernelSU 同款），浅色模式保持白色 + 阴影
-                        .background(
-                            if (isDark) DarkSurfaceElevated else MaterialTheme.colorScheme.surface,
-                            shape,
-                        )
-                        .padding(vertical = 6.dp),
-                ) {
-                    options.forEachIndexed { index, option ->
-                        val selected = index == selectedIndex
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .tvCardEffect(
-                                    onClick = {
-                                        expanded = false
-                                        if (!selected) onSelect(index)
-                                    },
-                                    shape = shape,
-                                    focusedScale = 1f,
-                                    glow = false,
-                                )
-                                .padding(horizontal = 20.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = option,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-                                color = if (selected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurface,
-                            )
-                            if (selected) {
-                                Icon(
-                                    imageVector = AppIcons.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
