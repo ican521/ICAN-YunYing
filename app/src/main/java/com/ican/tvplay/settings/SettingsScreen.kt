@@ -52,6 +52,7 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
@@ -478,6 +479,8 @@ private fun ConfigImportDialog(
     WindowDialog(
         show = true,
         title = "导入配置",
+        titleColor = MiuixTheme.colorScheme.onBackground,
+        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         onDismissRequest = onDismiss,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
