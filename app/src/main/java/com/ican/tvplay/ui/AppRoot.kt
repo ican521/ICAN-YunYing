@@ -73,7 +73,6 @@ import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 fun AppRoot() {
     val appViewModel = appViewModel { AppViewModel(this) }
     val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
-    val dynamicColor by appViewModel.dynamicColor.collectAsStateWithLifecycle()
     val themeColor by appViewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by appViewModel.enableBlur.collectAsStateWithLifecycle()
     val configReady by appViewModel.configReady.collectAsStateWithLifecycle()
@@ -91,7 +90,6 @@ fun AppRoot() {
 
     TvPlayTheme(
         themeMode = themeMode,
-        dynamicColor = dynamicColor,
         themeColor = themeColor,
     ) {
         // miuix 主题：为 KernelSU 同款下拉弹窗提供色板。

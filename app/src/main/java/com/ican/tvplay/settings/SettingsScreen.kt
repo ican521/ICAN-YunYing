@@ -63,7 +63,6 @@ fun SettingsScreen(
 ) {
     val viewModel = appViewModel { SettingsViewModel(this) }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
-    val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
     val backgroundPlay by viewModel.playerBackgroundPlay.collectAsStateWithLifecycle()
@@ -165,15 +164,7 @@ fun SettingsScreen(
             },
         )
 
-        SettingsCard(title = "主题", subtitle = "取色与效果") {
-            val supportsDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-            SettingsSwitchRow(
-                label = "动态取色",
-                hint = if (supportsDynamic) "跟随系统壁纸色调" else "需要 Android 12+",
-                checked = dynamicColor && supportsDynamic,
-                enabled = supportsDynamic,
-                onToggle = { viewModel.setDynamicColor(it) },
-            )
+        SettingsCard(title = "主题", subtitle = "自定义更多主题选项") {
             SettingsEntryRow(
                 label = "主题色板",
                 value = if (themeColor == 0) "默认" else "自定义",

@@ -38,15 +38,6 @@ class SettingsRepository(context: Context) {
         _themeMode.value = mode
     }
 
-    /** 动态取色（仅 Android 12+ 生效，低版本忽略并回退品牌色） */
-    private val _dynamicColor = MutableStateFlow(prefs.getBoolean(KEY_DYNAMIC_COLOR, false))
-    val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
-
-    fun setDynamicColor(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_DYNAMIC_COLOR, enabled).apply()
-        _dynamicColor.value = enabled
-    }
-
     /** 主题色板种子色，0 表示默认（品牌蓝） */
     private val _themeColor = MutableStateFlow(prefs.getInt(KEY_THEME_COLOR, 0))
     val themeColor: StateFlow<Int> = _themeColor.asStateFlow()
@@ -219,7 +210,6 @@ class SettingsRepository(context: Context) {
 
     private companion object {
         const val KEY_THEME = "theme_mode"
-        const val KEY_DYNAMIC_COLOR = "dynamic_color"
         const val KEY_THEME_COLOR = "theme_color"
         const val KEY_ENABLE_BLUR = "enable_blur"
         const val KEY_HOME_LAYOUT_SIZE = "home_layout_size"
