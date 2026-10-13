@@ -63,8 +63,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.window.Dialog
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
@@ -269,7 +269,7 @@ fun SitePickerDialog(
     onToggleChangeable: (TvBoxSite) -> Unit = {},
     toggleVersion: Int = 0,
 ) {
-    WindowDialog(
+    OverlayDialog(
         show = true,
         title = "选择站源",
         titleColor = MiuixTheme.colorScheme.onBackground,

@@ -14,8 +14,8 @@ import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
  * 全局统一确认弹窗：照搬 KernelSU ConfirmDialogMiuix（miuix WindowDialog + Text + 双 TextButton）。
@@ -32,11 +32,11 @@ fun MiuixConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    WindowDialog(
+    // 用 OverlayDialog（App 内覆盖层渲染）而非 WindowDialog（独立平台窗口）：
+    // 与下拉弹窗同一条 miuix 覆盖层管线，遮罩颜色/透明度/动画天然一致
+    OverlayDialog(
         show = show,
         title = title,
-        // WindowDialog 渲染在独立 Dialog 窗口，内部 CompositionLocal 可能回退浅色默认值，
-        // 关键文字色在此处（页面组合上下文，主题正确）取值后显式传入
         titleColor = MiuixTheme.colorScheme.onBackground,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         onDismissRequest = onDismiss,
