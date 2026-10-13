@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
@@ -17,7 +18,7 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
  * 全局统一确认弹窗：照搬 KernelSU ConfirmDialogMiuix（miuix WindowDialog + Text + 双 TextButton）。
- * 取消在左（默认色）、确定在右（主题色），底部按钮与内容间距 12dp。
+ * 取消在左（默认色）、确定在右（主题色）；[danger] = true 时确定钮为红色（删除等破坏性操作）。
  */
 @Composable
 fun MiuixConfirmDialog(
@@ -26,6 +27,7 @@ fun MiuixConfirmDialog(
     content: String,
     confirmText: String = "确定",
     dismissText: String = "取消",
+    danger: Boolean = false,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -50,7 +52,14 @@ fun MiuixConfirmDialog(
                     text = confirmText,
                     onClick = onConfirm,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    colors = if (danger) {
+                        ButtonDefaults.textButtonColorsPrimary(
+                            color = Color(0xFFFF5C5C),
+                            textColor = Color.White,
+                        )
+                    } else {
+                        ButtonDefaults.textButtonColorsPrimary()
+                    },
                 )
             }
         }
