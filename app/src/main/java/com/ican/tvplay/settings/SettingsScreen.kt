@@ -44,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.BACKGROUND_PIP
+import com.ican.tvplay.data.HomeLayoutSize
 import com.ican.tvplay.data.ThemeMode
 import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.SettingsViewModel
@@ -129,6 +130,25 @@ fun SettingsScreen(
                 }
                 ThemeOption("深色", themeMode == ThemeMode.DARK) {
                     viewModel.setThemeMode(ThemeMode.DARK)
+                }
+            }
+        }
+
+        SettingsCard(title = "布局", subtitle = "首页网格大小") {
+            // 手机（<600dp）只提供小/中两档；平板额外提供大（约3列）
+            val isTablet = LocalContext.current.resources.configuration.screenWidthDp >= 600
+            val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ThemeOption("小", homeLayoutSize == HomeLayoutSize.SMALL) {
+                    viewModel.setHomeLayoutSize(HomeLayoutSize.SMALL)
+                }
+                ThemeOption("中", homeLayoutSize == HomeLayoutSize.MEDIUM) {
+                    viewModel.setHomeLayoutSize(HomeLayoutSize.MEDIUM)
+                }
+                if (isTablet) {
+                    ThemeOption("大", homeLayoutSize == HomeLayoutSize.LARGE) {
+                        viewModel.setHomeLayoutSize(HomeLayoutSize.LARGE)
+                    }
                 }
             }
         }
