@@ -24,13 +24,12 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** 全局：主题模式 / 动态取色 / 主题色板 / 全局模糊 / 接口配置状态 */
+/** 全局：主题模式 / 主题色板 / 全局模糊 / 接口配置状态 */
 class AppViewModel(container: AppContainer) : ViewModel() {
     private val settings = container.settingsRepository
     private val videoRepository = container.videoRepository
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
-    val dynamicColor: StateFlow<Boolean> = settings.dynamicColor
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
 
@@ -231,7 +230,6 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     }
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
-    val dynamicColor: StateFlow<Boolean> = settings.dynamicColor
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
     val homeLayoutSize: StateFlow<com.ican.tvplay.data.HomeLayoutSize> = settings.homeLayoutSize
@@ -249,7 +247,6 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
-    fun setDynamicColor(enabled: Boolean) = settings.setDynamicColor(enabled)
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
     fun setEnableBlur(enabled: Boolean) = settings.setEnableBlur(enabled)
     fun setHomeLayoutSize(size: com.ican.tvplay.data.HomeLayoutSize) =
