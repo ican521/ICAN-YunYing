@@ -110,6 +110,7 @@ dependencies {
     implementation(libs.miuix.ui)
     implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
+    implementation(libs.hiddenapibypass)
 
     // Coil 3：网络封面加载
     implementation(libs.coil.compose)

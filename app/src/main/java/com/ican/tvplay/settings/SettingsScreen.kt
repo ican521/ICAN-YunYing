@@ -1,6 +1,7 @@
 package com.ican.tvplay.ui.settings
 
 import android.content.res.Configuration
+import android.app.Activity
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
@@ -55,6 +56,7 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
+import com.ican.tvplay.TvPlayApplication
 import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.BACKGROUND_PIP
 import com.ican.tvplay.data.HomeLayoutSize
@@ -81,6 +83,7 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
+    val enablePredictiveBack by viewModel.enablePredictiveBack.collectAsStateWithLifecycle()
     val backgroundPlay by viewModel.playerBackgroundPlay.collectAsStateWithLifecycle()
     val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     val configUrl by viewModel.configUrl.collectAsStateWithLifecycle()
@@ -212,6 +215,20 @@ fun SettingsScreen(
                 enabled = true,
                 onToggle = { viewModel.setEnableBlur(it) },
             )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                SettingsSwitchRow(
+                    label = "预测性返回",
+                    hint = "侧滑返回时预览返回效果",
+                    checked = enablePredictiveBack,
+                    enabled = true,
+                    onToggle = { enabled ->
+                        // KernelSU 同款：反射立即应用 + recreate 当前 Activity 重新注册返回回调，无需重启 App
+                        viewModel.setEnablePredictiveBack(enabled)
+                        TvPlayApplication.applyPredictiveBack(context.applicationInfo, enabled)
+                        (context as? Activity)?.recreate()
+                    },
+                )
+            }
         }
         }
 
