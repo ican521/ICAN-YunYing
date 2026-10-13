@@ -170,6 +170,9 @@ fun PlayerScreen(
     var landscapeFullscreen by remember { mutableStateOf(false) }
     // 横屏小窗↔全屏放大/缩回动画进行中：期间只渲染纯视频，不挂任何覆盖层
     var landZooming by remember { mutableStateOf(false) }
+    // 缩放会话令牌：每次进入/退出全屏自增，作为收敛监听 LaunchedEffect 的 key，
+    // 避免协程体内把 landZooming 置 false 导致自身被取消、渐显逻辑丢失
+    var landZoomToken by remember { mutableIntStateOf(0) }
     // 横版界面其他元素（信息列/线路/选集/简介）是否显示：缩回后渐显，进页面初始不播动画
     var landChromeVisible by remember { mutableStateOf(true) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -592,6 +595,7 @@ fun PlayerScreen(
                 controlsVisible = false
                 landscapeFullscreen = false
                 landZooming = true
+                landZoomToken++
             } else {
                 // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
                 (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -702,7 +706,7 @@ fun PlayerScreen(
 
         // 动画收敛后挂载/卸载覆盖层：放大结束才挂全屏布局（纯净画面起手），
         // 缩回动画播放期间横版布局也不渲染（只剩纯视频在缩小）
-        LaunchedEffect(landZooming) {
+        LaunchedEffect(landZoomToken) {
             if (landZooming) {
                 snapshotFlow {
                     !expandTransition.isRunning &&
@@ -834,6 +838,7 @@ fun PlayerScreen(
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     landscapeFullscreen = true
                     landZooming = true
+                    landZoomToken++
                 },
                 onBack = { handleBack() },
                 onLineChange = { flag ->
