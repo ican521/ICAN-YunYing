@@ -8,6 +8,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import com.ican.tvplay.ui.theme.LocalDarkTheme
+import top.yukonga.miuix.kmp.interfaces.HoldDownInteraction
 import top.yukonga.miuix.kmp.utils.MiuixIndication
 
 /**
@@ -44,9 +46,40 @@ fun Modifier.tvCardEffect(
     onLongClick: (() -> Unit)? = null,
     /** 冻结缩放：为 true 时定格在当前缩放值（不归 1、不产生跳变），供下拉弹窗等依赖实时窗口坐标锚点的场景，避免缩放期间锚点漂移 */
     freezeScale: Boolean = false,
+    /** 按住保持：为 true 时向 interactionSource 发射 HoldDownInteraction.HoldDown，MiuixIndication 保持按压蒙层（alpha 0.10），
+     *  为 false 时发射 Release 渐隐恢复——即 miuix BasicComponent holdDownState 的同款机制（KernelSU OverlayDropdownPreference 用法） */
+    holdDownState: Boolean = false,
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
+
+    // 照抄 miuix HoldDownObserver：把 holdDownState 镜像到 interactionSource（HoldDown/Release），
+    // 松开真实手指后由 HoldDown 接续保持按压色，状态归 false 后才释放渐隐
+    var heldDown by remember { mutableStateOf<HoldDownInteraction.HoldDown?>(null) }
+    LaunchedEffect(holdDownState, interactionSource) {
+        suspend fun release() {
+            heldDown?.let { current ->
+                interactionSource.emit(HoldDownInteraction.Release(current))
+                heldDown = null
+            }
+        }
+        if (holdDownState) {
+            release()
+            val interaction = HoldDownInteraction.HoldDown()
+            heldDown = interaction
+            interactionSource.emit(interaction)
+        } else {
+            release()
+        }
+    }
+    DisposableEffect(interactionSource) {
+        onDispose {
+            heldDown?.let { current ->
+                interactionSource.tryEmit(HoldDownInteraction.Release(current))
+            }
+            heldDown = null
+        }
+    }
 
     val animatedScale by animateFloatAsState(
         targetValue = if (focused) focusedScale else 1f,
