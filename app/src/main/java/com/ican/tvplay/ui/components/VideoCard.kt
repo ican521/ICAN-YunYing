@@ -97,21 +97,13 @@ fun VideoCard(
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             )
 
-            // 底部：年份（标题正上方）+ 标题
+            // 底部：标题
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
-                if (video.year > 0) {
-                    Text(
-                        text = "${video.year}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.8f),
-                        maxLines = 1,
-                    )
-                }
                 Text(
                     text = video.title,
                     style = MaterialTheme.typography.titleSmall,
