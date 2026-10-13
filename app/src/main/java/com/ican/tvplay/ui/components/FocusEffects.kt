@@ -10,8 +10,11 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -47,7 +50,7 @@ fun Modifier.tvCardEffect(
     glow: Boolean = true,
     enabled: Boolean = true,
     onLongClick: (() -> Unit)? = null,
-    /** 冻结缩放：为 true 时立即无动画恢复 1f（供下拉弹窗等依赖实时窗口坐标锚点的场景，避免缩放期间锚点漂移） */
+    /** 冻结缩放：为 true 时定格在当前缩放值（不归 1、不产生跳变），供下拉弹窗等依赖实时窗口坐标锚点的场景，避免缩放期间锚点漂移 */
     freezeScale: Boolean = false,
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
@@ -62,8 +65,12 @@ fun Modifier.tvCardEffect(
         ),
         label = "tvCardScale",
     )
-    // 冻结时绕过动画瞬时归位，保证弹窗出现首帧锚点已静止
-    val scale = if (freezeScale) 1f else animatedScale
+    // 冻结瞬间记录当前视觉缩放值并定格：焦点随后变化也不响应，解冻时从该值平滑恢复
+    var frozenAt by remember { mutableStateOf<Float?>(null) }
+    LaunchedEffect(freezeScale) {
+        frozenAt = if (freezeScale) animatedScale else null
+    }
+    val scale = frozenAt ?: animatedScale
 
     // 按下 / 松手使用不同时长的补间
     val highlight by animateFloatAsState(
