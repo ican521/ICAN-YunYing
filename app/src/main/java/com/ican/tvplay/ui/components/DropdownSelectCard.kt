@@ -115,15 +115,18 @@ fun DropdownSelectCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            // KernelSU BasicComponent endActions 结构：值文字 + 上下箭头 + OverlayDropdownPopup
+            // KernelSU BasicComponent endActions 结构：值文字 + 上下箭头 + OverlayDropdownPopup。
+            // 注意：不能用 Arrangement.spacedBy——miuix ListPopupLayout 在弹窗显示时会向此 Row
+            // 插入一个零尺寸锚点 Spacer，spacedBy 会因其插入/移除多出一个间距，导致值文字左右跳动。
+            // 间距改放在文字的固定 end padding 上（KernelSU endActions 的 Row 无 spacedBy）。
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
                     text = options.getOrElse(selectedIndex) { "" },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 6.dp),
                 )
                 Icon(
                     imageVector = AppIcons.Unfold,
