@@ -1,20 +1,21 @@
 package com.ican.tvplay.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,19 +24,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -48,9 +48,12 @@ import kotlin.math.roundToInt
 /**
  * KernelSU 风格下拉选择卡（全局通用）：
  * - 整卡可点击，右侧显示当前值 + 上下箭头；
- * - 点击后全屏黑色遮罩（40% 黑，点击遮罩任意处关闭）；
- * - 选项弹窗右上角精确对齐到箭头正下方，选中项为主题色文字 + 对勾；
- * - 深色模式弹窗用抬升色（无阴影），浅色模式白色 + 阴影。
+ * - 点击后全屏黑色遮罩渐显（点击遮罩任意处渐隐关闭）；
+ * - 选项菜单右上角精确对齐到箭头正下方（卡片底部 + 8dp），带缩放+渐显动画；
+ * - 深色模式菜单用抬升色（无阴影），浅色模式白色 + 阴影。
+ *
+ * 用 Dialog 全屏层实现（独立窗口覆盖在页面上方），不触碰底层页面窗口，
+ * 保证打开/关闭时页面零跳动、菜单定位坐标恒定。
  */
 @Composable
 fun DropdownSelectCard(
@@ -63,12 +66,15 @@ fun DropdownSelectCard(
     hint: String? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var closing by remember { mutableStateOf(false) }
     val isDark = LocalDarkTheme.current
     val shape = RoundedCornerShape(Spacing.corner)
-    // 卡片在窗口中的位置（boundsInWindow 与弹窗内容坐标系一致），用于确定性定位弹窗
+    // 卡片在窗口中的位置（boundsInWindow 与 Dialog 全屏层坐标系一致），用于菜单定位
     var anchorBounds by remember { mutableStateOf(Rect.Zero) }
-    // 弹窗遮罩层尺寸（即窗口尺寸）
-    var scrimSize by remember { mutableStateOf(IntSize.Zero) }
+
+    fun requestClose() {
+        if (!closing) closing = true
+    }
 
     Box(
         modifier = modifier
@@ -134,47 +140,59 @@ fun DropdownSelectCard(
     }
 
     if (expanded) {
-        Popup(
-            // 遮罩层铺满整个窗口，固定锚在窗口原点
-            popupPositionProvider = remember {
-                object : PopupPositionProvider {
-                    override fun calculatePosition(
-                        anchorBounds: IntRect,
-                        windowSize: IntSize,
-                        layoutDirection: LayoutDirection,
-                        popupContentSize: IntSize,
-                    ): IntOffset = IntOffset.Zero
-                }
-            },
-            onDismissRequest = { expanded = false },
-            properties = PopupProperties(focusable = true),
+        // 遮罩与菜单共用一条进度：180ms 渐显、160ms 渐隐（KernelSU 同款节奏）
+        val progress = remember { Animatable(0f) }
+        LaunchedEffect(Unit) {
+            progress.animateTo(1f, tween(durationMillis = 180))
+        }
+        LaunchedEffect(closing) {
+            if (closing) {
+                progress.animateTo(0f, tween(durationMillis = 160))
+                expanded = false
+                closing = false
+            }
+        }
+
+        Dialog(
+            onDismissRequest = { requestClose() },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+                dismissOnClickOutside = false,
+            ),
         ) {
+            var menuSize by remember { mutableStateOf(IntSize.Zero) }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(PopupScrim)
-                    .onSizeChanged { scrimSize = it }
+                    .background(PopupScrim.copy(alpha = PopupScrim.alpha * progress.value))
                     .pointerInput(Unit) {
                         // 点击遮罩任意处关闭（与 KernelSU 一致）
-                        detectTapGestures { expanded = false }
+                        detectTapGestures { requestClose() }
                     },
             ) {
-                // 等拿到窗口尺寸再显示菜单，避免首帧位置闪跳
-                if (scrimSize != IntSize.Zero && anchorBounds != Rect.Zero) {
+                if (anchorBounds != Rect.Zero) {
                     Column(
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
                             .offset {
                                 IntOffset(
-                                    // 右缘对齐：窗口右缘 → 卡片右缘 → 再左移 18dp（卡片内容区内边距）= 箭头正下方
-                                    -((scrimSize.width - anchorBounds.right.toInt()) +
-                                        with(this) { 18.dp.roundToPx() }),
-                                    // 顶部对齐：卡片底部 + 8dp 间距
+                                    // 右缘：卡片右缘内收 18dp（卡片内容区内边距）= 箭头正下方
+                                    (anchorBounds.right.roundToInt() - with(this) { 18.dp.roundToPx() } - menuSize.width)
+                                        .coerceAtLeast(0),
+                                    // 顶部：卡片底部 + 8dp 间距
                                     anchorBounds.bottom.roundToInt() + with(this) { 8.dp.roundToPx() },
                                 )
                             }
-                            .width(IntrinsicSize.Max)
-                            // 深色模式隐藏所有阴影（全局规范），浅色模式带投影
+                            .onSizeChanged { menuSize = it }
+                            .graphicsLayer {
+                                // 菜单随遮罩进度渐显 + 从右上角锚点轻微放大
+                                alpha = progress.value
+                                val scale = 0.92f + 0.08f * progress.value
+                                scaleX = scale
+                                scaleY = scale
+                                transformOrigin = TransformOrigin(1f, 0f)
+                            }
+                            // 深色模式下隐藏所有阴影（全局规范）
                             .then(
                                 if (!isDark) {
                                     Modifier.shadow(elevation = 6.dp, shape = shape, clip = false)
@@ -196,7 +214,7 @@ fun DropdownSelectCard(
                                     .fillMaxWidth()
                                     .tvCardEffect(
                                         onClick = {
-                                            expanded = false
+                                            requestClose()
                                             if (!selected) onSelect(index)
                                         },
                                         shape = shape,
