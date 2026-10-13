@@ -16,10 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -46,17 +43,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import top.yukonga.miuix.kmp.basic.TabRow
+import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.data.model.VideoCategory
 import com.ican.tvplay.data.remote.TvBoxSite
@@ -110,9 +106,7 @@ fun HomeScreen(
         }
     }
 
-    val selectedIndex = categories.indexOfFirst { it.id == selectedCategory }.coerceAtLeast(0)
-
-    // 点击 chip → pager 平移翻页（非瞬跳）；点击瞬间记录目标 index，颜色/指示器立即响应
+    // 点击 chip → pager 平移翻页（非瞬跳）；点击瞬间记录目标 index，高亮立即响应
     var tappedChipIndex by remember { mutableStateOf<Int?>(null) }
     val onChipClick: (Int) -> Unit = { index ->
         tappedChipIndex = index
@@ -159,7 +153,6 @@ fun HomeScreen(
         ) {
             CategoryChips(
                 categories = categories,
-                selectedIndex = selectedIndex,
                 pagerState = pagerState,
                 tappedIndex = tappedChipIndex,
                 horizontalPadding = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
@@ -438,110 +431,26 @@ private fun HomeTopBar(
 @Composable
 private fun CategoryChips(
     categories: List<VideoCategory>,
-    selectedIndex: Int,
     pagerState: androidx.compose.foundation.pager.PagerState,
     tappedIndex: Int?,
     horizontalPadding: androidx.compose.ui.unit.Dp,
     onSelect: (Int) -> Unit,
 ) {
-    // 文字高亮目标：点击瞬间切换，无动画；手势滑动时跟随 pager 最近页
+    // 高亮目标：点击瞬间切换；手势滑动时跟随 pager 最近页
     val colorTargetIndex = tappedIndex
         ?: (pagerState.currentPage + pagerState.currentPageOffsetFraction.toInt())
             .coerceIn(0, (categories.size - 1).coerceAtLeast(0))
 
-    // 目标Tab滚出屏幕边缘时，整栏最小距离滚动让其刚好完整露出；
-    // 目标Tab已完整可见时保持不动（点击与手势翻页均生效）
-    val listState = rememberLazyListState()
-    LaunchedEffect(colorTargetIndex) {
-        if (categories.isEmpty()) return@LaunchedEffect
-        val layoutInfo = listState.layoutInfo
-        val item = layoutInfo.visibleItemsInfo.firstOrNull { it.index == colorTargetIndex }
-        if (item == null) {
-            // 目标Tab完全未上屏：一次 animateScrollToItem 到位，避免"估算+校正"两次动画产生的反向回弹
-            listState.animateScrollToItem(colorTargetIndex)
-        } else {
-            val viewportStart = layoutInfo.viewportStartOffset
-            val viewportEnd = layoutInfo.viewportEndOffset
-            when {
-                // 左边缘被裁切 → 整栏右移，刚好露出
-                item.offset < viewportStart ->
-                    listState.animateScrollBy((item.offset - viewportStart).toFloat())
-                // 右边缘被裁切 → 整栏左移，刚好露出
-                item.offset + item.size > viewportEnd ->
-                    listState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat())
-            }
-        }
-    }
-
-    // 文字行：通栏+contentPadding，内容可滑到屏幕边缘，静止时最左Tab对齐搜索栏左边基准线
-    Column(modifier = Modifier.fillMaxWidth()) {
-        LazyRow(
-            state = listState,
-            contentPadding = PaddingValues(horizontal = horizontalPadding),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().height(27.dp),
-        ) {
-            items(categories.size, key = { categories[it].id }) { i ->
-                CategoryChipPlain(categories[i].name, i, colorTargetIndex == i, onSelect)
-            }
-        }
-
-        // === 底部指示器（贴文字行下方）：高3dp，宽=选中Tab文字宽度（chip宽-两侧6dp内边距），
-        // 仅选中时出现，未选中不出现；切换直接显隐无移动动画；目标Tab滑出屏幕时隐藏
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp)) {
-            val density = LocalDensity.current
-            val textPadPx = with(density) { 6.dp.toPx() }
-            val layoutInfo = listState.layoutInfo
-            val info = layoutInfo.visibleItemsInfo
-                .firstOrNull { it.index == colorTargetIndex }
-            if (info != null && info.size > textPadPx * 2) {
-                // item.offset 原点为内容区起点（含contentPadding偏移），
-                // 减去 viewportStartOffset 换算成相对文字行左缘的屏幕坐标，保证横条与文字对齐
-                val barX = info.offset - layoutInfo.viewportStartOffset + textPadPx
-                Box(
-                    modifier = Modifier
-                        .graphicsLayer { translationX = barX }
-                        .width(with(density) { (info.size - textPadPx * 2).toDp() })
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(percent = 50))
-                        .background(MaterialTheme.colorScheme.primary),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CategoryChipPlain(
-    text: String,
-    index: Int,
-    selected: Boolean,
-    onSelect: (Int) -> Unit,
-) {
-    val textColor = if (selected) MaterialTheme.colorScheme.primary
-    else MaterialTheme.colorScheme.onSurfaceVariant
-    val fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .fillMaxSize()
-            .tvCardEffect(
-                onClick = { onSelect(index) },
-                shape = RoundedCornerShape(percent = 50),
-                focusedScale = 1.06f,
-                glow = false,
-            )
-            .padding(horizontal = 6.dp),
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = textColor,
-            fontWeight = fontWeight,
-        )
-    }
+    // miuix 原生分段 Tab（KernelSU 模块仓库页同款）：等宽 tab + 滑动药丸指示器 + 选中自动居中
+    TabRow(
+        tabs = categories.map { it.name },
+        selectedTabIndex = colorTargetIndex,
+        onTabSelected = onSelect,
+        colors = TabRowDefaults.tabRowColors(
+            backgroundColor = MaterialTheme.colorScheme.background,
+        ),
+        modifier = Modifier.padding(horizontal = horizontalPadding),
+    )
 }
 
 @Composable
