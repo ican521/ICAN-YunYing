@@ -3,6 +3,8 @@ plugins {
     // AGP 9 内置 Kotlin，无需应用 org.jetbrains.kotlin.android
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    // AGP 9 内置 Kotlin 已在 classpath 提供 parcelize，无版本直接应用（KernelSU Route 需要 @Parcelize）
+    id("org.jetbrains.kotlin.plugin.parcelize")
     alias(libs.plugins.ksp)
 }
 
@@ -42,13 +44,14 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        // miuix-nav 字节码为 JVM 21（与 KernelSU 一致），target 必须对齐
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     kotlin {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         }
     }
 
@@ -59,6 +62,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
     implementation(libs.kotlinx.coroutines.android)
 
     // Lifecycle
@@ -78,9 +82,6 @@ dependencies {
     // Jetpack Compose for TV
     implementation(libs.androidx.tv.material)
     implementation(libs.androidx.tv.foundation)
-
-    // Navigation
-    implementation(libs.androidx.navigation.compose)
 
     // Room：收藏与播放历史
     implementation(libs.androidx.room.runtime)
@@ -105,11 +106,13 @@ dependencies {
     // miuix-blur：液态玻璃悬浮底栏的 Backdrop 模糊 / 折射
     implementation(libs.miuix.blur)
 
-    // miuix UI + preference + icons：KernelSU 同款下拉弹窗（OverlayDropdownPopup，同窗口覆盖层渲染）
-    // 与顶栏折叠（TopAppBar/MiuixScrollBehavior）及裸图标（MiuixIcons.Back）
+    // miuix UI + preference + icons + nav：KernelSU 同款下拉弹窗（OverlayDropdownPopup，同窗口覆盖层渲染）、
+    // 顶栏折叠（TopAppBar/MiuixScrollBehavior）、裸图标（MiuixIcons.Back）
+    // 与导航（NavDisplay：边缘滑动返回 + 预测性返回圆角裁剪动画）
     implementation(libs.miuix.ui)
     implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
+    implementation(libs.miuix.nav)
     implementation(libs.hiddenapibypass)
 
     // Coil 3：网络封面加载

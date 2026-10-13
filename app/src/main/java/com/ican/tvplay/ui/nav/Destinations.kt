@@ -3,29 +3,6 @@ package com.ican.tvplay.ui.nav
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.ican.tvplay.ui.components.AppIcons
 
-/** 路由常量与导航参数 */
-object Routes {
-    /** 一级页面容器（HorizontalPager：首页/收藏/设置） */
-    const val MAIN = "main"
-    const val HOME = "home"
-    const val SEARCH = "search"
-    const val FAVORITES = "favorites"
-    const val HISTORY = "history"
-    const val SETTINGS = "settings"
-    const val COLOR_PALETTE = "color_palette"
-
-    /** 跨站源搜索结果页：query 参数是搜索关键词 */
-    const val MULTI_SEARCH_PATTERN = "multi_search?query={query}"
-    fun multiSearch(query: String) = "multi_search?query=${android.net.Uri.encode(query)}"
-
-    const val PLAYER_PATTERN = "player/{videoId}/{episodeIndex}?flag={flag}&preInit={preInit}"
-
-    // videoId 必须 URL 编码：部分站源 id 形如 "movie/8858.html" 含斜杠，
-    // 不编码会打乱 path 段数导致 NavGraph 匹配失败闪退
-    fun player(videoId: String, episodeIndex: Int, flag: String = "", preInit: Boolean = false) =
-        "player/${android.net.Uri.encode(videoId)}/$episodeIndex?flag=${android.net.Uri.encode(flag)}&preInit=$preInit"
-}
-
 /** 底部胶囊导航的一个入口 */
 data class TopDestination(
     val route: String,
@@ -34,9 +11,7 @@ data class TopDestination(
 )
 
 val topDestinations = listOf(
-    TopDestination(Routes.HOME, "首页", AppIcons.Home),
-    TopDestination(Routes.FAVORITES, "收藏", AppIcons.Favorite),
-    TopDestination(Routes.SETTINGS, "设置", AppIcons.Settings),
+    TopDestination("home", "首页", AppIcons.Home),
+    TopDestination("favorites", "收藏", AppIcons.Favorite),
+    TopDestination("settings", "设置", AppIcons.Settings),
 )
-
-val topLevelRoutes = topDestinations.map { it.route }.toSet()

@@ -47,8 +47,8 @@ class SettingsRepository(context: Context) {
         _themeColor.value = color
     }
 
-    /** 全局模糊（液态玻璃底栏） */
-    private val _enableBlur = MutableStateFlow(prefs.getBoolean(KEY_ENABLE_BLUR, true))
+    /** 全局模糊（液态玻璃底栏），默认关闭 */
+    private val _enableBlur = MutableStateFlow(prefs.getBoolean(KEY_ENABLE_BLUR, false))
     val enableBlur: StateFlow<Boolean> = _enableBlur.asStateFlow()
 
     fun setEnableBlur(enabled: Boolean) {
@@ -63,6 +63,15 @@ class SettingsRepository(context: Context) {
     fun setEnablePredictiveBack(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_PREDICTIVE_BACK, enabled).apply()
         _enablePredictiveBack.value = enabled
+    }
+
+    /** 边缘滑动返回手势（KernelSU 同款 miuix-nav swipeDismiss，默认开启，切换即时生效无需重启） */
+    private val _enableSwipeDismiss = MutableStateFlow(prefs.getBoolean(KEY_SWIPE_DISMISS, true))
+    val enableSwipeDismiss: StateFlow<Boolean> = _enableSwipeDismiss.asStateFlow()
+
+    fun setEnableSwipeDismiss(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SWIPE_DISMISS, enabled).apply()
+        _enableSwipeDismiss.value = enabled
     }
 
     /** 首页网格布局大小（默认中） */
@@ -222,6 +231,7 @@ class SettingsRepository(context: Context) {
         const val KEY_THEME_COLOR = "theme_color"
         const val KEY_ENABLE_BLUR = "enable_blur"
         const val KEY_PREDICTIVE_BACK = "enable_predictive_back"
+        const val KEY_SWIPE_DISMISS = "enable_swipe_dismiss"
         const val KEY_HOME_LAYOUT_SIZE = "home_layout_size"
         const val KEY_CONFIG_URL = "config_url"
         const val KEY_SITE_KEY = "site_key"

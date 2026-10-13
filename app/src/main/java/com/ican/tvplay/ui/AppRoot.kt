@@ -2,14 +2,9 @@ package com.ican.tvplay.ui
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -30,16 +25,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -51,7 +42,8 @@ import com.ican.tvplay.ui.components.FloatingBottomBarItem
 import com.ican.tvplay.ui.components.LocalEnableBlur
 import com.ican.tvplay.ui.components.rememberMainPagerState
 import com.ican.tvplay.ui.home.HomeScreen
-import com.ican.tvplay.ui.nav.Routes
+import com.ican.tvplay.ui.nav.Route
+import com.ican.tvplay.ui.nav.rememberNavigator
 import com.ican.tvplay.ui.nav.topDestinations
 import com.ican.tvplay.player.PlayerScreen
 import com.ican.tvplay.player.core.Players
@@ -64,12 +56,15 @@ import com.ican.tvplay.ui.theme.LightSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.TvPlayTheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import androidx.compose.ui.graphics.Color
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
 import top.yukonga.miuix.kmp.utils.MiuixPopupUtils
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.nav.core.NavDisplay
+import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
+import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
+import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -78,6 +73,7 @@ fun AppRoot() {
     val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by appViewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by appViewModel.enableBlur.collectAsStateWithLifecycle()
+    val enableSwipeDismiss by appViewModel.enableSwipeDismiss.collectAsStateWithLifecycle()
     val configReady by appViewModel.configReady.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -106,7 +102,8 @@ fun AppRoot() {
                 lightColorScheme(surfaceContainer = LightSurface)
             },
         ) {
-        val navController = rememberNavController()
+        // miuix-nav 导航（照搬 KernelSU MainActivity：NavDisplay + 圆角裁剪 + 边缘滑动返回）
+        val navigator = rememberNavigator(Route.Main)
 
         // 毛玻璃开关下发：顶栏/底栏统一从 LocalEnableBlur 读取（KernelSU 同款机制）
         CompositionLocalProvider(LocalEnableBlur provides enableBlur) {
@@ -115,13 +112,21 @@ fun AppRoot() {
         LaunchedEffect(Unit) {
             Players.openPlayerRequest.collect { req ->
                 if (req != null) {
-                    navController.navigate(Routes.player(req.videoId, req.episodeIndex, req.flag))
+                    navigator.push(Route.Player(req.videoId, req.episodeIndex, req.flag))
                 }
             }
         }
 
-        val backStackEntry by navController.currentBackStackEntryAsState()
-        val currentRoute = backStackEntry?.destination?.route
+        // KernelSU 同款：边缘滑动返回方向（RTL 布局反向；开关关闭时不响应边缘滑动）
+        val swipeDismiss = if (enableSwipeDismiss) {
+            if (LocalLayoutDirection.current == LayoutDirection.Rtl) {
+                NavSwipeDirection.RightToLeft
+            } else {
+                NavSwipeDirection.LeftToRight
+            }
+        } else {
+            NavSwipeDirection.None
+        }
 
         // 液态玻璃底栏的模糊内容源：先铺背景色再记录内容
         val backgroundColor = MaterialTheme.colorScheme.background
@@ -149,20 +154,15 @@ fun AppRoot() {
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background),
         ) {
-            NavHost(
-                navController = navController,
-                startDestination = Routes.MAIN,
+            NavDisplay(
+                backStack = navigator.backStack,
                 modifier = Modifier
                     .fillMaxSize()
                     .layerBackdrop(backdrop),
-                // 二级页纯覆盖式平移：新页从右滑入，旧页固定不动；返回同理
-                enterTransition = { slideInHorizontally(animationSpec = tween(300)) { it } },
-                // ExitTransition.None 会让旧页瞬间消失，改用延迟快照淡出实现"保持不动"
-                exitTransition = { fadeOut(animationSpec = snap(delayMillis = 300)) },
-                popEnterTransition = { EnterTransition.None },
-                popExitTransition = { slideOutHorizontally(animationSpec = tween(300)) { it } },
+                effects = NavDisplayEffects(cornerClipRadius = rememberNavSystemCornerRadius()),
+                onBack = { navigator.pop() },
             ) {
-                composable(Routes.MAIN) {
+                entry<Route.Main>(swipeDismiss = swipeDismiss) {
                     HorizontalPager(
                         state = pagerState,
                         modifier = Modifier.fillMaxSize(),
@@ -171,90 +171,70 @@ fun AppRoot() {
                         when (page) {
                             0 -> HomeScreen(
                                 onVideoClick = { video ->
-                                    navController.navigate(Routes.multiSearch(video.title))
+                                    navigator.push(Route.MultiSearch(video.title))
                                 },
-                                onSearchClick = { navController.navigate(Routes.SEARCH) },
-                                onHistoryClick = { navController.navigate(Routes.HISTORY) },
+                                onSearchClick = { navigator.push(Route.Search) },
+                                onHistoryClick = { navigator.push(Route.History) },
                             )
 
                             1 -> FavoritesScreen(
                                 onPlay = { videoId, episodeIndex, flag, preInit ->
                                     if (guardPlay()) {
-                                        navController.navigate(Routes.player(videoId, episodeIndex, flag, preInit))
+                                        navigator.push(Route.Player(videoId, episodeIndex, flag, preInit))
                                     }
                                 },
                                 onBack = { mainPagerState.animateToPage(0) },
                             )
 
                             2 -> SettingsScreen(
-                                onColorPaletteClick = { navController.navigate(Routes.COLOR_PALETTE) },
+                                onColorPaletteClick = { navigator.push(Route.ColorPalette) },
                                 onBack = { mainPagerState.animateToPage(0) },
                             )
                         }
                     }
                 }
-                composable(Routes.COLOR_PALETTE) {
-                    ColorPaletteScreen(onBack = { navController.popBackStack() })
+                entry<Route.ColorPalette>(swipeDismiss = swipeDismiss) {
+                    ColorPaletteScreen(onBack = { navigator.pop() })
                 }
-                composable(Routes.SEARCH) {
+                entry<Route.Search>(swipeDismiss = swipeDismiss) {
                     SearchHomeScreen(
-                        onBack = { navController.popBackStack() },
-                        onSearch = { query -> navController.navigate(Routes.multiSearch(query)) },
+                        onBack = { navigator.pop() },
+                        onSearch = { query -> navigator.push(Route.MultiSearch(query)) },
                     )
                 }
-
-                composable(
-                    route = Routes.MULTI_SEARCH_PATTERN,
-                    arguments = listOf(navArgument("query") { type = NavType.StringType }),
-                ) { entry ->
-                    val query = entry.arguments?.getString("query").orEmpty()
+                entry<Route.MultiSearch>(swipeDismiss = swipeDismiss) { key ->
                     MultiSourceSearchScreen(
-                        initialQuery = query,
-                        onBack = { navController.popBackStack() },
+                        initialQuery = key.query,
+                        onBack = { navigator.pop() },
                         onPlay = { videoId, episodeIndex, flag, preInit ->
-                            navController.navigate(Routes.player(videoId, episodeIndex, flag, preInit))
+                            navigator.push(Route.Player(videoId, episodeIndex, flag, preInit))
                         },
                     )
                 }
-                composable(Routes.HISTORY) {
+                entry<Route.History>(swipeDismiss = swipeDismiss) {
                     HistoryScreen(
                         onPlay = { videoId, episodeIndex, flag, preInit ->
                             if (guardPlay()) {
-                                navController.navigate(Routes.player(videoId, episodeIndex, flag, preInit))
+                                navigator.push(Route.Player(videoId, episodeIndex, flag, preInit))
                             }
                         },
-                        onBack = { navController.popBackStack() },
+                        onBack = { navigator.pop() },
                     )
                 }
-
-                composable(
-                    route = Routes.PLAYER_PATTERN,
-                    arguments = listOf(
-                        navArgument("videoId") { type = NavType.StringType },
-                        navArgument("episodeIndex") { type = NavType.IntType },
-                        navArgument("flag") {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                        navArgument("preInit") {
-                            type = NavType.BoolType
-                            defaultValue = false
-                        },
-                    ),
-                ) { entry ->
+                entry<Route.Player>(swipeDismiss = swipeDismiss) { key ->
                     PlayerScreen(
-                        videoId = entry.arguments?.getString("videoId").orEmpty(),
-                        startEpisode = entry.arguments?.getInt("episodeIndex") ?: 0,
-                        startFlag = entry.arguments?.getString("flag").orEmpty(),
-                        preInitialized = entry.arguments?.getBoolean("preInit") ?: false,
-                        onBack = { navController.popBackStack() },
+                        videoId = key.videoId,
+                        startEpisode = key.episodeIndex,
+                        startFlag = key.flag,
+                        preInitialized = key.preInit,
+                        onBack = { navigator.pop() },
                     )
                 }
             }
 
-            // 底部悬浮液态玻璃导航：仅一级页面（main）显示
+            // 底部悬浮液态玻璃导航：仅一级页面（Main）显示
             AnimatedVisibility(
-                visible = currentRoute == Routes.MAIN,
+                visible = navigator.current() is Route.Main,
                 enter = fadeIn() + slideInVertically { it / 2 },
                 exit = fadeOut() + slideOutVertically { it / 2 },
                 modifier = Modifier.align(Alignment.BottomCenter),
