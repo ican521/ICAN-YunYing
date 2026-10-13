@@ -2,6 +2,7 @@ package com.ican.tvplay.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -84,18 +85,6 @@ fun VideoCard(
                     ),
             )
 
-            // 左上角：年份胶囊（与右上角评分胶囊同款，顶部对齐）
-            Text(
-                text = "${video.year}",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp)
-                    .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-            )
-
             // 右上角：评分胶囊
             Text(
                 text = video.rating,
@@ -108,18 +97,30 @@ fun VideoCard(
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             )
 
-            Text(
-                text = video.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            // 底部：年份（标题正上方）+ 标题
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .padding(horizontal = 10.dp, vertical = 8.dp),
-            )
+            ) {
+                if (video.year > 0) {
+                    Text(
+                        text = "${video.year}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.8f),
+                        maxLines = 1,
+                    )
+                }
+                Text(
+                    text = video.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
