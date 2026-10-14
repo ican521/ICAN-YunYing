@@ -1,7 +1,6 @@
 package com.ican.tvplay.ui.components
 
-import androidx.compose.animation.core.EaseInSine
-import androidx.compose.animation.core.EaseOutSine
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,12 +69,9 @@ fun MorphCollapsingTopBar(
         state.heightOffsetLimit = -expandedExtraPx
     }
 
-    // 双曲线分离（全程与滚动严格同步，无滞后无回弹）：
-    // 字号/字重走 EaseOutSine（先快后慢，收尾柔和），位置走 EaseInSine（先慢后快，落位干脆），
-    // Sine 曲线峰值速度仅为线性的 ~1.5 倍（Cubic 为 3 倍），中段不突兀；
-    // 栏高度保持线性，与内容滚动 1:1
-    val fontProgress = EaseOutSine.transform(fraction)
-    val posProgress = EaseInSine.transform(fraction)
+    // 形变进度统一走 LinearOutSlowInEasing（Material 标准减速曲线，起步快、收尾柔和），
+    // 全程与滚动严格同步，无滞后无回弹；栏高度保持线性，与内容滚动 1:1
+    val morphProgress = LinearOutSlowInEasing.transform(fraction)
 
     val barHeight = collapsedHeight + expandedExtra * (1f - fraction)
 
@@ -90,8 +86,8 @@ fun MorphCollapsingTopBar(
             Text(
                 text = title,
                 color = titleColor,
-                fontSize = (32f - 12f * fontProgress).sp,
-                fontWeight = FontWeight((400f + 100f * fontProgress).roundToInt()),
+                fontSize = (32f - 12f * morphProgress).sp,
+                fontWeight = FontWeight((400f + 100f * morphProgress).roundToInt()),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.layout { measurable, constraints ->
@@ -105,8 +101,8 @@ fun MorphCollapsingTopBar(
                     // 小标题端点：整栏水平居中、折叠行内垂直居中
                     val smallX = (constraints.maxWidth - placeable.width) / 2f
                     val smallY = (collapsedPx - placeable.height) / 2f
-                    val x = lerp(largeX, smallX, posProgress).roundToInt()
-                    val y = lerp(largeY, smallY, posProgress).roundToInt()
+                    val x = lerp(largeX, smallX, morphProgress).roundToInt()
+                    val y = lerp(largeY, smallY, morphProgress).roundToInt()
                     layout(placeable.width, placeable.height) {
                         placeable.place(x, y)
                     }
