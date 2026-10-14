@@ -133,10 +133,8 @@ fun FavoritesScreen(
                         entity = item,
                         editMode = editMode,
                         onClick = {
-                            if (editMode) {
-                                // 编辑模式下点击卡片也触发单条删除（更方便）
-                                viewModel.removeFavorite(item.videoId)
-                            } else {
+                            // 编辑模式下点卡片本体不响应，仅右上角叉号可删除
+                            if (!editMode) {
                                 // 按收藏记录的站源拉详情并直接进播放页（与搜索页点击卡片同链路）
                                 scope.launch {
                                     val prepared = viewModel.prepareFavoritePlay(item)
@@ -377,10 +375,8 @@ fun HistoryScreen(
                         history = history,
                         editMode = editMode,
                         onClick = {
-                            if (editMode) {
-                                // 编辑模式下点击卡片也触发单条删除（更方便）
-                                viewModel.removeHistory(history.videoId)
-                            } else {
+                            // 编辑模式下点卡片本体不响应，仅右上角叉号可删除
+                            if (!editMode) {
                                 // 按历史记录的站源拉详情并直接续播（与收藏页同链路），进度/集数由播放页自动恢复
                                 scope.launch {
                                     val prepared = viewModel.prepareHistoryPlay(history)
