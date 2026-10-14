@@ -20,6 +20,9 @@ import top.yukonga.miuix.kmp.shader.isRenderEffectSupported
 /** 全局毛玻璃开关（AppRoot 按设置页「全局模糊」开关提供，KernelSU 同款机制） */
 val LocalEnableBlur = staticCompositionLocalOf { false }
 
+/** 顶栏毛玻璃独立开关（AppRoot 按设置页「顶栏毛玻璃」开关提供，与全局模糊互不影响） */
+val LocalEnableTopBarBlur = staticCompositionLocalOf { true }
+
 /**
  * 顶栏毛玻璃内容源（照搬 KernelSU ui/util/BlurExt.kt）：
  * 毛玻璃关闭或设备不支持 RenderEffect 时返回 null（顶栏退化为不透明 surface 底色）。

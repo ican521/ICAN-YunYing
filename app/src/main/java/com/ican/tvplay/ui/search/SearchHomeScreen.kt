@@ -39,7 +39,7 @@ import androidx.tv.material3.Text
 import com.ican.tvplay.ui.SearchViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
-import com.ican.tvplay.ui.components.LocalEnableBlur
+import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixSearchInput
 import com.ican.tvplay.ui.components.pageHorizontalPadding
@@ -73,8 +73,7 @@ fun SearchHomeScreen(
     }
 
     // KernelSU 同款：固定毛玻璃顶栏（搜索栏不适合折叠，保持固定高度）
-    val enableBlurState = LocalEnableBlur.current
-    val backdrop = rememberBlurBackdrop(enableBlurState)
+    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
 

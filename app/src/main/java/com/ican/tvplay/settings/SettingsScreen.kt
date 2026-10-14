@@ -60,7 +60,7 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
-import com.ican.tvplay.ui.components.LocalEnableBlur
+import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.theme.Spacing
@@ -76,6 +76,7 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
+    val topBarBlur by viewModel.topBarBlurEnabled.collectAsStateWithLifecycle()
     val enablePredictiveBack by viewModel.enablePredictiveBack.collectAsStateWithLifecycle()
     val backgroundPlay by viewModel.playerBackgroundPlay.collectAsStateWithLifecycle()
     val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
@@ -113,8 +114,7 @@ fun SettingsScreen(
     }
     // KernelSU 同款：折叠顶栏 + 毛玻璃（关闭毛玻璃时顶栏退化为页面背景色）
     val scrollBehavior = MiuixScrollBehavior()
-    val enableBlurState = LocalEnableBlur.current
-    val backdrop = rememberBlurBackdrop(enableBlurState)
+    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
 
@@ -218,6 +218,12 @@ fun SettingsScreen(
                 summary = "底部导航液态玻璃效果",
                 checked = enableBlur,
                 onCheckedChange = { viewModel.setEnableBlur(it) },
+            )
+            SwitchPreference(
+                title = "顶栏毛玻璃",
+                summary = "顶部栏模糊效果，独立于全局模糊",
+                checked = topBarBlur,
+                onCheckedChange = { viewModel.setTopBarBlurEnabled(it) },
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 SwitchPreference(

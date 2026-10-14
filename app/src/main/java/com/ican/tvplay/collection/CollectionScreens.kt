@@ -55,7 +55,7 @@ import com.ican.tvplay.ui.CollectionViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.BlurredBar
-import com.ican.tvplay.ui.components.LocalEnableBlur
+import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
@@ -89,8 +89,7 @@ fun FavoritesScreen(
 
     // KernelSU 同款：折叠顶栏 + 毛玻璃
     val scrollBehavior = MiuixScrollBehavior()
-    val enableBlurState = LocalEnableBlur.current
-    val backdrop = rememberBlurBackdrop(enableBlurState)
+    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
 
@@ -328,8 +327,7 @@ fun HistoryScreen(
 
     // KernelSU 同款：折叠顶栏 + 毛玻璃
     val scrollBehavior = MiuixScrollBehavior()
-    val enableBlurState = LocalEnableBlur.current
-    val backdrop = rememberBlurBackdrop(enableBlurState)
+    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
 
