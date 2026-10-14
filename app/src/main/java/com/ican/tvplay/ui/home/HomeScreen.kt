@@ -56,13 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -75,11 +69,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.window.Dialog
-import top.yukonga.miuix.kmp.blur.LayerBackdrop
-import top.yukonga.miuix.kmp.blur.blur
-import top.yukonga.miuix.kmp.blur.drawBackdrop
-import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -91,6 +80,7 @@ import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.MiuixSearchInput
+import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
@@ -175,8 +165,7 @@ fun HomeScreen(
         // 禁用分类 Tab 栏 + 内容 Pager 的边界 overscroll 回弹效果
         CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
 
-        // 固定分类 chips（不透明背景）：通栏无左右padding，内容可滑到屏幕最边缘；
-        // 水平边距改为 LazyRow 的 contentPadding 传入，保证静止时最左Tab仍对齐页面基准线
+        // 固定分类 Tab（不透明背景）：通栏可滑至屏幕最左/最右缘，静止时首个 Tab 由内部 contentPadding 对齐页面基准线
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -186,7 +175,6 @@ fun HomeScreen(
                 categories = categories,
                 pagerState = pagerState,
                 tappedIndex = tappedChipIndex,
-                horizontalPadding = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
                 onSelect = onChipClick,
             )
         }
@@ -466,7 +454,6 @@ private fun CategoryChips(
     categories: List<VideoCategory>,
     pagerState: androidx.compose.foundation.pager.PagerState,
     tappedIndex: Int?,
-    horizontalPadding: androidx.compose.ui.unit.Dp,
     onSelect: (Int) -> Unit,
 ) {
     // 高亮目标：点击瞬间切换；手势滑动时跟随 pager 最近页
@@ -475,12 +462,12 @@ private fun CategoryChips(
             .coerceIn(0, (categories.size - 1).coerceAtLeast(0))
 
     // 下划线式分段 Tab：等宽布局 + 选中自动居中照搬 miuix TabRow 源码，
-    // 指示器改为文字底部主题色小横条（无容器底色、无未选中边框、无选中填充）
+    // 指示器改为文字底部主题色小横条（无容器底色、无未选中边框、无选中填充）；
+    // 通栏无外边距，左右基准线由内部 LazyRow contentPadding 保证
     UnderlineTabRow(
         tabs = categories.map { it.name },
         selectedTabIndex = colorTargetIndex,
         onTabSelected = onSelect,
-        modifier = Modifier.padding(horizontal = horizontalPadding),
     )
 }
 
@@ -516,6 +503,9 @@ private fun UnderlineTabRow(
         }
         val listState = rememberLazyListState()
         val density = LocalDensity.current
+        // 通栏后首个 Tab 靠 contentPadding 对齐页面左基准线；指示器偏移需同步加上该边距
+        val edgePadding = pageHorizontalPadding()
+        val edgePaddingPx = with(density) { edgePadding.toPx() }
         val tabWidthPx = with(density) { tabWidth.toPx() }
         val spacingPx = with(density) { itemSpacing.toPx() }
         var lastSettledIndex by remember { mutableIntStateOf(-1) }
@@ -546,41 +536,7 @@ private fun UnderlineTabRow(
         val fallbackIndicatorPx = with(density) { 20.dp.toPx() }
         val indicatorWidthPx = textWidths[selectedTabIndex]?.toFloat() ?: fallbackIndicatorPx
 
-        // 录制 Tab 内容（文字+指示器），供左右边缘条带做模糊重绘（与底栏同款 miuix backdrop 机制）
-        val tabBackdrop = rememberLayerBackdrop { drawContent() }
-        Box(Modifier.fillMaxSize()) {
-            // 内容层：clipToBounds 让指示器与文字在同一边界截断；两侧 24dp 透明度渐隐（DstIn），滑出更自然
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .layerBackdrop(tabBackdrop)
-                    .clipToBounds()
-                    .drawWithContent {
-                        drawContent()
-                        val fadePx = 24.dp.toPx()
-                        // 左缘：靠外全透明 → 靠内不透明
-                        drawRect(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(Color.Transparent, Color.Black),
-                                startX = 0f,
-                                endX = fadePx,
-                            ),
-                            size = Size(fadePx, size.height),
-                            blendMode = BlendMode.DstIn,
-                        )
-                        // 右缘：靠内不透明 → 靠外全透明
-                        drawRect(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(Color.Black, Color.Transparent),
-                                startX = size.width - fadePx,
-                                endX = size.width,
-                            ),
-                            topLeft = Offset(size.width - fadePx, 0f),
-                            size = Size(fadePx, size.height),
-                            blendMode = BlendMode.DstIn,
-                        )
-                    },
-            ) {
+        Box(Modifier.fillMaxSize().clipToBounds()) {
             // 主题色小横条：宽度=选中文字实际宽度（文字左缘→右缘），随选中切换即时变化
             Box(
                 modifier = Modifier
@@ -588,7 +544,7 @@ private fun UnderlineTabRow(
                     .padding(bottom = 3.dp)
                     .offset {
                         IntOffset(
-                            ((selectedTabIndex * (tabWidthPx + spacingPx)) - scrollOffset +
+                            ((edgePaddingPx + selectedTabIndex * (tabWidthPx + spacingPx)) - scrollOffset +
                                 (tabWidthPx - indicatorWidthPx) / 2).fastRoundToInt(),
                             0,
                         )
@@ -600,6 +556,7 @@ private fun UnderlineTabRow(
             )
             LazyRow(
                 state = listState,
+                contentPadding = PaddingValues(horizontal = edgePadding),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(itemSpacing),
                 overscrollEffect = null,
@@ -645,49 +602,8 @@ private fun UnderlineTabRow(
                     }
                 }
             }
-            }
-            // 左右边缘模糊条带：模糊副本中段最清晰、两端渐隐，叠加在内容渐隐带上形成「清晰→模糊→消失」过渡
-            TabEdgeBlurMask(backdrop = tabBackdrop, alignment = Alignment.CenterStart)
-            TabEdgeBlurMask(backdrop = tabBackdrop, alignment = Alignment.CenterEnd)
         }
     }
-}
-
-/** Tab 栏单侧边缘模糊条带：录制内容的模糊副本，alpha 中段最高、内外两侧渐隐（API 31+ 生效，低版本自动退化为纯透明度渐隐） */
-@Composable
-private fun BoxScope.TabEdgeBlurMask(
-    backdrop: LayerBackdrop,
-    alignment: Alignment,
-    fadeWidth: Dp = 24.dp,
-) {
-    Box(
-        modifier = Modifier
-            .align(alignment)
-            .fillMaxHeight()
-            .width(fadeWidth)
-            .drawBackdrop(
-                backdrop = backdrop,
-                shape = { RectangleShape },
-                effects = {
-                    padding = 12.dp.toPx()
-                    blur(6.dp.toPx(), 6.dp.toPx())
-                },
-                onDrawSurface = {},
-            )
-            .drawWithContent {
-                drawContent()
-                drawRect(
-                    brush = Brush.horizontalGradient(
-                        colorStops = arrayOf(
-                            0f to Color.Transparent,
-                            0.55f to Color.Black,
-                            1f to Color.Transparent,
-                        ),
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
-            },
-    )
 }
 
 @Composable
