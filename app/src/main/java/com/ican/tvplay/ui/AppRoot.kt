@@ -54,6 +54,7 @@ import com.ican.tvplay.ui.theme.DarkSurfaceVariant
 import com.ican.tvplay.ui.theme.LightSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.TvPlayTheme
+import com.ican.tvplay.ui.theme.popupDimColor
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -91,14 +92,14 @@ fun AppRoot() {
         themeColor = themeColor,
     ) {
         // miuix 主题：为 KernelSU 同款组件提供色板。
-        // 仅覆写 surfaceContainer（miuix Card/弹窗容器色），深色对齐全局板块色 #242424，
-        // 其余沿用 miuix 默认（含 windowDimming 遮罩：浅色黑30% / 深色黑60%，与 KernelSU 一致未覆盖）。
+        // 覆写两项：surfaceContainer（miuix Card/弹窗容器色，深色对齐全局板块色 #242424）、
+        // windowDimming（弹窗遮罩，收口到全局 popupDimColor()，值与 miuix 默认一致：浅色30%/深色60%）。
         val isDark = LocalDarkTheme.current
         MiuixTheme(
             colors = if (isDark) {
-                darkColorScheme(surfaceContainer = DarkSurfaceVariant)
+                darkColorScheme(surfaceContainer = DarkSurfaceVariant, windowDimming = popupDimColor())
             } else {
-                lightColorScheme(surfaceContainer = LightSurface)
+                lightColorScheme(surfaceContainer = LightSurface, windowDimming = popupDimColor())
             },
         ) {
         // miuix-nav 导航（照搬 KernelSU MainActivity：NavDisplay + 圆角裁剪 + 边缘滑动返回）

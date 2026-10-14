@@ -1,5 +1,6 @@
 package com.ican.tvplay.ui.theme
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 // 品牌色
@@ -31,3 +32,9 @@ val LightOnSurfaceMuted = Color(0xFF5C5E6E)
 val LightGlassTint = Color(0x66FFFFFF)
 val LightGlassTintStrong = Color(0x99FFFFFF)
 val LightScrim = Color(0xB3101018)
+
+// 全局弹窗遮罩色（单点收口）：miuix 对话框/下拉弹窗的 windowDimming 统一引用此函数。
+// 取值与 miuix 默认完全一致（浅色黑30% / 深色黑60%，逐位相同），仅将来源收口到项目内，观感零变化
+@Composable
+fun popupDimColor(): Color =
+    Color.Black.copy(alpha = if (LocalDarkTheme.current) 0.6f else 0.3f)
