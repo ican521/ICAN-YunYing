@@ -56,7 +56,6 @@ import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.LocalEnableBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
-import com.ican.tvplay.ui.components.MorphCollapsingTopBar
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
@@ -95,11 +94,11 @@ fun FavoritesScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             BlurredBar(backdrop) {
-                // 形变折叠顶栏：标题不消失，随滚动从大标题连续缩小移动到小标题位置
-                MorphCollapsingTopBar(
+                TopAppBar(
                     color = barColor,
                     title = "我的收藏",
                     titleColor = MaterialTheme.colorScheme.onBackground,
+                    largeTitleColor = MaterialTheme.colorScheme.onBackground,
                     actions = {
                         // 右上角圆形删除按钮（保留项目圆钮样式，与历史页完全一致）
                         if (favorites.isNotEmpty()) {
