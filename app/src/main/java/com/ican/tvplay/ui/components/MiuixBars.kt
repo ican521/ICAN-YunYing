@@ -16,6 +16,7 @@ import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.shader.isRenderEffectSupported
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** 全局毛玻璃开关（AppRoot 按设置页「全局模糊」开关提供，KernelSU 同款机制） */
 val LocalEnableBlur = staticCompositionLocalOf { false }
@@ -85,7 +86,7 @@ fun MiuixBackButton(
 /**
  * miuix 原生胶囊搜索输入框（全局通用）。
  * 照搬 KernelSU 搜索栏形态：全圆角胶囊、左侧搜索图标、输入后右侧出现清除钮、IME 搜索键提交。
- * 背景色传项目 surfaceVariant（与页面其他胶囊/板块底色一致），其余样式全部 miuix 默认。
+ * 背景色用 miuix surfaceContainerHigh（KernelSU 搜索栏同款底色），其余样式全部 miuix 默认。
  *
  * @param expanded 搜索页固定传 true（常驻展开态，无折叠逻辑）；首页假胶囊传 false + enabled=false。
  */
@@ -109,6 +110,6 @@ fun MiuixSearchInput(
         modifier = modifier,
         label = label,
         enabled = enabled,
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = MiuixTheme.colorScheme.surfaceContainerHigh,
     )
 }
