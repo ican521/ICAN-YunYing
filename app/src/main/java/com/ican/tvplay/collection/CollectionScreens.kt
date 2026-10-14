@@ -32,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -42,10 +41,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.utils.SinkFeedback
+import top.yukonga.miuix.kmp.utils.pressable
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
@@ -219,7 +222,8 @@ fun FavoritesScreen(
     )
 }
 
-/** 收藏卡片：样式与搜索详情页卡片一致（3:4 海报 + 右上角站源标签 + 底部渐变合并标签 + 标题），编辑模式叉号替换站源标签 */
+/** 收藏卡片：与首页 [VideoCard] 同款 miuix Card 容器 + SinkFeedback 按压形变；
+ *  左上角站源胶囊，编辑模式下隐藏并在右上角显示删除叉号；底部渐变 + 标题。 */
 @Composable
 private fun FavoriteCard(
     entity: FavoriteEntity,
@@ -227,19 +231,25 @@ private fun FavoriteCard(
     onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    androidx.compose.foundation.layout.Column(
-        modifier = Modifier.tvCardEffect(
-            onClick = onClick,
-            shape = RoundedCornerShape(Spacing.corner),
-            focusedScale = 1.05f,
-        ),
+    Card(
+        modifier = Modifier
+            .tvCardEffect(
+                onClick = onClick,
+                shape = RoundedCornerShape(Spacing.corner),
+                focusedScale = 1.05f,
+            )
+            .pressable(
+                interactionSource = null,
+                indication = SinkFeedback(),
+                delay = null,
+            ),
+        insideMargin = PaddingValues(0.dp),
+        colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(3f / 4f)
-                .clip(RoundedCornerShape(Spacing.corner))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .aspectRatio(3f / 4f),
         ) {
             AsyncImage(
                 model = entity.cover,
@@ -248,51 +258,52 @@ private fun FavoriteCard(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 右上角：站源标签（编辑模式下替换为删除叉号）
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp),
-            ) {
-                if (editMode) {
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .tvCardEffect(
-                                onClick = onDelete,
-                                shape = CircleShape,
-                                focusedScale = 1.15f,
-                                glow = false,
-                            )
-                            .background(Color(0x88000000), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = AppIcons.Close,
-                            contentDescription = "删除",
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                    ) {
-                        Text(
-                            text = entity.sourceName.ifBlank { "来源" },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+            // 左上角：站源胶囊（编辑模式下隐藏，避免与右上角叉号冲突）
+            if (!editMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = entity.sourceName.ifBlank { "来源" },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
 
-            // 底部渐变 + 合并标签胶囊 + 标题
+            // 右上角：编辑模式删除叉号
+            if (editMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(30.dp)
+                        .tvCardEffect(
+                            onClick = onDelete,
+                            shape = CircleShape,
+                            focusedScale = 1.15f,
+                            glow = false,
+                        )
+                        .background(Color(0x88000000), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = AppIcons.Close,
+                        contentDescription = "删除",
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+
+            // 底部渐变 + 标题
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -304,34 +315,14 @@ private fun FavoriteCard(
                     )
                     .padding(horizontal = 10.dp, vertical = 10.dp),
             ) {
-                androidx.compose.foundation.layout.Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    if (entity.categoryName.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                        ) {
-                            Text(
-                                text = entity.categoryName,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    Text(
-                        text = entity.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                Text(
+                    text = entity.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -494,8 +485,9 @@ fun HistoryScreen(
 }
 
 /**
- * 历史卡片：海报比例/圆角/渐变底/编辑叉号与 [FavoriteCard] 完全同款；
- * 差异点：底部标签胶囊显示「看到的集数」（位于标题上方），标题下方保留播放进度细条。
+ * 历史卡片：与首页 [VideoCard] 同款 miuix Card 容器 + SinkFeedback 按压形变；
+ * 左上角站源胶囊（编辑模式下隐藏），右上角编辑模式删除叉号；
+ * 底部标签胶囊显示「看到的集数」（位于标题上方），标题下方保留播放进度细条。
  */
 @Composable
 private fun HistoryCard(
@@ -509,19 +501,25 @@ private fun HistoryCard(
     } else {
         0f
     }
-    androidx.compose.foundation.layout.Column(
-        modifier = Modifier.tvCardEffect(
-            onClick = onClick,
-            shape = RoundedCornerShape(Spacing.corner),
-            focusedScale = 1.05f,
-        ),
+    Card(
+        modifier = Modifier
+            .tvCardEffect(
+                onClick = onClick,
+                shape = RoundedCornerShape(Spacing.corner),
+                focusedScale = 1.05f,
+            )
+            .pressable(
+                interactionSource = null,
+                indication = SinkFeedback(),
+                delay = null,
+            ),
+        insideMargin = PaddingValues(0.dp),
+        colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(3f / 4f)
-                .clip(RoundedCornerShape(Spacing.corner))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .aspectRatio(3f / 4f),
         ) {
             AsyncImage(
                 model = history.cover,
@@ -530,7 +528,27 @@ private fun HistoryCard(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 右上角：仅编辑模式显示删除叉号（与收藏卡片一致）
+            // 左上角：站源胶囊（与收藏卡片同款，编辑模式下隐藏避免与右上角叉号冲突）
+            if (!editMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = history.sourceName.ifBlank { "来源" },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            // 右上角：编辑模式删除叉号（与收藏卡片一致）
             if (editMode) {
                 Box(
                     modifier = Modifier
