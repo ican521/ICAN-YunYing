@@ -160,8 +160,17 @@ fun FavoritesScreen(
                         },
                         onDelete = { viewModel.removeFavorite(item.videoId) },
                         onLongClick = {
-                            // 非编辑模式：长按进入编辑模式；编辑模式内再长按：弹出清空全部确认
-                            if (editMode) showConfirm = true else editMode = true
+                            // 非编辑模式：长按进入编辑模式并 Toast 提示；编辑模式内再长按：弹出清空全部确认
+                            if (editMode) {
+                                showConfirm = true
+                            } else {
+                                editMode = true
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "再次长按可全部清空",
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                            }
                         },
                     )
                 }
@@ -395,8 +404,17 @@ fun HistoryScreen(
                         },
                         onDelete = { viewModel.removeHistory(history.videoId) },
                         onLongClick = {
-                            // 非编辑模式：长按进入编辑模式；编辑模式内再长按：弹出清空全部确认
-                            if (editMode) showConfirm = true else editMode = true
+                            // 非编辑模式：长按进入编辑模式并 Toast 提示；编辑模式内再长按：弹出清空全部确认
+                            if (editMode) {
+                                showConfirm = true
+                            } else {
+                                editMode = true
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "再次长按可全部清空",
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                            }
                         },
                     )
                 }
