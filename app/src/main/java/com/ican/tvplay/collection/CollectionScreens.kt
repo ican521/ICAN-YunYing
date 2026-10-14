@@ -234,10 +234,11 @@ private fun FavoriteCard(
     Card(
         modifier = Modifier
             .tvCardEffect(
-                onClick = onClick,
-                shape = RoundedCornerShape(Spacing.corner),
-                focusedScale = 1.05f,
-            )
+                    onClick = onClick,
+                    shape = RoundedCornerShape(Spacing.corner),
+                    focusedScale = 1.05f,
+                    glow = false,
+                )
             .pressable(
                 interactionSource = null,
                 indication = SinkFeedback(),
@@ -504,10 +505,11 @@ private fun HistoryCard(
     Card(
         modifier = Modifier
             .tvCardEffect(
-                onClick = onClick,
-                shape = RoundedCornerShape(Spacing.corner),
-                focusedScale = 1.05f,
-            )
+                    onClick = onClick,
+                    shape = RoundedCornerShape(Spacing.corner),
+                    focusedScale = 1.05f,
+                    glow = false,
+                )
             .pressable(
                 interactionSource = null,
                 indication = SinkFeedback(),

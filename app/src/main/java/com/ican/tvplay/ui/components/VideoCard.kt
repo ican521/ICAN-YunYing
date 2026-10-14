@@ -51,7 +51,7 @@ fun VideoCard(
     Card(
         modifier = modifier
             .width(width)
-            .tvCardEffect(onClick = onClick, shape = RoundedCornerShape(Spacing.corner))
+            .tvCardEffect(onClick = onClick, shape = RoundedCornerShape(Spacing.corner), glow = false)
             .pressable(
                 interactionSource = null,
                 indication = SinkFeedback(),
