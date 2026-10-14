@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
@@ -164,14 +165,15 @@ fun HomeScreen(
         (48.dp + contentPadding.calculateTopPadding()).toPx()
     }
     var searchRowCollapsePx by remember { mutableFloatStateOf(0f) }
-    // 横向切页立即展开搜索行：网格顶 padding 固定为展开态高度，
-    // 折叠态切到新页（滚动位置在 0）会露出搜索行等高空白，归零后搜索行正好填回原位
-    LaunchedEffect(pagerState.currentPage) {
-        searchRowCollapsePx = 0f
-    }
+    // 各页网格状态表：切页时用于把目标页滚动位置对齐折叠量
+    val gridStates = remember { mutableStateMapOf<Int, LazyGridState>() }
     val collapseConnection = remember {
         object : NestedScrollConnection {
+            /** 切页对齐滚动期间抑制折叠回调，防止程序性滚动回写折叠量 */
+            var suppress: Boolean = false
+
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (suppress) return Offset.Zero
                 val max = searchRowMaxCollapsePx
                 if (max <= 0f) return Offset.Zero
                 // miuix pager 跨轴手势层转发过来的滚动增量方向与标准相反，统一取反：
@@ -181,6 +183,22 @@ fun HomeScreen(
                     searchRowCollapsePx = (searchRowCollapsePx + dy).coerceIn(0f, max)
                 }
                 return Offset.Zero
+            }
+        }
+    }
+
+    // 横向切页保持折叠状态（不重置搜索行）：把目标页网格滚动到折叠量处，
+    // glued 不变量「折叠量 = 滚动量」成立 → 新页 Tab 行直接连着内容滑入，无空白。
+    // 程序性滚动会回流到 collapseConnection，用 suppress 抑制防止折叠量被二次累加
+    LaunchedEffect(pagerState.currentPage) {
+        val gs = gridStates[pagerState.currentPage] ?: return@LaunchedEffect
+        val collapse = searchRowCollapsePx
+        if (collapse > 0f && gs.firstVisibleItemIndex == 0 && gs.firstVisibleItemScrollOffset.toFloat() < collapse) {
+            collapseConnection.suppress = true
+            try {
+                gs.scrollBy(collapse - gs.firstVisibleItemScrollOffset)
+            } finally {
+                collapseConnection.suppress = false
             }
         }
     }
@@ -236,6 +254,8 @@ fun HomeScreen(
                 }
             }
             val gridState = remember(page) { LazyGridState() }
+            // 注册到页表：切页对齐折叠量时按页取用
+            LaunchedEffect(page) { gridStates[page] = gridState }
             // 离开当前页时立即滚回顶部（currentPage ≠ page）
             LaunchedEffect(pagerState.currentPage) {
                 if (pagerState.currentPage != page) gridState.scrollToItem(0)
