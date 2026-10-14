@@ -1,8 +1,5 @@
 package com.ican.tvplay.ui.home
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -74,7 +71,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastRoundToInt
@@ -102,9 +98,7 @@ import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -162,53 +156,29 @@ fun HomeScreen(
     // 仅在完全展开时更新：折叠过程中网格 padding 不变，避免 padding 变化引发网格滚动补偿的反馈振荡（闪动）
     var topBarHeightPx by remember { mutableIntStateOf(0) }
 
-    // 搜索行滚动折叠（连续跟随手指，与列表滚动 glued）：
-    // 上滑：列表实际滚多少搜索行就收多少，卡片与栏底缘同步上移，无缝隙；
-    // 下滑：列表实际滚多少就展多少；列表已在顶部时下拉过界量也用于展开；
-    // 折叠只改顶区高度、不碰网格布局 → 无反馈回路；松手停在中间时弹簧归位（过半收、未过半展）
-    // 最大收起量 = HomeTopBar 固定 48dp + 顶栏上边距，直接计算（不做 onGloballyPositioned 实测回写，杜绝测量振荡）
+    // 搜索行滚动折叠（严格 glued：折叠量 = 列表滚动量）：
+    // 上滑列表滚多少收多少、下滑滚多少展多少，卡片始终贴着搜索行底缘，栏无任何自主运动；
+    // 列表已在顶部时下拉过界量也用于展开；只改顶区高度、不碰网格布局，无反馈回路
+    // 最大收起量 = HomeTopBar 固定 48dp + 顶栏上边距，直接计算（不做实测回写，杜绝测量振荡）
     val searchRowMaxCollapsePx = with(density) {
         (48.dp + contentPadding.calculateTopPadding()).toPx()
     }
     var searchRowCollapsePx by remember { mutableFloatStateOf(0f) }
     val collapseConnection = remember {
         object : NestedScrollConnection {
-            var settleJob: Job? = null
-
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                settleJob?.cancel()
                 val max = searchRowMaxCollapsePx
                 if (max <= 0f) return Offset.Zero
-                val raw = when {
+                val dy = when {
                     consumed.y > 0f -> consumed.y
                     consumed.y < 0f -> consumed.y
                     available.y < 0f -> available.y
                     else -> 0f
                 }
-                // 亚像素死区：忽略程序性滚动补偿噪声，防止折叠量被反复微写
-                val dy = if (abs(raw) < 0.5f) 0f else raw
                 if (dy != 0f) {
                     searchRowCollapsePx = (searchRowCollapsePx + dy).coerceIn(0f, max)
                 }
                 return Offset.Zero
-            }
-
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                val max = searchRowMaxCollapsePx
-                val current = searchRowCollapsePx
-                if (max > 0f && current > 0f && current < max) {
-                    val target = if (current > max / 2f) max else 0f
-                    settleJob = scope.launch {
-                        animate(
-                            initialValue = current,
-                            targetValue = target,
-                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        ) { value, _ ->
-                            searchRowCollapsePx = value
-                        }
-                    }
-                }
-                return super.onPostFling(consumed, available)
             }
         }
     }
