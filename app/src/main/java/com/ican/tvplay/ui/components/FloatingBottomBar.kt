@@ -39,8 +39,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -355,7 +357,15 @@ fun FloatingBottomBar(
                 }
                 .selectableGroup()
                 .graphicsLayer { translationX = panelOffset }
-                .blackElevationShadow(6.dp, pillShape)
+                // 阴影照搬 KernelSU：dropShadow 一圈对称模糊（radius 10dp，黑，浅色 0.1 / 深色 0.2）
+                .dropShadow(
+                    shape = pillShape,
+                    shadow = Shadow(
+                        radius = 10.dp,
+                        color = Color.Black,
+                        alpha = if (isInDark) 0.2f else 0.1f,
+                    ),
+                )
                 .then(
                     if (isBlurEnabled) {
                         Modifier.drawBackdrop(
