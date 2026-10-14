@@ -560,8 +560,11 @@ private fun UnderlineTabRow(
             ) {
                 itemsIndexed(tabs) { index, tabText ->
                     val selected = selectedTabIndex == index
+                    // 文字贴底对齐 + 底部预留 12dp = 指示器高3 + 指示器下距3 + 目标间距6：
+                    // 保证「文字底缘→指示器顶缘」与「指示器底缘→下方内容」(3+3=6) 严格相等 6dp，
+                    // 不随字体缩放变化（原垂直居中方案约 5dp vs 6dp，两套对齐无关联）
                     Box(
-                        contentAlignment = Alignment.Center,
+                        contentAlignment = Alignment.BottomCenter,
                         modifier = Modifier
                             .fillMaxHeight()
                             .width(tabWidth)
@@ -585,9 +588,11 @@ private fun UnderlineTabRow(
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.onGloballyPositioned { coords ->
-                                textWidths[index] = coords.size.width
-                            },
+                            modifier = Modifier
+                                .padding(bottom = 12.dp)
+                                .onGloballyPositioned { coords ->
+                                    textWidths[index] = coords.size.width
+                                },
                         )
                     }
                 }
