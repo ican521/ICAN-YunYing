@@ -260,9 +260,19 @@ fun HomeScreen(
             LaunchedEffect(pagerState.currentPage) {
                 if (pagerState.currentPage != page) gridState.scrollToItem(0)
             }
-            // 进入目标页 settle 后再次确保在顶部
+            // 进入目标页 settle 后对齐到「顶部」：折叠态下顶部 = 滚动到折叠量处（Tab 行直接连内容），
+            // 展开态回到真正的滚动 0；程序性滚动用 suppress 抑制，防止回写折叠量
             LaunchedEffect(pagerState.settledPage) {
-                if (pagerState.settledPage == page) gridState.scrollToItem(0)
+                if (pagerState.settledPage == page) {
+                    val collapse = searchRowCollapsePx
+                    collapseConnection.suppress = true
+                    try {
+                        gridState.scrollToItem(0)
+                        if (collapse > 0f) gridState.scrollBy(collapse)
+                    } finally {
+                        collapseConnection.suppress = false
+                    }
+                }
             }
             BoxWithConstraints(
                 modifier = Modifier
