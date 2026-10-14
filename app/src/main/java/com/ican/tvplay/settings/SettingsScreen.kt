@@ -48,6 +48,7 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
@@ -60,7 +61,6 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
-import com.ican.tvplay.ui.components.DropdownSelectCard
 import com.ican.tvplay.ui.components.LocalEnableBlur
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
@@ -150,47 +150,49 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
         ) {
         item {
-        DropdownSelectCard(
-            title = "外观",
-            subtitle = "主题模式",
-            options = listOf("跟随系统", "浅色", "深色"),
-            selectedIndex = when (themeMode) {
-                ThemeMode.SYSTEM -> 0
-                ThemeMode.LIGHT -> 1
-                ThemeMode.DARK -> 2
-            },
-            onSelect = { index ->
-                viewModel.setThemeMode(
-                    when (index) {
-                        0 -> ThemeMode.SYSTEM
-                        1 -> ThemeMode.LIGHT
-                        else -> ThemeMode.DARK
-                    },
-                )
-            },
-        )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            OverlayDropdownPreference(
+                title = "主题模式",
+                items = listOf("跟随系统", "浅色", "深色"),
+                selectedIndex = when (themeMode) {
+                    ThemeMode.SYSTEM -> 0
+                    ThemeMode.LIGHT -> 1
+                    ThemeMode.DARK -> 2
+                },
+                onSelectedIndexChange = { index ->
+                    viewModel.setThemeMode(
+                        when (index) {
+                            0 -> ThemeMode.SYSTEM
+                            1 -> ThemeMode.LIGHT
+                            else -> ThemeMode.DARK
+                        },
+                    )
+                },
+            )
+        }
         }
 
         item {
-        DropdownSelectCard(
-            title = "布局",
-            subtitle = "首页网格大小",
-            options = layoutOptions,
-            selectedIndex = when (homeLayoutSize) {
-                HomeLayoutSize.SMALL -> 0
-                HomeLayoutSize.MEDIUM -> 1
-                HomeLayoutSize.LARGE -> 2
-            }.coerceAtMost(layoutOptions.lastIndex),
-            onSelect = { index ->
-                viewModel.setHomeLayoutSize(
-                    when (index) {
-                        0 -> HomeLayoutSize.SMALL
-                        1 -> HomeLayoutSize.MEDIUM
-                        else -> HomeLayoutSize.LARGE
-                    },
-                )
-            },
-        )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            OverlayDropdownPreference(
+                title = "首页网格大小",
+                items = layoutOptions,
+                selectedIndex = when (homeLayoutSize) {
+                    HomeLayoutSize.SMALL -> 0
+                    HomeLayoutSize.MEDIUM -> 1
+                    HomeLayoutSize.LARGE -> 2
+                }.coerceAtMost(layoutOptions.lastIndex),
+                onSelectedIndexChange = { index ->
+                    viewModel.setHomeLayoutSize(
+                        when (index) {
+                            0 -> HomeLayoutSize.SMALL
+                            1 -> HomeLayoutSize.MEDIUM
+                            else -> HomeLayoutSize.LARGE
+                        },
+                    )
+                },
+            )
+        }
         }
 
         item {
@@ -250,30 +252,31 @@ fun SettingsScreen(
         }
 
         item {
-        DropdownSelectCard(
-            title = "播放",
-            subtitle = "后台播放",
-            options = listOf("关闭", "开启", "画中画"),
-            selectedIndex = when (backgroundPlay) {
-                BACKGROUND_OFF -> 0
-                BACKGROUND_ON -> 1
-                else -> 2
-            },
-            onSelect = { index ->
-                when (index) {
-                    0 -> viewModel.setPlayerBackgroundPlay(BACKGROUND_OFF)
-                    1 -> {
-                        viewModel.setPlayerBackgroundPlay(BACKGROUND_ON)
-                        requestNotificationPermission()
+        Card(modifier = Modifier.fillMaxWidth()) {
+            OverlayDropdownPreference(
+                title = "后台播放",
+                summary = "开启：退出播放页后继续播放并可通知栏控制；画中画：全屏播放时切后台自动进入小窗",
+                items = listOf("关闭", "开启", "画中画"),
+                selectedIndex = when (backgroundPlay) {
+                    BACKGROUND_OFF -> 0
+                    BACKGROUND_ON -> 1
+                    else -> 2
+                },
+                onSelectedIndexChange = { index ->
+                    when (index) {
+                        0 -> viewModel.setPlayerBackgroundPlay(BACKGROUND_OFF)
+                        1 -> {
+                            viewModel.setPlayerBackgroundPlay(BACKGROUND_ON)
+                            requestNotificationPermission()
+                        }
+                        else -> {
+                            viewModel.setPlayerBackgroundPlay(BACKGROUND_PIP)
+                            requestNotificationPermission()
+                        }
                     }
-                    else -> {
-                        viewModel.setPlayerBackgroundPlay(BACKGROUND_PIP)
-                        requestNotificationPermission()
-                    }
-                }
-            },
-            hint = "开启：退出播放页后继续播放并可通知栏控制；画中画：全屏播放时切后台自动进入小窗",
-        )
+                },
+            )
+        }
         }
 
         item {
