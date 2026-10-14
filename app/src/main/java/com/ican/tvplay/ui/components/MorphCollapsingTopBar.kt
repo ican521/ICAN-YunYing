@@ -1,7 +1,7 @@
 package com.ican.tvplay.ui.components
 
-import androidx.compose.animation.core.EaseInCubic
-import androidx.compose.animation.core.EaseOutCubic
+import androidx.compose.animation.core.EaseInSine
+import androidx.compose.animation.core.EaseOutSine
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,10 +71,11 @@ fun MorphCollapsingTopBar(
     }
 
     // 双曲线分离（全程与滚动严格同步，无滞后无回弹）：
-    // 字号/字重走 EaseOutCubic（先快后慢，收尾柔和），位置走 EaseInCubic（先慢后快，落位干脆），
-    // 两条曲线的错位让形变过程产生灵动感；栏高度保持线性，与内容滚动 1:1
-    val fontProgress = EaseOutCubic.transform(fraction)
-    val posProgress = EaseInCubic.transform(fraction)
+    // 字号/字重走 EaseOutSine（先快后慢，收尾柔和），位置走 EaseInSine（先慢后快，落位干脆），
+    // Sine 曲线峰值速度仅为线性的 ~1.5 倍（Cubic 为 3 倍），中段不突兀；
+    // 栏高度保持线性，与内容滚动 1:1
+    val fontProgress = EaseOutSine.transform(fraction)
+    val posProgress = EaseInSine.transform(fraction)
 
     val barHeight = collapsedHeight + expandedExtra * (1f - fraction)
 
