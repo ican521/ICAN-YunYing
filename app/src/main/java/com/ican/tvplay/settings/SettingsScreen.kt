@@ -84,7 +84,6 @@ fun SettingsScreen(
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
     val enablePredictiveBack by viewModel.enablePredictiveBack.collectAsStateWithLifecycle()
-    val enableSwipeDismiss by viewModel.enableSwipeDismiss.collectAsStateWithLifecycle()
     val backgroundPlay by viewModel.playerBackgroundPlay.collectAsStateWithLifecycle()
     val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     val configUrl by viewModel.configUrl.collectAsStateWithLifecycle()
@@ -230,13 +229,6 @@ fun SettingsScreen(
                     },
                 )
             }
-            SettingsSwitchRow(
-                label = "边缘滑动返回",
-                hint = "从屏幕左缘右滑返回上一页",
-                checked = enableSwipeDismiss,
-                enabled = true,
-                onToggle = { viewModel.setEnableSwipeDismiss(it) },
-            )
         }
         }
 
