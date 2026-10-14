@@ -78,7 +78,7 @@ fun FavoritesScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
-    // 编辑模式：控制卡片叉号显示 + 右上角按钮变红
+    // 编辑模式：长按卡片进入（卡片显示叉号）；编辑模式内再长按 → 清空全部确认弹窗；返回键退出
     var editMode by remember { mutableStateOf(false) }
     // 清空确认弹窗
     var showConfirm by remember { mutableStateOf(false) }
@@ -102,43 +102,6 @@ fun FavoritesScreen(
                     title = "我的收藏",
                     titleColor = MaterialTheme.colorScheme.onBackground,
                     largeTitleColor = MaterialTheme.colorScheme.onBackground,
-                    actions = {
-                        // 右上角圆形删除按钮（保留项目圆钮样式，与历史页完全一致）
-                        if (favorites.isNotEmpty()) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .size(Spacing.circleButton)
-                                    .tvCardEffect(
-                                        onClick = {
-                                            if (!editMode) {
-                                                // 进入编辑模式
-                                                editMode = true
-                                            } else {
-                                                // 编辑模式 → 弹出清空确认
-                                                showConfirm = true
-                                            }
-                                        },
-                                        shape = CircleShape,
-                                        focusedScale = 1.1f,
-                                        glow = false,
-                                    )
-                                    .background(
-                                        if (editMode) Color(0xFFFF5C5C)
-                                        else MaterialTheme.colorScheme.surfaceVariant,
-                                        CircleShape,
-                                    ),
-                            ) {
-                                Icon(
-                                    imageVector = AppIcons.Delete,
-                                    contentDescription = if (editMode) "清空全部" else "编辑",
-                                    tint = if (editMode) Color.White
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(22.dp),
-                                )
-                            }
-                        }
-                    },
                     scrollBehavior = scrollBehavior,
                 )
             }
@@ -196,6 +159,10 @@ fun FavoritesScreen(
                             }
                         },
                         onDelete = { viewModel.removeFavorite(item.videoId) },
+                        onLongClick = {
+                            // 非编辑模式：长按进入编辑模式；编辑模式内再长按：弹出清空全部确认
+                            if (editMode) showConfirm = true else editMode = true
+                        },
                     )
                 }
                 }
@@ -230,6 +197,7 @@ private fun FavoriteCard(
     editMode: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -238,6 +206,7 @@ private fun FavoriteCard(
                     shape = RoundedCornerShape(Spacing.corner),
                     focusedScale = 1.05f,
                     glow = false,
+                    onLongClick = onLongClick,
                 )
             .pressable(
                 interactionSource = null,
@@ -339,7 +308,7 @@ fun HistoryScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
-    // 编辑模式：控制卡片叉号显示 + 右上角按钮变红（与收藏页同款交互）
+    // 编辑模式：长按卡片进入（卡片显示叉号）；编辑模式内再长按 → 清空全部确认弹窗；返回键退出
     var editMode by remember { mutableStateOf(false) }
     // 清空确认弹窗
     var showConfirm by remember { mutableStateOf(false) }
@@ -367,41 +336,6 @@ fun HistoryScreen(
                     navigationIcon = {
                         // 编辑模式下返回 = 取消编辑
                         MiuixBackButton(onClick = { if (editMode) editMode = false else onBack() })
-                    },
-                    actions = {
-                        // 右上角圆形删除按钮（与收藏页完全同款：两段式 编辑→清空确认）
-                        if (histories.isNotEmpty()) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .size(Spacing.circleButton)
-                                    .tvCardEffect(
-                                        onClick = {
-                                            if (!editMode) {
-                                                editMode = true
-                                            } else {
-                                                showConfirm = true
-                                            }
-                                        },
-                                        shape = CircleShape,
-                                        focusedScale = 1.1f,
-                                        glow = false,
-                                    )
-                                    .background(
-                                        if (editMode) Color(0xFFFF5C5C)
-                                        else MaterialTheme.colorScheme.surfaceVariant,
-                                        CircleShape,
-                                    ),
-                            ) {
-                                Icon(
-                                    imageVector = AppIcons.Delete,
-                                    contentDescription = if (editMode) "清空全部" else "编辑",
-                                    tint = if (editMode) Color.White
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(22.dp),
-                                )
-                            }
-                        }
                     },
                     scrollBehavior = scrollBehavior,
                 )
@@ -460,6 +394,10 @@ fun HistoryScreen(
                             }
                         },
                         onDelete = { viewModel.removeHistory(history.videoId) },
+                        onLongClick = {
+                            // 非编辑模式：长按进入编辑模式；编辑模式内再长按：弹出清空全部确认
+                            if (editMode) showConfirm = true else editMode = true
+                        },
                     )
                 }
                 }
@@ -496,6 +434,7 @@ private fun HistoryCard(
     editMode: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
     val progress = if (history.durationMs > 0) {
         (history.positionMs.toFloat() / history.durationMs).coerceIn(0f, 1f)
@@ -509,6 +448,7 @@ private fun HistoryCard(
                     shape = RoundedCornerShape(Spacing.corner),
                     focusedScale = 1.05f,
                     glow = false,
+                    onLongClick = onLongClick,
                 )
             .pressable(
                 interactionSource = null,
