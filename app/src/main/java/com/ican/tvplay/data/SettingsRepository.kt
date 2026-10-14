@@ -56,6 +56,15 @@ class SettingsRepository(context: Context) {
         _enableBlur.value = enabled
     }
 
+    /** 顶栏毛玻璃（独立于全局模糊开关，互不影响），默认开启 */
+    private val _topBarBlurEnabled = MutableStateFlow(prefs.getBoolean(KEY_TOP_BAR_BLUR, true))
+    val topBarBlurEnabled: StateFlow<Boolean> = _topBarBlurEnabled.asStateFlow()
+
+    fun setTopBarBlurEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_TOP_BAR_BLUR, enabled).apply()
+        _topBarBlurEnabled.value = enabled
+    }
+
     /** 预测性返回手势（KernelSU 同款，默认关闭；切换后立即生效，需 recreate Activity） */
     private val _enablePredictiveBack = MutableStateFlow(prefs.getBoolean(KEY_PREDICTIVE_BACK, false))
     val enablePredictiveBack: StateFlow<Boolean> = _enablePredictiveBack.asStateFlow()
@@ -221,6 +230,7 @@ class SettingsRepository(context: Context) {
         const val KEY_THEME = "theme_mode"
         const val KEY_THEME_COLOR = "theme_color"
         const val KEY_ENABLE_BLUR = "enable_blur"
+        const val KEY_TOP_BAR_BLUR = "top_bar_blur"
         const val KEY_PREDICTIVE_BACK = "enable_predictive_back"
         const val KEY_HOME_LAYOUT_SIZE = "home_layout_size"
         const val KEY_CONFIG_URL = "config_url"

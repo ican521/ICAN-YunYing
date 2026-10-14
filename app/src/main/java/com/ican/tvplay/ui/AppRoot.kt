@@ -39,6 +39,7 @@ import com.ican.tvplay.ui.collection.HistoryScreen
 import com.ican.tvplay.ui.components.FloatingBottomBar
 import com.ican.tvplay.ui.components.FloatingBottomBarItem
 import com.ican.tvplay.ui.components.LocalEnableBlur
+import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.rememberMainPagerState
 import com.ican.tvplay.ui.home.HomeScreen
 import com.ican.tvplay.ui.nav.Route
@@ -74,6 +75,7 @@ fun AppRoot() {
     val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by appViewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by appViewModel.enableBlur.collectAsStateWithLifecycle()
+    val topBarBlur by appViewModel.topBarBlurEnabled.collectAsStateWithLifecycle()
     val configReady by appViewModel.configReady.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -110,6 +112,7 @@ fun AppRoot() {
         // 取自该 Local（库默认值为 Black），不提供则深色模式下导入配置弹窗输入文字为黑色
         CompositionLocalProvider(
             LocalEnableBlur provides enableBlur,
+            LocalEnableTopBarBlur provides topBarBlur,
             LocalContentColor provides MiuixTheme.colorScheme.onBackground,
         ) {
 

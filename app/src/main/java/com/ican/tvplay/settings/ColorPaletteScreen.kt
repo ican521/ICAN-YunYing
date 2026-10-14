@@ -42,7 +42,7 @@ import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.BlurredBar
-import com.ican.tvplay.ui.components.LocalEnableBlur
+import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
@@ -64,8 +64,7 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
 
     // KernelSU 同款：折叠顶栏 + 毛玻璃
     val scrollBehavior = MiuixScrollBehavior()
-    val enableBlurState = LocalEnableBlur.current
-    val backdrop = rememberBlurBackdrop(enableBlurState)
+    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
 
