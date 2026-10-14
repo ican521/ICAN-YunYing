@@ -1,8 +1,7 @@
 package com.ican.tvplay.ui.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.EaseInCubic
+import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,10 +16,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -75,27 +70,11 @@ fun MorphCollapsingTopBar(
         state.heightOffsetLimit = -expandedExtraPx
     }
 
-    // 到位回弹：完全变小 / 完全变大的瞬间触发一次过冲弹簧（先冲过目标再弹回）
-    // bounce 为字号的额外缩放系数，0 = 无形变；变小→负冲（更小一点再回弹），变大→正冲
-    val bounce = remember { Animatable(0f) }
-    var prevFraction by remember { mutableFloatStateOf(fraction) }
-    LaunchedEffect(fraction) {
-        val prev = prevFraction
-        if (fraction == 1f && prev < 1f) {
-            bounce.snapTo(-0.08f)
-            bounce.animateTo(
-                0f,
-                spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow),
-            )
-        } else if (fraction == 0f && prev > 0f) {
-            bounce.snapTo(0.08f)
-            bounce.animateTo(
-                0f,
-                spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow),
-            )
-        }
-        prevFraction = fraction
-    }
+    // 双曲线分离（全程与滚动严格同步，无滞后无回弹）：
+    // 字号/字重走 EaseOutCubic（先快后慢，收尾柔和），位置走 EaseInCubic（先慢后快，落位干脆），
+    // 两条曲线的错位让形变过程产生灵动感；栏高度保持线性，与内容滚动 1:1
+    val fontProgress = EaseOutCubic.transform(fraction)
+    val posProgress = EaseInCubic.transform(fraction)
 
     val barHeight = collapsedHeight + expandedExtra * (1f - fraction)
 
@@ -110,8 +89,8 @@ fun MorphCollapsingTopBar(
             Text(
                 text = title,
                 color = titleColor,
-                fontSize = (32f - 12f * fraction).sp * (1f + bounce.value),
-                fontWeight = FontWeight((400f + 100f * fraction).roundToInt()),
+                fontSize = (32f - 12f * fontProgress).sp,
+                fontWeight = FontWeight((400f + 100f * fontProgress).roundToInt()),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.layout { measurable, constraints ->
@@ -125,8 +104,8 @@ fun MorphCollapsingTopBar(
                     // 小标题端点：整栏水平居中、折叠行内垂直居中
                     val smallX = (constraints.maxWidth - placeable.width) / 2f
                     val smallY = (collapsedPx - placeable.height) / 2f
-                    val x = lerp(largeX, smallX, fraction).roundToInt()
-                    val y = lerp(largeY, smallY, fraction).roundToInt()
+                    val x = lerp(largeX, smallX, posProgress).roundToInt()
+                    val y = lerp(largeY, smallY, posProgress).roundToInt()
                     layout(placeable.width, placeable.height) {
                         placeable.place(x, y)
                     }
