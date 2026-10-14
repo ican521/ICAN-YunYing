@@ -169,12 +169,9 @@ fun HomeScreen(
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 val max = searchRowMaxCollapsePx
                 if (max <= 0f) return Offset.Zero
-                val dy = when {
-                    consumed.y > 0f -> consumed.y
-                    consumed.y < 0f -> consumed.y
-                    available.y < 0f -> available.y
-                    else -> 0f
-                }
+                // miuix pager 跨轴手势层转发过来的滚动增量方向与标准相反，统一取反：
+                // 取反后 dy>0 = 上滑收起、dy<0 = 下拉/顶部过界展开
+                val dy = -(if (consumed.y != 0f) consumed.y else available.y)
                 if (dy != 0f) {
                     searchRowCollapsePx = (searchRowCollapsePx + dy).coerceIn(0f, max)
                 }
