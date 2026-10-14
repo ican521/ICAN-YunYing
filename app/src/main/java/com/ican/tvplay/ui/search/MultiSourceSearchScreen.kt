@@ -36,7 +36,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -44,8 +43,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.utils.SinkFeedback
+import top.yukonga.miuix.kmp.utils.pressable
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.player.core.PlaySpec
@@ -70,7 +73,7 @@ import androidx.tv.material3.Text
  * 跨站源搜索结果页（图一风格）：
  * - 左侧：「全部」+ 配置里全部可用站源，每个条目显示名称 + 搜索命中数量
  * - 右侧：默认展示所有站源合并的视频卡片网格；点击左侧筛选单个站源
- * - 卡片比例与首页一致 (3:4)，右上角站源标签，底部显示更新状态 / 备注 / 标题
+ * - 卡片比例与首页一致 (3:4)，左上角站源标签，底部显示更新状态 / 备注 / 标题
  */
 @Composable
 fun MultiSourceSearchScreen(
@@ -353,19 +356,25 @@ private fun CrossSourceVideoCard(
 ) {
     val (_, tags) = buildVideoStatus(video)
 
-    Column(
-        modifier = Modifier.tvCardEffect(
-            onClick = onClick,
-            shape = RoundedCornerShape(Spacing.corner),
-            focusedScale = 1.05f,
-        ),
+    Card(
+        modifier = Modifier
+            .tvCardEffect(
+                onClick = onClick,
+                shape = RoundedCornerShape(Spacing.corner),
+                focusedScale = 1.05f,
+            )
+            .pressable(
+                interactionSource = null,
+                indication = SinkFeedback(),
+                delay = null,
+            ),
+        insideMargin = androidx.compose.foundation.layout.PaddingValues(0.dp),
+        colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(3f / 4f)
-                .clip(RoundedCornerShape(Spacing.corner))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .aspectRatio(3f / 4f),
         ) {
             AsyncImage(
                 model = video.cover,
@@ -374,27 +383,22 @@ private fun CrossSourceVideoCard(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 右上角：站源标签（黑底「已完结/更新至」状态胶囊已按需求移除）
-            Row(
+            // 左上角：站源标签（黑底「已完结/更新至」状态胶囊已按需求移除）
+            Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                ) {
-                    Text(
-                        text = siteName.ifBlank { video.categoryName.ifBlank { "来源" } },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                Text(
+                    text = siteName.ifBlank { video.categoryName.ifBlank { "来源" } },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
 
             // 底部渐变 + 标签 + 标题
