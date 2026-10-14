@@ -607,7 +607,9 @@ fun PlayerScreen(
         // release / 后台续播转交由 onDispose 统一处理（popBackStack 后触发）
         onBack()
     }
-    BackHandler(enabled = true) { handleBack() }
+    // 仅在页面需要自己处理返回时拦截（退全屏 / 缩放动画中忽略）；
+    // 竖屏小窗状态下不拦截，交还 NavDisplay → 预测返回动画 + 边缘滑动返回生效
+    BackHandler(enabled = fullscreen || landZooming) { handleBack() }
 
     // PiP 画中画：窗口是整个 Activity 缩小画面，只渲染纯视频（隐藏全部 UI）
     if (inPip) {
