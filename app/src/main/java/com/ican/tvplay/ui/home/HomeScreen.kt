@@ -79,11 +79,15 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.BlurredBar
+import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
+import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.MiuixSearchInput
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -138,48 +142,25 @@ fun HomeScreen(
         tappedChipIndex = null
     }
 
-    Column(
+    // 顶区毛玻璃（收藏/设置页同款 BlurredBar 机制）：随「顶栏毛玻璃」开关，
+    // 内容滚动到顶区（搜索行 + Tab 行）下方时被模糊透出；关闭时顶区为页面底色，与原来一致
+    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
+    val density = LocalDensity.current
+    // 实测顶区总高度 → 每页网格的顶部 contentPadding，保证首屏内容起点与改造前一致
+    var topBarHeightPx by remember { mutableIntStateOf(0) }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        // 固定顶栏：搜索 + 历史（不透明背景，防止内容透出）
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(
-                    start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-                    top = contentPadding.calculateTopPadding(),
-                ),
-        ) {
-            HomeTopBar(
-                onSearchClick = onSearchClick,
-                onHistoryClick = onHistoryClick,
-            )
-        }
-
-        Spacer(Modifier.height(Spacing.categoryTabVertical))
-
         // 禁用分类 Tab 栏 + 内容 Pager 的边界 overscroll 回弹效果
         CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
 
-        // 固定分类 Tab（不透明背景）：通栏可滑至屏幕最左/最右缘，静止时首个 Tab 由内部 contentPadding 对齐页面基准线
+        // 内容层：录制给顶区毛玻璃（模糊关闭时原样渲染）
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.background),
+            modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier,
         ) {
-            CategoryChips(
-                categories = categories,
-                pagerState = pagerState,
-                tappedIndex = tappedChipIndex,
-                onSelect = onChipClick,
-            )
-        }
-
-        Spacer(Modifier.height(Spacing.categoryTabVertical))
 
         // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；
         // 每页数据完全独立于 selectedCategory（按 page index 从 categories 直接取对应分类 + 独立缓存），
@@ -200,6 +181,8 @@ fun HomeScreen(
             val pageContentPadding = PaddingValues(
                 start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
                 end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
+                // 顶部 = 实测顶区高度：内容可滚动到顶区下方，被毛玻璃透出
+                top = with(density) { topBarHeightPx.toDp() },
                 bottom = contentPadding.calculateBottomPadding(),
             )
 
@@ -247,6 +230,50 @@ fun HomeScreen(
                         )
                     }
                 }
+            }
+        }
+        }
+
+        // 顶区悬浮层：搜索 + 历史 / 分类 Tab（收藏/设置页同款 BlurredBar；
+        // 模糊开 → 透出背后滚动内容，模糊关 → 页面底色，与改造前一致）
+        BlurredBar(backdrop) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { topBarHeightPx = it.size.height }
+                    .background(
+                        if (backdrop != null) Color.Transparent
+                        else MaterialTheme.colorScheme.background,
+                    ),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                            end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
+                            top = contentPadding.calculateTopPadding(),
+                        ),
+                ) {
+                    HomeTopBar(
+                        onSearchClick = onSearchClick,
+                        onHistoryClick = onHistoryClick,
+                    )
+                }
+
+                Spacer(Modifier.height(Spacing.categoryTabVertical))
+
+                // 固定分类 Tab：通栏可滑至屏幕最左/最右缘，静止时首个 Tab 由内部 contentPadding 对齐页面基准线
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    CategoryChips(
+                        categories = categories,
+                        pagerState = pagerState,
+                        tappedIndex = tappedChipIndex,
+                        onSelect = onChipClick,
+                    )
+                }
+
+                Spacer(Modifier.height(Spacing.categoryTabVertical))
             }
         }
         }
