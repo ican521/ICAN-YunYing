@@ -50,7 +50,7 @@ import com.ican.tvplay.ui.search.MultiSourceSearchScreen
 import com.ican.tvplay.ui.search.SearchHomeScreen
 import com.ican.tvplay.ui.settings.ColorPaletteScreen
 import com.ican.tvplay.ui.settings.SettingsScreen
-import com.ican.tvplay.ui.theme.DarkSurfaceElevated
+import com.ican.tvplay.ui.theme.DarkSurfaceVariant
 import com.ican.tvplay.ui.theme.LightSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.TvPlayTheme
@@ -90,13 +90,13 @@ fun AppRoot() {
         themeMode = themeMode,
         themeColor = themeColor,
     ) {
-        // miuix 主题：为 KernelSU 同款下拉弹窗提供色板。
-        // 仅覆写 surfaceContainer（弹窗容器色，须比板块色亮一档以区分层级），
+        // miuix 主题：为 KernelSU 同款组件提供色板。
+        // 仅覆写 surfaceContainer（miuix Card/弹窗容器色），深色对齐全局板块色 #242424，
         // 其余沿用 miuix 默认（含 windowDimming 遮罩：浅色黑30% / 深色黑60%，与 KernelSU 一致未覆盖）。
         val isDark = LocalDarkTheme.current
         MiuixTheme(
             colors = if (isDark) {
-                darkColorScheme(surfaceContainer = DarkSurfaceElevated)
+                darkColorScheme(surfaceContainer = DarkSurfaceVariant)
             } else {
                 lightColorScheme(surfaceContainer = LightSurface)
             },
