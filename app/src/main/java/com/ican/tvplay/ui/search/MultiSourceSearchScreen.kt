@@ -47,6 +47,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
 import coil3.compose.AsyncImage
@@ -271,8 +272,15 @@ private fun SiteSourceChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val bg = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-    else MaterialTheme.colorScheme.surfaceVariant
+    // 未选中底色：仅浅色模式用 miuix surfaceContainerHigh（KernelSU 搜索栏同款 #E8E8E8），
+    // 深色模式保持项目 DarkSurfaceVariant（#242424 全局板块色）不变
+    val bg = if (selected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+    } else if (com.ican.tvplay.ui.theme.LocalDarkTheme.current) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        MiuixTheme.colorScheme.surfaceContainerHigh
+    }
     val fg = if (selected) MaterialTheme.colorScheme.primary
     else MaterialTheme.colorScheme.onSurfaceVariant
     val shape = RoundedCornerShape(percent = 50)
