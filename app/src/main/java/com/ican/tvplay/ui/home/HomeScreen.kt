@@ -595,7 +595,7 @@ private fun HomeTopBar(
                 .fillMaxHeight()
                 .tvCardEffect(onClick = onSearchClick, shape = CircleShape, focusedScale = 1.04f, glow = false)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .background(MiuixTheme.colorScheme.surfaceContainerHigh)
                 .padding(start = 16.dp),
         ) {
             Icon(
@@ -621,7 +621,7 @@ private fun HomeTopBar(
                 .size(Spacing.circleButton)
                 .tvCardEffect(onClick = onHistoryClick, shape = CircleShape, focusedScale = 1.1f, glow = false)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MiuixTheme.colorScheme.surfaceContainerHigh),
         ) {
             Icon(
                 imageVector = AppIcons.History,

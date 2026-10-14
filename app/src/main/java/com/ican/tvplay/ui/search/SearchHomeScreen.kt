@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.ican.tvplay.ui.SearchViewModel
@@ -150,7 +151,7 @@ fun SearchHomeScreen(
     }
 }
 
-/** 搜索词胶囊流式排列：40dp 高、全圆角、surfaceVariant 底、间距 8dp */
+/** 搜索词胶囊流式排列：40dp 高、全圆角、miuix surfaceContainerHigh 底（KernelSU 搜索栏同款底色）、间距 8dp */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WordFlowRow(
@@ -173,7 +174,7 @@ private fun WordFlowRow(
                         focusedScale = 1.05f,
                         glow = false,
                     )
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(percent = 50))
+                    .background(MiuixTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(percent = 50))
                     .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.Center,
             ) {
