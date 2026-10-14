@@ -4,8 +4,6 @@ import android.content.res.Configuration
 import android.app.Activity
 import android.os.Build
 import android.widget.Toast
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,41 +17,38 @@ import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.TvPlayApplication
@@ -69,7 +64,6 @@ import com.ican.tvplay.ui.components.DropdownSelectCard
 import com.ican.tvplay.ui.components.LocalEnableBlur
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
-import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -200,28 +194,36 @@ fun SettingsScreen(
         }
 
         item {
-        SettingsCard(title = "主题", subtitle = "自定义更多主题选项") {
-            SettingsEntryRow(
-                label = "主题色板",
-                value = if (themeColor == 0) "默认" else "自定义",
-                dotColor = if (themeColor == 0) MaterialTheme.colorScheme.primary
-                else Color(themeColor),
+        // KernelSU 同款：miuix Card + preference 行组，卡片内无标题
+        Card(modifier = Modifier.fillMaxWidth()) {
+            ArrowPreference(
+                title = "主题色板",
+                summary = if (themeColor == 0) "默认" else "自定义",
+                startAction = {
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 6.dp)
+                            .size(14.dp)
+                            .background(
+                                if (themeColor == 0) MaterialTheme.colorScheme.primary else Color(themeColor),
+                                CircleShape,
+                            ),
+                    )
+                },
                 onClick = onColorPaletteClick,
             )
-            SettingsSwitchRow(
-                label = "全局模糊",
-                hint = "底部导航液态玻璃效果",
+            SwitchPreference(
+                title = "全局模糊",
+                summary = "底部导航液态玻璃效果",
                 checked = enableBlur,
-                enabled = true,
-                onToggle = { viewModel.setEnableBlur(it) },
+                onCheckedChange = { viewModel.setEnableBlur(it) },
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                SettingsSwitchRow(
-                    label = "预测性返回",
-                    hint = "侧滑返回时预览返回效果",
+                SwitchPreference(
+                    title = "预测性返回",
+                    summary = "侧滑返回时预览返回效果",
                     checked = enablePredictiveBack,
-                    enabled = true,
-                    onToggle = { enabled ->
+                    onCheckedChange = { enabled ->
                         // KernelSU 同款：反射立即应用 + recreate 当前 Activity 重新注册返回回调，无需重启 App
                         viewModel.setEnablePredictiveBack(enabled)
                         TvPlayApplication.applyPredictiveBack(context.applicationInfo, enabled)
@@ -233,18 +235,15 @@ fun SettingsScreen(
         }
 
         item {
-        SettingsCard(title = "数据", subtitle = "配置来源") {
-            SettingsEntryRow(
-                label = "导入配置",
-                value = configUrl.ifEmpty { "未设置" },
-                dotColor = null,
+        Card(modifier = Modifier.fillMaxWidth()) {
+            ArrowPreference(
+                title = "导入配置",
+                summary = configUrl.ifEmpty { "未设置" },
                 onClick = { showConfigDialog = true },
             )
-            Spacer(Modifier.height(10.dp))
-            SettingsEntryRow(
-                label = "站源",
-                value = siteName,
-                dotColor = null,
+            ArrowPreference(
+                title = "站源",
+                summary = siteName,
                 onClick = { showSiteDialog = true },
             )
         }
@@ -278,13 +277,13 @@ fun SettingsScreen(
         }
 
         item {
-        SettingsCard(title = "关于", subtitle = "版本与运行环境") {
+        Card(modifier = Modifier.fillMaxWidth()) {
             val isTv = LocalContext.current.resources.configuration.uiMode.let { uiMode ->
                 (uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION
             }
-            InfoLine("应用名称", "ICAN云影")
-            InfoLine("版本", "0.1.0")
-            InfoLine("运行设备", if (isTv) "Android TV" else "手机 / 平板")
+            InfoRow("应用名称", "ICAN云影")
+            InfoRow("版本", "0.1.0")
+            InfoRow("运行设备", if (isTv) "Android TV" else "手机 / 平板")
         }
         }
         }
@@ -322,167 +321,17 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsCard(
-    title: String,
-    subtitle: String,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(Spacing.titleContentGap),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        content()
-    }
-}
-
-@Composable
-private fun InfoLine(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-/** 设置项开关行：点击整行切换，右侧胶囊指示 */
-@Composable
-private fun SettingsSwitchRow(
-    label: String,
-    hint: String,
-    checked: Boolean,
-    enabled: Boolean,
-    onToggle: (Boolean) -> Unit,
-) {
-    val contentAlpha = if (enabled) 1f else 0.45f
-    val trackColor by animateColorAsState(
-        targetValue = if (checked) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.surfaceVariant,
-        animationSpec = tween(200),
-        label = "switchTrack",
-    )
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .tvCardEffect(
-                onClick = { onToggle(!checked) },
-                shape = RoundedCornerShape(Spacing.corner),
-                focusedScale = 1.02f,
-                glow = false,
-                enabled = enabled,
-            )
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha),
-            )
-            Text(
-                text = hint,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
-            )
-        }
-        Box(
-            modifier = Modifier
-                .size(width = 42.dp, height = 24.dp)
-                .background(trackColor, RoundedCornerShape(Spacing.corner)),
-        ) {
-            val thumbOffset by androidx.compose.animation.core.animateDpAsState(
-                targetValue = if (checked) 20.dp else 2.dp,
-                animationSpec = tween(200),
-                label = "switchThumb",
-            )
-            Box(
-                modifier = Modifier
-                    .padding(start = thumbOffset)
-                    .size(20.dp)
-                    .align(Alignment.CenterStart)
-                    .background(Color.White, CircleShape),
-            )
-        }
-    }
-}
-
-/** 设置项入口行：点击跳转，右侧色点（可选）+ 文案 */
-@Composable
-private fun SettingsEntryRow(
-    label: String,
-    value: String,
-    dotColor: Color?,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .tvCardEffect(
-                onClick = onClick,
-                shape = RoundedCornerShape(Spacing.corner),
-                focusedScale = 1.02f,
-                glow = false,
-            )
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (dotColor != null) {
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .background(dotColor, CircleShape),
-                )
-            }
+private fun InfoRow(label: String, value: String) {
+    BasicComponent(
+        title = label,
+        endActions = {
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
+        },
+    )
 }
 
 /** 导入配置对话框：miuix WindowDialog + TextField，照搬 KernelSU 弹窗结构 */
