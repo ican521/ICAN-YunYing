@@ -70,10 +70,12 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
@@ -166,10 +168,13 @@ fun HomeScreen(
     // 搜索行滚动折叠（严格 glued：折叠量 = 列表滚动量）：
     // 上滑列表滚多少收多少、下滑滚多少展多少，卡片始终贴着搜索行底缘，栏无任何自主运动；
     // 列表已在顶部时下拉过界量也用于展开；只改顶区高度、不碰网格布局，无反馈回路
-    // 最大收起量 = HomeTopBar 固定 48dp + 顶栏上边距，直接计算（不做实测回写，杜绝测量振荡）
+    // 最大收起量 = HomeTopBar 固定 48dp + 搜索行顶部间距（不含状态栏：状态栏由固定 Spacer 占位
+    // 不折叠，否则收起后 Tab 行顶到屏幕最顶端与状态栏重叠），直接计算（不做实测回写，杜绝测量振荡）
     val searchRowMaxCollapsePx = with(density) {
-        (48.dp + contentPadding.calculateTopPadding()).toPx()
+        (48.dp + Spacing.pageTop).toPx()
     }
+    // HomeTopBar 内容高（48dp）：渐隐锚点——搜索栏可视高度收到与内容等高时文字/图标恰好完全隐形
+    val searchRowContentPx = with(density) { 48.dp.toPx() }
     var searchRowCollapsePx by remember { mutableFloatStateOf(0f) }
     // 各页网格状态表：切页时用于把目标页滚动位置对齐折叠量
     val gridStates = remember { mutableStateMapOf<Int, LazyGridState>() }
@@ -377,9 +382,14 @@ fun HomeScreen(
                         else MaterialTheme.colorScheme.background,
                     ),
             ) {
+                // 状态栏固定占位：不随折叠收起，收起后 Tab 行停在状态栏下缘而非屏幕最顶端
+                Spacer(Modifier.height(contentPadding.calculateTopPadding() - Spacing.pageTop))
+
                 // 搜索行：上滑时高度连续收到 0（底部裁切 + 同步渐隐），下滑任意位置展开；
-                // 高度 = 固定最大收起量 - 折叠量，全程计算值无实测回写
-                Box(
+                // 高度 = 固定最大收起量 - 折叠量，全程计算值无实测回写。
+                // 自绘 Layout 刚性测量：内层始终按展开全高（固定约束）测量摆放，
+                // 外层只收紧裁切——约束变化不传入内层，图标/文字全程保持原始尺寸不缩放
+                Layout(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(
@@ -387,30 +397,39 @@ fun HomeScreen(
                                 (searchRowMaxCollapsePx - searchRowCollapsePx).coerceAtLeast(0f).toDp()
                             },
                         )
-                        .clipToBounds(),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.TopStart)
-                            .graphicsLayer {
-                                alpha = if (searchRowMaxCollapsePx > 0f) {
-                                    1f - (searchRowCollapsePx / searchRowMaxCollapsePx).coerceIn(0f, 1f)
-                                } else {
-                                    1f
-                                }
+                        .clipToBounds()
+                        .graphicsLayer {
+                            // 渐隐锚点 = 内容高：上滑即开始渐隐，搜索栏可视高度收到与
+                            // 图标/文字等高（48dp）时 alpha 恰好降到 0，之后保持全隐
+                            val denom = searchRowMaxCollapsePx - searchRowContentPx
+                            alpha = if (denom > 0f) {
+                                ((searchRowMaxCollapsePx - searchRowCollapsePx - searchRowContentPx) / denom)
+                                    .coerceIn(0f, 1f)
+                            } else {
+                                1f
                             }
-                            .padding(
+                        },
+                    content = {
+                        Box(
+                            modifier = Modifier.padding(
                                 start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
                                 end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-                                top = contentPadding.calculateTopPadding(),
+                                top = Spacing.pageTop,
                             ),
-                    ) {
-                        HomeTopBar(
-                            onSearchClick = onSearchClick,
-                            onHistoryClick = onHistoryClick,
-                        )
-                    }
+                        ) {
+                            HomeTopBar(
+                                onSearchClick = onSearchClick,
+                                onHistoryClick = onHistoryClick,
+                            )
+                        }
+                    },
+                ) { measurables, constraints ->
+                    val w = constraints.maxWidth
+                    val h = constraints.maxHeight
+                    val placeable = measurables.single().measure(
+                        Constraints.fixed(w, searchRowMaxCollapsePx.fastRoundToInt()),
+                    )
+                    layout(w, h) { placeable.place(0, 0) }
                 }
 
                 Spacer(Modifier.height(Spacing.categoryTabVertical))
