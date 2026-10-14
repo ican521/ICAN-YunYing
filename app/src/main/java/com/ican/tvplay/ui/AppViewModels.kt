@@ -145,6 +145,9 @@ class CollectionViewModel(container: AppContainer) : ViewModel() {
     val histories = historyDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** 网格布局大小（小/中/大）：收藏/历史页列数跟随「设置-首页布局大小」，与首页同一规则 */
+    val homeLayoutSize: StateFlow<com.ican.tvplay.data.HomeLayoutSize> = settings.homeLayoutSize
+
     /** 收藏点击播放的准备结果：带选集的完整视频 + 所在站点信息（播放页延迟解析需要） */
     data class PreparedFavoritePlay(
         val video: Video,

@@ -229,23 +229,9 @@ fun HomeScreen(
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background),
             ) {
-                // 列数由「设置-首页布局大小」驱动：手机（<600dp）小=3列/中=2列（大不开放），
-                // 平板沿用自适应最小卡宽：小≈7列、中≈5列、大≈3列
-                val columns = if (maxWidth < 600.dp) {
-                    if (homeLayoutSize == com.ican.tvplay.data.HomeLayoutSize.SMALL) {
-                        GridCells.Fixed(3)
-                    } else {
-                        GridCells.Fixed(2)
-                    }
-                } else {
-                    GridCells.Adaptive(
-                        minSize = when (homeLayoutSize) {
-                            com.ican.tvplay.data.HomeLayoutSize.SMALL -> 132.dp
-                            com.ican.tvplay.data.HomeLayoutSize.MEDIUM -> 200.dp
-                            com.ican.tvplay.data.HomeLayoutSize.LARGE -> 300.dp
-                        },
-                    )
-                }
+                // 列数由「设置-首页布局大小」驱动（收藏/历史页共用同一规则 videoGridColumns）：
+                // 手机（<600dp）小=3列/中=2列（大不开放），平板自适应最小卡宽：小≈7列、中≈5列、大≈3列
+                val columns = com.ican.tvplay.ui.components.videoGridColumns(homeLayoutSize)
                 LazyVerticalGrid(
                     state = gridState,
                     columns = columns,
