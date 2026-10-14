@@ -164,6 +164,11 @@ fun HomeScreen(
         (48.dp + contentPadding.calculateTopPadding()).toPx()
     }
     var searchRowCollapsePx by remember { mutableFloatStateOf(0f) }
+    // 横向切页立即展开搜索行：网格顶 padding 固定为展开态高度，
+    // 折叠态切到新页（滚动位置在 0）会露出搜索行等高空白，归零后搜索行正好填回原位
+    LaunchedEffect(pagerState.currentPage) {
+        searchRowCollapsePx = 0f
+    }
     val collapseConnection = remember {
         object : NestedScrollConnection {
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
