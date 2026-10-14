@@ -4,9 +4,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.ican.tvplay.data.HomeLayoutSize
 import com.ican.tvplay.ui.theme.Spacing
 
 /**
@@ -53,3 +56,21 @@ fun topLevelContentPadding(): PaddingValues {
         bottom = Spacing.bottomBarInset,
     )
 }
+
+/**
+ * 视频网格统一列数规则（首页 / 收藏 / 历史共用），跟随「设置-首页布局大小」：
+ * 手机（<600dp）：小=3列、中=2列（大不开放）；平板：按最小卡宽自适应（小≈7列、中≈5列、大≈3列）。
+ */
+@Composable
+fun videoGridColumns(size: HomeLayoutSize): GridCells =
+    if (LocalConfiguration.current.screenWidthDp < 600) {
+        if (size == HomeLayoutSize.SMALL) GridCells.Fixed(3) else GridCells.Fixed(2)
+    } else {
+        GridCells.Adaptive(
+            minSize = when (size) {
+                HomeLayoutSize.SMALL -> 132.dp
+                HomeLayoutSize.MEDIUM -> 200.dp
+                HomeLayoutSize.LARGE -> 300.dp
+            },
+        )
+    }

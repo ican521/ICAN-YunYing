@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -62,6 +61,7 @@ import com.ican.tvplay.ui.components.MiuixConfirmDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.components.videoGridColumns
 import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -75,6 +75,7 @@ fun FavoritesScreen(
 ) {
     val viewModel = appViewModel { CollectionViewModel(this) }
     val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+    val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
@@ -115,7 +116,7 @@ fun FavoritesScreen(
                 EmptyText(text = "还没有收藏，去首页发现好片吧")
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(132.dp),
+                    columns = videoGridColumns(homeLayoutSize),
                     modifier = Modifier
                         .fillMaxSize()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -312,6 +313,7 @@ fun HistoryScreen(
 ) {
     val viewModel = appViewModel { CollectionViewModel(this) }
     val histories by viewModel.histories.collectAsStateWithLifecycle()
+    val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
@@ -357,7 +359,7 @@ fun HistoryScreen(
                 EmptyText(text = "还没有播放记录")
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(132.dp),
+                    columns = videoGridColumns(homeLayoutSize),
                     modifier = Modifier
                         .fillMaxSize()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
