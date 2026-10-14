@@ -104,7 +104,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlin.math.min
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -158,45 +157,34 @@ fun HomeScreen(
     // 内容滚动到顶区（搜索行 + Tab 行）下方时被模糊透出；关闭时顶区为页面底色，与原来一致
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val density = LocalDensity.current
-    // 实测顶区总高度 → 每页网格的顶部 contentPadding，保证首屏内容起点与改造前一致
+    // 实测顶区「展开状态」总高度 → 每页网格的固定顶部 contentPadding。
+    // 仅在完全展开时更新：折叠过程中网格 padding 不变，避免 padding 变化引发网格滚动补偿的反馈振荡（闪动）
     var topBarHeightPx by remember { mutableIntStateOf(0) }
 
-    // 搜索行滚动折叠（Material3 enterAlways 同款手感，连续跟随手指）：
-    // 上滑时优先消费滚动量把搜索行高度连续收到 0，收满后列表才开始滚；
-    // 下滑时任意位置先展开搜索行，展开后剩余滚动量再给列表；
-    // 松手停在中间时弹簧归位（过半→收起，未过半→展开）
+    // 搜索行滚动折叠（连续跟随手指，与列表滚动 glued）：
+    // 上滑：列表实际滚多少搜索行就收多少，卡片与栏底缘同步上移，无缝隙；
+    // 下滑：列表实际滚多少就展多少；列表已在顶部时下拉过界量也用于展开；
+    // 折叠只改顶区高度、不碰网格布局 → 无反馈回路；松手停在中间时弹簧归位（过半收、未过半展）
     var searchRowHeightPx by remember { mutableFloatStateOf(0f) }
     var searchRowCollapsePx by remember { mutableFloatStateOf(0f) }
     val collapseConnection = remember {
         object : NestedScrollConnection {
             var settleJob: Job? = null
 
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 settleJob?.cancel()
                 val max = searchRowHeightPx
                 if (max <= 0f) return Offset.Zero
-                val delta = available.y
-                return when {
-                    delta > 0f -> {
-                        val consume = min(delta, max - searchRowCollapsePx)
-                        if (consume > 0f) {
-                            searchRowCollapsePx += consume
-                            Offset(0f, consume)
-                        } else {
-                            Offset.Zero
-                        }
-                    }
-                    delta < 0f -> {
-                        val consume = -min(searchRowCollapsePx, -delta)
-                        if (consume < 0f) {
-                            searchRowCollapsePx += consume
-                            Offset(0f, consume)
-                        } else {
-                            Offset.Zero
-                        }
-                    }
-                    else -> Offset.Zero
+                val dy = when {
+                    consumed.y > 0f -> consumed.y
+                    consumed.y < 0f -> consumed.y
+                    available.y < 0f -> available.y
+                    else -> 0f
                 }
+                if (dy != 0f) {
+                    searchRowCollapsePx = (searchRowCollapsePx + dy).coerceIn(0f, max)
+                }
+                return Offset.Zero
             }
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
@@ -252,7 +240,7 @@ fun HomeScreen(
             val pageContentPadding = PaddingValues(
                 start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
                 end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-                // 顶部 = 实测顶区高度：内容可滚动到顶区下方，被毛玻璃透出
+                // 顶部 = 展开态顶区高度（固定值，不随折叠变化）：内容可滚动到顶区下方，被毛玻璃透出
                 top = with(density) { topBarHeightPx.toDp() },
                 bottom = contentPadding.calculateBottomPadding(),
             )
@@ -311,7 +299,8 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .onGloballyPositioned { topBarHeightPx = it.size.height }
+                    // 折叠过程中高度持续变化，只在完全展开时记录 → 网格顶部 padding 固定不动
+                    .onGloballyPositioned { if (searchRowCollapsePx == 0f) topBarHeightPx = it.size.height }
                     .background(
                         if (backdrop != null) Color.Transparent
                         else MaterialTheme.colorScheme.background,
