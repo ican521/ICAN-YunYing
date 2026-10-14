@@ -1,6 +1,6 @@
 package com.ican.tvplay.ui.components
 
-import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,9 +69,10 @@ fun MorphCollapsingTopBar(
         state.heightOffsetLimit = -expandedExtraPx
     }
 
-    // 形变进度统一走 LinearOutSlowInEasing（Material 标准减速曲线，起步快、收尾柔和），
+    // 形变进度统一走自定义贝塞尔曲线 CubicBezierEasing(0.20, 0.95, 0.30, 1.00)，
     // 全程与滚动严格同步，无滞后无回弹；栏高度保持线性，与内容滚动 1:1
-    val morphProgress = LinearOutSlowInEasing.transform(fraction)
+    val morphEasing = CubicBezierEasing(0.20f, 0.95f, 0.30f, 1.00f)
+    val morphProgress = morphEasing.transform(fraction)
 
     val barHeight = collapsedHeight + expandedExtra * (1f - fraction)
 
