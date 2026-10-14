@@ -55,7 +55,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -68,6 +75,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.window.Dialog
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.blur
+import top.yukonga.miuix.kmp.blur.drawBackdrop
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -534,7 +546,41 @@ private fun UnderlineTabRow(
         val fallbackIndicatorPx = with(density) { 20.dp.toPx() }
         val indicatorWidthPx = textWidths[selectedTabIndex]?.toFloat() ?: fallbackIndicatorPx
 
+        // 录制 Tab 内容（文字+指示器），供左右边缘条带做模糊重绘（与底栏同款 miuix backdrop 机制）
+        val tabBackdrop = rememberLayerBackdrop { drawContent() }
         Box(Modifier.fillMaxSize()) {
+            // 内容层：clipToBounds 让指示器与文字在同一边界截断；两侧 24dp 透明度渐隐（DstIn），滑出更自然
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(tabBackdrop)
+                    .clipToBounds()
+                    .drawWithContent {
+                        drawContent()
+                        val fadePx = 24.dp.toPx()
+                        // 左缘：靠外全透明 → 靠内不透明
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(Color.Transparent, Color.Black),
+                                startX = 0f,
+                                endX = fadePx,
+                            ),
+                            size = Size(fadePx, size.height),
+                            blendMode = BlendMode.DstIn,
+                        )
+                        // 右缘：靠内不透明 → 靠外全透明
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(Color.Black, Color.Transparent),
+                                startX = size.width - fadePx,
+                                endX = size.width,
+                            ),
+                            topLeft = Offset(size.width - fadePx, 0f),
+                            size = Size(fadePx, size.height),
+                            blendMode = BlendMode.DstIn,
+                        )
+                    },
+            ) {
             // 主题色小横条：宽度=选中文字实际宽度（文字左缘→右缘），随选中切换即时变化
             Box(
                 modifier = Modifier
@@ -599,8 +645,49 @@ private fun UnderlineTabRow(
                     }
                 }
             }
+            }
+            // 左右边缘模糊条带：模糊副本中段最清晰、两端渐隐，叠加在内容渐隐带上形成「清晰→模糊→消失」过渡
+            TabEdgeBlurMask(backdrop = tabBackdrop, alignment = Alignment.CenterStart)
+            TabEdgeBlurMask(backdrop = tabBackdrop, alignment = Alignment.CenterEnd)
         }
     }
+}
+
+/** Tab 栏单侧边缘模糊条带：录制内容的模糊副本，alpha 中段最高、内外两侧渐隐（API 31+ 生效，低版本自动退化为纯透明度渐隐） */
+@Composable
+private fun BoxScope.TabEdgeBlurMask(
+    backdrop: LayerBackdrop,
+    alignment: Alignment,
+    fadeWidth: Dp = 24.dp,
+) {
+    Box(
+        modifier = Modifier
+            .align(alignment)
+            .fillMaxHeight()
+            .width(fadeWidth)
+            .drawBackdrop(
+                backdrop = backdrop,
+                shape = { RectangleShape },
+                effects = {
+                    padding = 12.dp.toPx()
+                    blur(6.dp.toPx(), 6.dp.toPx())
+                },
+                onDrawSurface = {},
+            )
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colorStops = arrayOf(
+                            0f to Color.Transparent,
+                            0.55f to Color.Black,
+                            1f to Color.Transparent,
+                        ),
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
+            },
+    )
 }
 
 @Composable
