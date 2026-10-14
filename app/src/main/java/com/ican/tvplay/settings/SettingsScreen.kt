@@ -121,8 +121,6 @@ fun SettingsScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        // KernelSU 同款：页面不挂弹窗宿主，弹窗统一渲染到 AppRoot 根宿主，遮罩覆盖底栏
-        popupHost = { },
         topBar = {
             BlurredBar(backdrop) {
                 TopAppBar(
@@ -352,6 +350,8 @@ private fun ConfigImportDialog(
         title = "导入配置",
         titleColor = MiuixTheme.colorScheme.onBackground,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
+        renderInRootScaffold = true,
         onDismissRequest = onDismiss,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {

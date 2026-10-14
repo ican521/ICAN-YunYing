@@ -54,11 +54,11 @@ import com.ican.tvplay.ui.theme.DarkSurfaceVariant
 import com.ican.tvplay.ui.theme.LightSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.TvPlayTheme
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
-import top.yukonga.miuix.kmp.utils.MiuixPopupUtils
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
@@ -142,6 +142,12 @@ fun AppRoot() {
             mainPagerState.syncPage()
         }
 
+        // miuix 根 Scaffold（照搬 KernelSU MainActivity）：内部提供根级弹窗状态列表与默认弹窗宿主，
+        // renderInRootScaffold=true 的弹窗渲染在其宿主层，层级高于底栏，遮罩覆盖全屏
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -276,9 +282,7 @@ fun AppRoot() {
                 }
             }
 
-            // miuix 弹窗宿主：KernelSU 同款——弹窗/遮罩渲染在 App 自身窗口的全屏覆盖层
-            //（MiuixPopupHost，非独立 Dialog 窗口），坐标空间与页面一致
-            MiuixPopupUtils.MiuixPopupHost()
+        }
         }
         }
         }

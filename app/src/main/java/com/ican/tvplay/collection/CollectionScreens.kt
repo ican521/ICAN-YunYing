@@ -92,8 +92,6 @@ fun FavoritesScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        // KernelSU 同款：页面不挂弹窗宿主，弹窗统一渲染到 AppRoot 根宿主，遮罩覆盖底栏
-        popupHost = { },
         topBar = {
             BlurredBar(backdrop) {
                 TopAppBar(
@@ -367,8 +365,6 @@ fun HistoryScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        // KernelSU 同款：页面不挂弹窗宿主，弹窗统一渲染到 AppRoot 根宿主，遮罩覆盖底栏
-        popupHost = { },
         topBar = {
             BlurredBar(backdrop) {
                 TopAppBar(
