@@ -1,6 +1,7 @@
 package com.ican.tvplay.ui
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -162,7 +163,12 @@ fun AppRoot() {
                 effects = NavDisplayEffects(cornerClipRadius = rememberNavSystemCornerRadius()),
                 onBack = { navigator.pop() },
             ) {
-                entry<Route.Main>(swipeDismiss = swipeDismiss) {
+                entry<Route.Main>(swipeDismiss = NavSwipeDirection.None) {
+                    // 根路由关闭 miuix 边缘拖出：否则边缘手势被根页面消费，返回事件不派发。
+                    // 收藏/设置 Tab 下返回手势回到首页 Tab；首页 Tab 下交还系统处理
+                    BackHandler(enabled = pagerState.currentPage != 0) {
+                        mainPagerState.animateToPage(0)
+                    }
                     HorizontalPager(
                         state = pagerState,
                         modifier = Modifier.fillMaxSize(),
