@@ -1,5 +1,8 @@
 package com.ican.tvplay.ui.home
 
+import androidx.compose.animation.core.TargetBasedAnimation
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -54,6 +57,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -99,6 +104,7 @@ import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -169,8 +175,10 @@ fun HomeScreen(
     val gridStates = remember { mutableStateMapOf<Int, LazyGridState>() }
     val collapseConnection = remember {
         object : NestedScrollConnection {
-            /** 切页对齐滚动期间抑制折叠回调，防止程序性滚动回写折叠量 */
+            /** 切页对齐/吸附动画滚动期间抑制折叠回调，防止程序性滚动回写折叠量 */
             var suppress: Boolean = false
+            /** 最后一次手势拖动方向（松手吸附判定用）：>0 上滑收起、<0 下拉展开 */
+            var lastDy: Float = 0f
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 if (suppress) return Offset.Zero
@@ -181,6 +189,7 @@ fun HomeScreen(
                 val dy = -(if (consumed.y != 0f) consumed.y else available.y)
                 if (dy != 0f) {
                     searchRowCollapsePx = (searchRowCollapsePx + dy).coerceIn(0f, max)
+                    lastDy = dy
                 }
                 return Offset.Zero
             }
@@ -201,6 +210,60 @@ fun HomeScreen(
                 collapseConnection.suppress = false
             }
         }
+    }
+
+    // 松手吸附（AppBarLayout snap 语义）：
+    // 最后方向向上 → 吸附完全收起；向下且已展开量 > 阈值 → 吸附完全展开；向下不足阈值 → 吸回收起。
+    // collapse 与网格滚动同 spec 同步动画（suppress 防回流），保持「折叠量 = 滚动量」不脱开；
+    // 动画期间再拖动立即打断接管
+    val snapThresholdPx = with(density) { 48.dp.toPx() }
+    var snapJob by remember { mutableStateOf<Job?>(null) }
+    LaunchedEffect(Unit) {
+        var wasScrolling = false
+        snapshotFlow { gridStates[pagerState.settledPage]?.isScrollInProgress == true }
+            .collect { scrolling ->
+                if (scrolling) {
+                    wasScrolling = true
+                    snapJob?.cancel()
+                } else if (wasScrolling) {
+                    wasScrolling = false
+                    val max = searchRowMaxCollapsePx
+                    val cur = searchRowCollapsePx
+                    if (cur <= 0f || cur >= max) return@collect
+                    val target = when {
+                        collapseConnection.lastDy > 0f -> max
+                        collapseConnection.lastDy < 0f && cur <= max - snapThresholdPx -> 0f
+                        collapseConnection.lastDy < 0f -> max
+                        else -> if (cur > max / 2f) max else 0f
+                    }
+                    if (target == cur) return@collect
+                    val gs = gridStates[pagerState.settledPage]
+                    snapJob = scope.launch {
+                        collapseConnection.suppress = true
+                        try {
+                            // 逐帧低级循环：collapse 赋值与网格 scrollBy 同帧同步，严格保持 glued；
+                            // 本版本无 LazyGridState.animateScrollBy，故不用双动画并行方案
+                            val anim = TargetBasedAnimation(
+                                tween(240), Float.VectorConverter, cur, target, 0f,
+                            )
+                            val durationNanos = 240L * 1_000_000
+                            val startNanos = withFrameNanos { it }
+                            var prev = cur
+                            var playTime: Long
+                            do {
+                                playTime = withFrameNanos { it } - startNanos
+                                val v = anim.getValueFromNanos(playTime)
+                                val d = v - prev
+                                prev = v
+                                searchRowCollapsePx = v
+                                if (gs != null && d != 0f) gs.scrollBy(d)
+                            } while (playTime < durationNanos)
+                        } finally {
+                            collapseConnection.suppress = false
+                        }
+                    }
+                }
+            }
     }
 
     Box(
