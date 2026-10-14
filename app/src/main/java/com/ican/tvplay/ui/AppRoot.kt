@@ -54,6 +54,7 @@ import com.ican.tvplay.ui.theme.DarkSurfaceElevated
 import com.ican.tvplay.ui.theme.LightSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.TvPlayTheme
+import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
@@ -104,7 +105,12 @@ fun AppRoot() {
         val navigator = rememberNavigator(Route.Main)
 
         // 毛玻璃开关下发：顶栏/底栏统一从 LocalEnableBlur 读取（KernelSU 同款机制）
-        CompositionLocalProvider(LocalEnableBlur provides enableBlur) {
+        // LocalContentColor 照搬 KernelSU MiuixKernelSUTheme：miuix TextField/Text/Icon 默认内容色
+        // 取自该 Local（库默认值为 Black），不提供则深色模式下导入配置弹窗输入文字为黑色
+        CompositionLocalProvider(
+            LocalEnableBlur provides enableBlur,
+            LocalContentColor provides MiuixTheme.colorScheme.onBackground,
+        ) {
 
         // 通知栏点击 → 恢复播放页（后台续播场景）
         LaunchedEffect(Unit) {
