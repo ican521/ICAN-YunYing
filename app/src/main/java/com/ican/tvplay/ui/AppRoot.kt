@@ -26,9 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,7 +72,6 @@ fun AppRoot() {
     val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by appViewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by appViewModel.enableBlur.collectAsStateWithLifecycle()
-    val enableSwipeDismiss by appViewModel.enableSwipeDismiss.collectAsStateWithLifecycle()
     val configReady by appViewModel.configReady.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -116,17 +113,6 @@ fun AppRoot() {
                     navigator.push(Route.Player(req.videoId, req.episodeIndex, req.flag))
                 }
             }
-        }
-
-        // KernelSU 同款：边缘滑动返回方向（RTL 布局反向；开关关闭时不响应边缘滑动）
-        val swipeDismiss = if (enableSwipeDismiss) {
-            if (LocalLayoutDirection.current == LayoutDirection.Rtl) {
-                NavSwipeDirection.RightToLeft
-            } else {
-                NavSwipeDirection.LeftToRight
-            }
-        } else {
-            NavSwipeDirection.None
         }
 
         // 液态玻璃底栏的模糊内容源：先铺背景色再记录内容
@@ -199,16 +185,16 @@ fun AppRoot() {
                         }
                     }
                 }
-                entry<Route.ColorPalette>(swipeDismiss = swipeDismiss) {
+                entry<Route.ColorPalette>(swipeDismiss = NavSwipeDirection.None) {
                     ColorPaletteScreen(onBack = { navigator.pop() })
                 }
-                entry<Route.Search>(swipeDismiss = swipeDismiss) {
+                entry<Route.Search>(swipeDismiss = NavSwipeDirection.None) {
                     SearchHomeScreen(
                         onBack = { navigator.pop() },
                         onSearch = { query -> navigator.push(Route.MultiSearch(query)) },
                     )
                 }
-                entry<Route.MultiSearch>(swipeDismiss = swipeDismiss) { key ->
+                entry<Route.MultiSearch>(swipeDismiss = NavSwipeDirection.None) { key ->
                     MultiSourceSearchScreen(
                         initialQuery = key.query,
                         onBack = { navigator.pop() },
@@ -217,7 +203,7 @@ fun AppRoot() {
                         },
                     )
                 }
-                entry<Route.History>(swipeDismiss = swipeDismiss) {
+                entry<Route.History>(swipeDismiss = NavSwipeDirection.None) {
                     HistoryScreen(
                         onPlay = { videoId, episodeIndex, flag, preInit ->
                             if (guardPlay()) {
@@ -227,7 +213,7 @@ fun AppRoot() {
                         onBack = { navigator.pop() },
                     )
                 }
-                entry<Route.Player>(swipeDismiss = swipeDismiss) { key ->
+                entry<Route.Player>(swipeDismiss = NavSwipeDirection.None) { key ->
                     PlayerScreen(
                         videoId = key.videoId,
                         startEpisode = key.episodeIndex,
