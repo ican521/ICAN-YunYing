@@ -1,5 +1,8 @@
 package com.ican.tvplay.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +17,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -68,6 +75,28 @@ fun MorphCollapsingTopBar(
         state.heightOffsetLimit = -expandedExtraPx
     }
 
+    // 到位回弹：完全变小 / 完全变大的瞬间触发一次过冲弹簧（先冲过目标再弹回）
+    // bounce 为字号的额外缩放系数，0 = 无形变；变小→负冲（更小一点再回弹），变大→正冲
+    val bounce = remember { Animatable(0f) }
+    var prevFraction by remember { mutableFloatStateOf(fraction) }
+    LaunchedEffect(fraction) {
+        val prev = prevFraction
+        if (fraction == 1f && prev < 1f) {
+            bounce.snapTo(-0.08f)
+            bounce.animateTo(
+                0f,
+                spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow),
+            )
+        } else if (fraction == 0f && prev > 0f) {
+            bounce.snapTo(0.08f)
+            bounce.animateTo(
+                0f,
+                spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow),
+            )
+        }
+        prevFraction = fraction
+    }
+
     val barHeight = collapsedHeight + expandedExtra * (1f - fraction)
 
     Column(
@@ -81,7 +110,7 @@ fun MorphCollapsingTopBar(
             Text(
                 text = title,
                 color = titleColor,
-                fontSize = (32f - 12f * fraction).sp,
+                fontSize = (32f - 12f * fraction).sp * (1f + bounce.value),
                 fontWeight = FontWeight((400f + 100f * fraction).roundToInt()),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
