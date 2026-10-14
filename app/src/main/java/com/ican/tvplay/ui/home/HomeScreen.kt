@@ -416,7 +416,7 @@ private fun HomeTopBar(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .weight(1f)
-                .tvCardEffect(onClick = onSearchClick, shape = CircleShape, focusedScale = 1.04f)
+                .tvCardEffect(onClick = onSearchClick, shape = CircleShape, focusedScale = 1.04f, glow = false)
                 .clip(CircleShape),
         ) {
             MiuixSearchInput(
@@ -435,7 +435,7 @@ private fun HomeTopBar(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(Spacing.circleButton)
-                .tvCardEffect(onClick = onHistoryClick, shape = CircleShape, focusedScale = 1.1f)
+                .tvCardEffect(onClick = onHistoryClick, shape = CircleShape, focusedScale = 1.1f, glow = false)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
