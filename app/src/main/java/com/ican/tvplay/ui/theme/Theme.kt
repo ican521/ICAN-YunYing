@@ -20,7 +20,7 @@ val LocalDarkTheme = compositionLocalOf { false }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 private val TvDarkColors = darkColorScheme(
-    primary = BrandBlue,
+    primary = BrandBlueDeep,
     onPrimary = Color.White,
     secondary = BrandTeal,
     tertiary = BrandViolet,
@@ -35,7 +35,7 @@ private val TvDarkColors = darkColorScheme(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 private val TvLightColors = lightColorScheme(
-    primary = BrandBlueDeep,
+    primary = BrandBlue,
     onPrimary = Color.White,
     secondary = Color(0xFF009A89),
     tertiary = Color(0xFF7A52D6),
