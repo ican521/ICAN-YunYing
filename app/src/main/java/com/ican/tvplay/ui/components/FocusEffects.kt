@@ -19,13 +19,33 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import top.yukonga.miuix.kmp.interfaces.HoldDownInteraction
 import top.yukonga.miuix.kmp.utils.MiuixIndication
+
+/**
+ * 全局统一黑色 elevation 阴影（单点收口）：卡片/胶囊/圆钮/底栏共用同一实现。
+ * 固定纯黑、与主题色脱钩（更换主题色板时阴影不跟随变化）；深色模式不画（纯黑背景上不可见）。
+ */
+@Composable
+fun Modifier.blackElevationShadow(elevation: Dp, shape: Shape): Modifier =
+    if (LocalDarkTheme.current) {
+        this
+    } else {
+        this.shadow(
+            elevation = elevation,
+            shape = shape,
+            ambientColor = Color.Black,
+            spotColor = Color.Black,
+            clip = false,
+        )
+    }
 
 /**
  * 全局统一的卡片交互效果（手机触屏 + TV 遥控器同一套）：
@@ -110,14 +130,8 @@ fun Modifier.tvCardEffect(
     return this
         .scale(scale)
         .then(
-            if (glow && !isDark) {
-                Modifier.shadow(
-                    elevation = if (focused) 18.dp else 6.dp,
-                    shape = shape,
-                    ambientColor = accent,
-                    spotColor = accent,
-                    clip = false,
-                )
+            if (glow) {
+                Modifier.blackElevationShadow(if (focused) 18.dp else 6.dp, shape)
             } else {
                 Modifier
             },
