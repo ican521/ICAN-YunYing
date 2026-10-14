@@ -1,6 +1,5 @@
 package com.ican.tvplay.ui.settings
 
-import android.content.res.Configuration
 import android.app.Activity
 import android.os.Build
 import android.widget.Toast
@@ -281,12 +280,8 @@ fun SettingsScreen(
 
         item {
         Card(modifier = Modifier.fillMaxWidth()) {
-            val isTv = LocalContext.current.resources.configuration.uiMode.let { uiMode ->
-                (uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION
-            }
             InfoRow("应用名称", "ICAN云影")
             InfoRow("版本", "0.1.0")
-            InfoRow("运行设备", if (isTv) "Android TV" else "手机 / 平板")
         }
         }
         }
