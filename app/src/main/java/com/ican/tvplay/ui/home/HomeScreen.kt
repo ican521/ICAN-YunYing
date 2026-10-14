@@ -104,6 +104,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -165,7 +166,10 @@ fun HomeScreen(
     // 上滑：列表实际滚多少搜索行就收多少，卡片与栏底缘同步上移，无缝隙；
     // 下滑：列表实际滚多少就展多少；列表已在顶部时下拉过界量也用于展开；
     // 折叠只改顶区高度、不碰网格布局 → 无反馈回路；松手停在中间时弹簧归位（过半收、未过半展）
-    var searchRowHeightPx by remember { mutableFloatStateOf(0f) }
+    // 最大收起量 = HomeTopBar 固定 48dp + 顶栏上边距，直接计算（不做 onGloballyPositioned 实测回写，杜绝测量振荡）
+    val searchRowMaxCollapsePx = with(density) {
+        (48.dp + contentPadding.calculateTopPadding()).toPx()
+    }
     var searchRowCollapsePx by remember { mutableFloatStateOf(0f) }
     val collapseConnection = remember {
         object : NestedScrollConnection {
@@ -173,14 +177,16 @@ fun HomeScreen(
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 settleJob?.cancel()
-                val max = searchRowHeightPx
+                val max = searchRowMaxCollapsePx
                 if (max <= 0f) return Offset.Zero
-                val dy = when {
+                val raw = when {
                     consumed.y > 0f -> consumed.y
                     consumed.y < 0f -> consumed.y
                     available.y < 0f -> available.y
                     else -> 0f
                 }
+                // 亚像素死区：忽略程序性滚动补偿噪声，防止折叠量被反复微写
+                val dy = if (abs(raw) < 0.5f) 0f else raw
                 if (dy != 0f) {
                     searchRowCollapsePx = (searchRowCollapsePx + dy).coerceIn(0f, max)
                 }
@@ -188,7 +194,7 @@ fun HomeScreen(
             }
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                val max = searchRowHeightPx
+                val max = searchRowMaxCollapsePx
                 val current = searchRowCollapsePx
                 if (max > 0f && current > 0f && current < max) {
                     val target = if (current > max / 2f) max else 0f
@@ -307,31 +313,24 @@ fun HomeScreen(
                     ),
             ) {
                 // 搜索行：上滑时高度连续收到 0（底部裁切 + 同步渐隐），下滑任意位置展开；
-                // 内层实测自然高度作为最大收起量，外层高度变化经顶区 onGloballyPositioned 同步网格顶部 padding
+                // 高度 = 固定最大收起量 - 折叠量，全程计算值无实测回写
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .then(
-                            if (searchRowHeightPx > 0f) {
-                                Modifier
-                                    .height(
-                                        with(density) {
-                                            (searchRowHeightPx - searchRowCollapsePx).coerceAtLeast(0f).toDp()
-                                        },
-                                    )
-                                    .clipToBounds()
-                            } else {
-                                Modifier
+                        .height(
+                            with(density) {
+                                (searchRowMaxCollapsePx - searchRowCollapsePx).coerceAtLeast(0f).toDp()
                             },
-                        ),
+                        )
+                        .clipToBounds(),
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .align(Alignment.TopStart)
                             .graphicsLayer {
-                                alpha = if (searchRowHeightPx > 0f) {
-                                    1f - (searchRowCollapsePx / searchRowHeightPx).coerceIn(0f, 1f)
+                                alpha = if (searchRowMaxCollapsePx > 0f) {
+                                    1f - (searchRowCollapsePx / searchRowMaxCollapsePx).coerceIn(0f, 1f)
                                 } else {
                                     1f
                                 }
@@ -340,8 +339,7 @@ fun HomeScreen(
                                 start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
                                 end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
                                 top = contentPadding.calculateTopPadding(),
-                            )
-                            .onGloballyPositioned { searchRowHeightPx = it.size.height.toFloat() },
+                            ),
                     ) {
                         HomeTopBar(
                             onSearchClick = onSearchClick,
