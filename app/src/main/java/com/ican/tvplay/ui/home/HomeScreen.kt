@@ -65,17 +65,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
@@ -96,7 +93,6 @@ import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
-import com.ican.tvplay.ui.components.MiuixSearchInput
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
@@ -385,11 +381,10 @@ fun HomeScreen(
                 // 状态栏固定占位：不随折叠收起，收起后 Tab 行停在状态栏下缘而非屏幕最顶端
                 Spacer(Modifier.height(contentPadding.calculateTopPadding() - Spacing.pageTop))
 
-                // 搜索行：上滑时高度连续收到 0（底部裁切 + 同步渐隐），下滑任意位置展开；
-                // 高度 = 固定最大收起量 - 折叠量，全程计算值无实测回写。
-                // 自绘 Layout 刚性测量：内层始终按展开全高（固定约束）测量摆放，
-                // 外层只收紧裁切——约束变化不传入内层，图标/文字全程保持原始尺寸不缩放
-                Layout(
+                // 搜索行：上滑时高度连续收到 0（约束传入，胶囊/按钮随高度压缩变形 +
+                // 内部占位文字与图标同步渐隐），下滑任意位置展开；
+                // 高度 = 固定最大收起量 - 折叠量，全程计算值无实测回写
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(
@@ -397,39 +392,34 @@ fun HomeScreen(
                                 (searchRowMaxCollapsePx - searchRowCollapsePx).coerceAtLeast(0f).toDp()
                             },
                         )
-                        .clipToBounds()
-                        .graphicsLayer {
-                            // 渐隐锚点 = 内容高：上滑即开始渐隐，搜索栏可视高度收到与
-                            // 图标/文字等高（48dp）时 alpha 恰好降到 0，之后保持全隐
-                            val denom = searchRowMaxCollapsePx - searchRowContentPx
-                            alpha = if (denom > 0f) {
-                                ((searchRowMaxCollapsePx - searchRowCollapsePx - searchRowContentPx) / denom)
-                                    .coerceIn(0f, 1f)
-                            } else {
-                                1f
-                            }
-                        },
-                    content = {
-                        Box(
-                            modifier = Modifier.padding(
+                        .clipToBounds(),
+                ) {
+                    // 渐隐锚点 = 内容高：上滑即开始渐隐，搜索行可视高度收到与
+                    // 图标/文字等高（48dp）时 alpha 恰好降到 0，之后保持全隐
+                    val contentAlpha = run {
+                        val denom = searchRowMaxCollapsePx - searchRowContentPx
+                        if (denom > 0f) {
+                            ((searchRowMaxCollapsePx - searchRowCollapsePx - searchRowContentPx) / denom)
+                                .coerceIn(0f, 1f)
+                        } else {
+                            1f
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
                                 start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
                                 end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
                                 top = Spacing.pageTop,
                             ),
-                        ) {
-                            HomeTopBar(
-                                onSearchClick = onSearchClick,
-                                onHistoryClick = onHistoryClick,
-                            )
-                        }
-                    },
-                ) { measurables, constraints ->
-                    val w = constraints.maxWidth
-                    val h = constraints.maxHeight
-                    val placeable = measurables.single().measure(
-                        Constraints.fixed(w, searchRowMaxCollapsePx.fastRoundToInt()),
-                    )
-                    layout(w, h) { placeable.place(0, 0) }
+                    ) {
+                        HomeTopBar(
+                            contentAlpha = contentAlpha,
+                            onSearchClick = onSearchClick,
+                            onHistoryClick = onHistoryClick,
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(Spacing.categoryTabVertical))
@@ -587,6 +577,7 @@ private fun SiteToggleIcon(
 
 @Composable
 private fun HomeTopBar(
+    contentAlpha: Float,
     onSearchClick: () -> Unit,
     onHistoryClick: () -> Unit,
 ) {
@@ -595,26 +586,35 @@ private fun HomeTopBar(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxWidth().height(48.dp),
     ) {
-        // 胶囊搜索框：miuix 原生假胶囊（KernelSU SearchBarFake 同款），点击进入搜索页
-        Box(
-            contentAlignment = Alignment.Center,
+        // 胶囊搜索框：自绘假胶囊（视觉照搬 KernelSU SearchBarFake：左 16dp 起 20dp 放大镜 + 8dp 间距占位字），
+        // 点击进入搜索页；胶囊底不渐隐，仅内部占位文字与放大镜按 contentAlpha 渐隐
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .weight(1f)
+                .fillMaxHeight()
                 .tvCardEffect(onClick = onSearchClick, shape = CircleShape, focusedScale = 1.04f, glow = false)
-                .clip(CircleShape),
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(start = 16.dp),
         ) {
-            MiuixSearchInput(
-                query = "",
-                onQueryChange = {},
-                onSearch = {},
-                label = "搜索影片、剧集",
-                enabled = false,
-                expanded = false,
-                modifier = Modifier.fillMaxWidth(),
+            Icon(
+                imageVector = AppIcons.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "搜索影片、剧集",
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+                fontSize = 16.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
 
-        // 历史按钮
+        // 历史按钮：圆形底不渐隐，仅图标按 contentAlpha 渐隐
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -626,7 +626,7 @@ private fun HomeTopBar(
             Icon(
                 imageVector = AppIcons.History,
                 contentDescription = "历史",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
                 modifier = Modifier.size(22.dp),
             )
         }
