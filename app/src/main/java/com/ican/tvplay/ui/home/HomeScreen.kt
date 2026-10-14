@@ -1,5 +1,8 @@
 package com.ican.tvplay.ui.home
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -45,6 +48,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -56,7 +60,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -65,6 +74,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastRoundToInt
@@ -92,7 +102,9 @@ import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -149,6 +161,64 @@ fun HomeScreen(
     // 实测顶区总高度 → 每页网格的顶部 contentPadding，保证首屏内容起点与改造前一致
     var topBarHeightPx by remember { mutableIntStateOf(0) }
 
+    // 搜索行滚动折叠（Material3 enterAlways 同款手感，连续跟随手指）：
+    // 上滑时优先消费滚动量把搜索行高度连续收到 0，收满后列表才开始滚；
+    // 下滑时任意位置先展开搜索行，展开后剩余滚动量再给列表；
+    // 松手停在中间时弹簧归位（过半→收起，未过半→展开）
+    var searchRowHeightPx by remember { mutableFloatStateOf(0f) }
+    var searchRowCollapsePx by remember { mutableFloatStateOf(0f) }
+    val collapseConnection = remember {
+        object : NestedScrollConnection {
+            var settleJob: Job? = null
+
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                settleJob?.cancel()
+                val max = searchRowHeightPx
+                if (max <= 0f) return Offset.Zero
+                val delta = available.y
+                return when {
+                    delta > 0f -> {
+                        val consume = min(delta, max - searchRowCollapsePx)
+                        if (consume > 0f) {
+                            searchRowCollapsePx += consume
+                            Offset(0f, consume)
+                        } else {
+                            Offset.Zero
+                        }
+                    }
+                    delta < 0f -> {
+                        val consume = -min(searchRowCollapsePx, -delta)
+                        if (consume < 0f) {
+                            searchRowCollapsePx += consume
+                            Offset(0f, consume)
+                        } else {
+                            Offset.Zero
+                        }
+                    }
+                    else -> Offset.Zero
+                }
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                val max = searchRowHeightPx
+                val current = searchRowCollapsePx
+                if (max > 0f && current > 0f && current < max) {
+                    val target = if (current > max / 2f) max else 0f
+                    settleJob = scope.launch {
+                        animate(
+                            initialValue = current,
+                            targetValue = target,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        ) { value, _ ->
+                            searchRowCollapsePx = value
+                        }
+                    }
+                }
+                return super.onPostFling(consumed, available)
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -157,9 +227,10 @@ fun HomeScreen(
         // 禁用分类 Tab 栏 + 内容 Pager 的边界 overscroll 回弹效果
         CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
 
-        // 内容层：录制给顶区毛玻璃（模糊关闭时原样渲染）
+        // 内容层：录制给顶区毛玻璃（模糊关闭时原样渲染）；挂搜索行折叠的滚动连接
         Box(
-            modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier,
+            modifier = (if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                .nestedScroll(collapseConnection),
         ) {
 
         // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；
@@ -246,19 +317,48 @@ fun HomeScreen(
                         else MaterialTheme.colorScheme.background,
                     ),
             ) {
+                // 搜索行：上滑时高度连续收到 0（底部裁切 + 同步渐隐），下滑任意位置展开；
+                // 内层实测自然高度作为最大收起量，外层高度变化经顶区 onGloballyPositioned 同步网格顶部 padding
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(
-                            start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                            end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-                            top = contentPadding.calculateTopPadding(),
+                        .then(
+                            if (searchRowHeightPx > 0f) {
+                                Modifier
+                                    .height(
+                                        with(density) {
+                                            (searchRowHeightPx - searchRowCollapsePx).coerceAtLeast(0f).toDp()
+                                        },
+                                    )
+                                    .clipToBounds()
+                            } else {
+                                Modifier
+                            },
                         ),
                 ) {
-                    HomeTopBar(
-                        onSearchClick = onSearchClick,
-                        onHistoryClick = onHistoryClick,
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopStart)
+                            .graphicsLayer {
+                                alpha = if (searchRowHeightPx > 0f) {
+                                    1f - (searchRowCollapsePx / searchRowHeightPx).coerceIn(0f, 1f)
+                                } else {
+                                    1f
+                                }
+                            }
+                            .padding(
+                                start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                                end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
+                                top = contentPadding.calculateTopPadding(),
+                            )
+                            .onGloballyPositioned { searchRowHeightPx = it.size.height.toFloat() },
+                    ) {
+                        HomeTopBar(
+                            onSearchClick = onSearchClick,
+                            onHistoryClick = onHistoryClick,
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(Spacing.categoryTabVertical))
