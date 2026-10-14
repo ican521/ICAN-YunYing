@@ -552,13 +552,17 @@ fun PlayerScreen(
 
     // Surface 生命周期
     DisposableEffect(Unit) {
-        // 监听 Activity 生命周期：切后台自动 pause，回前台 resume
+        // 监听 Activity 生命周期：切后台自动 pause（仅后台播放关闭时），回前台 resume
         val activity = context as? android.app.Activity
         val lifecycle = (activity as? androidx.lifecycle.LifecycleOwner)?.lifecycle
         val lifecycleObserver = object : DefaultLifecycleObserver {
             override fun onPause(owner: LifecycleOwner) {
-                // PiP 画中画中不暂停（小窗继续播）
-                if (activity?.isInPictureInPictureMode != true) Players.onPause()
+                // PiP 画中画中不暂停（小窗继续播）；
+                // 后台播放开启/画中画模式下退后台也不暂停——否则已暂停的 mediaPlayback
+                // 前台服务会被系统（尤其 MIUI）立即回收，进程被杀，表现为"退后台直接死掉"
+                if (activity?.isInPictureInPictureMode != true && backgroundMode == BACKGROUND_OFF) {
+                    Players.onPause()
+                }
             }
             override fun onResume(owner: LifecycleOwner) { Players.onResume() }
         }
