@@ -362,6 +362,7 @@ private fun CrossSourceVideoCard(
                 onClick = onClick,
                 shape = RoundedCornerShape(Spacing.corner),
                 focusedScale = 1.05f,
+                glow = false,
             )
             .pressable(
                 interactionSource = null,
