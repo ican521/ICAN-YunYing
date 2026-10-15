@@ -1116,7 +1116,10 @@ private fun LandscapePlayLayout(
             modifier = Modifier
                 .offset(x = playerLeft, y = playerTop)
                 .width(playerWidth)
-                .height(playerHeight),
+                .height(playerHeight)
+                // 控制层随小窗一起裁成圆角：否则底部渐变条（半透明黑压浅色底 = 浅灰）
+                // 的方角会露在圆角缺口里，形成左右下角的浅灰色直角块
+                .clip(RoundedCornerShape(playerCorner)),
             playerState = playerState,
             controlsVisible = controlsVisible,
             locked = locked,
@@ -1256,22 +1259,50 @@ private fun PreviewPlayerArea(
     onEnterFullscreen: () -> Unit,
 ) {
     Box(
-        modifier = modifier.clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null,
-        ) { onToggleControls() },
+        modifier = modifier.pointerInput(locked) {
+            // 与全屏手势层同款判定：单击不等待双击超时、立即响应；
+            // 单击 = 显示/隐藏控制层（原行为不变），双击 = 进入全屏（替代原右下角全屏按钮）；
+            // 移动过或点在控制层按钮等已消费事件的手势全程让位
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val downX = down.position.x
+                val downY = down.position.y
+                var moved = false
+                var consumedByChild = false
+                while (true) {
+                    val event = awaitPointerEvent()
+                    if (event.changes.any { it.isConsumed }) consumedByChild = true
+                    if (event.changes.all { !it.pressed }) break
+                    val c = event.changes.firstOrNull() ?: continue
+                    if (hypot(c.position.x - downX, c.position.y - downY) >
+                        viewConfiguration.touchSlop
+                    ) {
+                        moved = true
+                    }
+                }
+                if (moved || consumedByChild) return@awaitEachGesture
+                val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+                    awaitFirstDown(requireUnconsumed = false)
+                }
+                if (second != null) {
+                    // 双击：等第二次抬起后进入全屏（锁定时不响应）
+                    while (true) {
+                        val e2 = awaitPointerEvent()
+                        if (e2.changes.all { !it.pressed }) break
+                    }
+                    if (!locked) onEnterFullscreen()
+                } else {
+                    onToggleControls()
+                }
+            }
+        },
     ) {
         // 预览小窗控制层：单击视频区显示/隐藏（fongmi 同款交互）
         // 返回键随控制层显隐（fongmi 同款：控制层隐藏时返回键一起消失），48dp 纯图标无背景
         if (controlsVisible && !locked) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onToggleControls() },
-            ) {
+            // 控制层不再自带 clickable：空白处的单击/双击统一由外层手势层处理，
+            // 只有按钮（已消费事件）才让位，保证控制层显示时双击同样能进全屏
+            Box(modifier = Modifier.fillMaxSize()) {
                 // 顶栏：返回（左） + 投屏（右），fongmi 同款 48dp 纯图标，无圆形底色
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1321,8 +1352,6 @@ private fun PreviewPlayerArea(
                         modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                     )
                     Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
-                    // 全屏按钮：随控制层显示/隐藏（与播放暂停按钮同机制），位于小窗右下角，纯图标无背景
-                    PlainTopBtn(AppIcons.Fullscreen, "全屏") { onEnterFullscreen() }
                 }
             }
         }
