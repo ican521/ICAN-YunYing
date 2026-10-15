@@ -1,9 +1,8 @@
 package com.ican.tvplay.ui.components
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
@@ -120,7 +119,8 @@ object AppIcons {
             "1.31.26 2s-.1 1.36-.26 2h-3.38z",
     )
 
-    // 空心心形：实心轮廓均匀描边（stroke）绘制，避免 fill 挖空画法底部交汇处线条偏粗
+    // 空心心形：外轮廓与 [Favorite] 完全相同的复合路径 + evenOdd 挖空，
+    // 保证空心/实心两态外边缘完全重合、视觉尺寸一致（描边画法会因线宽外扩显得更大）
     val FavoriteBorder: ImageVector = ImageVector.Builder(
         name = "favorite_border",
         defaultWidth = 24.dp,
@@ -129,14 +129,15 @@ object AppIcons {
         viewportHeight = 24f,
     ).addPath(
         pathData = addPathNodes(
-            "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3" +
-                "c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5" +
-                "c0 3.78-3.4 6.86-8.55 11.54z",
+            "M16.5 3c-1.74 0 -3.41 0.81 -4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5" +
+                "c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45 -1.32C18.6 15.36 22 12.28 22 8.5" +
+                " 22 5.42 19.58 3 16.5 3z" +
+                "M12.1 18.55l-0.1 0.1 -0.1 -0.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5" +
+                "c1.54 0 3.04 0.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5" +
+                " 0 2.89 -3.14 5.74 -7.9 10.05z",
         ),
-        stroke = SolidColor(Color.Black),
-        strokeLineWidth = 1.9f,
-        strokeLineCap = StrokeCap.Round,
-        strokeLineJoin = StrokeJoin.Round,
+        fill = SolidColor(Color.Black),
+        pathFillType = PathFillType.EvenOdd,
     ).build()
 
     // ---- 播放器控制 ----
@@ -179,9 +180,13 @@ object AppIcons {
 
     // ---- FongMi 播放器控制 ----
 
+    // 照搬 fongmi mobile/drawable/ic_control_cast.xml（Chromecast 标准投屏图标）
     val Cast: ImageVector = vector(
         "cast",
-        "M21 3H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM1 15v3h3a3 3 0 0 0-3-3zm0 4v3h3a3 3 0 0 0-3-3zm0-8v2a7 7 0 0 1 7 7h2a9 9 0 0 0-9-9z",
+        "M21 3L3 3c-1.1 0 -2 0.9 -2 2v3h2L3 5h18v14h-7v2h7c1.1 0 2 -0.9 2 -2L23 5c0 -1.1 -0.9 -2 -2 -2z" +
+            "M1 18v3h3c0 -1.66 -1.34 -3 -3 -3z" +
+            "M1 14v2c2.76 0 5 2.24 5 5h2c0 -3.87 -3.13 -7 -7 -7z" +
+            "M1 10v2c4.97 0 9 4.03 9 9h2c0 -6.08 -4.93 -11 -11 -11z",
     )
 
     val Info: ImageVector = vector(

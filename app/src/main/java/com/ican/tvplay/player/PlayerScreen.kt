@@ -110,7 +110,6 @@ import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.player.core.SubItem
 import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.components.AppIcons
-import com.ican.tvplay.ui.components.CircleIconButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
@@ -997,7 +996,7 @@ private fun PortraitPlayLayout(
         modifier = Modifier
             .weight(1f)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = com.ican.tvplay.ui.theme.Spacing.pageHorizontal, vertical = 12.dp),
+            .padding(horizontal = pageHorizontalPadding(), vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         val v = current ?: return@Column
@@ -1007,7 +1006,7 @@ private fun PortraitPlayLayout(
 
         // 线路
         LineSection(v = v, lineFlag = lineFlag, onLineChange = onLineChange)
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Spacing.titleContentGap))
 
         // 选集（倒序/更多，横滑↔网格）
         EpisodeSection(
@@ -1015,7 +1014,7 @@ private fun PortraitPlayLayout(
             episodeIndex = episodeIndex,
             onEpisodeSelect = onEpisodeSelect,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.sectionSpacing))
 
         // 简介
         DescriptionSection(v = v)
@@ -1455,7 +1454,8 @@ private fun VideoMetaSection(
     }
 }
 
-/** 标题行收藏圆钮（竖屏/横屏共用）：已收藏心形粉色，点击切换收藏并携带站源信息 */
+/** 标题行收藏按钮（竖屏/横屏共用）：裸图标无圆形底色，48dp 点击热区与原圆钮一致，
+ * 已收藏心形粉色，点击切换收藏并携带站源信息 */
 @Composable
 private fun FavoriteButton(v: Video) {
     val container = appContainer()
@@ -1466,41 +1466,53 @@ private fun FavoriteButton(v: Video) {
         isFav = container.favoriteDao.isFavorite(v.id)
     }
 
-    CircleIconButton(
-        icon = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
-        contentDescription = if (isFav) "取消收藏" else "收藏",
-        tint = if (isFav) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
-        onClick = {
-            val newFav = !isFav
-            isFav = newFav
-            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                if (newFav) {
-                    // 记录视频所在站源：点击收藏时按此站源拉详情并播放
-                    val cached = Players.cachedVideo
-                    val favSiteKey = cached?.siteKey ?: ""
-                    val favSiteName = v.sourceName.ifBlank {
-                        com.ican.tvplay.ui.components.siteShortName(
-                            cached?.site?.name.orEmpty(),
-                            favSiteKey,
-                        )
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(Spacing.circleButton)
+            .tvCardEffect(
+                onClick = {
+                    val newFav = !isFav
+                    isFav = newFav
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        if (newFav) {
+                            // 记录视频所在站源：点击收藏时按此站源拉详情并播放
+                            val cached = Players.cachedVideo
+                            val favSiteKey = cached?.siteKey ?: ""
+                            val favSiteName = v.sourceName.ifBlank {
+                                com.ican.tvplay.ui.components.siteShortName(
+                                    cached?.site?.name.orEmpty(),
+                                    favSiteKey,
+                                )
+                            }
+                            container.favoriteDao.upsert(
+                                FavoriteEntity(
+                                    videoId = v.id,
+                                    title = v.title,
+                                    cover = v.cover,
+                                    categoryName = v.categoryName,
+                                    addedAt = System.currentTimeMillis(),
+                                    sourceKey = favSiteKey,
+                                    sourceName = favSiteName,
+                                ),
+                            )
+                        } else {
+                            container.favoriteDao.delete(v.id)
+                        }
                     }
-                    container.favoriteDao.upsert(
-                        FavoriteEntity(
-                            videoId = v.id,
-                            title = v.title,
-                            cover = v.cover,
-                            categoryName = v.categoryName,
-                            addedAt = System.currentTimeMillis(),
-                            sourceKey = favSiteKey,
-                            sourceName = favSiteName,
-                        ),
-                    )
-                } else {
-                    container.favoriteDao.delete(v.id)
-                }
-            }
-        },
-    )
+                },
+                shape = CircleShape,
+                focusedScale = 1.1f,
+                glow = false,
+            ),
+    ) {
+        Icon(
+            imageVector = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
+            contentDescription = if (isFav) "取消收藏" else "收藏",
+            tint = if (isFav) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp),
+        )
+    }
 }
 
 /** 线路区块（fongmi: detail_flag）：横向滚动 chips */
@@ -1620,11 +1632,9 @@ private fun EpisodeSection(
     }
 }
 
-/** 简介区块：默认 4 行，点击展开全部 */
+/** 简介区块：直接全部显示，不折叠、不可点击 */
 @Composable
 private fun DescriptionSection(v: Video) {
-    var expandedDesc by remember { mutableStateOf(false) }
-
     Text(
         text = "简介",
         style = MaterialTheme.typography.titleMedium,
@@ -1632,14 +1642,11 @@ private fun DescriptionSection(v: Video) {
         color = MaterialTheme.colorScheme.onBackground,
     )
     Spacer(modifier = Modifier.height(4.dp))
-    Box(modifier = Modifier.fillMaxWidth().clickable { expandedDesc = !expandedDesc }) {
-        Text(
-            text = v.description.ifBlank { "暂无简介" },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = if (expandedDesc) Int.MAX_VALUE else 4,
-        )
-    }
+    Text(
+        text = v.description.ifBlank { "暂无简介" },
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 // ========== 全屏布局 ==========
@@ -1691,10 +1698,13 @@ private fun FullscreenPlayLayout(
     // fongmi 同款手势反馈浮层：拖动 seek 预览目标 / 长按倍速提示
     var seekPreview by remember { mutableStateOf<Long?>(null) }
     var speedUpHint by remember { mutableStateOf(false) }
+    // 拖动底部进度条时的实时目标比例：顶部居中显示「跳转至 MM:SS」，松手消失
+    var sliderSeekFraction by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(locked) {
         if (locked) {
             seekPreview = null
             speedUpHint = false
+            sliderSeekFraction = null
         }
     }
 
@@ -1814,6 +1824,21 @@ private fun FullscreenPlayLayout(
                 )
             }
         }
+        // 拖动底部进度条：顶部居中实时显示「跳转至 MM:SS」，跟随手指位置更新
+        val sliderFraction = sliderSeekFraction
+        if (sliderFraction != null && playerState.durationMs > 0) {
+            Text(
+                text = "跳转至${formatMs((sliderFraction * playerState.durationMs).toLong())}",
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 24.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+        }
         if (speedUpHint) {
             Text(
                 text = "2.0倍速快进中",
@@ -1831,16 +1856,12 @@ private fun FullscreenPlayLayout(
         if (controlsVisible && !locked) {
             Box(modifier = Modifier.fillMaxSize()) {
                 // 顶栏（fongmi: 56dp 行高 + 左右 4dp padding，返回 48dp / 标题 16sp 占中间 / 右侧投屏 48dp）
+                // 无黑色渐变遮罩：纯白图标直接叠在画面上
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color(0xCC000000), Color.Transparent),
-                            ),
-                        )
                         .statusBarsPadding()
                         .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 24.dp),
                 ) {
@@ -1896,6 +1917,7 @@ private fun FullscreenPlayLayout(
                             progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
                             onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
                             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                            onDragFractionChange = { sliderSeekFraction = it },
                         )
                         Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
                     }
@@ -2240,12 +2262,16 @@ private fun formatMs(ms: Long): String {
 /** seek 后"保持目标进度"的释放阈值：播放器进度与目标差值 ≤ 该比例即视为已跟上 */
 private const val SEEK_HOLD_TOLERANCE = 0.002f
 
-/** 细直线进度条：2dp 轨道 + 白色圆点滑块，支持点按与横向拖动 seek（小窗/全屏统一风格） */
+/**
+ * 细直线进度条：2dp 轨道 + 白色圆点滑块，支持点按与横向拖动 seek（小窗/全屏统一风格）。
+ * [onDragFractionChange] 拖动开始/移动回调实时目标比例，拖动结束回 null（供全屏顶部「跳转至 MM:SS」提示）。
+ */
 @Composable
 private fun LineSlider(
     progress: Float,
     onSeek: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    onDragFractionChange: ((Float?) -> Unit)? = null,
 ) {
     // 拖动中的临时进度（null=未拖动），松手才真正 seek，避免拖动过程中频繁跳转
     var dragProgress by remember { mutableStateOf<Float?>(null) }
@@ -2277,14 +2303,24 @@ private fun LineSlider(
             }
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
-                    onDragStart = { offset -> dragProgress = (offset.x / size.width).coerceIn(0f, 1f) },
+                    onDragStart = { offset ->
+                        val f = (offset.x / size.width).coerceIn(0f, 1f)
+                        dragProgress = f
+                        onDragFractionChange?.invoke(f)
+                    },
                     onDragEnd = {
                         dragProgress?.let(commitSeek)
                         dragProgress = null
+                        onDragFractionChange?.invoke(null)
                     },
-                    onDragCancel = { dragProgress = null },
+                    onDragCancel = {
+                        dragProgress = null
+                        onDragFractionChange?.invoke(null)
+                    },
                 ) { change, _ ->
-                    dragProgress = (change.position.x / size.width).coerceIn(0f, 1f)
+                    val f = (change.position.x / size.width).coerceIn(0f, 1f)
+                    dragProgress = f
+                    onDragFractionChange?.invoke(f)
                 }
             },
     ) {
