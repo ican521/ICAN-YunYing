@@ -102,6 +102,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.ican.tvplay.data.BACKGROUND_OFF
+import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.data.model.Episode
@@ -152,6 +153,8 @@ fun PlayerScreen(
     var video by remember { mutableStateOf<Video?>(null) }
     var episodeIndex by remember { mutableIntStateOf(startEpisode) }
     var initialized by remember { mutableStateOf(false) }
+    /** 详情（线路/选集/简介）加载中：fongmi 式双圈——小窗一个圈、详情信息流区一个圈 */
+    var detailLoading by remember { mutableStateOf(false) }
     var pendingPosition by remember { mutableLongStateOf(0L) }
     // 片头/片尾标记（ms；片尾存"距结尾时长"，fongmi History.opening/ending 同款）
     var openingMs by remember { mutableLongStateOf(0L) }
@@ -284,27 +287,33 @@ fun PlayerScreen(
         // 跨站源场景优先：MultiSourceSearchScreen 提前 cache 的视频直接命中，
         // 避免先在 VideoRepository 的当前站点上发起慢查询（错站查询既慢又可能查错视频）
         var v = Players.consumeCachedVideo(videoId)?.video
-        // 搜索元数据不含选集（点击卡片立即跳转，详情异步补齐）：命中缓存但无选集/线路时，
-        // 在播放页内补拉完整详情，期间保持黑底转圈加载页；拉取失败 → v=null 走错误页
-        val cachedEntry = Players.cachedVideo?.takeIf { it.video.id == videoId }
-        if (v != null && cachedEntry?.site != null && v.playSources.isEmpty() && v.episodes.isEmpty()) {
-            val full = loadSiteDetail(cachedEntry.site, cachedEntry.jarSpec, v.id)
+        // 搜索元数据不含选集（点击卡片立即跳转）：先把元数据挂上屏（页面骨架立刻可见，
+        // 小窗与详情区各转一个圈，对齐 fongmi VideoActivity 的 progress + progressLayout），
+        // 再在播放页内补拉完整详情；拉取失败 → v=null 走错误页
+        val metaEntry = Players.cachedVideo?.takeIf { it.video.id == videoId }
+        val needAsyncDetail = v != null && metaEntry?.site != null &&
+            v.playSources.isEmpty() && v.episodes.isEmpty()
+        if (needAsyncDetail) {
+            video = v
+            initialized = true
+            detailLoading = true
+            val full = loadSiteDetail(metaEntry!!.site, metaEntry.jarSpec, v!!.id)
+            detailLoading = false
             v = if (full != null) {
                 val merged = full.copy(
                     sourceName = v.sourceName.ifBlank {
                         com.ican.tvplay.ui.components.siteShortName(
-                            cachedEntry.site.name, cachedEntry.siteKey,
+                            metaEntry.site.name, metaEntry.siteKey,
                         )
                     },
                 )
                 // 缓存升级为完整详情：后续解析播放地址/失败自动换站源都读这份
-                Players.cacheVideo(merged, cachedEntry.siteKey, cachedEntry.site, cachedEntry.jarSpec)
+                Players.cacheVideo(merged, metaEntry.siteKey, metaEntry.site, metaEntry.jarSpec)
                 merged
             } else {
                 null
             }
-        }
-        if (v == null) {
+        } else if (v == null) {
             v = container.videoRepository.getVideo(videoId)
         }
         video = v
@@ -603,6 +612,12 @@ fun PlayerScreen(
         onDispose { Players.uiEpisodeNavigator = null }
     }
 
+    DisposableEffect(Unit) {
+        // X 关闭画中画小窗：Activity 后台触发退出播放页（不销毁 App，回到首页）
+        Players.uiExitNavigator = { onBack() }
+        onDispose { Players.uiExitNavigator = null }
+    }
+
     // Surface 生命周期
     DisposableEffect(Unit) {
         // 监听 Activity 生命周期：切后台自动 pause（仅后台播放关闭时），回前台 resume
@@ -629,14 +644,17 @@ fun PlayerScreen(
                 activity.restoreDefaultOrientation()
                 saveProgress()
             } else {
-                // 真正退出：保存进度；保活开启 → 转交前台服务后台续播（不销毁播放器）
+                // 真正退出：保存进度；仅「后台播放」模式转交前台服务后台续播（不销毁播放器）；
+                // 「画中画」只负责全屏切后台自动进小窗，返回退出播放页应直接停止
                 saveProgress()
-                if (backgroundMode != BACKGROUND_OFF && Players.isAlive()) {
+                if (backgroundMode == BACKGROUND_ON && Players.isAlive()) {
                     Players.detachForBackground()
                 } else {
                     Players.release()
                     PlaybackService.stop(context)
                 }
+                // 清全屏标记：否则退出后 isFullscreen 残留 true，首页按 Home 会误触自动画中画
+                Players.isFullscreen = false
                 activity.restoreDefaultOrientation()
             }
         }
@@ -668,35 +686,25 @@ fun PlayerScreen(
     // 竖屏小窗状态下不拦截，交还 NavDisplay → 预测返回动画 + 边缘滑动返回生效
     BackHandler(enabled = fullscreen || landZooming) { handleBack() }
 
-    // PiP 画中画：窗口是整个 Activity 缩小画面，只渲染纯视频（隐藏全部 UI）
-    if (inPip) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black),
-        ) {
-            AndroidView(
-                factory = { sharedPlayerView },
-                update = { view ->
-                    if (view.player !== Players.player) Players.bindPlayerView(view)
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        return
-    }
+    // PiP 画中画：系统会把整个 Activity 窗口直接缩小，因此不切换视图子树
+    // （同一个 PlayerView 跨 AndroidView 节点 reparent 有崩溃风险），
+    // 只在原布局上让视频铺满、隐藏全部覆盖层与信息流（对齐 fongmi 行为）
 
     val current = video
 
     // video 加载中 → 黑底转圈过渡页（LaunchedEffect 是异步的，初始帧 video 必为 null，
     // 不能立即渲染错误页，否则加载期间会闪错误页）
     if (current == null) {
-        if (!initialized) {
+        // PiP 理论上只在播放中（current 非空）进入；极端时序下给纯黑兜底，
+        // 避免空数据把错误页/信息流投进画中画
+        if (inPip || !initialized) {
             Box(
                 modifier = Modifier.fillMaxSize().background(Color.Black),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(36.dp))
+                if (!inPip) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(36.dp))
+                }
             }
             return
         }
@@ -713,7 +721,7 @@ fun PlayerScreen(
     // BoxWithConstraints 提供整屏尺寸，供横屏小窗→全屏放大动画插值。
     // 旋转过渡期 / 放大动画期间为黑底；缩回后柔和渐变回主题背景，避免硬切
     val rootBackground by animateColorAsState(
-        targetValue = if (fullscreen || pendingFullscreen != null ||
+        targetValue = if (inPip || fullscreen || pendingFullscreen != null ||
             landscapeFullscreen || landZooming
         ) {
             Color.Black
@@ -810,6 +818,8 @@ fun PlayerScreen(
                 if (view.player !== Players.player) Players.bindPlayerView(view)
             },
             modifier = when {
+                // 画中画：铺满整个（已被系统缩小的）Activity 窗口
+                inPip -> Modifier.fillMaxSize()
                 // 手机旋转进入的全屏：直接铺满
                 fullscreen && !landscapeFullscreen -> Modifier.fillMaxSize()
                 // 旋转挂起期间统一沿用竖屏尺寸，避免转屏中途露出横版或画面拉伸
@@ -829,6 +839,8 @@ fun PlayerScreen(
             }.background(Color.Black),
         )
         when {
+        // 画中画：只保留最底层视频，不挂任何覆盖层/信息流
+        inPip -> Unit
         fullscreen -> {
         FullscreenPlayLayout(
             current = current,
@@ -879,6 +891,7 @@ fun PlayerScreen(
                 lineEpisodes = lineEpisodes,
                 lineFlag = lineFlag,
                 playerState = playerState,
+                detailLoading = detailLoading,
                 controlsVisible = controlsVisible,
                 locked = locked,
                 playerTop = animTop,
@@ -925,6 +938,7 @@ fun PlayerScreen(
             lineEpisodes = lineEpisodes,
             lineFlag = lineFlag,
             playerState = playerState,
+            detailLoading = detailLoading,
             controlsVisible = controlsVisible,
             locked = locked,
             onToggleControls = { controlsVisible = !controlsVisible },
@@ -977,6 +991,8 @@ private fun PortraitPlayLayout(
     lineEpisodes: List<Episode>,
     lineFlag: String,
     playerState: Players.PlayerState,
+    /** 详情加载中：小窗与详情区同时显示转圈（fongmi progress + progressLayout） */
+    detailLoading: Boolean,
     controlsVisible: Boolean,
     locked: Boolean,
     onToggleControls: () -> Unit,
@@ -1018,6 +1034,7 @@ private fun PortraitPlayLayout(
             .statusBarsPadding()
             .aspectRatio(16f / 9f),
         playerState = playerState,
+        showLoading = detailLoading,
         controlsVisible = controlsVisible,
         locked = locked,
         onToggleControls = onToggleControls,
@@ -1030,6 +1047,20 @@ private fun PortraitPlayLayout(
     )
 
     // === 可滚动详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===
+    // fongmi ProgressLayout：详情未回来时整个信息区只显示一个居中圈，回来后再填充内容
+    if (detailLoading) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(36.dp),
+            )
+        }
+    } else {
     Column(
         modifier = Modifier
             .weight(1f)
@@ -1056,6 +1087,7 @@ private fun PortraitPlayLayout(
         DescriptionSection(v = v)
 
         Spacer(modifier = Modifier.height(60.dp))
+    }
     }
 
     // === 对话框 ===
@@ -1114,6 +1146,8 @@ private fun LandscapePlayLayout(
     lineEpisodes: List<Episode>,
     lineFlag: String,
     playerState: Players.PlayerState,
+    /** 详情加载中：小窗与详情区同时显示转圈（fongmi progress + progressLayout） */
+    detailLoading: Boolean,
     controlsVisible: Boolean,
     locked: Boolean,
     // 动画中的播放器边界（小窗静止值 = 38% 宽 16:9 + 状态栏顶部偏移 + 左缘对齐页面左基线）
@@ -1157,6 +1191,7 @@ private fun LandscapePlayLayout(
                 // 的方角会露在圆角缺口里，形成左右下角的浅灰色直角块
                 .clip(RoundedCornerShape(playerCorner)),
             playerState = playerState,
+            showLoading = detailLoading,
             controlsVisible = controlsVisible,
             locked = locked,
             onToggleControls = onToggleControls,
@@ -1180,8 +1215,19 @@ private fun LandscapePlayLayout(
                 ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (current != null) {
-                VideoMetaSection(v = current, lineFlag = lineFlag, itemSpacing = 10.dp)
+            when {
+                detailLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(36.dp),
+                        )
+                    }
+                }
+                current != null -> VideoMetaSection(v = current, lineFlag = lineFlag, itemSpacing = 10.dp)
             }
         }
 
@@ -1200,16 +1246,29 @@ private fun LandscapePlayLayout(
             // 板块主间距与竖屏信息流统一为 sectionSpacing
             verticalArrangement = Arrangement.spacedBy(com.ican.tvplay.ui.theme.Spacing.sectionSpacing),
         ) {
-            if (current != null) {
-                LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange)
-                EpisodeSection(
-                    lineEpisodes = lineEpisodes,
-                    episodeIndex = episodeIndex,
-                    onEpisodeSelect = onEpisodeSelect,
-                )
-                DescriptionSection(v = current)
+            when {
+                detailLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(36.dp),
+                        )
+                    }
+                }
+                current != null -> {
+                    LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange)
+                    EpisodeSection(
+                        lineEpisodes = lineEpisodes,
+                        episodeIndex = episodeIndex,
+                        onEpisodeSelect = onEpisodeSelect,
+                    )
+                    DescriptionSection(v = current)
 
-                Spacer(modifier = Modifier.height(60.dp))
+                    Spacer(modifier = Modifier.height(60.dp))
+                }
             }
         }
     }
@@ -1289,6 +1348,8 @@ private fun BoxScope.CornerNotch(color: Color, r: Dp, alignment: Alignment) {
 private fun PreviewPlayerArea(
     modifier: Modifier,
     playerState: Players.PlayerState,
+    /** 详情未就绪时强制显示转圈（fongmi 进页面即 showProgress），就绪后跟播放器 buffering 状态 */
+    showLoading: Boolean = false,
     controlsVisible: Boolean,
     locked: Boolean,
     onToggleControls: () -> Unit,
@@ -1398,8 +1459,8 @@ private fun PreviewPlayerArea(
             }
         }
 
-        // 加载转圈（fongmi: view_progress）
-        if (playerState.buffering) {
+        // 加载转圈（fongmi: view_progress；进页面即显示，STATE_READY 后随 buffering 显隐）
+        if (showLoading || playerState.buffering) {
             CircularProgressIndicator(
                 color = Color.White,
                 modifier = Modifier.align(Alignment.Center).size(36.dp),
