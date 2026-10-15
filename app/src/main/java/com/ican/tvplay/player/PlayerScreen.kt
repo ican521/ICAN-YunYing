@@ -988,18 +988,6 @@ private fun PortraitPlayLayout(
         onSeekDragChange = onSeekDragChange,
     )
 
-    // === 阴影分割线 ===
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(4.dp)
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0x33000000), Color.Transparent),
-                ),
-            ),
-    )
-
     // === 可滚动详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===
     Column(
         modifier = Modifier
