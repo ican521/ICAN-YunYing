@@ -105,6 +105,7 @@ import com.ican.tvplay.player.core.SubItem
 import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.CircleIconButton
+import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
 import androidx.compose.runtime.snapshotFlow
@@ -710,6 +711,12 @@ fun PlayerScreen(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "animTop",
         ) { expanded -> if (expanded) 0.dp else statusBarTop }
+        // 横屏小窗左缘：对齐页面左基线（手机 16dp / 平板 24dp），放大到全屏时收回到 0
+        val pageHorizontal = pageHorizontalPadding()
+        val animLeft by expandTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "animLeft",
+        ) { expanded -> if (expanded) 0.dp else pageHorizontal }
 
         // 动画收敛后处理：放大结束挂全屏布局（纯净画面起手）；
         // 缩回期间横版布局全程渲染，信息列/下方区块锚定视频边缘跟随滑入滑出（fongmi ChangeBounds）
@@ -758,7 +765,7 @@ fun PlayerScreen(
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
                 isLandscape ->
                     Modifier
-                        .offset(y = animTop)
+                        .offset(x = animLeft, y = animTop)
                         .width(animWidth)
                         .height(animHeight)
                 else ->
@@ -818,11 +825,13 @@ fun PlayerScreen(
                 controlsVisible = controlsVisible,
                 locked = locked,
                 playerTop = animTop,
+                playerLeft = animLeft,
                 playerWidth = animWidth,
                 playerHeight = animHeight,
                 smallPlayerWidth = screenW * LAND_PLAYER_WIDTH_FRACTION,
                 screenWidth = screenW,
                 screenHeight = screenH,
+                pageHorizontal = pageHorizontal,
                 onToggleControls = { controlsVisible = !controlsVisible },
                 onTogglePlay = { Players.playPause() },
                 onPrev = { if (episodeIndex > 0) episodeIndex-- },
@@ -1059,13 +1068,15 @@ private fun LandscapePlayLayout(
     playerState: Players.PlayerState,
     controlsVisible: Boolean,
     locked: Boolean,
-    // 动画中的播放器边界（小窗静止值 = 38% 宽 16:9 + 状态栏顶部偏移）
+    // 动画中的播放器边界（小窗静止值 = 38% 宽 16:9 + 状态栏顶部偏移 + 左缘对齐页面左基线）
     playerTop: Dp,
+    playerLeft: Dp,
     playerWidth: Dp,
     playerHeight: Dp,
     smallPlayerWidth: Dp,
     screenWidth: Dp,
     screenHeight: Dp,
+    pageHorizontal: Dp,
     onToggleControls: () -> Unit,
     onTogglePlay: () -> Unit,
     onPrev: () -> Unit,
@@ -1079,7 +1090,7 @@ private fun LandscapePlayLayout(
         // 播放器覆盖层：与底层常驻 PlayerView 同位同尺寸（尺寸由根 AndroidView 动画值驱动）
         PreviewPlayerArea(
             modifier = Modifier
-                .offset(y = playerTop)
+                .offset(x = playerLeft, y = playerTop)
                 .width(playerWidth)
                 .height(playerHeight),
             playerState = playerState,
@@ -1096,11 +1107,11 @@ private fun LandscapePlayLayout(
         // 右侧信息列：锚在视频右缘，宽度固定（小窗时的剩余宽度），随放大向右滑出屏幕
         Column(
             modifier = Modifier
-                .offset(x = playerWidth, y = playerTop)
-                .width(screenWidth - smallPlayerWidth)
+                .offset(x = playerLeft + playerWidth, y = playerTop)
+                .width(screenWidth - smallPlayerWidth - playerLeft)
                 .padding(
                     start = com.ican.tvplay.ui.theme.Spacing.sectionSpacing,
-                    end = com.ican.tvplay.ui.theme.Spacing.pageHorizontal,
+                    end = pageHorizontal,
                     top = 12.dp,
                 ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -1117,7 +1128,7 @@ private fun LandscapePlayLayout(
                 .fillMaxWidth()
                 .height(screenHeight - playerTop - playerHeight)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = com.ican.tvplay.ui.theme.Spacing.pageHorizontal),
+                .padding(horizontal = pageHorizontal),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (current != null) {
