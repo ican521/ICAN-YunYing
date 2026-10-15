@@ -208,18 +208,19 @@ private fun FavoriteCard(
 ) {
     Card(
         modifier = Modifier
+            // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
+            .pressable(
+                interactionSource = null,
+                indication = SinkFeedback(),
+                delay = null,
+            )
             .tvCardEffect(
                     onClick = onClick,
                     shape = RoundedCornerShape(Spacing.corner),
                     focusedScale = 1.05f,
                     glow = false,
                     onLongClick = onLongClick,
-                )
-            .pressable(
-                interactionSource = null,
-                indication = SinkFeedback(),
-                delay = null,
-            ),
+                ),
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
     ) {
@@ -457,18 +458,19 @@ private fun HistoryCard(
     }
     Card(
         modifier = Modifier
+            // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
+            .pressable(
+                interactionSource = null,
+                indication = SinkFeedback(),
+                delay = null,
+            )
             .tvCardEffect(
                     onClick = onClick,
                     shape = RoundedCornerShape(Spacing.corner),
                     focusedScale = 1.05f,
                     glow = false,
                     onLongClick = onLongClick,
-                )
-            .pressable(
-                interactionSource = null,
-                indication = SinkFeedback(),
-                delay = null,
-            ),
+                ),
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
     ) {

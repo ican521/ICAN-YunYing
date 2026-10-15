@@ -214,14 +214,14 @@ fun SettingsScreen(
                 onClick = onColorPaletteClick,
             )
             SwitchPreference(
-                title = "全局模糊",
+                title = "液态玻璃",
                 summary = "底部导航液态玻璃效果",
                 checked = enableBlur,
                 onCheckedChange = { viewModel.setEnableBlur(it) },
             )
             SwitchPreference(
                 title = "顶栏毛玻璃",
-                summary = "顶部栏模糊效果，独立于全局模糊",
+                summary = "顶部栏模糊效果，独立于液态玻璃",
                 checked = topBarBlur,
                 onCheckedChange = { viewModel.setTopBarBlurEnabled(it) },
             )

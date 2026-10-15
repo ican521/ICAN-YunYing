@@ -2,6 +2,7 @@ package com.ican.tvplay.player
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -241,6 +242,27 @@ fun PlayerScreen(
     // 后台续播返回本页时跳过一次重新解析（直接接管在播的播放器）
     var resumeFromBackground by remember { mutableStateOf(false) }
 
+    // 按站点补拉完整详情（spider 站走 detailContent，采集站走 VodApiClient.detail）：
+    // 搜索页点击卡片不再阻塞等详情，详情下沉到播放页内异步加载（慢站源也能秒进播放页）
+    suspend fun loadSiteDetail(
+        site: com.ican.tvplay.data.remote.TvBoxSite,
+        jarSpec: String,
+        id: String,
+    ): Video? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val item = runCatching {
+            if (site.isSpider()) {
+                val spider = container.spiderManager.getSpider(site, jarSpec)
+                    ?: return@withContext null
+                com.ican.tvplay.data.remote.VodParse.parseVodListJson(
+                    container.spiderManager.detailContent(spider, listOf(id)),
+                ).firstOrNull()
+            } else {
+                com.ican.tvplay.data.remote.VodApiClient().detail(site, id)
+            }
+        }.getOrNull() ?: return@withContext null
+        with(com.ican.tvplay.data.remote.VodParse) { item.toVideo(withEpisodes = true) }
+    }
+
     // 加载视频信息 + 历史进度
     LaunchedEffect(videoId) {
         // 后台续播返回：播放器仍在播同一部剧同一集 → 直接接管，不重新解析
@@ -259,9 +281,29 @@ fun PlayerScreen(
             initialized = true
             return@LaunchedEffect
         }
-        // 跨站源场景优先：MultiSourceSearchScreen 提前 cache 的完整视频直接命中，
+        // 跨站源场景优先：MultiSourceSearchScreen 提前 cache 的视频直接命中，
         // 避免先在 VideoRepository 的当前站点上发起慢查询（错站查询既慢又可能查错视频）
         var v = Players.consumeCachedVideo(videoId)?.video
+        // 搜索元数据不含选集（点击卡片立即跳转，详情异步补齐）：命中缓存但无选集/线路时，
+        // 在播放页内补拉完整详情，期间保持黑底转圈加载页；拉取失败 → v=null 走错误页
+        val cachedEntry = Players.cachedVideo?.takeIf { it.video.id == videoId }
+        if (v != null && cachedEntry?.site != null && v.playSources.isEmpty() && v.episodes.isEmpty()) {
+            val full = loadSiteDetail(cachedEntry.site, cachedEntry.jarSpec, v.id)
+            v = if (full != null) {
+                val merged = full.copy(
+                    sourceName = v.sourceName.ifBlank {
+                        com.ican.tvplay.ui.components.siteShortName(
+                            cachedEntry.site.name, cachedEntry.siteKey,
+                        )
+                    },
+                )
+                // 缓存升级为完整详情：后续解析播放地址/失败自动换站源都读这份
+                Players.cacheVideo(merged, cachedEntry.siteKey, cachedEntry.site, cachedEntry.jarSpec)
+                merged
+            } else {
+                null
+            }
+        }
         if (v == null) {
             v = container.videoRepository.getVideo(videoId)
         }
@@ -584,7 +626,7 @@ fun PlayerScreen(
             val isConfigChange = activity?.isChangingConfigurations == true
             // 屏幕旋转：只保存进度 + 解锁方向，不 release 播放器（单例保持播放）
             if (isConfigChange) {
-                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                activity.restoreDefaultOrientation()
                 saveProgress()
             } else {
                 // 真正退出：保存进度；保活开启 → 转交前台服务后台续播（不销毁播放器）
@@ -595,7 +637,7 @@ fun PlayerScreen(
                     Players.release()
                     PlaybackService.stop(context)
                 }
-                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                activity.restoreDefaultOrientation()
             }
         }
     }
@@ -612,7 +654,7 @@ fun PlayerScreen(
                 landZoomToken++
             } else {
                 // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
-                (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                (context as? Activity).restoreDefaultOrientation()
                 pendingFullscreen = false
             }
             return
@@ -750,8 +792,7 @@ fun PlayerScreen(
                     // 缩回完成：恢复方向自由并显示状态栏（组件位置均由动画值驱动，无 inset 跳变）
                     controlsVisible = false
                     val activity = context as? Activity
-                    activity?.requestedOrientation =
-                        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    activity.restoreDefaultOrientation()
                     if (activity != null) {
                         WindowCompat.getInsetsController(
                             activity.window, activity.window.decorView,
@@ -1648,6 +1689,22 @@ private fun EpisodeSection(
     }
 }
 
+/** 站源接口返回的简介常带 <p>/<br> 等 HTML 标签残留：显示前剥离，只留正文 */
+private val htmlTagRegex = Regex("<[^>]*>|〈[^〉]*〉")
+
+private fun cleanDescription(raw: String): String = raw.replace(htmlTagRegex, "").trim()
+
+/** 退出全屏/离开播放页后恢复屏幕方向：小屏手机锁回竖屏（禁用自动横向），平板恢复系统自由方向 */
+private fun Activity?.restoreDefaultOrientation() {
+    val activity = this ?: return
+    val smallScreen = activity.resources.configuration.screenWidthDp < 600
+    activity.requestedOrientation = if (smallScreen) {
+        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    } else {
+        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
+}
+
 /** 简介区块：直接全部显示，不折叠、不可点击 */
 @Composable
 private fun DescriptionSection(v: Video) {
@@ -1660,7 +1717,7 @@ private fun DescriptionSection(v: Video) {
         )
         Spacer(modifier = Modifier.height(Spacing.titleContentGap))
         Text(
-            text = v.description.ifBlank { "暂无简介" },
+            text = cleanDescription(v.description).ifBlank { "暂无简介" },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -1744,30 +1801,50 @@ private fun FullscreenPlayLayout(
                     // 点在控制层按钮等可点击控件上（事件被消费）：手势全程让位，
                     // 不触发长按快进/拖动seek/单击双击（否则点动作栏按钮会被误判为视频区单击而收起控制层）
                     var gestureBlocked = false
+                    // 手指最后已知位置（长按位移判定用）：手指静止时不产生触摸事件，
+                    // 裸 await 会让长按判定饿死——必须靠下方超时等待到点主动判定
+                    var lastX = downX
+                    var lastY = downY
 
                     while (true) {
-                        val event = awaitPointerEvent()
+                        // 在到达长按阈值的剩余时间内等事件；超时无事件 = 手指静止按住，
+                        // 立即触发长按（对齐 fongmi GestureDetector.onLongPress 的系统阈值回调，约 400-500ms）
+                        val canLongPress = !isLong && axis == 0 && !locked && !gestureBlocked
+                        val event = if (canLongPress) {
+                            val remaining = viewConfiguration.longPressTimeoutMillis -
+                                (SystemClock.uptimeMillis() - downTime)
+                            if (remaining > 0) {
+                                withTimeoutOrNull(remaining) { awaitPointerEvent() }
+                            } else {
+                                null // 已到阈值：立即走下方长按判定，不再等事件
+                            }
+                        } else {
+                            awaitPointerEvent()
+                        }
+
+                        if (event == null) {
+                            // 长按阈值到点（期间无新事件）：位移仍在 slop 内 → 2 倍速快进
+                            if (hypot(lastX - downX, lastY - downY) <= viewConfiguration.touchSlop) {
+                                val st = Players.state.value
+                                if (st.playing && st.durationMs > 0) {
+                                    isLong = true
+                                    Players.setSpeed(2f)
+                                    speedUpHint = true
+                                } else {
+                                    axis = 2 // 未在播放：不再触发长按
+                                }
+                            } else {
+                                axis = 2 // 已移出 slop：取消长按资格
+                            }
+                            continue
+                        }
+
                         if (event.changes.any { it.isConsumed }) gestureBlocked = true
                         if (event.changes.all { !it.pressed }) break // 手指抬起
                         if (locked || gestureBlocked) continue // 锁定：拖动/长按失效，仅保留单击/双击
                         val change = event.changes.firstOrNull() ?: continue
-                        val now = change.uptimeMillis
-
-                        // 长按快进（fongmi onLongPress → onSpeedUp：2 倍速播放）
-                        if (!isLong && axis == 0 &&
-                            now - downTime >= viewConfiguration.longPressTimeoutMillis &&
-                            hypot(change.position.x - downX, change.position.y - downY) <= viewConfiguration.touchSlop
-                        ) {
-                            val st = Players.state.value
-                            if (st.playing && st.durationMs > 0) {
-                                isLong = true
-                                Players.setSpeed(2f)
-                                speedUpHint = true
-                            } else {
-                                axis = 2 // 未在播放：不再触发长按
-                            }
-                            continue
-                        }
+                        lastX = change.position.x
+                        lastY = change.position.y
 
                         if (isLong) continue // 长按快进期间忽略移动
                         // 方向判定（fongmi checkFunc：累计位移 ≥20dp，横向优先）

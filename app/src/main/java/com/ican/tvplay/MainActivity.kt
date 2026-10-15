@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.app.PictureInPictureParams
 import android.app.RemoteAction
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.drawable.Icon
 import android.os.Build
@@ -32,6 +33,10 @@ class MainActivity : ComponentActivity() {
         android.util.Log.d("Startup", "activity onCreate begin")
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // 小屏（手机）禁用自动横向：锁定竖屏，仅播放全屏时由播放页临时请求横屏；平板保持系统方向
+        if (resources.configuration.screenWidthDp < 600) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
         handleOpenPlayerIntent(intent)
         setContent {
             AppRoot()
