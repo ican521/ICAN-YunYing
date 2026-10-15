@@ -2224,7 +2224,8 @@ private fun SubtitleDialog(
                 .padding(20.dp),
         ) {
             Text("字幕", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-            Column(modifier = Modifier.padding(top = 14.dp)) {
+            // 行间距与 OptionDialog（倍速/缓冲等弹窗）统一为 6dp
+            Column(modifier = Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 SubRow("关闭字幕", textDisabled) { onDisable() }
                 tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected) { onSelect(t) } }
                 SubRow("添加外挂字幕…", false) { onAddExternal() }
