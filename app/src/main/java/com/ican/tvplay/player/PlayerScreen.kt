@@ -1344,13 +1344,13 @@ private fun PreviewPlayerArea(
                         )
                         .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
                 ) {
-                    Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
+                    Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
                     LineSlider(
                         progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
                         onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
                         modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                     )
-                    Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
+                    Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
                 }
             }
         }
@@ -1819,7 +1819,8 @@ private fun FullscreenPlayLayout(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = formatMs(seekPreview ?: 0L),
-                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
+                    // tnum 等宽数字（fongmi view_widget_vod 同款）：数字逐帧变化时胶囊宽度不抖动
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"),
                     color = Color.White,
                 )
             }
@@ -1829,7 +1830,7 @@ private fun FullscreenPlayLayout(
         if (sliderFraction != null && playerState.durationMs > 0) {
             Text(
                 text = "跳转至${formatMs((sliderFraction * playerState.durationMs).toLong())}",
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"),
                 color = Color.White,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -1912,14 +1913,14 @@ private fun FullscreenPlayLayout(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 0.dp),
                     ) {
-                        Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
+                        Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
                         LineSlider(
                             progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
                             onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
                             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                             onDragFractionChange = { sliderSeekFraction = it },
                         )
-                        Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
+                        Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
                     }
                     // 动作栏（fongmi: 左组功能 + 右侧字幕/音轨/片头/片尾，白色 14sp 文字）
                     Row(
