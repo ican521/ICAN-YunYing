@@ -52,7 +52,6 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.TvPlayApplication
-import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.BACKGROUND_PIP
 import com.ican.tvplay.data.HomeLayoutSize
 import com.ican.tvplay.data.ThemeMode
@@ -260,20 +259,12 @@ fun SettingsScreen(
         Card(modifier = Modifier.fillMaxWidth()) {
             OverlayDropdownPreference(
                 title = "后台播放",
-                summary = "开启：退出播放页后继续播放并可通知栏控制；画中画：全屏播放时切后台自动进入小窗",
-                items = listOf("关闭", "开启", "画中画"),
-                selectedIndex = when (backgroundPlay) {
-                    BACKGROUND_OFF -> 0
-                    BACKGROUND_ON -> 1
-                    else -> 2
-                },
+                summary = "全屏播放时切后台自动进入画中画",
+                items = listOf("关闭", "画中画"),
+                selectedIndex = if (backgroundPlay == BACKGROUND_OFF) 0 else 1,
                 onSelectedIndexChange = { index ->
                     when (index) {
                         0 -> viewModel.setPlayerBackgroundPlay(BACKGROUND_OFF)
-                        1 -> {
-                            viewModel.setPlayerBackgroundPlay(BACKGROUND_ON)
-                            requestNotificationPermission()
-                        }
                         else -> {
                             viewModel.setPlayerBackgroundPlay(BACKGROUND_PIP)
                             requestNotificationPermission()

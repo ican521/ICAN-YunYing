@@ -187,6 +187,10 @@ object Players {
     /** 页面存活时的切集导航（更新页面 episodeIndex 触发页面解析流）；null = 页面已退出，走后台直接解析 */
     var uiEpisodeNavigator: ((Int) -> Unit)? = null
 
+    /** 页面返回导航：X 关闭画中画小窗后由 Activity 触发，退出播放页（App 保留在后台） */
+    var uiExitNavigator: (() -> Unit)? = null
+    fun requestExitPlayer() { uiExitNavigator?.invoke() }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     /** 后台片尾自动切集防重（页面存活时由 PlayerScreen 的 autoNextArmed 负责） */
