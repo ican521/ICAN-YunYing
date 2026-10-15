@@ -193,8 +193,11 @@ fun HomeScreen(
     val searchRowMaxCollapsePx = with(density) {
         (48.dp + Spacing.pageTop).toPx()
     }
-    // HomeTopBar 内容高（48dp）：渐隐锚点——搜索栏可视高度收到与内容等高时文字/图标恰好完全隐形
+    // HomeTopBar 内容高（48dp）：渐隐锚点基准
     val searchRowContentPx = with(density) { 48.dp.toPx() }
+    // 完全隐去的推迟量：让文字/图标在搜索栏可视高度「快要小于内容高」时才彻底隐形
+    // （即可视高度 = 内容高 - 该推迟量时 alpha 才降到 0）
+    val searchRowFadeEndDelayPx = with(density) { 8.dp.toPx() }
     // 顶区「展开状态」总高度 → 每页网格固定顶部 contentPadding。
     // 确定性计算，不做实测回写：实测值会受「顶栏毛玻璃」开关引起的重排影响出现瞬时偏差，
     // 从而抖动网格 padding 并导致搜索行折叠短时卡住 / 内容错位
@@ -456,12 +459,13 @@ fun HomeScreen(
                         )
                         .clipToBounds(),
                 ) {
-                    // 渐隐锚点 = 内容高：上滑即开始渐隐，搜索行可视高度收到与
-                    // 图标/文字等高（48dp）时 alpha 恰好降到 0，之后保持全隐
+                    // 渐隐锚点 = 内容高 - 推迟量：上滑即开始渐隐，搜索栏可视高度收到
+                    // 「快要小于内容高」（比内容高再低 8dp）时才完全隐去，之后保持全隐
                     val contentAlpha = run {
-                        val denom = searchRowMaxCollapsePx - searchRowContentPx
+                        val fadeFullHidePx = searchRowContentPx - searchRowFadeEndDelayPx
+                        val denom = searchRowMaxCollapsePx - fadeFullHidePx
                         if (denom > 0f) {
-                            ((searchRowMaxCollapsePx - searchRowCollapsePx - searchRowContentPx) / denom)
+                            ((searchRowMaxCollapsePx - searchRowCollapsePx - fadeFullHidePx) / denom)
                                 .coerceIn(0f, 1f)
                         } else {
                             1f
