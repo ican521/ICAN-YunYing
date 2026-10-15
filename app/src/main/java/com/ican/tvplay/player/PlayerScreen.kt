@@ -14,11 +14,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -73,8 +75,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -108,6 +114,7 @@ import com.ican.tvplay.ui.components.CircleIconButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.theme.Spacing
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -717,6 +724,11 @@ fun PlayerScreen(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "animLeft",
         ) { expanded -> if (expanded) 0.dp else pageHorizontal }
+        // 小窗圆角半径（方案 B 遮罩用）：小窗态 16dp，放大到全屏同步归零 → 缺口尺寸为 0 自动消失
+        val animCorner by expandTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "animCorner",
+        ) { expanded -> if (expanded) 0.dp else Spacing.corner }
 
         // 动画收敛后处理：放大结束挂全屏布局（纯净画面起手）；
         // 缩回期间横版布局全程渲染，信息列/下方区块锚定视频边缘跟随滑入滑出（fongmi ChangeBounds）
@@ -832,6 +844,7 @@ fun PlayerScreen(
                 screenWidth = screenW,
                 screenHeight = screenH,
                 pageHorizontal = pageHorizontal,
+                playerCorner = animCorner,
                 onToggleControls = { controlsVisible = !controlsVisible },
                 onTogglePlay = { Players.playPause() },
                 onPrev = { if (episodeIndex > 0) episodeIndex-- },
@@ -1077,6 +1090,8 @@ private fun LandscapePlayLayout(
     screenWidth: Dp,
     screenHeight: Dp,
     pageHorizontal: Dp,
+    /** 小窗圆角半径（遮罩方案，随放大动画归零） */
+    playerCorner: Dp,
     onToggleControls: () -> Unit,
     onTogglePlay: () -> Unit,
     onPrev: () -> Unit,
@@ -1087,6 +1102,15 @@ private fun LandscapePlayLayout(
     onEpisodeSelect: (Int) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
+        // 小窗圆角遮罩：先画（层级低于控制层），只覆盖视频四角，不拦截触摸
+        PlayerCornerMask(
+            left = playerLeft,
+            top = playerTop,
+            width = playerWidth,
+            height = playerHeight,
+            corner = playerCorner,
+        )
+
         // 播放器覆盖层：与底层常驻 PlayerView 同位同尺寸（尺寸由根 AndroidView 动画值驱动）
         PreviewPlayerArea(
             modifier = Modifier
@@ -1146,6 +1170,69 @@ private fun LandscapePlayLayout(
             }
         }
     }
+}
+
+/**
+ * 小窗圆角遮罩（方案 B）：视频由 SurfaceView 渲染、画面由系统独立合成，Compose 无法裁剪它，
+ * 因此在视频上方用「与页面底色同色的 4 个圆角缺口」把四个直角盖掉，视觉上等效 [Spacing.corner] 圆角。
+ *
+ * - 只覆盖四角那一小块，不带任何 pointerInput，不拦截小窗控制层的触摸
+ * - [corner] 随放大动画归零（缺口尺寸为 0）→ 全屏时自动消失，无需额外显隐逻辑
+ */
+@Composable
+private fun PlayerCornerMask(
+    left: Dp,
+    top: Dp,
+    width: Dp,
+    height: Dp,
+    corner: Dp,
+) {
+    if (corner <= 0.dp) return
+    val color = MaterialTheme.colorScheme.background
+    Box(modifier = Modifier.offset(x = left, y = top).size(width, height)) {
+        CornerNotch(color, corner, Alignment.TopStart)
+        CornerNotch(color, corner, Alignment.TopEnd)
+        CornerNotch(color, corner, Alignment.BottomStart)
+        CornerNotch(color, corner, Alignment.BottomEnd)
+    }
+}
+
+/**
+ * 单个 r×r 圆角缺口：填充「方形 − 四分之一圆」，
+ * 圆心取方块中靠近视频中心的那一角（由 [alignment] 决定朝向）。
+ */
+@Composable
+private fun BoxScope.CornerNotch(color: Color, r: Dp, alignment: Alignment) {
+    val mirrorX = alignment == Alignment.TopEnd || alignment == Alignment.BottomEnd
+    val mirrorY = alignment == Alignment.BottomStart || alignment == Alignment.BottomEnd
+    Box(
+        modifier = Modifier
+            .align(alignment)
+            .size(r)
+            .drawWithCache {
+                val s = size.minDimension
+                // 基准路径：圆心在方块右下角（即左上角缺口）——左边 → 四分之一弧 → 回原点的直角区
+                val base = Path().apply {
+                    moveTo(0f, 0f)
+                    lineTo(0f, s)
+                    arcTo(Rect(Offset(s, s), s), 180f, 90f, false)
+                    close()
+                }
+                onDrawBehind {
+                    withTransform(
+                        {
+                            scale(
+                                scaleX = if (mirrorX) -1f else 1f,
+                                scaleY = if (mirrorY) -1f else 1f,
+                                pivot = center,
+                            )
+                        },
+                    ) {
+                        drawPath(base, color)
+                    }
+                }
+            },
+    )
 }
 
 // ========== 非全屏播放器区与信息区块（竖屏 / 横屏共用） ==========
