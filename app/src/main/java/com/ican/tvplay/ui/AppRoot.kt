@@ -22,6 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -107,6 +109,15 @@ fun AppRoot() {
         // miuix-nav 导航（照搬 KernelSU MainActivity：NavDisplay + 圆角裁剪 + 边缘滑动返回）
         val navigator = rememberNavigator(Route.Main)
 
+        // 卡片点击防连点：快速连点只响应第一次（600ms 窗口），避免重复 push 叠页面
+        val lastCardNavAt = remember { mutableLongStateOf(0L) }
+        fun pushCardRouteThrottled(route: Route) {
+            val now = System.currentTimeMillis()
+            if (now - lastCardNavAt.longValue < 600L) return
+            lastCardNavAt.longValue = now
+            navigator.push(route)
+        }
+
         // 毛玻璃开关下发：顶栏/底栏统一从 LocalEnableBlur 读取（KernelSU 同款机制）
         // LocalContentColor 照搬 KernelSU MiuixKernelSUTheme：miuix TextField/Text/Icon 默认内容色
         // 取自该 Local（库默认值为 Black），不提供则深色模式下导入配置弹窗输入文字为黑色
@@ -179,7 +190,7 @@ fun AppRoot() {
                         when (page) {
                             0 -> HomeScreen(
                                 onVideoClick = { video ->
-                                    navigator.push(Route.MultiSearch(video.title))
+                                    pushCardRouteThrottled(Route.MultiSearch(video.title))
                                 },
                                 onSearchClick = { navigator.push(Route.Search) },
                                 onHistoryClick = { navigator.push(Route.History) },
@@ -188,7 +199,7 @@ fun AppRoot() {
                             1 -> FavoritesScreen(
                                 onPlay = { videoId, episodeIndex, flag, preInit ->
                                     if (guardPlay()) {
-                                        navigator.push(Route.Player(videoId, episodeIndex, flag, preInit))
+                                        pushCardRouteThrottled(Route.Player(videoId, episodeIndex, flag, preInit))
                                     }
                                 },
                                 onBack = { mainPagerState.animateToPage(0) },
@@ -215,7 +226,7 @@ fun AppRoot() {
                         initialQuery = key.query,
                         onBack = { navigator.pop() },
                         onPlay = { videoId, episodeIndex, flag, preInit ->
-                            navigator.push(Route.Player(videoId, episodeIndex, flag, preInit))
+                            pushCardRouteThrottled(Route.Player(videoId, episodeIndex, flag, preInit))
                         },
                     )
                 }
@@ -223,7 +234,7 @@ fun AppRoot() {
                     HistoryScreen(
                         onPlay = { videoId, episodeIndex, flag, preInit ->
                             if (guardPlay()) {
-                                navigator.push(Route.Player(videoId, episodeIndex, flag, preInit))
+                                pushCardRouteThrottled(Route.Player(videoId, episodeIndex, flag, preInit))
                             }
                         },
                         onBack = { navigator.pop() },

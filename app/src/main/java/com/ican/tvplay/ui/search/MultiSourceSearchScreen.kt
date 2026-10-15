@@ -32,7 +32,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,7 +65,6 @@ import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
-import kotlinx.coroutines.launch
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 
@@ -83,7 +81,6 @@ fun MultiSourceSearchScreen(
     onPlay: (videoId: String, episodeIndex: Int, flag: String, preInitialized: Boolean) -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
     val vm = appViewModel { MultiSourceSearchViewModel(context) }
 
     val sites by vm.sites.collectAsStateWithLifecycle()
@@ -223,9 +220,7 @@ fun MultiSourceSearchScreen(
                             video = dv.video,
                             siteName = dv.siteName,
                             onClick = {
-                                scope.launch {
-                                    handlePlayClick(vm, context, dv.video, dv.siteKey, onPlay)
-                                }
+                                handlePlayClick(vm, dv.video, dv.siteKey, onPlay)
                             },
                         )
                     }
@@ -238,30 +233,23 @@ fun MultiSourceSearchScreen(
 }
 
 /**
- * 点击卡片的播放流程：
- * 1. 从目标站点拉取完整详情（带 episodes / playSources）
- * 2. 解析播放地址（spider 走 playerContent，HTTP 直接返回原 URL）
- * 3. 启动 Players
- * 4. 通知导航层跳转 PlayerScreen（preInit=true → PlayerScreen 不再重新 start）
+ * 点击卡片的播放流程（不阻塞等详情接口）：
+ * 1. 缓存搜索元数据 + 站点信息（搜索接口不含选集，详情由播放页进入后异步补齐）
+ * 2. 立即跳转 PlayerScreen——详情接口慢的站源也能秒进播放页，加载期间黑底转圈
+ * 播放地址解析同样下沉到播放页（某些网盘 jar 在 playerContent 时触发扫码弹窗，
+ * 必须进入播放页后再解析，PlayerScreen 用 cached.site/jarSpec 延迟解析）
  */
-private suspend fun handlePlayClick(
+private fun handlePlayClick(
     vm: MultiSourceSearchViewModel,
-    context: android.content.Context,
     video: Video,
     siteKey: String,
     onPlay: (String, Int, String, Boolean) -> Unit,
 ) {
-    val fullVideo = vm.getDetail(siteKey, video.id) ?: return
-    val firstLine = fullVideo.playSources.firstOrNull()
-    if (firstLine == null) return
+    val entry = vm.siteEntry(siteKey) ?: return
+    Players.cacheVideo(video, siteKey, entry.site, entry.jarSpec)
 
-    // 不在此处预解析播放地址：某些网盘 jar 在 playerContent 时触发扫码弹窗，
-    // 必须进入播放页后再解析（PlayerScreen 用 cached.site/jarSpec 延迟解析）
-    val entry = vm.siteEntry(siteKey)
-    Players.cacheVideo(fullVideo, siteKey, entry?.site, entry?.jarSpec.orEmpty())
-
-    // preInit=false: 让 PlayerScreen 自己调 Players.start()，此时 SurfaceView 已 attach，时序正确
-    onPlay(fullVideo.id, 0, firstLine.flag, false)
+    // preInit=false: 让 PlayerScreen 自己补详情并调 Players.start()，此时 SurfaceView 已 attach，时序正确
+    onPlay(video.id, 0, "", false)
 }
 
 // ========== 左侧站源 chip ==========
@@ -365,16 +353,17 @@ private fun CrossSourceVideoCard(
 
     Card(
         modifier = Modifier
+            // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
+            .pressable(
+                interactionSource = null,
+                indication = SinkFeedback(),
+                delay = null,
+            )
             .tvCardEffect(
                 onClick = onClick,
                 shape = RoundedCornerShape(Spacing.corner),
                 focusedScale = 1.05f,
                 glow = false,
-            )
-            .pressable(
-                interactionSource = null,
-                indication = SinkFeedback(),
-                delay = null,
             ),
         insideMargin = androidx.compose.foundation.layout.PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),

@@ -38,8 +38,9 @@ import top.yukonga.miuix.kmp.utils.pressable
  * 低版本自动回退 RoundedCornerShape；底色由 Card colors 提供，兼作海报加载占位色）。
  *
  * 交互分两层，与 miuix Card 可点版内部结构同构：
- * - [tvCardEffect]：焦点放大/发光描边 + MiuixIndication 按压蒙层（无水波纹）+ 遥控器点击；
  * - [pressable] + SinkFeedback：按压形变（缩放 0.94，spring(0.8f, 600f)，delay=null 立即下沉）。
+ *   必须放在外层：缩放绘制作用于其后的全部内容，按压蒙层才跟随卡片一起缩小；
+ * - [tvCardEffect]：焦点放大/发光描边 + MiuixIndication 按压蒙层（无水波纹）+ 遥控器点击。
  */
 @Composable
 fun VideoCard(
@@ -51,12 +52,12 @@ fun VideoCard(
     Card(
         modifier = modifier
             .width(width)
-            .tvCardEffect(onClick = onClick, shape = RoundedCornerShape(Spacing.corner), glow = false)
             .pressable(
                 interactionSource = null,
                 indication = SinkFeedback(),
                 delay = null,
-            ),
+            )
+            .tvCardEffect(onClick = onClick, shape = RoundedCornerShape(Spacing.corner), glow = false),
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
     ) {
