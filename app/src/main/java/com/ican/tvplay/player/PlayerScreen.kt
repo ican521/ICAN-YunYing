@@ -1817,10 +1817,11 @@ private fun FullscreenPlayLayout(
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
+                // 宽度由透明占位文字锁定，数字逐帧变化时胶囊不伸缩（兼容不支持 tnum 的 OEM 字体）
+                StableTimeText(
                     text = formatMs(seekPreview ?: 0L),
-                    // tnum 等宽数字（fongmi view_widget_vod 同款）：数字逐帧变化时胶囊宽度不抖动
-                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"),
+                    durationMs = playerState.durationMs,
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
                     color = Color.White,
                 )
             }
@@ -1828,9 +1829,11 @@ private fun FullscreenPlayLayout(
         // 拖动底部进度条：顶部居中实时显示「跳转至 MM:SS」，跟随手指位置更新
         val sliderFraction = sliderSeekFraction
         if (sliderFraction != null && playerState.durationMs > 0) {
-            Text(
+            StableTimeText(
                 text = "跳转至${formatMs((sliderFraction * playerState.durationMs).toLong())}",
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"),
+                durationMs = playerState.durationMs,
+                prefix = "跳转至",
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
                 color = Color.White,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -2250,6 +2253,27 @@ private fun AddSubtitleDialog(onAdd: (String, String) -> Unit, onDismiss: () -> 
 }
 
 // ========== 工具方法 ==========
+
+/**
+ * 宽度稳定的时间文字：部分 OEM 定制字体会忽略 tnum，数字宽度随时间逐帧变化会让胶囊持续变形。
+ * 用「当前时长可能出现的最长时间串」透明占位撑开宽度，真实文字叠放其上居中。
+ * 一次拖动会话内视频时长不变 → 占位宽度恒定，胶囊形状不随手指移动而变化。
+ */
+@Composable
+private fun StableTimeText(
+    text: String,
+    durationMs: Long,
+    style: androidx.compose.ui.text.TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier,
+    prefix: String = "",
+) {
+    val maxTime = if (durationMs >= 3_600_000L) "00:00:00" else "00:00"
+    Box(contentAlignment = Alignment.Center, modifier = modifier) {
+        Text(text = "$prefix$maxTime", style = style, color = Color.Transparent)
+        Text(text = text, style = style, color = color)
+    }
+}
 
 private fun formatMs(ms: Long): String {
     if (ms <= 0) return "00:00"
