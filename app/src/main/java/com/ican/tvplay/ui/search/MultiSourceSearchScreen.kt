@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.miuix.kmp.basic.Card
@@ -121,6 +122,7 @@ fun MultiSourceSearchScreen(
                     MiuixBackButton(onClick = onBack)
 
                     // miuix 原生胶囊搜索框（左搜索图标 + 输入后右侧清除钮，IME 搜索键提交）
+                    // 收起态不自动聚焦：热恢复重组不会弹键盘，点击展开才弹（对齐 fongmi）
                     MiuixSearchInput(
                         query = queryText,
                         onQueryChange = { queryText = it },
@@ -219,9 +221,7 @@ fun MultiSourceSearchScreen(
                         CrossSourceVideoCard(
                             video = dv.video,
                             siteName = dv.siteName,
-                            onClick = {
-                                handlePlayClick(vm, dv.video, dv.siteKey, onPlay)
-                            },
+                            onClick = { handlePlayClick(vm, dv.video, dv.siteKey, onPlay) },
                         )
                     }
                 }

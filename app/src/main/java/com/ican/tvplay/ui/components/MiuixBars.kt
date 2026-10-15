@@ -98,7 +98,9 @@ fun MiuixSearchInput(
     modifier: Modifier = Modifier,
     label: String = "",
     enabled: Boolean = true,
-    expanded: Boolean = true,
+    // 默认收起态：miuix InputField 展开态每次重组都自动聚焦并弹键盘（擦掉小窗热恢复
+    // 时搜索页重组 → 键盘把整页顶动）；收起态不聚焦，点击展开才弹键盘（对齐 fongmi）
+    expanded: Boolean = false,
     onExpandedChange: (Boolean) -> Unit = {},
 ) {
     InputField(
