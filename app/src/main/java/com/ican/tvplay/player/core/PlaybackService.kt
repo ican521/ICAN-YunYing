@@ -103,11 +103,25 @@ class PlaybackService : Service() {
         return START_NOT_STICKY
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // fongmi onTaskRemoved → tryShutdown 对齐：App 被从最近任务划掉即结束保活——
+        // 先存一次进度（release 会清 playbackContext），再释放播放器、停服务（onDestroy 撤通知/释放 session）
+        runCatching { if (Players.isAlive()) Players.persistProgressIfNeeded() }
+        Players.release()
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
+        // 先停内部协程：release 触发的状态流变化不会再补发通知
+        scope.cancel()
         Players.onPlayerChanged = null
         mediaSession?.release()
         mediaSession = null
-        scope.cancel()
+        // 显式移除前台通知并兜底 cancel：防止销毁前最后一次 notify() 发出的
+        // 普通通知在 service 停止后残留（表现为退出后通知栏仍显示"视频播放中"）
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(NOTIFICATION_ID)
         super.onDestroy()
     }
 
