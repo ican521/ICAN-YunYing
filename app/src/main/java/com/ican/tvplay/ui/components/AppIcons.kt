@@ -201,7 +201,8 @@ object AppIcons {
 
     val LockOpen: ImageVector = vector(
         "lock_open",
-        "M12 2a5 5 0 0 0-5 5h2a3 3 0 1 1 6 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V11a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm0 15a2 2 0 1 1 0-4 2 2 0 0 1 0 4z",
+        // 整体上移 1（盒体 y 8..22，与 Lock 完全一致），锁孔保持在 y 13..17，消除锁定/解锁切换时的上下跳动
+        "M12 1a5 5 0 0 0-5 5h2a3 3 0 1 1 6 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm0 16a2 2 0 1 1 0-4 2 2 0 0 1 0 4z",
     )
 
     val Refresh: ImageVector = vector(
