@@ -42,15 +42,13 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        android.util.Log.d("Startup", "activity onCreate begin")
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        // 进程被杀重开恢复页面（如落在搜索页）时，系统会在窗口聚焦时自动弹出输入法，
-        // adjustResize 随之把界面顶得跳动——fongmi 重开是安静的：恢复场景强制初始隐藏键盘，
-        // 用户点击输入框时仍正常唤起（显式 showSoftInput 不受该状态位影响），正常导航不受影响
-        if (savedInstanceState != null) {
-            window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
-        }
+        // 擦掉小窗重开是热恢复（onRestart，无 onCreate）：搜索框仍持有 Compose 焦点，
+        // 窗口重新聚焦时系统自动弹出输入法，adjustResize 随之把界面顶得跳动——
+        // fongmi 重开是安静的：窗口聚焦时始终不自动弹键盘（冷启/热恢复/进程恢复全覆盖），
+        // 用户点击输入框是显式唤起，不受该状态位影响
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         // 小屏（手机）禁用自动横向：锁定竖屏，仅播放全屏时由播放页临时请求横屏；平板保持系统方向
         if (resources.configuration.screenWidthDp < 600) {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -59,7 +57,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             AppRoot()
         }
-        android.util.Log.d("Startup", "activity onCreate end")
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -180,6 +177,11 @@ class MainActivity : ComponentActivity() {
         // 后台时 Compose 重组挂起，返回导航会在回前台第一帧生效（onDispose 幂等，无副作用）。
         // （进 PiP 时 Activity 保持可见不会 onStop，展开回前台的 onResume 会先清标记，均不误触发）
         if (wasInPip && !isFinishing) {
+            // 后台前把 IME 服务端状态清掉：系统侧会记住「应用键盘可见」，重开窗口聚焦时
+            // IMMS 自动恢复键盘（结果页顶栏已无输入框，应用侧无 show 请求，纯系统恢复）；
+            // 进后台即隐藏，重开无可恢复状态
+            (getSystemService(INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager)
+                ?.hideSoftInputFromWindow(window.decorView.windowToken, 0)
             // 恢复方向 + 清全屏标记：不解除横屏请求的话，下次打开 App 会先横屏再转竖屏，
             // 且残留的 isFullscreen 会让首页按 Home 误触画中画
             Players.isFullscreen = false
@@ -188,6 +190,12 @@ class MainActivity : ComponentActivity() {
             } else {
                 ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
+            // 同步恢复状态栏：全屏播放时隐藏的状态栏若不在此处恢复，系统会记住「隐藏」，
+            // 重开回前台首帧按无状态栏渲染，播放页退出的恢复调用约 370ms 后才生效，
+            // 状态栏 inset 从 0 动画到满高会把整页顶得上下跳动
+            androidx.core.view.WindowInsetsControllerCompat(
+                window, window.decorView,
+            ).show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
             Players.persistProgressIfNeeded()
             Players.release()
             PlaybackService.stop(this)
