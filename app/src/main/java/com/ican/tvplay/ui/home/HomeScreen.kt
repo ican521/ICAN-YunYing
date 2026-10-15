@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -46,6 +49,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -106,6 +110,29 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/** 顶部分类 Tab 行高度（与 [UnderlineTabRow] 默认高度一致，用于确定性计算顶区展开总高） */
+private val TabRowHeight = 42.dp
+
+/**
+ * 把网格重置到「折叠态顶部」：滚动 0 + 折叠量偏移，即 glued 不变量要求的
+ * 「折叠量 = 网格滚动量」位置。用于离屏页与刚 settle 的目标页。
+ */
+private suspend fun resetGridToCollapseTop(gs: LazyGridState, collapsePx: Float) {
+    gs.scrollToItem(0)
+    if (collapsePx > 0f) gs.scrollBy(collapsePx)
+}
+
+/**
+ * 只修正「停在顶部区」（firstVisibleItemIndex == 0）的网格：把滚动量对齐到折叠量。
+ * 已对齐时直接返回，不产生任何滚动与布局开销（用于切页过程中逐帧同步离屏邻页）。
+ */
+private suspend fun syncGridToCollapse(gs: LazyGridState, collapsePx: Float) {
+    if (gs.firstVisibleItemIndex != 0) return
+    val cur = gs.firstVisibleItemScrollOffset.toFloat()
+    if (cur == collapsePx) return
+    gs.scrollBy(collapsePx - cur)
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
@@ -157,9 +184,6 @@ fun HomeScreen(
     // 内容滚动到顶区（搜索行 + Tab 行）下方时被模糊透出；关闭时顶区为页面底色，与原来一致
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val density = LocalDensity.current
-    // 实测顶区「展开状态」总高度 → 每页网格的固定顶部 contentPadding。
-    // 仅在完全展开时更新：折叠过程中网格 padding 不变，避免 padding 变化引发网格滚动补偿的反馈振荡（闪动）
-    var topBarHeightPx by remember { mutableIntStateOf(0) }
 
     // 搜索行滚动折叠（严格 glued：折叠量 = 列表滚动量）：
     // 上滑列表滚多少收多少、下滑滚多少展多少，卡片始终贴着搜索行底缘，栏无任何自主运动；
@@ -171,6 +195,14 @@ fun HomeScreen(
     }
     // HomeTopBar 内容高（48dp）：渐隐锚点——搜索栏可视高度收到与内容等高时文字/图标恰好完全隐形
     val searchRowContentPx = with(density) { 48.dp.toPx() }
+    // 顶区「展开状态」总高度 → 每页网格固定顶部 contentPadding。
+    // 确定性计算，不做实测回写：实测值会受「顶栏毛玻璃」开关引起的重排影响出现瞬时偏差，
+    // 从而抖动网格 padding 并导致搜索行折叠短时卡住 / 内容错位
+    val statusBarTopDp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val topBarHeightPx = with(density) {
+        statusBarTopDp.toPx() + searchRowMaxCollapsePx +
+            (Spacing.categoryTabVertical * 2 + TabRowHeight).toPx()
+    }
     var searchRowCollapsePx by remember { mutableFloatStateOf(0f) }
     // 各页网格状态表：切页时用于把目标页滚动位置对齐折叠量
     val gridStates = remember { mutableStateMapOf<Int, LazyGridState>() }
@@ -197,21 +229,15 @@ fun HomeScreen(
         }
     }
 
-    // 横向切页保持折叠状态（不重置搜索行）：把目标页网格滚动到折叠量处，
-    // glued 不变量「折叠量 = 滚动量」成立 → 新页 Tab 行直接连着内容滑入，无空白。
-    // 程序性滚动会回流到 collapseConnection，用 suppress 抑制防止折叠量被二次累加
-    LaunchedEffect(pagerState.currentPage) {
-        val gs = gridStates[pagerState.currentPage] ?: return@LaunchedEffect
-        val collapse = searchRowCollapsePx
-        if (collapse > 0f && gs.firstVisibleItemIndex == 0 && gs.firstVisibleItemScrollOffset.toFloat() < collapse) {
-            collapseConnection.suppress = true
-            try {
-                gs.scrollBy(collapse - gs.firstVisibleItemScrollOffset)
-            } finally {
-                collapseConnection.suppress = false
-            }
-        }
-    }
+    // 「网格顶部滚动量 = 折叠量」不变量：所有已组合的页（含 beyondViewport 预渲染的邻页）
+    // 只要停在顶部区（firstVisibleItemIndex == 0）就必须严格等于当前折叠量，且双向维持。
+    // 该不变量由三个钩子维持：
+    //   ① 非当前页在「组合 / 数据装载完成 / settle 变化」后立即对齐 → 预渲染邻页滑入前已就位；
+    //   ② 横向拖动 / 翻页期间逐帧把离屏页对齐到当前折叠量 → 覆盖「先纵向滚动改折叠量、紧接着横向切页」；
+    //   ③ 页面 settle 后重置到对齐位置 → 目标页回到顶部，离屏页重置不会产生可见跳动。
+    // 不再使用「currentPage 变化时立刻把离屏页 scrollToItem(0)」：
+    // 那会把预渲染邻页拉回滚动 0（顶部空出折叠量像素），越过中点后新旧页角色互换，
+    // 表现为「右侧页上移、左侧页下移、空白左右横跳」。
 
     // 松手吸附（AppBarLayout snap 语义）：
     // 最后方向向上 → 吸附完全收起；向下且已展开量 > 阈值 → 吸附完全展开；向下不足阈值 → 吸回收起。
@@ -219,6 +245,35 @@ fun HomeScreen(
     // 动画期间再拖动立即打断接管
     val snapThresholdPx = with(density) { 48.dp.toPx() }
     var snapJob by remember { mutableStateOf<Job?>(null) }
+
+    // 钩子②：横向拖动 / 翻页（含点击 chip 的翻页动画）期间，持续把离屏页对齐到当前折叠量。
+    // 关键覆盖：用户先纵向滚动改变折叠量、松手吸附动画尚未结束时又横向切页——
+    // 邻页必须跟着吸附动画逐帧同步，否则滑入瞬间顶部会空出折叠量像素。
+    // 对齐函数在「已对齐」时直接返回，故静止/已对齐状态下不产生任何额外滚动与布局开销
+    LaunchedEffect(Unit) {
+        var wasMoving = false
+        snapshotFlow { pagerState.isScrollInProgress || pagerState.currentPageOffsetFraction != 0f }
+            .collect { moving ->
+                if (moving == wasMoving) return@collect
+                wasMoving = moving
+                if (!moving) return@collect
+                while (pagerState.isScrollInProgress || pagerState.currentPageOffsetFraction != 0f) {
+                    val settled = pagerState.settledPage
+                    val collapse = searchRowCollapsePx
+                    collapseConnection.suppress = true
+                    try {
+                        for ((p, gs) in gridStates) {
+                            if (p == settled) continue
+                            syncGridToCollapse(gs, collapse)
+                        }
+                    } finally {
+                        collapseConnection.suppress = false
+                    }
+                    withFrameNanos { }
+                }
+            }
+    }
+
     LaunchedEffect(Unit) {
         var wasScrolling = false
         snapshotFlow { gridStates[pagerState.settledPage]?.isScrollInProgress == true }
@@ -230,35 +285,36 @@ fun HomeScreen(
                     wasScrolling = false
                     val max = searchRowMaxCollapsePx
                     val cur = searchRowCollapsePx
-                    if (cur <= 0f || cur >= max) return@collect
                     val target = when {
+                        cur <= 0f || cur >= max -> cur
                         collapseConnection.lastDy > 0f -> max
                         collapseConnection.lastDy < 0f && cur <= max - snapThresholdPx -> 0f
                         collapseConnection.lastDy < 0f -> max
                         else -> if (cur > max / 2f) max else 0f
                     }
-                    if (target == cur) return@collect
                     val gs = gridStates[pagerState.settledPage]
                     snapJob = scope.launch {
                         collapseConnection.suppress = true
                         try {
-                            // 逐帧低级循环：collapse 赋值与网格 scrollBy 同帧同步，严格保持 glued；
-                            // 本版本无 LazyGridState.animateScrollBy，故不用双动画并行方案
-                            val anim = TargetBasedAnimation(
-                                tween(240), Float.VectorConverter, cur, target, 0f,
-                            )
-                            val durationNanos = 240L * 1_000_000
-                            val startNanos = withFrameNanos { it }
-                            var prev = cur
-                            var playTime: Long
-                            do {
-                                playTime = withFrameNanos { it } - startNanos
-                                val v = anim.getValueFromNanos(playTime)
-                                val d = v - prev
-                                prev = v
-                                searchRowCollapsePx = v
-                                if (gs != null && d != 0f) gs.scrollBy(d)
-                            } while (playTime < durationNanos)
+                            if (target != cur) {
+                                // 逐帧低级循环：collapse 赋值与网格 scrollBy 同帧同步，严格保持 glued；
+                                // 本版本无 LazyGridState.animateScrollBy，故不用双动画并行方案
+                                val anim = TargetBasedAnimation(
+                                    tween(240), Float.VectorConverter, cur, target, 0f,
+                                )
+                                val durationNanos = 240L * 1_000_000
+                                val startNanos = withFrameNanos { it }
+                                var prev = cur
+                                var playTime: Long
+                                do {
+                                    playTime = withFrameNanos { it } - startNanos
+                                    val v = anim.getValueFromNanos(playTime)
+                                    val d = v - prev
+                                    prev = v
+                                    searchRowCollapsePx = v
+                                    if (gs != null && d != 0f) gs.scrollBy(d)
+                                } while (playTime < durationNanos)
+                            }
                         } finally {
                             collapseConnection.suppress = false
                         }
@@ -318,24 +374,32 @@ fun HomeScreen(
                 }
             }
             val gridState = remember(page) { LazyGridState() }
-            // 注册到页表：切页对齐折叠量时按页取用
-            LaunchedEffect(page) { gridStates[page] = gridState }
-            // 离开当前页时立即滚回顶部（currentPage ≠ page）
-            LaunchedEffect(pagerState.currentPage) {
-                if (pagerState.currentPage != page) gridState.scrollToItem(0)
+            // 注册到页表：切页/同步时按页取用；页面销毁时一并移除，避免残留 stale state 被同步逻辑空转
+            DisposableEffect(page) {
+                gridStates[page] = gridState
+                onDispose { gridStates.remove(page) }
             }
-            // 进入目标页 settle 后对齐到「顶部」：折叠态下顶部 = 滚动到折叠量处（Tab 行直接连内容），
-            // 展开态回到真正的滚动 0；程序性滚动用 suppress 抑制，防止回写折叠量
+            // 钩子①/③：非当前页在「组合 / 数据装载完成 / settle 变化」后立即把网格对齐到折叠量
+            // （此时该页已完全离屏，重置到顶部不会产生可见跳动）。
+            // 预渲染邻页因此在其滑入前就处于「顶部 = 折叠量」位置 → 滑入瞬间无空白、无上下跳动
+            LaunchedEffect(pageVideos.value, pagerState.settledPage) {
+                if (page == pagerState.settledPage || pageVideos.value.isEmpty()) return@LaunchedEffect
+                collapseConnection.suppress = true
+                try {
+                    resetGridToCollapseTop(gridState, searchRowCollapsePx)
+                } finally {
+                    collapseConnection.suppress = false
+                }
+            }
+            // 钩子③（当前页）：settle 到本页后重置到「顶部」——折叠态顶部 = 对齐折叠量处
+            // （Tab 行直接连内容），展开态回到真正的滚动 0；程序性滚动用 suppress 抑制，防止回写折叠量
             LaunchedEffect(pagerState.settledPage) {
-                if (pagerState.settledPage == page) {
-                    val collapse = searchRowCollapsePx
-                    collapseConnection.suppress = true
-                    try {
-                        gridState.scrollToItem(0)
-                        if (collapse > 0f) gridState.scrollBy(collapse)
-                    } finally {
-                        collapseConnection.suppress = false
-                    }
+                if (pagerState.settledPage != page) return@LaunchedEffect
+                collapseConnection.suppress = true
+                try {
+                    resetGridToCollapseTop(gridState, searchRowCollapsePx)
+                } finally {
+                    collapseConnection.suppress = false
                 }
             }
             BoxWithConstraints(
@@ -371,8 +435,6 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    // 折叠过程中高度持续变化，只在完全展开时记录 → 网格顶部 padding 固定不动
-                    .onGloballyPositioned { if (searchRowCollapsePx == 0f) topBarHeightPx = it.size.height }
                     .background(
                         if (backdrop != null) Color.Transparent
                         else MaterialTheme.colorScheme.background,
@@ -664,7 +726,7 @@ private fun UnderlineTabRow(
     modifier: Modifier = Modifier,
     minWidth: Dp = 76.dp,
     maxWidth: Dp = 98.dp,
-    height: Dp = 42.dp,
+    height: Dp = TabRowHeight,
     itemSpacing: Dp = 9.dp,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth().height(height)) {
