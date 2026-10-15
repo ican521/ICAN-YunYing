@@ -2102,10 +2102,12 @@ private fun PlainTopBtn(icon: ImageVector, desc: String, onClick: () -> Unit) {
     ) { Icon(icon, desc, tint = Color.White, modifier = Modifier.size(24.dp)) }
 }
 
-/** 预览小窗中部控制按钮（fongmi: shape_control 40/48dp 圆形 + 30% 黑底 + 24dp 白图标），按压用 tvCardEffect 变浅灰 */
+/** 预览小窗中部控制按钮（fongmi: shape_control 40/48dp 圆形 + 30% 黑底 + 32dp 白图标），按压用 tvCardEffect 变浅灰 */
 @Composable
 private fun MiniLargeBtn(icon: ImageVector, desc: String, onClick: () -> Unit, isPrimary: Boolean = false) {
     val size = if (isPrimary) 48.dp else 40.dp
+    // fongmi: exo_icon_play/pause 固有尺寸 32dp（scaleType=center 不做缩放），主按钮照搬该尺寸
+    val iconSize = if (isPrimary) 32.dp else 24.dp
     Box(
         modifier = Modifier
             .size(size)
@@ -2113,7 +2115,7 @@ private fun MiniLargeBtn(icon: ImageVector, desc: String, onClick: () -> Unit, i
             .background(Color(0x4D000000), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, desc, tint = Color.White, modifier = Modifier.size(24.dp))
+        Icon(icon, desc, tint = Color.White, modifier = Modifier.size(iconSize))
     }
 }
 
