@@ -1884,9 +1884,12 @@ private fun FullscreenPlayLayout(
                         )
                         .padding(bottom = 8.dp),
                 ) {
+                    // 进度条行（时间 + 进度条 + 时长）：行整体下移 —— 去掉行底部内边距，
+                    // 使「进度条行 ↔ 功能栏」的间距 ≈「功能栏 ↔ 屏幕底部」的距离
+                    // （功能栏到屏幕底 = 容器 8dp 底部内边距 + 按钮自身 8dp 内边距）
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 0.dp),
                     ) {
                         Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Color.White)
                         LineSlider(
@@ -2232,6 +2235,9 @@ private fun formatMs(ms: Long): String {
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
 }
 
+/** seek 后"保持目标进度"的释放阈值：播放器进度与目标差值 ≤ 该比例即视为已跟上 */
+private const val SEEK_HOLD_TOLERANCE = 0.002f
+
 /** 细直线进度条：2dp 轨道 + 白色圆点滑块，支持点按与横向拖动 seek（小窗/全屏统一风格） */
 @Composable
 private fun LineSlider(
@@ -2241,19 +2247,37 @@ private fun LineSlider(
 ) {
     // 拖动中的临时进度（null=未拖动），松手才真正 seek，避免拖动过程中频繁跳转
     var dragProgress by remember { mutableStateOf<Float?>(null) }
+    // seek 已提交、但播放器进度尚未跟上时的目标进度：
+    // 期间继续渲染该目标（否则 playState 还停在旧位置，滑块会先跳回原位置再跳到目标）
+    var pendingSeek by remember { mutableStateOf<Float?>(null) }
+    // 提交 seek：进入"保持目标进度"状态
+    val commitSeek: (Float) -> Unit = { v ->
+        val target = v.coerceIn(0f, 1f)
+        pendingSeek = target
+        onSeek(target)
+    }
+    // 播放器进度追上目标 → 释放保持值，交回播放器进度驱动
+    LaunchedEffect(pendingSeek, progress) {
+        val ps = pendingSeek ?: return@LaunchedEffect
+        if (abs(progress - ps) <= SEEK_HOLD_TOLERANCE) pendingSeek = null
+    }
+    // 兜底：seek 迟迟未生效（如网络 seek 慢）也要释放，避免滑块被长期钉在目标位置
+    LaunchedEffect(pendingSeek) {
+        if (pendingSeek == null) return@LaunchedEffect
+        delay(1200)
+        pendingSeek = null
+    }
     BoxWithConstraints(
         modifier = modifier
             .height(24.dp)
             .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    onSeek((offset.x / size.width).coerceIn(0f, 1f))
-                }
+                detectTapGestures { offset -> commitSeek(offset.x / size.width) }
             }
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragStart = { offset -> dragProgress = (offset.x / size.width).coerceIn(0f, 1f) },
                     onDragEnd = {
-                        dragProgress?.let(onSeek)
+                        dragProgress?.let(commitSeek)
                         dragProgress = null
                     },
                     onDragCancel = { dragProgress = null },
@@ -2262,7 +2286,7 @@ private fun LineSlider(
                 }
             },
     ) {
-        val p = (dragProgress ?: progress).coerceIn(0f, 1f)
+        val p = (dragProgress ?: pendingSeek ?: progress).coerceIn(0f, 1f)
         val width = maxWidth
         // 背景轨道
         Box(
