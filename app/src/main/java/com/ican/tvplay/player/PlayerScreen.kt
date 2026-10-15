@@ -1487,7 +1487,9 @@ private fun FavoriteButton(v: Video) {
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(Spacing.circleButton)
-            .tvCardEffect(
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
                 onClick = {
                     val newFav = !isFav
                     isFav = newFav
@@ -1518,9 +1520,6 @@ private fun FavoriteButton(v: Video) {
                         }
                     }
                 },
-                shape = CircleShape,
-                focusedScale = 1.1f,
-                glow = false,
             ),
     ) {
         Icon(
@@ -1608,14 +1607,20 @@ private fun EpisodeSection(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .padding(start = 12.dp)
-                    .clickable { reversedEp = !reversedEp },
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { reversedEp = !reversedEp },
             )
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = if (showAllEps) "收起 ▾" else "更多 ▸",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { showAllEps = !showAllEps },
+                modifier = Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { showAllEps = !showAllEps },
             )
         }
         Spacer(modifier = Modifier.height(Spacing.titleContentGap))
