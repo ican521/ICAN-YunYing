@@ -1000,32 +1000,30 @@ private fun PortraitPlayLayout(
             ),
     )
 
-    // === 可滚动详情信息流（左右边距对齐全局规范；区块组件与横屏布局共用） ===
+    // === 可滚动详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===
     Column(
         modifier = Modifier
             .weight(1f)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = pageHorizontalPadding(), vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(horizontal = pageHorizontalPadding(), vertical = Spacing.titleContentGap),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
     ) {
         val v = current ?: return@Column
 
-        // 标题+收藏 / 更新备注 / 站源 / 年份·地区·类型
+        // 标题+收藏 / 更新备注 / 站源 / 年份·地区·类型（标题↔信息行的次间距在组件内部）
         VideoMetaSection(v = v, lineFlag = lineFlag)
 
-        // 线路
+        // 线路（标题↔chips 的次间距在组件内部）
         LineSection(v = v, lineFlag = lineFlag, onLineChange = onLineChange)
-        Spacer(modifier = Modifier.height(Spacing.titleContentGap))
 
-        // 选集（倒序/更多，横滑↔网格）
+        // 选集（倒序/更多，横滑↔网格；标题↔按钮的次间距在组件内部）
         EpisodeSection(
             lineEpisodes = lineEpisodes,
             episodeIndex = episodeIndex,
             onEpisodeSelect = onEpisodeSelect,
         )
-        Spacer(modifier = Modifier.height(Spacing.sectionSpacing))
 
-        // 简介
+        // 简介（标题↔正文的次间距在组件内部）
         DescriptionSection(v = v)
 
         Spacer(modifier = Modifier.height(60.dp))
@@ -1165,18 +1163,21 @@ private fun LandscapePlayLayout(
                 .fillMaxWidth()
                 .height(screenHeight - playerTop - playerHeight)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = pageHorizontal),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(
+                    start = pageHorizontal,
+                    end = pageHorizontal,
+                    top = com.ican.tvplay.ui.theme.Spacing.titleContentGap,
+                ),
+            // 板块主间距与竖屏信息流统一为 sectionSpacing
+            verticalArrangement = Arrangement.spacedBy(com.ican.tvplay.ui.theme.Spacing.sectionSpacing),
         ) {
             if (current != null) {
                 LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange)
-                Spacer(modifier = Modifier.height(com.ican.tvplay.ui.theme.Spacing.titleContentGap))
                 EpisodeSection(
                     lineEpisodes = lineEpisodes,
                     episodeIndex = episodeIndex,
                     onEpisodeSelect = onEpisodeSelect,
                 )
-                Spacer(modifier = Modifier.height(com.ican.tvplay.ui.theme.Spacing.sectionSpacing))
                 DescriptionSection(v = current)
 
                 Spacer(modifier = Modifier.height(60.dp))
@@ -1398,10 +1399,7 @@ private fun VideoMetaSection(
     modifier: Modifier = Modifier,
     itemSpacing: Dp = 6.dp,
 ) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(itemSpacing),
-    ) {
+    Column(modifier = modifier) {
         // 标题 + 收藏按钮（收藏入口在标题右侧，圆钮尺寸/样式不变）
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1420,49 +1418,55 @@ private fun VideoMetaSection(
             FavoriteButton(v = v)
         }
 
-        // 更新备注（fongmi: remark）
-        val eps = v.playSources.firstOrNull()?.episodes ?: v.episodes
-        val remark = when {
-            eps.isEmpty() -> ""
-            eps.last().title.contains("完结") -> "已完结"
-            else -> "更新至第${eps.size}集"
-        }
-        if (remark.isNotBlank()) {
-            Text(
-                text = remark,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        // 标题 ↔ 自身信息内容：统一次间距
+        Spacer(modifier = Modifier.height(Spacing.titleContentGap))
 
-        // 站源（fongmi: site）
-        Text(
-            text = "站源：${v.sourceName.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // 更新备注/站源/年份/地区/类型：信息行之间保持行内密度 itemSpacing
+        Column(verticalArrangement = Arrangement.spacedBy(itemSpacing)) {
+            // 更新备注（fongmi: remark）
+            val eps = v.playSources.firstOrNull()?.episodes ?: v.episodes
+            val remark = when {
+                eps.isEmpty() -> ""
+                eps.last().title.contains("完结") -> "已完结"
+                else -> "更新至第${eps.size}集"
+            }
+            if (remark.isNotBlank()) {
+                Text(
+                    text = remark,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
-        // 年份/地区/类型各占一行（fongmi: other）
-        if (v.year > 0) {
+            // 站源（fongmi: site）
             Text(
-                text = "年份：${v.year}",
+                text = "站源：${v.sourceName.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-        if (v.region.isNotBlank()) {
-            Text(
-                text = "地区：${v.region}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (v.categoryName.isNotBlank()) {
-            Text(
-                text = "类型：${v.categoryName}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+
+            // 年份/地区/类型各占一行（fongmi: other）
+            if (v.year > 0) {
+                Text(
+                    text = "年份：${v.year}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (v.region.isNotBlank()) {
+                Text(
+                    text = "地区：${v.region}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (v.categoryName.isNotBlank()) {
+                Text(
+                    text = "类型：${v.categoryName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -1535,13 +1539,14 @@ private fun LineSection(
     lineFlag: String,
     onLineChange: (String) -> Unit,
 ) {
-    Text(
-        text = "线路",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onBackground,
-        modifier = Modifier.padding(top = 8.dp),
-    )
+    Column {
+        Text(
+            text = "线路",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(modifier = Modifier.height(Spacing.titleContentGap))
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(v.playSources) { source ->
             val selected = source.flag == lineFlag
@@ -1571,6 +1576,7 @@ private fun LineSection(
             }
         }
     }
+    }
 }
 
 /** 选集区块（fongmi: detail_episode）：标题+倒序/正序+更多；默认横向滚动，点更多切 FlowRow 网格 */
@@ -1583,63 +1589,67 @@ private fun EpisodeSection(
     var showAllEps by remember { mutableStateOf(false) }
     var reversedEp by remember { mutableStateOf(false) }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "选集",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Text(
-            text = if (reversedEp) "正序" else "倒序",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .padding(start = 12.dp)
-                .clickable { reversedEp = !reversedEp },
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        Text(
-            text = if (showAllEps) "收起 ▾" else "更多 ▸",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.clickable { showAllEps = !showAllEps },
-        )
-    }
-    Spacer(modifier = Modifier.height(6.dp))
-
-    val displayEps = if (reversedEp) lineEpisodes.asReversed() else lineEpisodes
-    fun realIdx(displayIdx: Int) = if (reversedEp) lineEpisodes.size - 1 - displayIdx else displayIdx
-
-    if (showAllEps) {
-        // 网格模式：与收起状态同一自适应按钮（最小正方形、随文字变长），FlowRow 自动换行
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+    // 单根 Column：对外只占外层信息流一个板块，板块主间距由外层统一；
+    // 标题 ↔ 按钮为组件内部次间距，不被外层 spacedBy 影响
+    Column {
+        Row(
             modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            displayEps.forEachIndexed { dispIdx, ep ->
-                val idx = realIdx(dispIdx)
-                EpisodeChip(
-                    title = ep.title,
-                    selected = idx == episodeIndex,
-                    onClick = { onEpisodeSelect(idx) },
-                )
-            }
+            Text(
+                text = "选集",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = if (reversedEp) "正序" else "倒序",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    .clickable { reversedEp = !reversedEp },
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = if (showAllEps) "收起 ▾" else "更多 ▸",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { showAllEps = !showAllEps },
+            )
         }
-    } else {
-        // 默认横向滚动（fongmi: adapter_episode_hori），按钮尺寸与展开网格一致
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            itemsIndexed(displayEps) { dispIdx, ep ->
-                val idx = realIdx(dispIdx)
-                EpisodeChip(
-                    title = ep.title,
-                    selected = idx == episodeIndex,
-                    onClick = { onEpisodeSelect(idx) },
-                )
+        Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+
+        val displayEps = if (reversedEp) lineEpisodes.asReversed() else lineEpisodes
+        fun realIdx(displayIdx: Int) = if (reversedEp) lineEpisodes.size - 1 - displayIdx else displayIdx
+
+        if (showAllEps) {
+            // 网格模式：与收起状态同一自适应按钮（最小正方形、随文字变长），FlowRow 自动换行
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                displayEps.forEachIndexed { dispIdx, ep ->
+                    val idx = realIdx(dispIdx)
+                    EpisodeChip(
+                        title = ep.title,
+                        selected = idx == episodeIndex,
+                        onClick = { onEpisodeSelect(idx) },
+                    )
+                }
+            }
+        } else {
+            // 默认横向滚动（fongmi: adapter_episode_hori），按钮尺寸与展开网格一致
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                itemsIndexed(displayEps) { dispIdx, ep ->
+                    val idx = realIdx(dispIdx)
+                    EpisodeChip(
+                        title = ep.title,
+                        selected = idx == episodeIndex,
+                        onClick = { onEpisodeSelect(idx) },
+                    )
+                }
             }
         }
     }
@@ -1648,18 +1658,20 @@ private fun EpisodeSection(
 /** 简介区块：直接全部显示，不折叠、不可点击 */
 @Composable
 private fun DescriptionSection(v: Video) {
-    Text(
-        text = "简介",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onBackground,
-    )
-    Spacer(modifier = Modifier.height(4.dp))
-    Text(
-        text = v.description.ifBlank { "暂无简介" },
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    Column {
+        Text(
+            text = "简介",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+        Text(
+            text = v.description.ifBlank { "暂无简介" },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 // ========== 全屏布局 ==========
