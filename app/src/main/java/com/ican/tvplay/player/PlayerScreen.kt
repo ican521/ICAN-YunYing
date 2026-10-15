@@ -168,6 +168,8 @@ fun PlayerScreen(
     var controlsVisible by remember { mutableStateOf(true) }
     // 控制层交互计数：动作栏按钮点击时自增，重置 5 秒自动隐藏计时（fongmi setR1Callback 同款）
     var controlsTick by remember { mutableIntStateOf(0) }
+    // 正在拖动进度条（小窗/全屏共用）：拖动期间挂起自动隐藏计时，松手后重新计 5 秒
+    var seekDragging by remember { mutableStateOf(false) }
     var locked by remember { mutableStateOf(false) }
     var fullscreen by remember { mutableStateOf(false) }
     // 全屏挂起状态（fongmi 同款时序：先请求系统旋转，旋转完成后再切换布局）
@@ -517,8 +519,9 @@ fun PlayerScreen(
     }
 
     // 自动隐藏控制层（fongmi 同款：显示后 5 秒无操作隐藏，交互重置计时）
-    LaunchedEffect(controlsVisible, locked, playerState.playing, controlsTick) {
-        if (!controlsVisible || locked) return@LaunchedEffect
+    // seekDragging 也是 key：拖动开始即挂起倒计时，松手(false)使本 effect 重启重新计 5 秒
+    LaunchedEffect(controlsVisible, locked, playerState.playing, controlsTick, seekDragging) {
+        if (!controlsVisible || locked || seekDragging) return@LaunchedEffect
         if (playerState.playing) {
             delay(HIDE_DELAY_MS)
             if (playerState.playing && !locked) controlsVisible = false
@@ -820,6 +823,7 @@ fun PlayerScreen(
                 toastMsg("已清除片尾标记")
                 saveProgress()
             },
+            onSeekDragChange = { seekDragging = it },
         )
         }
         // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
@@ -869,6 +873,7 @@ fun PlayerScreen(
                 onEpisodeSelect = { idx ->
                     if (idx != episodeIndex) episodeIndex = idx
                 },
+                onSeekDragChange = { seekDragging = it },
             )
         } else {
         // 竖屏手机 / 退全屏旋转过渡期：统一竖屏布局
@@ -914,6 +919,7 @@ fun PlayerScreen(
             onScaleChange = { settings.setPlayerScale(it.name) },
             onDecodeChange = { settings.setPlayerDecode(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
+            onSeekDragChange = { seekDragging = it },
         )
         }
         }
@@ -945,6 +951,7 @@ private fun PortraitPlayLayout(
     onScaleChange: (Players.ScaleMode) -> Unit,
     onDecodeChange: (Players.Decode) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
+    onSeekDragChange: (Boolean) -> Unit,
 ) {
     var showSpeed by remember { mutableStateOf(false) }
     var showScale by remember { mutableStateOf(false) }
@@ -977,6 +984,7 @@ private fun PortraitPlayLayout(
         onPrev = onPrev,
         onNext = onNext,
         onEnterFullscreen = onEnterFullscreen,
+        onSeekDragChange = onSeekDragChange,
     )
 
     // === 阴影分割线 ===
@@ -1099,6 +1107,7 @@ private fun LandscapePlayLayout(
     onBack: () -> Unit,
     onLineChange: (String) -> Unit,
     onEpisodeSelect: (Int) -> Unit,
+    onSeekDragChange: (Boolean) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // 小窗圆角遮罩：先画（层级低于控制层），只覆盖视频四角，不拦截触摸
@@ -1128,6 +1137,7 @@ private fun LandscapePlayLayout(
             onPrev = onPrev,
             onNext = onNext,
             onEnterFullscreen = onEnterFullscreen,
+            onSeekDragChange = onSeekDragChange,
         )
 
         // 右侧信息列：锚在视频右缘，宽度固定（小窗时的剩余宽度），随放大向右滑出屏幕
@@ -1256,6 +1266,7 @@ private fun PreviewPlayerArea(
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onEnterFullscreen: () -> Unit,
+    onSeekDragChange: (Boolean) -> Unit,
 ) {
     Box(
         modifier = modifier.pointerInput(locked) {
@@ -1349,6 +1360,7 @@ private fun PreviewPlayerArea(
                         progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
                         onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
                         modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                        onDragFractionChange = { onSeekDragChange(it != null) },
                     )
                     Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
                 }
@@ -1679,6 +1691,7 @@ private fun FullscreenPlayLayout(
     onMarkEnding: () -> Unit,
     onClearOpening: () -> Unit,
     onClearEnding: () -> Unit,
+    onSeekDragChange: (Boolean) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     // 锁定状态下的解锁按钮显隐（单击唤出，2.5s 自动隐藏）
@@ -1921,7 +1934,10 @@ private fun FullscreenPlayLayout(
                             progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
                             onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
                             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                            onDragFractionChange = { sliderSeekFraction = it },
+                            onDragFractionChange = {
+                                sliderSeekFraction = it
+                                onSeekDragChange(it != null)
+                            },
                         )
                         Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
                     }
@@ -2268,10 +2284,13 @@ private fun StableTimeText(
     modifier: Modifier = Modifier,
     prefix: String = "",
 ) {
+    // Monospace 等宽字体：不依赖 OEM 字体是否支持 tnum，数字必然等宽，
+    // 同格式时间串宽度逐帧恒定，居中后连前缀文字位置都不跳动
+    val monoStyle = style.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
     val maxTime = if (durationMs >= 3_600_000L) "00:00:00" else "00:00"
     Box(contentAlignment = Alignment.Center, modifier = modifier) {
-        Text(text = "$prefix$maxTime", style = style, color = Color.Transparent)
-        Text(text = text, style = style, color = color)
+        Text(text = "$prefix$maxTime", style = monoStyle, color = Color.Transparent)
+        Text(text = text, style = monoStyle, color = color)
     }
 }
 
