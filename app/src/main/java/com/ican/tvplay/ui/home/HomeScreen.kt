@@ -1,5 +1,6 @@
 package com.ican.tvplay.ui.home
 
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.TargetBasedAnimation
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
@@ -112,6 +113,9 @@ import kotlin.math.roundToInt
 
 /** 顶部分类 Tab 行高度（与 [UnderlineTabRow] 默认高度一致，用于确定性计算顶区展开总高） */
 private val TabRowHeight = 42.dp
+
+/** 搜索行松手吸附缓动：CubicBezier(0.22, 0.95, 0.25, 1) —— 起步干脆、尾巴更长 */
+private val SnapEasing = CubicBezierEasing(0.22f, 0.95f, 0.25f, 1.0f)
 
 /**
  * 把网格重置到「折叠态顶部」：滚动 0 + 折叠量偏移，即 glued 不变量要求的
@@ -302,8 +306,9 @@ fun HomeScreen(
                             if (target != cur) {
                                 // 逐帧低级循环：collapse 赋值与网格 scrollBy 同帧同步，严格保持 glued；
                                 // 本版本无 LazyGridState.animateScrollBy，故不用双动画并行方案
+                                // 缓动曲线改用 CubicBezier(0.22, 0.95, 0.25, 1)：起步更干脆、尾巴更长
                                 val anim = TargetBasedAnimation(
-                                    tween(240), Float.VectorConverter, cur, target, 0f,
+                                    tween(240, easing = SnapEasing), Float.VectorConverter, cur, target, 0f,
                                 )
                                 val durationNanos = 240L * 1_000_000
                                 val startNanos = withFrameNanos { it }
