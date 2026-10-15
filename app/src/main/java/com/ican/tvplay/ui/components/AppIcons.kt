@@ -231,13 +231,15 @@ object AppIcons {
         "M6 18l8.5-6L6 6v12zM16 6v12h2V6z",
     )
 
+    // Material 标准 fast_rewind：两个三角均朝左
     val Rewind: ImageVector = vector(
         "rewind",
-        "M11 18V6l-8.5 6zM12.5 8.5V15l8.5-6.5z",
+        "M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z",
     )
 
+    // Material 标准 fast_forward：两个三角均朝右
     val Forward: ImageVector = vector(
         "forward",
-        "M4 18l8.5-6L4 6v12zM16 6v12l8.5-6z",
+        "M4 18l8.5-6L4 6v12zm9.5-12v12l8.5-6-8.5-6z",
     )
 }

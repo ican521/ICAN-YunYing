@@ -1807,7 +1807,7 @@ private fun FullscreenPlayLayout(
                     .align(Alignment.TopCenter)
                     .padding(top = 24.dp)
                     .clip(RoundedCornerShape(28.dp))
-                    .background(Color.Black.copy(alpha = 0.5f))
+                    .background(Color(0x4D000000))
                     .padding(start = 12.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
             ) {
                 Icon(
@@ -1835,7 +1835,7 @@ private fun FullscreenPlayLayout(
                     .align(Alignment.TopCenter)
                     .padding(top = 24.dp)
                     .clip(RoundedCornerShape(28.dp))
-                    .background(Color.Black.copy(alpha = 0.5f))
+                    .background(Color(0x4D000000))
                     .padding(horizontal = 16.dp, vertical = 6.dp),
             )
         }
@@ -1848,7 +1848,7 @@ private fun FullscreenPlayLayout(
                     .align(Alignment.TopCenter)
                     .padding(top = 24.dp)
                     .clip(RoundedCornerShape(28.dp))
-                    .background(Color.Black.copy(alpha = 0.5f))
+                    .background(Color(0x4D000000))
                     .padding(horizontal = 16.dp, vertical = 6.dp),
             )
         }
