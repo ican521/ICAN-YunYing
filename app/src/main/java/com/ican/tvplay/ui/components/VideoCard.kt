@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.ui.theme.Spacing
+import com.ican.tvplay.util.posterModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import top.yukonga.miuix.kmp.basic.Card
@@ -49,6 +51,7 @@ fun VideoCard(
     modifier: Modifier = Modifier,
     width: Dp = 148.dp,
 ) {
+    val context = LocalContext.current
     Card(
         modifier = modifier
             .width(width)
@@ -67,7 +70,7 @@ fun VideoCard(
                 .aspectRatio(3f / 4f),
         ) {
             AsyncImage(
-                model = video.cover,
+                model = posterModel(context, video.cover),
                 contentDescription = video.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

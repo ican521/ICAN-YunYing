@@ -48,7 +48,9 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
+import androidx.compose.ui.platform.LocalContext
 import coil3.compose.AsyncImage
+import com.ican.tvplay.util.posterModel
 import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.ui.CollectionViewModel
@@ -206,6 +208,7 @@ private fun FavoriteCard(
     onDelete: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    val context = LocalContext.current
     Card(
         modifier = Modifier
             // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
@@ -230,7 +233,7 @@ private fun FavoriteCard(
                 .aspectRatio(3f / 4f),
         ) {
             AsyncImage(
-                model = entity.cover,
+                model = posterModel(context, entity.cover),
                 contentDescription = entity.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
@@ -456,6 +459,7 @@ private fun HistoryCard(
     } else {
         0f
     }
+    val context = LocalContext.current
     Card(
         modifier = Modifier
             // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
@@ -480,7 +484,7 @@ private fun HistoryCard(
                 .aspectRatio(3f / 4f),
         ) {
             AsyncImage(
-                model = history.cover,
+                model = posterModel(context, history.cover),
                 contentDescription = history.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

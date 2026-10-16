@@ -50,7 +50,9 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
+import androidx.compose.ui.platform.LocalContext
 import coil3.compose.AsyncImage
+import com.ican.tvplay.util.posterModel
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.player.core.PlaySpec
 import com.ican.tvplay.player.core.Players
@@ -350,6 +352,7 @@ private fun CrossSourceVideoCard(
     onClick: () -> Unit,
 ) {
     val (_, tags) = buildVideoStatus(video)
+    val context = LocalContext.current
 
     Card(
         modifier = Modifier
@@ -374,7 +377,7 @@ private fun CrossSourceVideoCard(
                 .aspectRatio(3f / 4f),
         ) {
             AsyncImage(
-                model = video.cover,
+                model = posterModel(context, video.cover),
                 contentDescription = video.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
