@@ -13,6 +13,7 @@ import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
@@ -148,6 +149,7 @@ fun PlayerScreen(
     val savedSpeed by settings.playerSpeed.collectAsStateWithLifecycle()
     val savedScale by settings.playerScale.collectAsStateWithLifecycle()
     val savedDecode by settings.playerDecode.collectAsStateWithLifecycle()
+    val savedEngine by settings.playerEngine.collectAsStateWithLifecycle()
     val savedBuffer by settings.playerBuffer.collectAsStateWithLifecycle()
 
     var video by remember { mutableStateOf<Video?>(null) }
@@ -225,6 +227,12 @@ fun PlayerScreen(
         Players.setDecode(
             Players.Decode.entries.firstOrNull { it.name == savedDecode }
                 ?: Players.Decode.HARD,
+        )
+    }
+    LaunchedEffect(savedEngine) {
+        Players.setKernel(
+            Players.Kernel.entries.firstOrNull { it.name == savedEngine }
+                ?: Players.Kernel.EXO,
         )
     }
     LaunchedEffect(savedBuffer) {
@@ -731,6 +739,19 @@ fun PlayerScreen(
         animationSpec = tween(LAND_ZOOM_DURATION_MS),
         label = "rootBackground",
     )
+    // 播放期间保持屏幕常亮（fongmi 同款：播放中 FLAG_KEEP_SCREEN_ON，暂停/退出恢复）
+    val activity = context as? Activity
+    DisposableEffect(playerState.playing) {
+        val window = activity?.window
+        if (playerState.playing) {
+            window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -862,6 +883,7 @@ fun PlayerScreen(
             playbackSpeed = settings.playerSpeed.collectAsStateWithLifecycle().value,
             onScaleChange = { settings.setPlayerScale(it.name) },
             onDecodeChange = { settings.setPlayerDecode(it.name) },
+            onEngineChange = { settings.setPlayerEngine(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
             openingMs = openingMs,
             endingMs = endingMs,
@@ -1208,6 +1230,9 @@ private fun LandscapePlayLayout(
             modifier = Modifier
                 .offset(x = playerLeft + playerWidth, y = playerTop)
                 .width(screenWidth - smallPlayerWidth - playerLeft)
+                // 浅色模式下全屏缩回小窗时，根 Box 残留黑底会透出到信息列，
+                // 此处显式覆盖主题背景，确保缩回后恢复浅色
+                .background(MaterialTheme.colorScheme.background)
                 .padding(
                     start = com.ican.tvplay.ui.theme.Spacing.sectionSpacing,
                     end = pageHorizontal,
@@ -1237,6 +1262,9 @@ private fun LandscapePlayLayout(
                 .offset(y = playerTop + playerHeight)
                 .fillMaxWidth()
                 .height(screenHeight - playerTop - playerHeight)
+                // 浅色模式下全屏缩回小窗时，根 Box 残留黑底会透出到下方区块，
+                // 此处显式覆盖主题背景，确保缩回后恢复浅色
+                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
                 .padding(
                     start = pageHorizontal,
@@ -1461,10 +1489,24 @@ private fun PreviewPlayerArea(
 
         // 加载转圈（fongmi: view_progress；进页面即显示，STATE_READY 后随 buffering 显隐）
         if (showLoading || playerState.buffering) {
-            CircularProgressIndicator(
-                color = Color.White,
-                modifier = Modifier.align(Alignment.Center).size(36.dp),
-            )
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier.size(36.dp),
+                )
+                // 缓冲时显示实时网速（fongmi 缓冲进度下方显示网速）
+                if (playerState.buffering && playerState.networkSpeedBps > 0) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = formatNetworkSpeed(playerState.networkSpeedBps),
+                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
+                        color = Color.White,
+                    )
+                }
+            }
         }
 
         // 播放/解析错误轻量提示（替代黑屏卡死；自动换源失败后停留在此提示）
@@ -1648,9 +1690,16 @@ private fun LineSection(
                         shape = shape, focusedScale = 1.06f, glow = false,
                     )
                     .background(
-                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                         else MaterialTheme.colorScheme.surfaceVariant,
                         shape,
+                    )
+                    .then(
+                        if (selected) Modifier.border(
+                            width = 1.5.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = shape,
+                        ) else Modifier,
                     )
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             ) {
@@ -1659,7 +1708,7 @@ private fun LineSection(
                     style = MaterialTheme.typography.labelMedium,
                     color = if (selected) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                     maxLines = 1,
                 )
             }
@@ -1808,6 +1857,7 @@ private fun FullscreenPlayLayout(
     playbackSpeed: Float,
     onScaleChange: (Players.ScaleMode) -> Unit,
     onDecodeChange: (Players.Decode) -> Unit,
+    onEngineChange: (Players.Kernel) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
     openingMs: Long,
     endingMs: Long,
@@ -1817,6 +1867,7 @@ private fun FullscreenPlayLayout(
     onClearEnding: () -> Unit,
     onSeekDragChange: (Boolean) -> Unit,
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // 锁定状态下的解锁按钮显隐（单击唤出，2.5s 自动隐藏）
     var unlockHint by remember { mutableStateOf(false) }
@@ -1827,6 +1878,7 @@ private fun FullscreenPlayLayout(
         }
     }
     // 动作栏对话框状态
+    var showEngine by remember { mutableStateOf(false) }
     var showSpeed by remember { mutableStateOf(false) }
     var showBuffer by remember { mutableStateOf(false) }
     var showAudio by remember { mutableStateOf(false) }
@@ -2092,8 +2144,9 @@ private fun FullscreenPlayLayout(
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp),
                     ) {
-                        // 左组：解码（显示当前值，点击直接切换）/ 缓冲 / 重播 / 倍速 / 缩放（点击循环切换）
+                        // 左组：内核（EXO/MPV/其他弹窗，fongmi PlayerEngineDialog）/ 解码（显示当前值，点击直接切换）/ 缓冲 / 重播 / 倍速 / 缩放（点击循环切换）
                         // 点击动作栏按钮重置 5 秒自动隐藏计时（fongmi setR1Callback 同款），不立即消失
+                        ActionBtn(playerState.kernel.label) { showEngine = true; onControlInteract() }
                         ActionBtn(playerState.decode.label) {
                             onDecodeChange(
                                 if (playerState.decode == Players.Decode.HARD) Players.Decode.SOFT
@@ -2164,6 +2217,35 @@ private fun FullscreenPlayLayout(
         }
 
         // 动作栏对话框（与竖屏同款）
+        // 播放内核（fongmi PlayerEngineDialog：EXO / MPV / 其他=系统选择器外部播放器）
+        if (showEngine) {
+            val engineOptions = Players.Kernel.entries.map { it.label } + "其他"
+            OptionDialog("播放内核", engineOptions, playerState.kernel.label, { it }, { label ->
+                when (label) {
+                    "其他" -> {
+                        // 仿 fongmi PlaybackIntent.choose：系统选择器外部播放器打开（url + headers + 进度）
+                        val info = Players.externalPlayInfo()
+                        if (info != null) {
+                            runCatching {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                    setDataAndType(android.net.Uri.parse(info.url), "video/*")
+                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    putExtra("title", info.title)
+                                    putExtra("position", info.positionMs.toInt())
+                                    putExtra("return_result", true)
+                                    if (info.headers.isNotEmpty()) {
+                                        putExtra("headers", info.headers.flatMap { (k, v) -> listOf(k, v) }.toTypedArray())
+                                    }
+                                }
+                                context.startActivity(android.content.Intent.createChooser(intent, null))
+                            }
+                        }
+                    }
+                    else -> Players.Kernel.entries.firstOrNull { it.label == label }?.let(onEngineChange)
+                }
+                showEngine = false
+            }) { showEngine = false }
+        }
         if (showSpeed) {
             OptionDialog("倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
         }
@@ -2552,6 +2634,16 @@ private fun LineSlider(
 
 private fun formatSpeed(speed: Float): String =
     if (speed == speed.toInt().toFloat()) "${speed.toInt()}.0x" else "${speed}x"
+
+/** 格式化网络速度（bps → 用户可读字符串） */
+private fun formatNetworkSpeed(bps: Long): String {
+    val bytesPerSec = bps / 8
+    return when {
+        bytesPerSec >= 1024 * 1024 -> "%.1f MB/s".format(bytesPerSec / (1024f * 1024f))
+        bytesPerSec >= 1024 -> "%.1f KB/s".format(bytesPerSec / 1024f)
+        else -> "$bytesPerSec B/s"
+    }
+}
 
 private const val RESUME_THRESHOLD_MS = 5_000L
 private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L

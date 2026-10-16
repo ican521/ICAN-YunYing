@@ -176,6 +176,15 @@ class SettingsRepository(context: Context) {
         _playerDecode.value = decode
     }
 
+    /** 播放内核：EXO / MPV（默认 EXO，仿 fongmi PlayerSetting.player_engine） */
+    private val _playerEngine = MutableStateFlow(prefs.getString(KEY_PLAYER_ENGINE, null).orEmpty())
+    val playerEngine: StateFlow<String> = _playerEngine.asStateFlow()
+
+    fun setPlayerEngine(engine: String) {
+        prefs.edit().putString(KEY_PLAYER_ENGINE, engine).apply()
+        _playerEngine.value = engine
+    }
+
     /** 缓冲档位：1/2/3（默认缓冲时长的倍率，仿 fongmi PlayerSetting.getBuffer） */
     private val _playerBuffer = MutableStateFlow(prefs.getInt(KEY_PLAYER_BUFFER, 1))
     val playerBuffer: StateFlow<Int> = _playerBuffer.asStateFlow()
@@ -240,6 +249,7 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_SPEED = "player_speed"
         const val KEY_PLAYER_SCALE = "player_scale"
         const val KEY_PLAYER_DECODE = "player_decode"
+        const val KEY_PLAYER_ENGINE = "player_engine"
         const val KEY_PLAYER_BUFFER = "player_buffer"
         const val KEY_PLAYER_BACKGROUND = "player_background"
         const val KEY_SEARCH_HISTORY = "search_history"

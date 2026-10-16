@@ -20,6 +20,9 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.upstream.BandwidthMeter
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
+import androidx.media3.mpvplayer.MpvPlayer
 import androidx.media3.ui.PlayerView
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -52,6 +55,9 @@ object Players {
     /** 解码内核 */
     enum class Decode(val label: String) { HARD("硬解"), SOFT("软解") }
 
+    /** 播放内核（仿 fongmi PlayerEngine.Type：EXO=ExoPlayer，MPV=libmpv） */
+    enum class Kernel(val label: String) { EXO("EXO"), MPV("MPV") }
+
     /** 画面缩放（resizeMode 用 AspectRatioFrameLayout 常量；ratio=0 表示跟随视频原始比例），命名对齐 fongmi select_scale */
     enum class ScaleMode(val label: String, val resizeMode: Int, val ratio: Float) {
         FIT("原始", androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT, 0f),
@@ -81,12 +87,15 @@ object Players {
         val bufferedMs: Long = 0L,
         val speed: Float = 1.0f,
         val decode: Decode = Decode.HARD,
+        val kernel: Kernel = Kernel.EXO,
         val scaleMode: ScaleMode = ScaleMode.FIT,
         val bufferTier: BufferTier = BufferTier.LOW,
         val audioTracks: List<TrackOption> = emptyList(),
         val textTracks: List<TrackOption> = emptyList(),
         val textDisabled: Boolean = false,
         val error: String? = null,
+        /** 实时网络速度（bps），缓冲时显示在转圈下方 */
+        val networkSpeedBps: Long = 0L,
     )
 
     private val _state = MutableStateFlow(PlayerState())
@@ -94,7 +103,17 @@ object Players {
 
     private val handler = Handler(Looper.getMainLooper())
 
-    var player: ExoPlayer? = null
+    /** 带宽计：用于缓冲时实时网速显示 */
+    private var bandwidthMeter: DefaultBandwidthMeter? = null
+    private val bandwidthListener = BandwidthMeter.EventListener { elapsedMs, bytesTransferred, bitrateEstimate ->
+        // 用本次采样实际速率（bytes/ms → bps）作为实时网速，比估计带宽更贴近瞬时速度
+        val bps = if (elapsedMs > 0) bytesTransferred * 8 * 1000 / elapsedMs else bitrateEstimate
+        if (_state.value.networkSpeedBps != bps) {
+            _state.value = _state.value.copy(networkSpeedBps = bps)
+        }
+    }
+
+    var player: Player? = null
         private set
 
     private var appContext: Context? = null
@@ -179,7 +198,7 @@ object Players {
     }
 
     /** player 实例变化钩子（PlaybackService 的 MediaSession 同步 setPlayer 用） */
-    var onPlayerChanged: ((ExoPlayer?) -> Unit)? = null
+    var onPlayerChanged: ((Player?) -> Unit)? = null
 
     /** 播放器是否存活（后台续播时 player 不为 null） */
     fun isAlive(): Boolean = player != null
@@ -399,6 +418,8 @@ object Players {
     /** 退出播放页时释放 */
     fun release() {
         handler.removeCallbacks(ticker)
+        bandwidthMeter?.removeEventListener(bandwidthListener)
+        bandwidthMeter = null
         playerView?.player = null
         playerView = null
         player?.run {
@@ -416,6 +437,7 @@ object Players {
             ready = false, playing = false, buffering = false,
             positionMs = 0L, durationMs = 0L, bufferedMs = 0L,
             audioTracks = emptyList(), textTracks = emptyList(), error = null,
+            networkSpeedBps = 0L,
         )
     }
 
@@ -450,7 +472,32 @@ object Players {
         _state.value = _state.value.copy(scaleMode = mode)
     }
 
-    // ---- 解码 / 缓冲（需重建播放器） ----
+    /** 当前播放信息（「其他」外部播放器跳转用，仿 fongmi PlaybackIntent.choose 的入参） */
+    data class ExternalPlayInfo(
+        val url: String,
+        val headers: Map<String, String>,
+        val positionMs: Long,
+        val title: String,
+    )
+
+    fun externalPlayInfo(): ExternalPlayInfo? {
+        val spec = currentSpec ?: return null
+        if (spec.url.isBlank()) return null
+        return ExternalPlayInfo(
+            url = spec.url,
+            headers = spec.headers,
+            positionMs = player?.currentPosition?.coerceAtLeast(0L) ?: 0L,
+            title = playbackContext?.video?.title ?: "",
+        )
+    }
+
+    // ---- 内核 / 解码 / 缓冲（需重建播放器） ----
+
+    fun setKernel(kernel: Kernel) {
+        if (_state.value.kernel == kernel) return
+        _state.value = _state.value.copy(kernel = kernel)
+        rebuild()
+    }
 
     fun setDecode(decode: Decode) {
         if (_state.value.decode == decode) return
@@ -499,10 +546,10 @@ object Players {
 
     // ---- 内部实现 ----
 
-    private fun ensurePlayer(): ExoPlayer {
+    private fun ensurePlayer(): Player {
         player?.let { return it }
         val ctx = appContext ?: error("Players.start() 未先调用")
-        val p = buildPlayer(ctx, _state.value.decode, _state.value.bufferTier)
+        val p = buildPlayer(ctx, _state.value.kernel, _state.value.decode, _state.value.bufferTier)
         player = p
         handler.post(ticker)
         onPlayerChanged?.invoke(p)
@@ -514,8 +561,29 @@ object Players {
         return p
     }
 
+    /** 仿 fongmi PlayerEngineFactory + ExoUtil.buildPlayer：按内核创建 ExoPlayer 或 MpvPlayer */
+    private fun buildPlayer(ctx: Context, kernel: Kernel, decode: Decode, tier: BufferTier): Player {
+        if (kernel == Kernel.MPV) {
+            // libmpv so 仅 arm64-v8a / armeabi-v7a；不可用（x86 模拟器等）自动回退 EXO
+            val available = runCatching { MpvPlayer.isAvailable() }.getOrDefault(false)
+            if (!available) {
+                Log.w(TAG, "MPV not available, fallback to EXO")
+                _state.value = _state.value.copy(kernel = Kernel.EXO)
+            } else {
+                // fongmi PlayerEngine.HARD/SOFT → mpv hwdec（C.DECODE_HARDWARE=1 / DECODE_SOFTWARE=0，官方 C 无常量，直接传值）
+                val mpvDecode = if (decode == Decode.SOFT) 0 else 1
+                return MpvPlayer.Builder(ctx).setDecode(mpvDecode).build().apply {
+                    addListener(listener)
+                    setPlaybackSpeed(_state.value.speed)
+                    playWhenReady = true
+                }
+            }
+        }
+        return buildExoPlayer(ctx, decode, tier)
+    }
+
     /** 仿 fongmi ExoUtil.buildPlayer/buildLoadControl/buildRenderersFactory 的官方 media3 等价实现 */
-    private fun buildPlayer(ctx: Context, decode: Decode, tier: BufferTier): ExoPlayer {
+    private fun buildExoPlayer(ctx: Context, decode: Decode, tier: BufferTier): ExoPlayer {
         val renderersFactory = DefaultRenderersFactory(ctx)
             .setEnableDecoderFallback(true)
             .setExtensionRendererMode(
@@ -531,9 +599,15 @@ object Players {
                 DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
             )
             .build()
+        // 带宽计：缓冲时实时网速显示
+        val meter = DefaultBandwidthMeter.Builder(ctx)
+            .build()
+            .apply { addEventListener(handler, bandwidthListener) }
+        bandwidthMeter = meter
         return ExoPlayer.Builder(ctx, renderersFactory)
             .setTrackSelector(DefaultTrackSelector(ctx))
             .setLoadControl(loadControl)
+            .setBandwidthMeter(meter)
             .build()
             .apply {
                 // CONTENT_TYPE_MOVIE 让系统把 AC3/EAC3/DTS 等音频路由到正确的硬件路径
@@ -551,8 +625,8 @@ object Players {
             }
     }
 
-    private fun startInternal(p: ExoPlayer, spec: PlaySpec, positionMs: Long) {
-        Log.d(TAG, "startInternal url=${spec.url.take(120)} headers=${spec.headers.keys}")
+    private fun startInternal(p: Player, spec: PlaySpec, positionMs: Long) {
+        Log.d(TAG, "startInternal kernel=${_state.value.kernel} url=${spec.url.take(120)} headers=${spec.headers.keys}")
         autoNextFired = false   // 新一集重新武装后台片尾自动切集
         // 换源前先 stop 释放上一个 MediaSource，避免资源冲突导致无声/崩溃
         p.stop()
@@ -561,6 +635,10 @@ object Players {
         val metaTitle = playbackContext?.video?.title
         val metaArtist = playbackContext?.episodes
             ?.getOrNull(playbackContext?.episodeIndex ?: -1)?.title
+        // headers 同时写入 RequestMetadata.extras：MPV 内核（native 拉流）由此读取 UA/Referer/http-header-fields
+        val extras = android.os.Bundle().apply {
+            spec.headers.forEach { (k, v) -> putString(k, v) }
+        }
         val item = MediaItemFactory.from(spec).buildUpon()
             .setMediaMetadata(
                 MediaMetadata.Builder()
@@ -568,9 +646,13 @@ object Players {
                     .setArtist(metaArtist?.takeIf { it.isNotBlank() } ?: "视频播放中")
                     .build(),
             )
+            .setRequestMetadata(
+                MediaItem.RequestMetadata.Builder().setExtras(extras).build(),
+            )
             .build()
         val headers = MediaItemFactory.checkUa(spec.headers)
-        if (headers.isNotEmpty()) {
+        if (p is ExoPlayer && headers.isNotEmpty()) {
+            // EXO 内核：headers 走 OkHttp DataSource 注入
             val ds = DefaultHttpDataSource.Factory()
                 .setDefaultRequestProperties(headers)
                 .setAllowCrossProtocolRedirects(true)
@@ -590,12 +672,14 @@ object Players {
         val wasPlaying = old.playWhenReady
         val spec = currentSpec
         handler.removeCallbacks(ticker)
+        bandwidthMeter?.removeEventListener(bandwidthListener)
+        bandwidthMeter = null
         playerView?.player = null   // 先解绑旧 player
         old.stop()           // 先 stop 释放媒体资源
         old.removeListener(listener)
         old.release()
         player = null
-        val p = buildPlayer(ctx, _state.value.decode, _state.value.bufferTier)
+        val p = buildPlayer(ctx, _state.value.kernel, _state.value.decode, _state.value.bufferTier)
         player = p
         handler.post(ticker)
         onPlayerChanged?.invoke(p)
