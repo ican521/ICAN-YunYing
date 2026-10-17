@@ -77,6 +77,7 @@ data class VodItem(
     @SerialName("vod_play_from") val vodPlayFrom: String = "",
     @SerialName("vod_play_url") val vodPlayUrl: String = "",
     @SerialName("type_name") val typeName: String = "",
+    @SerialName("action") val action: String = "",
 )
 
 /** 列表/分类接口返回 */

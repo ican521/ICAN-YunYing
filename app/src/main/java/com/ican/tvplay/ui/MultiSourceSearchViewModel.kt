@@ -215,6 +215,32 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
     /** 按 siteKey 查站点条目（播放页延迟解析需要 site + jarSpec） */
     fun siteEntry(siteKey: String): SiteEntry? = _sites.value.firstOrNull { it.site.key == siteKey }
 
+    /** 网盘配置持久化（与 AppContainer 的 SettingsRepository 共享同一 prefs 文件） */
+    val driveConfigs = settings.driveConfigs
+
+    fun saveDriveConfigs(configs: List<com.ican.tvplay.ui.components.DriveConfig>) =
+        settings.saveDriveConfigs(configs)
+
+    /**
+     * 执行指定站点 action 卡片的 jar 操作（fongmi SiteApi.action 同款：网盘配置等），
+     * 完成后主线程回调 msg（空串不提示）。
+     */
+    fun executeAction(siteKey: String, action: String, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            val msg = runCatching {
+                val entry = _sites.value.firstOrNull { it.site.key == siteKey } ?: return@runCatching ""
+                if (!entry.site.isSpider()) return@runCatching ""
+                val spider = spiderManager.getSpider(entry.site, entry.jarSpec) ?: return@runCatching ""
+                val jsonStr = spiderManager.action(spider, action)
+                if (jsonStr.isBlank()) ""
+                else runCatching {
+                    json.parseToJsonElement(jsonStr).jsonObject["msg"]?.jsonPrimitive?.content.orEmpty()
+                }.getOrDefault("")
+            }.getOrDefault("")
+            withContext(Dispatchers.Main) { onDone(msg) }
+        }
+    }
+
     /**
      * 对指定站点解析播放地址：spider 走 playerContent + 可选 jx 解析，HTTP 直接返回原 URL
      */

@@ -397,6 +397,24 @@ class VideoRepository(
     }
 
     /**
+     * 执行当前站点的 action 卡片操作（fongmi SiteApi.action 同款）：
+     * spider 站调 jar 的 action()（jar 内部弹扫码/输入流程）。
+     * 返回 JSON 中的 msg 供 Toast，空串表示无提示。
+     */
+    suspend fun executeSiteAction(action: String): String {
+        val loaded = _currentSite.value ?: return ""
+        if (!loaded.site.isSpider()) return ""
+        val spider = currentSpider
+            ?: spiderManager.getSpider(loaded.site, loaded.jarSpec)
+            ?: return ""
+        val jsonStr = spiderManager.action(spider, action)
+        if (jsonStr.isBlank()) return ""
+        return runCatching {
+            rawJson.parseToJsonElement(jsonStr).jsonObject["msg"]?.jsonPrimitive?.content.orEmpty()
+        }.getOrDefault("")
+    }
+
+    /**
      * 播放前调用：spider 站经 playerContent 解析真实 URL（可能带 header）；
      * HTTP 站直接返回原 url。flag 为所选线路标识，缺省用视频首源。
      */

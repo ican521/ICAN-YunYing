@@ -49,6 +49,7 @@ object VodParse {
             episodes = playSources.firstOrNull()?.episodes.orEmpty(),
             playFrom = firstPlayFrom,
             playSources = playSources,
+            action = action,
         )
     }
 

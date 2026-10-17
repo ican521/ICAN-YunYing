@@ -96,6 +96,7 @@ import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.BlurredBar
+import com.ican.tvplay.ui.components.DriveConfigDialog
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.pageHorizontalPadding
@@ -145,7 +146,28 @@ fun HomeScreen(
     onHistoryClick: () -> Unit,
 ) {
     val viewModel = appViewModel { HomeViewModel(this) }
+    val settings = viewModel.settings
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
+    var driveDialogVideo by remember { mutableStateOf<Video?>(null) }
+    val driveConfigs by settings.driveConfigs.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // 网盘配置弹窗
+    driveDialogVideo?.let { video ->
+        DriveConfigDialog(
+            video = video,
+            drives = driveConfigs,
+            onDismiss = { driveDialogVideo = null },
+            onSave = { configs ->
+                settings.saveDriveConfigs(configs)
+                viewModel.executeDriveAction(video.action) { msg ->
+                    if (msg.isNotBlank()) {
+                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+        )
+    }
 
     val contentPadding = topLevelContentPadding()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
@@ -429,7 +451,13 @@ fun HomeScreen(
                     gridItems(pageVideos.value, key = { it.id }) { video ->
                         VideoCardItem(
                             video = video,
-                            onClick = { onVideoClick(video) },
+                            onClick = {
+                                if (video.action.isNotBlank()) {
+                                    driveDialogVideo = video
+                                } else {
+                                    onVideoClick(video)
+                                }
+                            },
                         )
                     }
                 }

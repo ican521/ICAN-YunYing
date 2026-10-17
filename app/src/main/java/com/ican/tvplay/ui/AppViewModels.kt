@@ -46,6 +46,7 @@ class AppViewModel(container: AppContainer) : ViewModel() {
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel(container: AppContainer) : ViewModel() {
     private val repo = container.videoRepository
+    val settings = container.settingsRepository
 
     /** 首页网格布局大小（小/中/大） */
     val homeLayoutSize: StateFlow<com.ican.tvplay.data.HomeLayoutSize> =
@@ -86,6 +87,16 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
 
     /** 按分类 id 独立取该分类下视频（每页独立加载，不依赖 selectedCategory 选中态） */
     suspend fun getCategoryVideos(categoryId: String): List<Video> = repo.getVideos(categoryId)
+
+    /**
+     * 执行当前站点 action 卡片的 jar 操作（网盘配置等），完成后回调 msg（空串不提示）。
+     */
+    fun executeDriveAction(action: String, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            val msg = runCatching { repo.executeSiteAction(action) }.getOrDefault("")
+            onDone(msg)
+        }
+    }
 }
 
 /** 搜索：关键词防抖 + 历史记录 + 推荐词 */

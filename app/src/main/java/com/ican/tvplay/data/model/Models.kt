@@ -45,4 +45,6 @@ data class Video(
     val sourceName: String = "",
     /** 全部播放线路（vod_play_from / vod_play_url 按 $$$ 分隔完整保留） */
     val playSources: List<PlayLine> = emptyList(),
+    /** 网盘配置动作标识（fongmi Vod.action）：非空表示此卡片为网盘配置入口，点击弹出配置弹窗而非进入播放页 */
+    val action: String = "",
 )

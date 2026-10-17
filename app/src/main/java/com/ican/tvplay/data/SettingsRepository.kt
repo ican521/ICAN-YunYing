@@ -2,6 +2,7 @@ package com.ican.tvplay.data
 
 import android.content.Context
 import com.ican.tvplay.data.remote.TvBoxSite
+import com.ican.tvplay.ui.components.DriveConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -254,5 +255,47 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_BACKGROUND = "player_background"
         const val KEY_SEARCH_HISTORY = "search_history"
         const val MAX_SEARCH_HISTORY = 10
+        const val KEY_DRIVE_CONFIGS = "drive_configs"
+    }
+
+    // ---- 网盘配置 ----
+
+    private val _driveConfigs = MutableStateFlow(
+        runCatching {
+            prefs.getStringSet(KEY_DRIVE_CONFIGS, emptySet()).orEmpty()
+                .mapNotNull { str ->
+                    // 格式：name|action|token|order
+                    val parts = str.split("|")
+                    if (parts.size >= 4) {
+                        DriveConfig(
+                            name = parts[0],
+                            action = parts[1],
+                            token = parts[2],
+                            order = parts[3].toIntOrNull() ?: 0,
+                        )
+                    } else null
+                }
+                .sortedBy { it.order }
+        }.getOrDefault(emptyList()),
+    )
+    val driveConfigs: StateFlow<List<DriveConfig>> = _driveConfigs.asStateFlow()
+
+    fun saveDriveConfigs(configs: List<DriveConfig>) {
+        val strSet = configs.mapIndexed { index, config ->
+            "${config.name}|${config.action}|${config.token}|$index"
+        }.toSet()
+        prefs.edit().putStringSet(KEY_DRIVE_CONFIGS, strSet).apply()
+        _driveConfigs.value = configs
+    }
+
+    fun addDriveConfig(config: DriveConfig) {
+        val updated = _driveConfigs.value.toMutableList()
+        updated.add(config)
+        saveDriveConfigs(updated)
+    }
+
+    fun removeDriveConfig(action: String) {
+        val updated = _driveConfigs.value.filter { it.action != action }
+        saveDriveConfigs(updated)
     }
 }

@@ -213,6 +213,21 @@ class SpiderManager(private val appContext: Context) {
             }.onFailure { Log.e(TAG, "playerContent fail flag=$flag id=$id", it) }.getOrDefault("")
         }
 
+    /**
+     * action(String) → jar 自定义操作（fongmi SiteApi.action 同款）：
+     * 网盘配置类卡片点击时调用，jar 内部弹扫码/输入流程，返回 JSON {msg} 供 Toast。
+     * 基类默认返回 null，不支持 action 的 jar 返回空串。
+     */
+    suspend fun action(spider: Any, action: String): String =
+        withContext(Dispatchers.IO) {
+            lockOf(spider).withLock {
+                runCatching {
+                    spider.javaClass.getMethod("action", String::class.java)
+                        .invoke(spider, action) as? String ?: ""
+                }
+            }.onFailure { Log.e(TAG, "action fail action=$action", it) }.getOrDefault("")
+        }
+
     /** 探测并缓存 jar 内 com.github.catvod.spider.Proxy.proxy(Map) 静态方法（fongmi JarLoader.invokeProxy 同款） */
     private fun invokeProxy(loaderKey: String, loader: DexClassLoader) {
         runCatching {
