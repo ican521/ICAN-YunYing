@@ -5,9 +5,11 @@ import android.content.pm.ActivityInfo
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
@@ -17,6 +19,8 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -29,6 +33,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -38,9 +43,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -49,8 +56,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TabRowDefaults
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -73,6 +82,8 @@ import kotlin.math.hypot
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.setValue
@@ -86,14 +97,20 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -102,6 +119,9 @@ import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.local.FavoriteEntity
@@ -120,6 +140,7 @@ import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
@@ -148,7 +169,6 @@ fun PlayerScreen(
     val settings = container.settingsRepository
     val savedSpeed by settings.playerSpeed.collectAsStateWithLifecycle()
     val savedScale by settings.playerScale.collectAsStateWithLifecycle()
-    val savedDecode by settings.playerDecode.collectAsStateWithLifecycle()
     val savedEngine by settings.playerEngine.collectAsStateWithLifecycle()
     val savedBuffer by settings.playerBuffer.collectAsStateWithLifecycle()
 
@@ -161,8 +181,6 @@ fun PlayerScreen(
     // 片头/片尾标记（ms；片尾存"距结尾时长"，fongmi History.opening/ending 同款）
     var openingMs by remember { mutableLongStateOf(0L) }
     var endingMs by remember { mutableLongStateOf(0L) }
-    // 片尾自动切下一集的防重复触发标志（每集/每次改标记后重新武装）
-    var autoNextArmed by remember(endingMs) { mutableStateOf(true) }
     val skipFirstStart = remember { mutableStateOf(preInitialized) }
 
     // 线路切换
@@ -171,8 +189,8 @@ fun PlayerScreen(
         ?.let { sources -> sources.firstOrNull { it.flag == lineFlag } ?: sources.firstOrNull() }
     val lineEpisodes = playLine?.episodes ?: video?.episodes.orEmpty()
 
-    // 控制层状态
-    var controlsVisible by remember { mutableStateOf(true) }
+    // 控制层状态：进入播放页默认隐藏，用户单击预览小窗后才呼出
+    var controlsVisible by remember { mutableStateOf(false) }
     // 控制层交互计数：动作栏按钮点击时自增，重置 5 秒自动隐藏计时（fongmi setR1Callback 同款）
     var controlsTick by remember { mutableIntStateOf(0) }
     // 正在拖动进度条（小窗/全屏共用）：拖动期间挂起自动隐藏计时，松手后重新计 5 秒
@@ -204,12 +222,15 @@ fun PlayerScreen(
     }
 
     // 共享 PlayerView（fongmi 同思路：全屏/竖屏只是改容器尺寸，PlayerView 从不销毁重建）。
-    // 常驻唯一 AndroidView，竖屏↔全屏↔画中画切换时 Surface 不销毁，消除切换黑屏
+    // 常驻唯一 AndroidView，竖屏↔全屏↔画中画切换时 Surface 不销毁，消除切换黑屏。
+    // fongmi 用 surface_type="none" + setRender(SURFACE)；我们 media3 无 setRender，
+    // 故从 XML inflate，surface_type=texture_view：TextureView 不挖窗口洞，
+    // 彻底消除视频 FIT 模式边缘 1px 白缝/亮色闪烁，黑边区由本视图黑色背景提供。
     val sharedPlayerView = remember {
-        PlayerView(context).apply {
-            useController = false
-            Players.bindPlayerView(this)
-        }
+        android.view.LayoutInflater.from(context)
+            .inflate(com.ican.tvplay.R.layout.player_view, null) as PlayerView
+    }.apply {
+        Players.bindPlayerView(this)
     }
     DisposableEffect(Unit) {
         onDispose { Players.unbindPlayerView(sharedPlayerView) }
@@ -221,12 +242,6 @@ fun PlayerScreen(
         Players.setScaleMode(
             Players.ScaleMode.entries.firstOrNull { it.name == savedScale }
                 ?: Players.ScaleMode.FIT,
-        )
-    }
-    LaunchedEffect(savedDecode) {
-        Players.setDecode(
-            Players.Decode.entries.firstOrNull { it.name == savedDecode }
-                ?: Players.Decode.HARD,
         )
     }
     LaunchedEffect(savedEngine) {
@@ -358,14 +373,10 @@ fun PlayerScreen(
         val pos = pendingPosition
         pendingPosition = 0L
 
-        // 优先用上游（DetailScreen）提前解析好的 PlaySpec
         try {
-            val preResolved = Players.pendingPreStartSpec?.also { Players.pendingPreStartSpec = null }
-            val spec = if (preResolved != null) {
-                preResolved
-            } else {
-                val cached = Players.cachedVideo?.takeIf { it.video.id == v.id }
-                val source = if (cached?.site != null) {
+            val cached = Players.cachedVideo?.takeIf { it.video.id == v.id }
+            val source = when {
+                cached?.site != null -> {
                     // 跨站源：在播放页内解析（某些网盘 jar 在 playerContent 时触发扫码弹窗，
                     // 解析必须发生在进入播放页之后，弹窗时机才正确）
                     container.spiderManager.resolvePlayUrl(
@@ -374,11 +385,17 @@ fun PlayerScreen(
                         playUrl = episode.playUrl,
                         flag = playLine?.flag ?: v.playFrom,
                     )
-                } else {
+                }
+                cached != null -> {
+                    // 推送/直链视频（fongmi playerContent PUSH 分支同款）：episode.playUrl 即真实地址，
+                    // 直接播放，不经过站点 spider 解析
+                    com.ican.tvplay.data.PlaySource(episode.playUrl)
+                }
+                else -> {
                     container.videoRepository.resolvePlaySource(v, episode, playLine?.flag ?: v.playFrom)
                 }
-                PlaySpec(url = source.url, headers = source.headers)
             }
+            val spec = PlaySpec(url = source.url, headers = source.headers)
             // 注册播放上下文：通知栏展示 / 上一集下一集 / 后台片尾自动切集依赖
             Players.playbackContext = Players.PlaybackContext(
                 video = v,
@@ -389,10 +406,11 @@ fun PlayerScreen(
                 endingMs = endingMs,
             )
             // start 内部已兜底同步异常；这里再包一层防止 spider/jx 解析或上下文构造异常导致闪退
+            // 每次开播（含换集）都跳过片头：startPositionMs = max(续播位置, openingMs)
             Players.start(
                 context = context,
                 spec = spec,
-                startPositionMs = pos,
+                startPositionMs = maxOf(pos, openingMs),
             )
         } catch (t: Throwable) {
             if (t is kotlinx.coroutines.CancellationException) throw t
@@ -498,6 +516,9 @@ fun PlayerScreen(
                         endingMs = endingMs,
                         sourceKey = siteKey,
                         sourceName = siteName,
+                        // 记住当前所选线路：从历史续播时恢复同一条线路。
+                        // lineFlag 优先（切换线路后状态即时更新），为空时兜底 playLine（首条线路）
+                        lineFlag = lineFlag.takeIf { it.isNotBlank() } ?: playLine?.flag.orEmpty(),
                     ),
                 )
             }.onFailure {
@@ -543,13 +564,15 @@ fun PlayerScreen(
     }
 
     // 片尾自动切下一集（fongmi: onTimeChanged → nextEpisode）
+    // 每集只触发一次：endingSkipped 随 episodeIndex 重置（remember key 为 episodeIndex）
+    var endingSkipped by remember(episodeIndex) { mutableStateOf(false) }
     LaunchedEffect(playerState.positionMs) {
         val dur = playerState.durationMs
-        if (autoNextArmed && endingMs > 0 && dur > 0 && playerState.playing &&
+        if (!endingSkipped && endingMs > 0 && dur > 0 &&
             endingMs + playerState.positionMs >= dur
         ) {
-            autoNextArmed = false
             if (episodeIndex < lineEpisodes.size - 1) {
+                endingSkipped = true
                 toastMsg("已跳过片尾")
                 episodeIndex++
             }
@@ -595,11 +618,11 @@ fun PlayerScreen(
         val activity = context as? Activity ?: return@LaunchedEffect
         val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         if (immersive) {
-            // 沉浸式：隐藏状态栏，从边缘上滑可临时唤出
+            // 沉浸式：隐藏状态栏与导航栏，从边缘上滑可临时唤出
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            controller.hide(WindowInsetsCompat.Type.statusBars())
+            controller.hide(WindowInsetsCompat.Type.systemBars())
         } else {
-            controller.show(WindowInsetsCompat.Type.statusBars())
+            controller.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 
@@ -607,7 +630,7 @@ fun PlayerScreen(
     DisposableEffect(Unit) {
         onDispose {
             (context as? Activity)?.window?.let { w ->
-                WindowCompat.getInsetsController(w, w.decorView).show(WindowInsetsCompat.Type.statusBars())
+                WindowCompat.getInsetsController(w, w.decorView).show(WindowInsetsCompat.Type.systemBars())
             }
         }
     }
@@ -727,18 +750,19 @@ fun PlayerScreen(
     // 根：视频 View 常驻最底层，不随布局切换重建（Surface 不销毁 → 切换无黑屏），
     // 竖屏控制层/信息流、全屏控制层作为覆盖层画在其上。
     // BoxWithConstraints 提供整屏尺寸，供横屏小窗→全屏放大动画插值。
-    // 旋转过渡期 / 放大动画期间为黑底；缩回后柔和渐变回主题背景，避免硬切
-    val rootBackground by animateColorAsState(
-        targetValue = if (inPip || fullscreen || pendingFullscreen != null ||
-            landscapeFullscreen || landZooming
-        ) {
-            Color.Black
-        } else {
-            MaterialTheme.colorScheme.background
-        },
-        animationSpec = tween(LAND_ZOOM_DURATION_MS),
-        label = "rootBackground",
-    )
+    // 缩放过程中露出的背景直接使用主题背景色（不做黑↔主题色渐变，
+    // 避免动画中途出现与主题不一致的灰色板块）
+    val rootBackground = if (landZooming) {
+        // 小窗↔全屏缩放动画中：根背景必须与信息列/下方区块同为主题色。
+        // 点全屏时 landscapeFullscreen 在动画开始就置 true，若让它走下面的纯黑分支，
+        // 横版布局未显式刷底色的空档（播放器上方/左侧、信息列底部与下方区块之间）
+        // 会透出黑色，与刷白的区块拼成黑白块
+        MaterialTheme.colorScheme.background
+    } else if (inPip || fullscreen || pendingFullscreen != null || landscapeFullscreen) {
+        Color.Black
+    } else {
+        MaterialTheme.colorScheme.background
+    }
     // 播放期间保持屏幕常亮（fongmi 同款：播放中 FLAG_KEEP_SCREEN_ON，暂停/退出恢复）
     val activity = context as? Activity
     DisposableEffect(playerState.playing) {
@@ -836,28 +860,39 @@ fun PlayerScreen(
             factory = { sharedPlayerView },
             update = { view ->
                 view.resizeMode = playerState.scaleMode.resizeMode
+                // TextureView 不挖洞，PlayerView 背景直接用黑色：视频 FIT 模式黑边区显示黑色。
+                view.setBackgroundColor(android.graphics.Color.BLACK)
                 if (view.player !== Players.player) Players.bindPlayerView(view)
             },
             modifier = when {
                 // 画中画：铺满整个（已被系统缩小的）Activity 窗口
-                inPip -> Modifier.fillMaxSize()
+                inPip -> Modifier.fillMaxSize().background(Color.Black)
                 // 手机旋转进入的全屏：直接铺满
-                fullscreen && !landscapeFullscreen -> Modifier.fillMaxSize()
-                // 旋转挂起期间统一沿用竖屏尺寸，避免转屏中途露出横版或画面拉伸
-                // （必须排在 isLandscape 前：旋转中途配置已翻为横屏但挂起仍未结束）
+                fullscreen && !landscapeFullscreen -> Modifier.fillMaxSize().background(Color.Black)
+                // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
+                // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感
                 pendingFullscreen != null ->
-                    Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f)
+                    Modifier.fillMaxSize().background(Color.Black)
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
-                isLandscape ->
+                // 深色：小窗（非全屏）四周加圆角描边；圆角随放大动画归零，全屏时描边宽度归零不显示
+                isLandscape -> {
+                    val cornerShape = RoundedCornerShape(animCorner)
+                    val isDark = com.ican.tvplay.ui.theme.LocalDarkTheme.current
+                    // 仅在有圆角（非全屏）时才显示描边；全屏时 animCorner=0，描边宽度归 0
+                    val borderWidth = if (isDark && animCorner > 0.dp) 1.dp else 0.dp
                     Modifier
                         .offset(x = animLeft, y = animTop)
                         .width(animWidth)
                         .height(animHeight)
+                        .clip(cornerShape)
+                        .background(Color.Black)
+                        .border(width = borderWidth, color = Color.White.copy(alpha = 0.15f), shape = cornerShape)
+                }
                 else ->
-                    Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f)
-            }.background(Color.Black),
+                    Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f).background(Color.Black)
+            },
         )
         when {
         // 画中画：只保留最底层视频，不挂任何覆盖层/信息流
@@ -882,7 +917,7 @@ fun PlayerScreen(
             onSpeedChange = { settings.setPlayerSpeed(it) },
             playbackSpeed = settings.playerSpeed.collectAsStateWithLifecycle().value,
             onScaleChange = { settings.setPlayerScale(it.name) },
-            onDecodeChange = { settings.setPlayerDecode(it.name) },
+            onEpisodeSelect = { idx -> if (idx != episodeIndex) episodeIndex = idx },
             onEngineChange = { settings.setPlayerEngine(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
             openingMs = openingMs,
@@ -911,9 +946,10 @@ fun PlayerScreen(
                 current = current,
                 episodeIndex = episodeIndex,
                 lineEpisodes = lineEpisodes,
-                lineFlag = lineFlag,
+                // 传入解析后的实际播放线路：进入播放页未手动点选时 lineFlag 可能为空，
+                // 直接透传会导致线路栏没有任何选中高亮（fongmi setFlags 同款解析）
+                lineFlag = playLine?.flag ?: lineFlag,
                 playerState = playerState,
-                detailLoading = detailLoading,
                 controlsVisible = controlsVisible,
                 locked = locked,
                 playerTop = animTop,
@@ -943,8 +979,8 @@ fun PlayerScreen(
                 onBack = { handleBack() },
                 onLineChange = { flag ->
                     if (flag != lineFlag) {
-                        saveProgress()
                         lineFlag = flag
+                        saveProgress()
                     }
                 },
                 onEpisodeSelect = { idx ->
@@ -958,9 +994,9 @@ fun PlayerScreen(
             current = current,
             episodeIndex = episodeIndex,
             lineEpisodes = lineEpisodes,
-            lineFlag = lineFlag,
+            // 同 LandscapePlayLayout：解析后的实际播放线路，保证初始就有选中高亮
+            lineFlag = playLine?.flag ?: lineFlag,
             playerState = playerState,
-            detailLoading = detailLoading,
             controlsVisible = controlsVisible,
             locked = locked,
             onToggleControls = { controlsVisible = !controlsVisible },
@@ -986,8 +1022,8 @@ fun PlayerScreen(
             onBack = { handleBack() },
             onLineChange = { flag ->
                 if (flag != lineFlag) {
-                    saveProgress()
                     lineFlag = flag
+                    saveProgress()
                 }
             },
             onEpisodeSelect = { idx ->
@@ -995,11 +1031,27 @@ fun PlayerScreen(
             },
             onSpeedChange = { settings.setPlayerSpeed(it) },
             onScaleChange = { settings.setPlayerScale(it.name) },
-            onDecodeChange = { settings.setPlayerDecode(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
             onSeekDragChange = { seekDragging = it },
         )
         }
+        }
+
+        // === 全屏居中缓冲转圈 ===
+        // 详情（文字/线路/选集/简介）加载期间，整屏只有这一个居中转圈；
+        // 详情回来后即隐藏。视频自身的缓冲转圈仍由预览小窗内部 playerState.buffering 控制。
+        if (detailLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier.size(48.dp),
+                )
+            }
         }
     }
 }
@@ -1013,8 +1065,6 @@ private fun PortraitPlayLayout(
     lineEpisodes: List<Episode>,
     lineFlag: String,
     playerState: Players.PlayerState,
-    /** 详情加载中：小窗与详情区同时显示转圈（fongmi progress + progressLayout） */
-    detailLoading: Boolean,
     controlsVisible: Boolean,
     locked: Boolean,
     onToggleControls: () -> Unit,
@@ -1029,13 +1079,11 @@ private fun PortraitPlayLayout(
     onEpisodeSelect: (Int) -> Unit,
     onSpeedChange: (Float) -> Unit,
     onScaleChange: (Players.ScaleMode) -> Unit,
-    onDecodeChange: (Players.Decode) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
     onSeekDragChange: (Boolean) -> Unit,
 ) {
     var showSpeed by remember { mutableStateOf(false) }
     var showScale by remember { mutableStateOf(false) }
-    var showDecode by remember { mutableStateOf(false) }
     var showBuffer by remember { mutableStateOf(false) }
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
@@ -1056,7 +1104,7 @@ private fun PortraitPlayLayout(
             .statusBarsPadding()
             .aspectRatio(16f / 9f),
         playerState = playerState,
-        showLoading = detailLoading,
+        showLoading = false,
         controlsVisible = controlsVisible,
         locked = locked,
         onToggleControls = onToggleControls,
@@ -1069,20 +1117,7 @@ private fun PortraitPlayLayout(
     )
 
     // === 可滚动详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===
-    // fongmi ProgressLayout：详情未回来时整个信息区只显示一个居中圈，回来后再填充内容
-    if (detailLoading) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center,
-        ) {
-            CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(36.dp),
-            )
-        }
-    } else {
+    // 详情加载期间整屏遮罩转圈统一显示（见根 Box），此处不再分区域转圈
     Column(
         modifier = Modifier
             .weight(1f)
@@ -1110,7 +1145,6 @@ private fun PortraitPlayLayout(
 
         Spacer(modifier = Modifier.height(60.dp))
     }
-    }
 
     // === 对话框 ===
     if (showSpeed) {
@@ -1118,9 +1152,6 @@ private fun PortraitPlayLayout(
     }
     if (showScale) {
         OptionDialog("画面缩放", Players.ScaleMode.entries, playerState.scaleMode, { it.label }, { onScaleChange(it); showScale = false }) { showScale = false }
-    }
-    if (showDecode) {
-        OptionDialog("解码内核", Players.Decode.entries, playerState.decode, { it.label }, { onDecodeChange(it); showDecode = false }) { showDecode = false }
     }
     if (showBuffer) {
         OptionDialog("缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
@@ -1168,8 +1199,6 @@ private fun LandscapePlayLayout(
     lineEpisodes: List<Episode>,
     lineFlag: String,
     playerState: Players.PlayerState,
-    /** 详情加载中：小窗与详情区同时显示转圈（fongmi progress + progressLayout） */
-    detailLoading: Boolean,
     controlsVisible: Boolean,
     locked: Boolean,
     // 动画中的播放器边界（小窗静止值 = 38% 宽 16:9 + 状态栏顶部偏移 + 左缘对齐页面左基线）
@@ -1213,7 +1242,7 @@ private fun LandscapePlayLayout(
                 // 的方角会露在圆角缺口里，形成左右下角的浅灰色直角块
                 .clip(RoundedCornerShape(playerCorner)),
             playerState = playerState,
-            showLoading = detailLoading,
+            showLoading = false,
             controlsVisible = controlsVisible,
             locked = locked,
             onToggleControls = onToggleControls,
@@ -1240,19 +1269,8 @@ private fun LandscapePlayLayout(
                 ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            when {
-                detailLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(36.dp),
-                        )
-                    }
-                }
-                current != null -> VideoMetaSection(v = current, lineFlag = lineFlag, itemSpacing = 10.dp)
+            if (current != null) {
+                VideoMetaSection(v = current, lineFlag = lineFlag, itemSpacing = 10.dp)
             }
         }
 
@@ -1274,29 +1292,16 @@ private fun LandscapePlayLayout(
             // 板块主间距与竖屏信息流统一为 sectionSpacing
             verticalArrangement = Arrangement.spacedBy(com.ican.tvplay.ui.theme.Spacing.sectionSpacing),
         ) {
-            when {
-                detailLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(36.dp),
-                        )
-                    }
-                }
-                current != null -> {
-                    LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange)
-                    EpisodeSection(
-                        lineEpisodes = lineEpisodes,
-                        episodeIndex = episodeIndex,
-                        onEpisodeSelect = onEpisodeSelect,
-                    )
-                    DescriptionSection(v = current)
+            if (current != null) {
+                LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange)
+                EpisodeSection(
+                    lineEpisodes = lineEpisodes,
+                    episodeIndex = episodeIndex,
+                    onEpisodeSelect = onEpisodeSelect,
+                )
+                DescriptionSection(v = current)
 
-                    Spacer(modifier = Modifier.height(60.dp))
-                }
+                Spacer(modifier = Modifier.height(60.dp))
             }
         }
     }
@@ -1422,11 +1427,43 @@ private fun PreviewPlayerArea(
                     }
                     if (!locked) onEnterFullscreen()
                 } else {
-                    onToggleControls()
+                    if (playerState.error == null) onToggleControls()
                 }
             }
         },
     ) {
+        // 加载转圈（fongmi: view_progress；进页面即显示，STATE_READY 后随 buffering 显隐）
+        // 放在控制层下面：缓冲时转圈在按钮后方，按钮仍然可点击（与 fongmi 同款 z-order）
+        // 转圈固定在屏幕中心，不随网速文字出现而位移
+        if (showLoading || playerState.buffering) {
+            CircularProgressIndicator(
+                color = Color.White,
+                modifier = Modifier
+                    .size(36.dp)
+                    .align(Alignment.Center),
+            )
+            // fongmi view_progress 同款：网速文字与转圈同为中心锚点、marginTop=40dp（12sp 白色），
+            // 缓冲期间每秒采样刷新（TrafficStats），缓冲结束随转圈一起消失
+            var speedText by remember { mutableStateOf("") }
+            LaunchedEffect(Unit) {
+                com.ican.tvplay.player.core.Traffic.reset()
+                while (true) {
+                    speedText = com.ican.tvplay.player.core.Traffic.setSpeed()
+                    kotlinx.coroutines.delay(1000)
+                }
+            }
+            if (speedText.isNotEmpty()) {
+                Text(
+                    text = speedText,
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(y = 40.dp),
+                )
+            }
+        }
+
         // 预览小窗控制层：单击视频区显示/隐藏（fongmi 同款交互）
         // 返回键随控制层显隐（fongmi 同款：控制层隐藏时返回键一起消失），48dp 纯图标无背景
         if (controlsVisible && !locked) {
@@ -1483,28 +1520,6 @@ private fun PreviewPlayerArea(
                         onDragFractionChange = { onSeekDragChange(it != null) },
                     )
                     Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
-                }
-            }
-        }
-
-        // 加载转圈（fongmi: view_progress；进页面即显示，STATE_READY 后随 buffering 显隐）
-        if (showLoading || playerState.buffering) {
-            Column(
-                modifier = Modifier.align(Alignment.Center),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    modifier = Modifier.size(36.dp),
-                )
-                // 缓冲时显示实时网速（fongmi 缓冲进度下方显示网速）
-                if (playerState.buffering && playerState.networkSpeedBps > 0) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = formatNetworkSpeed(playerState.networkSpeedBps),
-                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
-                        color = Color.White,
-                    )
                 }
             }
         }
@@ -1685,30 +1700,28 @@ private fun LineSection(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
+                    // 几何与选集 EpisodeChip 完全一致：40dp 高、40dp 最小宽、左右 12dp 内边距。
+                    // 高度固定后 Spacing.corner(16dp) 小于半高 → 呈圆矩形（此前内容撑高 32dp 时恰好呈胶囊）
+                    .height(40.dp)
+                    .defaultMinSize(minWidth = 40.dp)
                     .tvCardEffect(
                         onClick = { onLineChange(source.flag) },
                         shape = shape, focusedScale = 1.06f, glow = false,
                     )
                     .background(
-                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                        // 与选集 EpisodeChip 选中态完全一致：浅主色填充、无描边
+                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                         else MaterialTheme.colorScheme.surfaceVariant,
                         shape,
                     )
-                    .then(
-                        if (selected) Modifier.border(
-                            width = 1.5.dp,
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = shape,
-                        ) else Modifier,
-                    )
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp),
             ) {
                 Text(
                     text = source.flag,
                     style = MaterialTheme.typography.labelMedium,
                     color = if (selected) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                 )
             }
@@ -1717,18 +1730,16 @@ private fun LineSection(
     }
 }
 
-/** 选集区块（fongmi: detail_episode）：标题+倒序/正序+更多；默认横向滚动，点更多切 FlowRow 网格 */
+/** 选集区块（fongmi: detail_episode）：标题+倒序/正序+更多；默认横向滚动，点更多弹出分页网格弹窗 */
 @Composable
 private fun EpisodeSection(
     lineEpisodes: List<Episode>,
     episodeIndex: Int,
     onEpisodeSelect: (Int) -> Unit,
 ) {
-    var showAllEps by remember { mutableStateOf(false) }
+    var showEpisodeGrid by remember { mutableStateOf(false) }
     var reversedEp by remember { mutableStateOf(false) }
 
-    // 单根 Column：对外只占外层信息流一个板块，板块主间距由外层统一；
-    // 标题 ↔ 按钮为组件内部次间距，不被外层 spacedBy 影响
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1741,7 +1752,7 @@ private fun EpisodeSection(
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Text(
-                text = if (reversedEp) "正序" else "倒序",
+                text = if (reversedEp) "倒序" else "正序",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
@@ -1753,46 +1764,214 @@ private fun EpisodeSection(
             )
             Spacer(modifier = Modifier.weight(1f))
             Text(
-                text = if (showAllEps) "收起 ▾" else "更多 ▸",
+                text = "更多",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                ) { showAllEps = !showAllEps },
+                ) { showEpisodeGrid = true },
             )
         }
         Spacer(modifier = Modifier.height(Spacing.titleContentGap))
 
         val displayEps = if (reversedEp) lineEpisodes.asReversed() else lineEpisodes
-        fun realIdx(displayIdx: Int) = if (reversedEp) lineEpisodes.size - 1 - displayIdx else displayIdx
-
-        if (showAllEps) {
-            // 网格模式：与收起状态同一自适应按钮（最小正方形、随文字变长），FlowRow 自动换行
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                displayEps.forEachIndexed { dispIdx, ep ->
-                    val idx = realIdx(dispIdx)
-                    EpisodeChip(
-                        title = ep.title,
-                        selected = idx == episodeIndex,
-                        onClick = { onEpisodeSelect(idx) },
-                    )
-                }
+        // 选中集在显示序列中的位置（倒序时需换算）
+        val selectedDispIdx = if (reversedEp) lineEpisodes.size - 1 - episodeIndex else episodeIndex
+        val listState = rememberLazyListState()
+        // 选中集变化、倒序切换、或剧集加载完成时，把选中项滚动到选集栏最左侧。
+        // 用 snapshotFlow 等待列表项实际布局完成（totalItemsCount > selectedDispIdx）后再滚动，
+        // 避免剧集从空加载到有数据时立即调用 scrollToItem 因未布局而失效。
+        LaunchedEffect(selectedDispIdx, lineEpisodes.size) {
+            if (lineEpisodes.isNotEmpty() && selectedDispIdx in 0 until lineEpisodes.size) {
+                snapshotFlow { listState.layoutInfo.totalItemsCount }
+                    .filter { it > selectedDispIdx }
+                    .first()
+                listState.scrollToItem(selectedDispIdx)
             }
-        } else {
-            // 默认横向滚动（fongmi: adapter_episode_hori），按钮尺寸与展开网格一致
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                itemsIndexed(displayEps) { dispIdx, ep ->
-                    val idx = realIdx(dispIdx)
-                    EpisodeChip(
-                        title = ep.title,
-                        selected = idx == episodeIndex,
-                        onClick = { onEpisodeSelect(idx) },
-                    )
+        }
+        // 默认横向滚动（fongmi: adapter_episode_hori）
+        LazyRow(
+            state = listState,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            itemsIndexed(displayEps) { dispIdx, ep ->
+                val idx = if (reversedEp) lineEpisodes.size - 1 - dispIdx else dispIdx
+                EpisodeChip(
+                    title = ep.title,
+                    selected = idx == episodeIndex,
+                    onClick = { onEpisodeSelect(idx) },
+                )
+            }
+        }
+    }
+
+    EpisodeGridDialog(
+        show = showEpisodeGrid,
+        episodes = lineEpisodes,
+        currentIndex = episodeIndex,
+        // 倒序仅作用于播放页选集行；"更多"弹窗始终正序显示
+        reversed = false,
+        onSelect = { idx ->
+            onEpisodeSelect(idx)
+            showEpisodeGrid = false
+        },
+        onDismiss = { showEpisodeGrid = false },
+    )
+}
+
+/** 选集「更多」分页网格弹窗（照搬 fongmi EpisodeGridDialog 框架 + MIUIX OverlayDialog 风格）：
+ *  - 按集名平均长度动态计算列数 spanCount（1~5 列）
+ *  - 每页 itemCount = spanCount × (横屏 5 行 / 竖屏 10 行)
+ *  - 顶部分页 Tab 显示每集范围（如 "1 - 10"），底部 HorizontalPager 切换页面
+ *  - 打开自动跳转到当前播放集所在页 */
+@Composable
+private fun EpisodeGridDialog(
+    show: Boolean,
+    episodes: List<Episode>,
+    currentIndex: Int,
+    reversed: Boolean,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    // 分页与 Tab 始终正序（"1-10"、"11-20"…）；倒序只反转每页内部的集排列
+    val displayEps = episodes
+
+    // fongmi setSpanCount：按集名平均长度定列数
+    val avgLen = if (episodes.isNotEmpty()) {
+        episodes.map { it.title.length }.average().toInt()
+    } else 0
+    val spanCount = when {
+        avgLen >= 12 -> 1
+        avgLen >= 8 -> 2
+        avgLen >= 4 -> 3
+        avgLen >= 2 -> 4
+        else -> 5
+    }
+    val rowsPerPage = if (isLandscape) 5 else 10
+    val itemCount = spanCount * rowsPerPage
+    // 空集（详情加载中）时 pageCount 至少为 1，避免 coerceIn(0, -1) 崩溃
+    val pageCount = ((displayEps.size + itemCount - 1) / itemCount).coerceAtLeast(1)
+
+    // 分页标题：始终正序 "1 - 10" / "11 - 20" ...
+    val pageTitles = (0 until pageCount).map { p ->
+        val start = p * itemCount + 1
+        val end = minOf((p + 1) * itemCount, displayEps.size)
+        "$start - $end"
+    }
+
+    // 当前播放集所在页（始终按正序分页计算）
+    val currentPage = if (displayEps.isNotEmpty()) {
+        (currentIndex / itemCount).coerceIn(0, pageCount - 1)
+    } else 0
+
+    val pagerState = rememberPagerState(initialPage = currentPage, pageCount = { pageCount })
+    val scope = rememberCoroutineScope()
+
+    // 每次弹窗打开时，强制跳回当前播放集所在页（不记忆上次浏览页）
+    LaunchedEffect(show) {
+        if (show) pagerState.scrollToPage(currentPage)
+    }
+
+    OverlayDialog(
+        show = show,
+        title = "选集",
+        titleColor = MiuixTheme.colorScheme.onBackground,
+        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        renderInRootScaffold = true,
+        onDismissRequest = onDismiss,
+        // 占满当前状态下允许的最大宽度（去掉库默认 maxWidth 上限），
+        // 左右外边距对齐播放页内容边距（pageHorizontalPadding），弹窗标题/网格与播放页大标题、按钮组件同左基线
+        maxWidth = Dp.Infinity,
+        outsideMargin = DpSize(pageHorizontalPadding(), 0.dp),
+        // 水平 0（网格贴弹窗边缘，与页面内容对齐）；垂直统一 titleContentGap，不再单独设间距
+        insideMargin = DpSize(0.dp, Spacing.titleContentGap),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            if (pageCount > 1) {
+                androidx.compose.material3.ScrollableTabRow(
+                    selectedTabIndex = pagerState.currentPage,
+                    containerColor = Color.Transparent,
+                    contentColor = MiuixTheme.colorScheme.onBackground,
+                    edgePadding = 0.dp,
+                    divider = {},
+                    // 蓝色指示器（固定浅色主题蓝，深浅模式统一）
+                    indicator = { tabPositions ->
+                        if (pagerState.currentPage < tabPositions.size) {
+                            Box(
+                                with(TabRowDefaults) {
+                                    Modifier
+                                        .tabIndicatorOffset(tabPositions[pagerState.currentPage])
+                                        .height(3.dp)
+                                        .background(
+                                            color = Color(0xFF3482FF),
+                                            shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
+                                        )
+                                },
+                            )
+                        }
+                    },
+                ) {
+                    pageTitles.forEachIndexed { idx, title ->
+                        val isSelected = pagerState.currentPage == idx
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) { scope.launch { pagerState.animateScrollToPage(idx) } }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                // 分页 Tab 与选集网格的间距复用播放页「标题↔按钮」间距，不单独设值
+                Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+            }
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxWidth(),
+                // 页与页之间留出间隙（视觉上与 6dp 的 chip 间距区分开），滑动时能看到页与页不粘连
+                pageSpacing = Spacing.titleContentGap,
+            ) { page ->
+                val start = page * itemCount
+                val rawPage = displayEps.subList(start, minOf(start + itemCount, displayEps.size))
+                // 倒序只反转本页内部的集顺序（分页本身保持正序）
+                val pageEpisodes = if (reversed) rawPage.asReversed() else rawPage
+                // 页高精确适配 rowsPerPage 行（EpisodeChip 40dp + 行间距 6dp），不留滚动余量
+                val pageHeight = 40.dp * rowsPerPage + 6.dp * (rowsPerPage - 1)
+                LazyVerticalGrid(
+                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(spanCount),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    // 每页只允许左右翻页，页内禁止上下滚动
+                    userScrollEnabled = false,
+                    modifier = Modifier.height(pageHeight),
+                ) {
+                    itemsIndexed(pageEpisodes) { dispIdx, ep ->
+                        // 倒序时本页内部反转：dispIdx 0 对应页内最后一集
+                        val realIdx = if (reversed) {
+                            start + rawPage.size - 1 - dispIdx
+                        } else {
+                            start + dispIdx
+                        }
+                        EpisodeChip(
+                            title = ep.title,
+                            selected = realIdx == currentIndex,
+                            onClick = { onSelect(realIdx) },
+                            modifier = Modifier.fillMaxWidth(),
+                            showBorder = true,
+                        )
+                    }
                 }
             }
         }
@@ -1856,7 +2035,7 @@ private fun FullscreenPlayLayout(
     onSpeedChange: (Float) -> Unit,
     playbackSpeed: Float,
     onScaleChange: (Players.ScaleMode) -> Unit,
-    onDecodeChange: (Players.Decode) -> Unit,
+    onEpisodeSelect: (Int) -> Unit,
     onEngineChange: (Players.Kernel) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
     openingMs: Long,
@@ -1884,6 +2063,7 @@ private fun FullscreenPlayLayout(
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
     var showAddSub by remember { mutableStateOf(false) }
+    var showEpisodes by remember { mutableStateOf(false) }
     // fongmi 同款手势反馈浮层：拖动 seek 预览目标 / 长按倍速提示
     var seekPreview by remember { mutableStateOf<Long?>(null) }
     var speedUpHint by remember { mutableStateOf(false) }
@@ -2008,16 +2188,13 @@ private fun FullscreenPlayLayout(
                 }
             },
     ) {
-        // fongmi 手势反馈浮层：顶部居中 50% 黑底 28dp 圆角胶囊（view_widget_vod seek/message 同款）
+        // fongmi 手势反馈浮层：顶部居中显示快进/快退目标时间（无胶囊底，纯文字+图标）
         if (seekPreview != null) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 24.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Color(0x4D000000))
-                    .padding(start = 12.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                    .padding(top = 24.dp),
             ) {
                 Icon(
                     imageVector = if ((seekPreview ?: 0L) >= playerState.positionMs) AppIcons.Forward else AppIcons.Rewind,
@@ -2026,7 +2203,7 @@ private fun FullscreenPlayLayout(
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                // 宽度由透明占位文字锁定，数字逐帧变化时胶囊不伸缩（兼容不支持 tnum 的 OEM 字体）
+                // 宽度由透明占位文字锁定，数字逐帧变化时位置不跳动
                 StableTimeText(
                     text = formatMs(seekPreview ?: 0L),
                     durationMs = playerState.durationMs,
@@ -2035,7 +2212,7 @@ private fun FullscreenPlayLayout(
                 )
             }
         }
-        // 拖动底部进度条：顶部居中实时显示「跳转至 MM:SS」，跟随手指位置更新
+        // 拖动底部进度条：顶部居中实时显示「跳转至 MM:SS」，跟随手指位置更新（无胶囊底）
         val sliderFraction = sliderSeekFraction
         if (sliderFraction != null && playerState.durationMs > 0) {
             StableTimeText(
@@ -2046,10 +2223,7 @@ private fun FullscreenPlayLayout(
                 color = Color.White,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 24.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Color(0x4D000000))
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                    .padding(top = 24.dp),
             )
         }
         if (speedUpHint) {
@@ -2144,16 +2318,9 @@ private fun FullscreenPlayLayout(
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp),
                     ) {
-                        // 左组：内核（EXO/MPV/其他弹窗，fongmi PlayerEngineDialog）/ 解码（显示当前值，点击直接切换）/ 缓冲 / 重播 / 倍速 / 缩放（点击循环切换）
+                        // 左组：内核（EXO/MPV/其他弹窗，fongmi PlayerEngineDialog）/ 缓冲 / 重播 / 倍速 / 缩放（点击循环切换）
                         // 点击动作栏按钮重置 5 秒自动隐藏计时（fongmi setR1Callback 同款），不立即消失
                         ActionBtn(playerState.kernel.label) { showEngine = true; onControlInteract() }
-                        ActionBtn(playerState.decode.label) {
-                            onDecodeChange(
-                                if (playerState.decode == Players.Decode.HARD) Players.Decode.SOFT
-                                else Players.Decode.HARD,
-                            )
-                            onControlInteract()
-                        }
                         ActionBtn("缓冲") { showBuffer = true; onControlInteract() }
                         ActionBtn("重播") { Players.seekTo(0); onControlInteract() }
                         ActionBtn("倍速") { showSpeed = true; onControlInteract() }
@@ -2176,6 +2343,11 @@ private fun FullscreenPlayLayout(
                             onLongClick = onClearEnding,
                             onClick = { onMarkEnding(); onControlInteract() },
                         )
+                        // 最右侧：选集（fongmi control.action.episodes：剧集数 ≥2 才显示，
+                        // 点击弹出右侧选集列表 EpisodeListDialog）
+                        if (lineEpisodes.size >= 2) {
+                            ActionBtn("选集") { showEpisodes = true; onControlInteract() }
+                        }
                     }
                 }
             }
@@ -2204,6 +2376,35 @@ private fun FullscreenPlayLayout(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(AppIcons.Lock, "解锁", tint = Color.White, modifier = Modifier.size(24.dp))
+            }
+        }
+
+        // 缓冲转圈（fongmi 全屏 view_progress 同款：中心固定位置，不随网速文字位移）
+        if (playerState.buffering) {
+            CircularProgressIndicator(
+                color = Color.White,
+                modifier = Modifier
+                    .size(36.dp)
+                    .align(Alignment.Center),
+            )
+            // fongmi view_progress 同款：网速文字居中偏下 40dp（12sp 白色），缓冲期间每秒刷新
+            var fsSpeedText by remember { mutableStateOf("") }
+            LaunchedEffect(Unit) {
+                com.ican.tvplay.player.core.Traffic.reset()
+                while (true) {
+                    fsSpeedText = com.ican.tvplay.player.core.Traffic.setSpeed()
+                    kotlinx.coroutines.delay(1000)
+                }
+            }
+            if (fsSpeedText.isNotEmpty()) {
+                Text(
+                    text = fsSpeedText,
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(y = 40.dp),
+                )
             }
         }
 
@@ -2251,6 +2452,17 @@ private fun FullscreenPlayLayout(
         }
         if (showBuffer) {
             OptionDialog("缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
+        }
+        if (showEpisodes) {
+            EpisodeSideSheet(
+                episodes = lineEpisodes,
+                currentIndex = episodeIndex,
+                onSelect = { idx ->
+                    // 切集由 sheet 收回动画结束后通过 onDismiss 统一关闭
+                    onEpisodeSelect(idx)
+                },
+                onDismiss = { showEpisodes = false },
+            )
         }
         if (showAudio) {
             OptionDialog("音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }) { showAudio = false }
@@ -2301,8 +2513,26 @@ private fun ActionBtn(
 }
 
 @Composable
-private fun EpisodeChip(title: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun EpisodeChip(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    showBorder: Boolean = false,
+) {
     val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
+    val isDark = com.ican.tvplay.ui.theme.LocalDarkTheme.current
+    // 描边：仅在"更多"弹窗里显示（showBorder=true）；选集栏不描边
+    val borderModifier = if (showBorder) {
+        val borderColor = if (selected) {
+            MaterialTheme.colorScheme.primary
+        } else if (isDark) {
+            Color.White.copy(alpha = 0.12f)
+        } else {
+            Color.Black.copy(alpha = 0.12f)
+        }
+        Modifier.border(width = 1.dp, color = borderColor, shape = shape)
+    } else Modifier
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -2315,6 +2545,7 @@ private fun EpisodeChip(title: String, selected: Boolean, onClick: () -> Unit, m
                 else MaterialTheme.colorScheme.surfaceVariant,
                 shape,
             )
+            .then(borderModifier)
             .padding(horizontal = 12.dp),
     ) {
         Text(
@@ -2325,6 +2556,138 @@ private fun EpisodeChip(title: String, selected: Boolean, onClick: () -> Unit, m
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
         )
+    }
+}
+
+/** 全屏选集侧边弹窗（fongmi EpisodeListDialog 同款：右侧滑出面板，宽度=max(200dp,最长集名14sp文本宽)且≤屏宽1/3，
+ * 垂直列表、居中 14sp 文本、圆角 8dp 背景、选中集高亮，打开自动滚动到当前集，点击切集并关闭）。
+ * 收回动画与呼出对称：先从右往左滑入，收回时原路从左往右滑出，动画结束再通知父级移除。 */
+@Composable
+private fun EpisodeSideSheet(
+    episodes: List<Episode>,
+    currentIndex: Int,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
+    val configuration = LocalConfiguration.current
+    val textStyle = TextStyle(fontSize = 14.sp)
+    // fongmi getWidth()：minWidth=200dp，逐项取最长文本宽，上限为屏宽 1/3
+    val panelWidth = remember(episodes, configuration) {
+        val minPx = with(density) { 200.dp.toPx() }
+        val maxPx = with(density) { configuration.screenWidthDp.dp.toPx() / 3f }
+        var w = minPx
+        episodes.forEach { ep ->
+            w = maxOf(w, textMeasurer.measure(ep.title, textStyle).size.width.toFloat())
+        }
+        with(density) { minOf(w, maxPx).toDp() }
+    }
+    // 用 Popup 而非 Dialog：Dialog 会新建窗口并自动唤出状态栏/导航栏，破坏全屏沉浸；
+    // Popup 挂在当前窗口内，系统栏保持隐藏
+    // 呼出：首帧面板停在屏外，挂载后从右往左滑入到位（fongmi 弹窗转场同款方向）
+    // 收回：sheetShown=false 触发原路从左往右滑出，动画结束再调用 onDismiss 移除 Popup
+    var sheetShown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { sheetShown = true }
+    val sheetSlideX by animateDpAsState(
+        targetValue = if (sheetShown) 0.dp else panelWidth + 20.dp,
+        animationSpec = tween(260, easing = FastOutSlowInEasing),
+        label = "episodeSheetSlide",
+    )
+    // 收回：播放滑出动画后再通知父级
+    val dismissWithAnim: () -> Unit = {
+        scope.launch {
+            sheetShown = false
+            kotlinx.coroutines.delay(260)
+            onDismiss()
+        }
+    }
+    Popup(
+        onDismissRequest = dismissWithAnim,
+        properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = false),
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // MIUIX 风格遮罩：半透明黑色，点击收起
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = dismissWithAnim,
+                    ),
+            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .offset(x = sheetSlideX)
+                    .fillMaxHeight()
+                    .width(panelWidth)
+                    .background(
+                        Color(0xFF2C2C2C),
+                        RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp),
+                    )
+                    // 面板本体消费点击，避免点面板空白处误触发外层收起
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) {}
+                    .padding(horizontal = 10.dp, vertical = 16.dp),
+            ) {
+                // 标题（深色配色，居中）
+                Text(
+                    text = "选集",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFEDEDF5),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                )
+                val listState = rememberLazyListState(
+                    initialFirstVisibleItemIndex = currentIndex.coerceIn(0, episodes.lastIndex),
+                )
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    itemsIndexed(episodes) { idx, ep ->
+                        val selected = idx == currentIndex
+                        val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(shape)
+                                .background(
+                                    if (selected) Color(0xFF277AF7).copy(alpha = 0.25f)
+                                    else Color.Transparent,
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (selected) Color(0xFF277AF7)
+                                    else Color.White.copy(alpha = 0.12f),
+                                    shape = shape,
+                                )
+                                .clickable { onSelect(idx); dismissWithAnim() }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                        ) {
+                            Text(
+                                text = ep.title,
+                                fontSize = 14.sp,
+                                color = if (selected) Color.White
+                                else Color(0xFFA6A6BA),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -2506,9 +2869,10 @@ private fun AddSubtitleDialog(onAdd: (String, String) -> Unit, onDismiss: () -> 
 // ========== 工具方法 ==========
 
 /**
- * 宽度稳定的时间文字：部分 OEM 定制字体会忽略 tnum，数字宽度随时间逐帧变化会让胶囊持续变形。
+ * 宽度稳定的时间文字：部分 OEM 定制字体会忽略 tnum，数字宽度随时间逐帧变化会让布局跳动。
  * 用「当前时长可能出现的最长时间串」透明占位撑开宽度，真实文字叠放其上居中。
- * 一次拖动会话内视频时长不变 → 占位宽度恒定，胶囊形状不随手指移动而变化。
+ * 一次拖动会话内视频时长不变 → 占位宽度恒定，时间文字位置不随手指移动而变化。
+ * 字体跟随系统默认（不指定 fontFamily），用户设置的系统字体会自动生效。
  */
 @Composable
 private fun StableTimeText(
@@ -2519,13 +2883,10 @@ private fun StableTimeText(
     modifier: Modifier = Modifier,
     prefix: String = "",
 ) {
-    // Monospace 等宽字体：不依赖 OEM 字体是否支持 tnum，数字必然等宽，
-    // 同格式时间串宽度逐帧恒定，居中后连前缀文字位置都不跳动
-    val monoStyle = style.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
     val maxTime = if (durationMs >= 3_600_000L) "00:00:00" else "00:00"
     Box(contentAlignment = Alignment.Center, modifier = modifier) {
-        Text(text = "$prefix$maxTime", style = monoStyle, color = Color.Transparent)
-        Text(text = text, style = monoStyle, color = color)
+        Text(text = "$prefix$maxTime", style = style, color = Color.Transparent)
+        Text(text = text, style = style, color = color)
     }
 }
 
@@ -2635,16 +2996,6 @@ private fun LineSlider(
 private fun formatSpeed(speed: Float): String =
     if (speed == speed.toInt().toFloat()) "${speed.toInt()}.0x" else "${speed}x"
 
-/** 格式化网络速度（bps → 用户可读字符串） */
-private fun formatNetworkSpeed(bps: Long): String {
-    val bytesPerSec = bps / 8
-    return when {
-        bytesPerSec >= 1024 * 1024 -> "%.1f MB/s".format(bytesPerSec / (1024f * 1024f))
-        bytesPerSec >= 1024 -> "%.1f KB/s".format(bytesPerSec / 1024f)
-        else -> "$bytesPerSec B/s"
-    }
-}
-
 private const val RESUME_THRESHOLD_MS = 5_000L
 private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
 
@@ -2687,24 +3038,6 @@ private fun PlayerErrorOverlay(
             color = Color.White.copy(alpha = 0.85f),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        Box(
-            modifier = Modifier
-                .padding(top = 4.dp)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(MaterialTheme.colorScheme.primary)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { onBack() }
-                .padding(horizontal = 24.dp, vertical = 9.dp),
-        ) {
-            Text(
-                text = "返回",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
-        }
     }
 }
 
