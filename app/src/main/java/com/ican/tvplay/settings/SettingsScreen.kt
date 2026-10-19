@@ -63,6 +63,7 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
+import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
@@ -401,8 +402,8 @@ private fun ConfigImportDialog(
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
         renderInRootScaffold = true,
-        // 三边统一 16dp：底部 = 手势条避让(≈13.1dp) + 3dp 垫高
-        outsideMargin = DpSize(16.dp, 3.dp),
+        // 三边统一 16dp：底部 = max(16dp, 系统导航栏高度)，跨设备自适应
+        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
         onDismissRequest = onDismiss,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {

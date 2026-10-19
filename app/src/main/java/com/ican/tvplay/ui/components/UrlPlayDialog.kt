@@ -49,8 +49,8 @@ fun UrlPlayDialog(
         titleColor = MiuixTheme.colorScheme.onBackground,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         renderInRootScaffold = true,
-        // 三边统一 16dp：底部 = 手势条避让(≈13.1dp) + 3dp 垫高
-        outsideMargin = DpSize(16.dp, 3.dp),
+        // 三边统一 16dp：底部 = max(16dp, 系统导航栏高度)，跨设备自适应
+        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
         onDismissRequest = onDismiss,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
