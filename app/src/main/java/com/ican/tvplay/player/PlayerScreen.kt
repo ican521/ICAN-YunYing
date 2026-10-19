@@ -1822,7 +1822,7 @@ private fun EpisodeSection(
 
 /** 选集「更多」分页网格弹窗（照搬 fongmi EpisodeGridDialog 框架 + MIUIX OverlayDialog 风格）：
  *  - 按集名平均长度动态计算列数 spanCount（1~5 列）
- *  - 每页 itemCount = spanCount × 行数（行数由弹窗实测可用高推导，任意设备/横竖屏末行完整）
+ *  - 每页 itemCount = spanCount × 行数（按 2/3 屏高再预留一整行推导，宁少一行不截断）
  *  - 顶部分页 Tab 显示每集范围（如 "1 - 10"），底部 HorizontalPager 切换页面
  *  - 打开自动跳转到当前播放集所在页 */
 @Composable
@@ -1849,11 +1849,35 @@ private fun EpisodeGridDialog(
         avgLen >= 2 -> 4
         else -> 5
     }
-    // 弹窗内容固定区高度估算：标题行28 + titleContentGap×5（标题上下留白、Tab↔网格间距、底部留白 + 安全余量）+ Tab行44；
+    // 行数宁少勿截：miuix 弹窗硬限总高 2/3 屏高，在此基础再预留一整行(46dp)安全余量，
+    // 保证任意设备/横竖屏/视频下末行完整不截断。固定区 = 标题行28 + titleContentGap×5（留白+安全余量）+ Tab行44；
     // 每行占高 = chip 40dp（固定 dp，不随字体缩放）+ 行距 6dp
     val dialogFixedHeight = 28.dp + Spacing.titleContentGap * 5 + 44.dp
-    // 实测拿不到上限时的回退估算：miuix 弹窗硬限总高 2/3 屏高
-    val fallbackCapHeight = with(configuration) { (screenHeightDp * 2f / 3f).dp }
+    val dialogCapHeight = with(configuration) { (screenHeightDp * 2f / 3f).dp }
+    val rowsPerPage = ((dialogCapHeight - dialogFixedHeight - 46.dp).value / 46f).toInt().coerceIn(3, 10)
+    val itemCount = spanCount * rowsPerPage
+    // 空集（详情加载中）时 pageCount 至少为 1，避免 coerceIn(0, -1) 崩溃
+    val pageCount = ((displayEps.size + itemCount - 1) / itemCount).coerceAtLeast(1)
+
+    // 分页标题：始终正序 "1 - 10" / "11 - 20" ...
+    val pageTitles = (0 until pageCount).map { p ->
+        val start = p * itemCount + 1
+        val end = minOf((p + 1) * itemCount, displayEps.size)
+        "$start - $end"
+    }
+
+    // 当前播放集所在页（始终按正序分页计算）
+    val currentPage = if (displayEps.isNotEmpty()) {
+        (currentIndex / itemCount).coerceIn(0, pageCount - 1)
+    } else 0
+
+    val pagerState = rememberPagerState(initialPage = currentPage, pageCount = { pageCount })
+    val scope = rememberCoroutineScope()
+
+    // 每次弹窗打开时，强制跳回当前播放集所在页（不记忆上次浏览页）
+    LaunchedEffect(show) {
+        if (show) pagerState.scrollToPage(currentPage)
+    }
 
     OverlayDialog(
         show = show,
@@ -1869,36 +1893,7 @@ private fun EpisodeGridDialog(
         // 水平/垂直留白统一 titleContentGap：选集网格不再贴死弹窗左右边缘
         insideMargin = DpSize(Spacing.titleContentGap, Spacing.titleContentGap),
     ) {
-        // 实测 miuix 实际分配给内容的最大高度来推导行数：估算误差只会少算行数、不会溢出，
-        // 结构上杜绝末行截断（任意设备/横竖屏/视频均适用）；拿不到上限（无界）时回退 2/3 屏高估算
-        androidx.compose.foundation.layout.BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val grantedHeight = if (constraints.hasBoundedHeight) maxHeight else fallbackCapHeight
-            val rowsPerPage = ((grantedHeight - dialogFixedHeight).value / 46f).toInt().coerceIn(3, 10)
-            val itemCount = spanCount * rowsPerPage
-            // 空集（详情加载中）时 pageCount 至少为 1，避免 coerceIn(0, -1) 崩溃
-            val pageCount = ((displayEps.size + itemCount - 1) / itemCount).coerceAtLeast(1)
-
-            // 分页标题：始终正序 "1 - 10" / "11 - 20" ...
-            val pageTitles = (0 until pageCount).map { p ->
-                val start = p * itemCount + 1
-                val end = minOf((p + 1) * itemCount, displayEps.size)
-                "$start - $end"
-            }
-
-            // 当前播放集所在页（始终按正序分页计算）
-            val currentPage = if (displayEps.isNotEmpty()) {
-                (currentIndex / itemCount).coerceIn(0, pageCount - 1)
-            } else 0
-
-            val pagerState = rememberPagerState(initialPage = currentPage, pageCount = { pageCount })
-            val scope = rememberCoroutineScope()
-
-            // 每次弹窗打开时，强制跳回当前播放集所在页（不记忆上次浏览页）
-            LaunchedEffect(show) {
-                if (show) pagerState.scrollToPage(currentPage)
-            }
-
-            Column(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             if (pageCount > 1) {
                 androidx.compose.material3.ScrollableTabRow(
                     selectedTabIndex = pagerState.currentPage,
@@ -1980,7 +1975,6 @@ private fun EpisodeGridDialog(
                         )
                     }
                 }
-            }
             }
         }
     }
