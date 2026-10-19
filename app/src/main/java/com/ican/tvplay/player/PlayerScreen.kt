@@ -1907,19 +1907,19 @@ private fun EpisodeGridDialog(
                     .fillMaxWidth()
                     .padding(top = Spacing.titleContentGap),
             )
-            // 标题 ↔ Tab/网格 间距复用播放页「标题↔按钮」间距，不单独设值
-            Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+            // 标题 ↔ Tab 间距：3dp 实测补偿值——文字行高自带隐藏空隙（标题下缘约 4dp + Tab 内部约 7.8dp），
+            // 补偿后标题墨迹↔Tab 墨迹 ≈ 14.8dp，与「弹窗顶↔标题」14.5dp、「Tab↔网格」14.7dp 三段等距
+            Spacer(modifier = Modifier.height(3.dp))
             if (pageCount > 1) {
                 androidx.compose.material3.ScrollableTabRow(
                     selectedTabIndex = pagerState.currentPage,
                     containerColor = Color.Transparent,
                     contentColor = MiuixTheme.colorScheme.onBackground,
-                    edgePadding = 0.dp,
+                    // 与选集网格同款行为：静止时首个 Tab 距弹窗边 12dp，滚动时 Tab 可贴到弹窗最边缘
+                    edgePadding = Spacing.titleContentGap,
                     divider = {},
                     // 删除 Tab 底部蓝色指示器（仅靠选中色区分当前页）
                     indicator = {},
-                    // Tab 行左右内缩 12dp（网格通到边缘后 Tab 仍与旧版视觉位置一致）
-                    modifier = Modifier.padding(horizontal = Spacing.titleContentGap),
                 ) {
                     pageTitles.forEachIndexed { idx, title ->
                         val isSelected = pagerState.currentPage == idx
@@ -1929,7 +1929,7 @@ private fun EpisodeGridDialog(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
                                 ) { scope.launch { pagerState.animateScrollToPage(idx) } }
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
@@ -1941,8 +1941,8 @@ private fun EpisodeGridDialog(
                         }
                     }
                 }
-                // 分页 Tab 与选集网格的间距复用播放页「标题↔按钮」间距，不单独设值
-                Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+                // Tab ↔ 网格间距：4dp 实测补偿值（Tab 行内部隐藏空隙约 6.7dp），补偿后墨迹间距 ≈14.7dp
+                Spacer(modifier = Modifier.height(4.dp))
             }
             HorizontalPager(
                 state = pagerState,
