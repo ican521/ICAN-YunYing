@@ -1890,7 +1890,8 @@ private fun EpisodeGridDialog(
         // 占满当前状态下允许的最大宽度（去掉库默认 maxWidth 上限），
         // 左右外边距对齐播放页内容边距（pageHorizontalPadding）
         maxWidth = Dp.Infinity,
-        outsideMargin = DpSize(pageHorizontalPadding(), 0.dp),
+        // 三边统一 16dp：左右 = 播放页内容区边距；底部 = 手势条避让(≈13.1dp) + 3dp 垫高
+        outsideMargin = DpSize(pageHorizontalPadding(), 3.dp),
         // 弹窗内部边距全部归零、由内容区自控：选集网格左右不再内缩，
         // 滑动切页时网格内容直接绘制到弹窗最左/最右边缘；Tab 单独保留 12dp 内缩
         insideMargin = DpSize(0.dp, 0.dp),
