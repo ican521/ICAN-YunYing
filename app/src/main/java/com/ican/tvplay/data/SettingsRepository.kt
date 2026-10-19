@@ -2,7 +2,6 @@ package com.ican.tvplay.data
 
 import android.content.Context
 import com.ican.tvplay.data.remote.TvBoxSite
-import com.ican.tvplay.ui.components.DriveConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -168,15 +167,6 @@ class SettingsRepository(context: Context) {
         _playerScale.value = scale
     }
 
-    /** 解码内核：HARD / SOFT（ffmpeg 软解） */
-    private val _playerDecode = MutableStateFlow(prefs.getString(KEY_PLAYER_DECODE, null).orEmpty())
-    val playerDecode: StateFlow<String> = _playerDecode.asStateFlow()
-
-    fun setPlayerDecode(decode: String) {
-        prefs.edit().putString(KEY_PLAYER_DECODE, decode).apply()
-        _playerDecode.value = decode
-    }
-
     /** 播放内核：EXO / MPV（默认 EXO，仿 fongmi PlayerSetting.player_engine） */
     private val _playerEngine = MutableStateFlow(prefs.getString(KEY_PLAYER_ENGINE, null).orEmpty())
     val playerEngine: StateFlow<String> = _playerEngine.asStateFlow()
@@ -204,6 +194,15 @@ class SettingsRepository(context: Context) {
     fun setPlayerBackgroundPlay(mode: Int) {
         prefs.edit().putInt(KEY_PLAYER_BACKGROUND, mode).apply()
         _playerBackgroundPlay.value = mode
+    }
+
+    /** 收藏同步模式（fongmi Setting.sync_mode）：0=双向 1=上传 2=下载 */
+    private val _syncMode = MutableStateFlow(prefs.getInt(KEY_SYNC_MODE, 0))
+    val syncMode: StateFlow<Int> = _syncMode.asStateFlow()
+
+    fun setSyncMode(mode: Int) {
+        prefs.edit().putInt(KEY_SYNC_MODE, mode).apply()
+        _syncMode.value = mode
     }
 
     // ---- 搜索历史 ----
@@ -236,6 +235,37 @@ class SettingsRepository(context: Context) {
         _searchHistory.value = updated
     }
 
+    /**
+     * 从 SharedPreferences 重新读取全部设置到 StateFlow（恢复备份后调用，免重启生效，
+     * 对齐 fongmi SettingFragment 恢复成功后 initConfig() 的重载语义）。
+     */
+    fun reloadFromPrefs() {
+        _themeMode.value = runCatching {
+            ThemeMode.valueOf(prefs.getString(KEY_THEME, null) ?: ThemeMode.SYSTEM.name)
+        }.getOrDefault(ThemeMode.SYSTEM)
+        _themeColor.value = prefs.getInt(KEY_THEME_COLOR, 0)
+        _enableBlur.value = prefs.getBoolean(KEY_ENABLE_BLUR, false)
+        _topBarBlurEnabled.value = prefs.getBoolean(KEY_TOP_BAR_BLUR, true)
+        _enablePredictiveBack.value = prefs.getBoolean(KEY_PREDICTIVE_BACK, false)
+        _homeLayoutSize.value = runCatching {
+            HomeLayoutSize.valueOf(
+                prefs.getString(KEY_HOME_LAYOUT_SIZE, null) ?: HomeLayoutSize.MEDIUM.name,
+            )
+        }.getOrDefault(HomeLayoutSize.MEDIUM)
+        _configUrl.value = prefs.getString(KEY_CONFIG_URL, null).orEmpty()
+        _siteKey.value = prefs.getString(KEY_SITE_KEY, null).orEmpty()
+        _playerSpeed.value = prefs.getFloat(KEY_PLAYER_SPEED, 1.0f)
+        _playerScale.value = prefs.getString(KEY_PLAYER_SCALE, null).orEmpty()
+        _playerEngine.value = prefs.getString(KEY_PLAYER_ENGINE, null).orEmpty()
+        _playerBuffer.value = prefs.getInt(KEY_PLAYER_BUFFER, 1)
+        _playerBackgroundPlay.value = prefs.getInt(KEY_PLAYER_BACKGROUND, BACKGROUND_OFF)
+        _syncMode.value = prefs.getInt(KEY_SYNC_MODE, 0)
+        _searchHistory.value = runCatching {
+            prefs.getStringSet(KEY_SEARCH_HISTORY, emptySet()).orEmpty().toList()
+        }.getOrDefault(emptyList())
+        _siteToggleVersion.value += 1
+    }
+
     private companion object {
         const val KEY_THEME = "theme_mode"
         const val KEY_THEME_COLOR = "theme_color"
@@ -249,53 +279,11 @@ class SettingsRepository(context: Context) {
         const val KEY_SITE_CHANGEABLE_PREFIX = "site_changeable_"
         const val KEY_PLAYER_SPEED = "player_speed"
         const val KEY_PLAYER_SCALE = "player_scale"
-        const val KEY_PLAYER_DECODE = "player_decode"
         const val KEY_PLAYER_ENGINE = "player_engine"
         const val KEY_PLAYER_BUFFER = "player_buffer"
         const val KEY_PLAYER_BACKGROUND = "player_background"
+        const val KEY_SYNC_MODE = "sync_mode"
         const val KEY_SEARCH_HISTORY = "search_history"
         const val MAX_SEARCH_HISTORY = 10
-        const val KEY_DRIVE_CONFIGS = "drive_configs"
-    }
-
-    // ---- 网盘配置 ----
-
-    private val _driveConfigs = MutableStateFlow(
-        runCatching {
-            prefs.getStringSet(KEY_DRIVE_CONFIGS, emptySet()).orEmpty()
-                .mapNotNull { str ->
-                    // 格式：name|action|token|order
-                    val parts = str.split("|")
-                    if (parts.size >= 4) {
-                        DriveConfig(
-                            name = parts[0],
-                            action = parts[1],
-                            token = parts[2],
-                            order = parts[3].toIntOrNull() ?: 0,
-                        )
-                    } else null
-                }
-                .sortedBy { it.order }
-        }.getOrDefault(emptyList()),
-    )
-    val driveConfigs: StateFlow<List<DriveConfig>> = _driveConfigs.asStateFlow()
-
-    fun saveDriveConfigs(configs: List<DriveConfig>) {
-        val strSet = configs.mapIndexed { index, config ->
-            "${config.name}|${config.action}|${config.token}|$index"
-        }.toSet()
-        prefs.edit().putStringSet(KEY_DRIVE_CONFIGS, strSet).apply()
-        _driveConfigs.value = configs
-    }
-
-    fun addDriveConfig(config: DriveConfig) {
-        val updated = _driveConfigs.value.toMutableList()
-        updated.add(config)
-        saveDriveConfigs(updated)
-    }
-
-    fun removeDriveConfig(action: String) {
-        val updated = _driveConfigs.value.filter { it.action != action }
-        saveDriveConfigs(updated)
     }
 }

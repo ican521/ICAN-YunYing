@@ -286,10 +286,12 @@ class SpiderManager(private val appContext: Context) {
         playUrl: String,
         flag: String,
     ): com.ican.tvplay.data.PlaySource = withContext(Dispatchers.IO) {
-        if (!site.isSpider()) return@withContext com.ican.tvplay.data.PlaySource(playUrl)
+        // fongmi Source.fetch：处理特殊协议（video://、push://等）
+        val fixedPlayUrl = fixSpecialProtocol(playUrl)
+        if (!site.isSpider()) return@withContext com.ican.tvplay.data.PlaySource(fixedPlayUrl)
         val spider = getSpider(site, jarSpec)
-            ?: return@withContext com.ican.tvplay.data.PlaySource(playUrl)
-        val jsonStr = playerContent(spider, flag.ifBlank { site.key }, playUrl)
+            ?: return@withContext com.ican.tvplay.data.PlaySource(fixedPlayUrl)
+        val jsonStr = playerContent(spider, flag.ifBlank { site.key }, fixedPlayUrl)
         if (jsonStr.isBlank()) return@withContext com.ican.tvplay.data.PlaySource(playUrl)
         runCatching {
             val json = Json { ignoreUnknownKeys = true }
@@ -315,6 +317,15 @@ class SpiderManager(private val appContext: Context) {
             }
             com.ican.tvplay.data.PlaySource(url = finalUrl.ifBlank { playUrl }, headers = headers)
         }.getOrNull() ?: com.ican.tvplay.data.PlaySource(playUrl)
+    }
+
+    /** fongmi Source.fetch：处理特殊协议（video:// 去前缀，其他协议暂时直接返回） */
+    private fun fixSpecialProtocol(url: String): String {
+        return when {
+            url.startsWith("video://") -> url.substring(8)
+            url.startsWith("push://") -> url.substring(7)
+            else -> url
+        }
     }
 
     // ---- 内部：jar 下载 / 校验 / 加载 ----

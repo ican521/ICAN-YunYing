@@ -143,10 +143,6 @@ object Players {
         return if (c != null && c.video.id == videoId) c else null
     }
 
-    /** 跨站源场景下：MultiSourceSearchScreen 提前解析好的 PlaySpec（已经 jx/parse 处理过真实 URL + headers）
-     *  PlayerScreen LaunchedEffect 里优先用这个，避免 VideoRepository.resolvePlaySource 查 currentSite 错站 */
-    var pendingPreStartSpec: PlaySpec? = null
-
     // ---- 后台续播 / 通知栏控制 / PiP ----
 
     /** 当前播放的剧集上下文：通知栏展示 + 上一集/下一集切换 + 后台片尾自动切集所需 */
@@ -251,7 +247,8 @@ object Players {
         }
         playbackContext = ctx.copy(episodeIndex = targetIndex)
         val act = appContext ?: return
-        start(act, PlaySpec(url = source.url, headers = source.headers))
+        // 后台切集同样跳过片头
+        start(act, PlaySpec(url = source.url, headers = source.headers), startPositionMs = ctx.openingMs)
         // 后台切集：把新集锚点写进历史（进度从 0 开始计）
         val dao = container.historyDao
         val index = targetIndex
@@ -572,14 +569,47 @@ object Players {
             } else {
                 // fongmi PlayerEngine.HARD/SOFT → mpv hwdec（C.DECODE_HARDWARE=1 / DECODE_SOFTWARE=0，官方 C 无常量，直接传值）
                 val mpvDecode = if (decode == Decode.SOFT) 0 else 1
-                return MpvPlayer.Builder(ctx).setDecode(mpvDecode).build().apply {
-                    addListener(listener)
-                    setPlaybackSpeed(_state.value.speed)
-                    playWhenReady = true
+                return try {
+                    val config = buildMpvConfig(ctx)
+                    MpvPlayer.Builder(ctx).setDecode(mpvDecode).setConfig(config).build().apply {
+                        addListener(listener)
+                        setPlaybackSpeed(_state.value.speed)
+                        playWhenReady = true
+                    }
+                } catch (t: Throwable) {
+                    // MPV native 初始化失败（如缺少配置目录/证书等），回退 EXO 避免闪退
+                    Log.e(TAG, "MPV build failed, fallback to EXO", t)
+                    _state.value = _state.value.copy(kernel = Kernel.EXO)
+                    buildExoPlayer(ctx, decode, tier)
                 }
             }
         }
         return buildExoPlayer(ctx, decode, tier)
+    }
+
+    /**
+     * 构建 MpvPlayerConfig（fongmi MpvUtil.buildConfig 简化版）：
+     * 配置目录（mpv.conf 读取）+ shader 缓存 + Android 默认选项，
+     * 缺少这些配置时 MPV native 初始化可能崩溃。
+     */
+    private fun buildMpvConfig(ctx: Context): androidx.media3.mpvplayer.MpvPlayerConfig {
+        val mpvDir = java.io.File(ctx.filesDir, "mpv").apply { mkdirs() }
+        val mpvCacheDir = java.io.File(ctx.cacheDir, "mpv").apply { mkdirs() }
+        // fongmi MpvUtil.buildConfig 同款：指定 CA 证书包，mpv(curl) 拉流 TLS 校验必需，
+        // 否则报 "TLS certificate verification failed" 所有 https 分片打不开
+        val caFile = java.io.File(ctx.filesDir, "cacert.pem")
+        return androidx.media3.mpvplayer.MpvPlayerConfig.Builder()
+            .addConfigDirectory(mpvDir)
+            .addTlsCaFileFromAsset(ctx, "cacert.pem", caFile)
+            .addAndroidDefaults(
+                androidx.media3.mpvplayer.MpvAndroidOptions.Builder()
+                    .setShaderCacheDirectory(mpvCacheDir)
+                    .setAudioPassthroughEnabled(false)
+                    .setVulkanEnabled(false)
+                    .setGpuNextEnabled(false)
+                    .build(),
+            )
+            .build()
     }
 
     /** 仿 fongmi ExoUtil.buildPlayer/buildLoadControl/buildRenderersFactory 的官方 media3 等价实现 */

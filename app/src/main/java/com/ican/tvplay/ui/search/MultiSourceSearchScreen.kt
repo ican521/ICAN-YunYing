@@ -59,7 +59,6 @@ import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.ui.MultiSourceSearchViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
-import com.ican.tvplay.ui.components.DriveConfigDialog
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixSearchInput
@@ -94,25 +93,6 @@ fun MultiSourceSearchScreen(
     val searchedQuery by vm.query.collectAsStateWithLifecycle()
 
     var queryText by remember { mutableStateOf(initialQuery) }
-
-    // 网盘配置弹窗：action 卡片（网盘设置入口）点击时弹出，不进播放页
-    var driveDialogTarget by remember { mutableStateOf<Pair<Video, String>?>(null) }
-    val driveConfigs by vm.driveConfigs.collectAsStateWithLifecycle()
-    driveDialogTarget?.let { (video, siteKey) ->
-        DriveConfigDialog(
-            video = video,
-            drives = driveConfigs,
-            onDismiss = { driveDialogTarget = null },
-            onSave = { configs ->
-                vm.saveDriveConfigs(configs)
-                vm.executeAction(siteKey, video.action) { msg ->
-                    if (msg.isNotBlank()) {
-                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                }
-            },
-        )
-    }
 
     // 首次进入时触发跨站搜索（initialQuery 非空才触发）；
     // 播放页返回时若已有同词结果则跳过，保持列表与滚动位置不变
@@ -244,8 +224,13 @@ fun MultiSourceSearchScreen(
                             video = dv.video,
                             siteName = dv.siteName,
                             onClick = {
+                                // fongmi 同款：action 卡片直接执行 jar action → Toast 返回 msg
                                 if (dv.video.action.isNotBlank()) {
-                                    driveDialogTarget = dv.video to dv.siteKey
+                                    vm.executeAction(dv.siteKey, dv.video.action) { msg ->
+                                        if (msg.isNotBlank()) {
+                                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 } else {
                                     handlePlayClick(vm, dv.video, dv.siteKey, onPlay)
                                 }

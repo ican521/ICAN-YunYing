@@ -242,4 +242,28 @@ object AppIcons {
         "forward",
         "M4 18l8.5-6L4 6v12zm9.5-12v12l8.5-6-8.5-6z",
     )
+
+    // 链接图标（fongmi PushActivity 同款：输入链接解析播放）
+    val Link: ImageVector = vector(
+        "link",
+        "M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z",
+    )
+
+    // 云同步图标（收藏上传/下载同步）
+    val CloudSync: ImageVector = vector(
+        "cloud_sync",
+        "M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM10 17l-3.5-3.5L8.5 11.5l1.5 1.5 3-3 1.5 1.5L10 17zm6.5-7h-2v2h3v-2h-3z",
+    )
+
+    // 电视图标（收藏同步设备列表 type=0，fongmi ic_cast_tv）
+    val Tv: ImageVector = vector(
+        "tv",
+        "M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z",
+    )
+
+    // 手机图标（收藏同步设备列表 type=1，fongmi ic_cast_phone）
+    val Phone: ImageVector = vector(
+        "phone",
+        "M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z",
+    )
 }

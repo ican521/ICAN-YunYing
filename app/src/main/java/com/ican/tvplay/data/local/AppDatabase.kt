@@ -10,8 +10,10 @@ import androidx.room.RoomDatabase
 import androidx.room.Upsert
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.Serializable
 
 /** 收藏记录 */
+@Serializable
 @Entity(tableName = "favorites")
 data class FavoriteEntity(
     @PrimaryKey val videoId: String,
@@ -26,6 +28,7 @@ data class FavoriteEntity(
 )
 
 /** 播放历史（含播放进度） */
+@Serializable
 @Entity(tableName = "history")
 data class HistoryEntity(
     @PrimaryKey val videoId: String,
@@ -45,7 +48,37 @@ data class HistoryEntity(
     val sourceKey: String = "",
     /** 站源显示名（仅取 | 前名称），历史卡片与播放页站源行用 */
     val sourceName: String = "",
+    /** 上次播放所选线路 flag：从历史续播时恢复同一条线路 */
+    val lineFlag: String = "",
 )
+
+/** 局域网同步设备（fongmi Device 精简版：uuid/name/ip/type，type 0=电视 1=手机） */
+@Serializable
+@Entity(
+    tableName = "devices",
+    indices = [androidx.room.Index(value = ["uuid", "name"], unique = true)],
+)
+data class DeviceEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val uuid: String = "",
+    val name: String = "",
+    /** 完整地址，含协议与端口，如 http://192.168.1.5:9978 */
+    val ip: String = "",
+    val type: Int = 0,
+)
+
+@Dao
+interface DeviceDao {
+
+    @Query("SELECT * FROM devices")
+    fun observeAll(): Flow<List<DeviceEntity>>
+
+    @androidx.room.Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdate(device: DeviceEntity)
+
+    @Query("DELETE FROM devices")
+    suspend fun clear()
+}
 
 @Dao
 interface FavoriteDao {
@@ -89,13 +122,14 @@ interface HistoryDao {
 }
 
 @Database(
-    entities = [FavoriteEntity::class, HistoryEntity::class],
-    version = 4,
+    entities = [FavoriteEntity::class, HistoryEntity::class, DeviceEntity::class],
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao
     abstract fun historyDao(): HistoryDao
+    abstract fun deviceDao(): DeviceDao
 
     companion object {
         /** v1→v2：history 表增加片头/片尾标记列 */
@@ -122,14 +156,46 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v4→v5：新增局域网同步设备表（fongmi Device） */
+        private val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS devices (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "uuid TEXT NOT NULL DEFAULT '', " +
+                        "name TEXT NOT NULL DEFAULT '', " +
+                        "ip TEXT NOT NULL DEFAULT '', " +
+                        "type INTEGER NOT NULL DEFAULT 0)",
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_devices_uuid_name ON devices (uuid, name)")
+            }
+        }
+
+        /** v5→v6：history 表增加 lineFlag 列（上次播放所选线路，旧数据留空兜底首条线路） */
+        private val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE history ADD COLUMN lineFlag TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 "tvplay.db",
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigration()
                 .build()
+
+        /** 全局单例（fongmi AppDatabase.get 同款）：UI、同步、备份共用同一连接，
+         *  保证写入能触发对方 Room Flow 的失效通知，避免各开各的连接导致 WAL 不可见。 */
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        fun get(context: Context): AppDatabase =
+            INSTANCE ?: synchronized(this) {
+                INSTANCE ?: create(context.applicationContext).also { INSTANCE = it }
+            }
     }
 }

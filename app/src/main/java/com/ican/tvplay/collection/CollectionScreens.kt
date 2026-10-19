@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -38,7 +40,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -85,6 +86,20 @@ fun FavoritesScreen(
     var editMode by remember { mutableStateOf(false) }
     // 清空确认弹窗
     var showConfirm by remember { mutableStateOf(false) }
+    // 收藏同步弹窗（fongmi SyncDialog：局域网设备列表 + 双向/上传/下载模式）
+    var showSyncDialog by remember { mutableStateOf(false) }
+    val devices by viewModel.devices.collectAsStateWithLifecycle()
+    val syncMode by viewModel.syncMode.collectAsStateWithLifecycle()
+    var scanning by remember { mutableStateOf(false) }
+
+    // 打开同步弹窗：无历史设备时自动扫描（fongmi SyncDialog.getDevice）
+    androidx.compose.runtime.LaunchedEffect(showSyncDialog) {
+        if (showSyncDialog && devices.isEmpty() && !scanning) {
+            scanning = true
+            viewModel.rescanDevices(context)
+            scanning = false
+        }
+    }
 
     // 编辑模式下按返回 = 取消编辑（不退出页面）；清空弹窗打开时返回由弹窗自行消费
     BackHandler(enabled = editMode && !showConfirm) { editMode = false }
@@ -104,6 +119,16 @@ fun FavoritesScreen(
                     title = "我的收藏",
                     titleColor = MaterialTheme.colorScheme.onBackground,
                     largeTitleColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIcon = {
+                        // 云同步按钮：上传/导入收藏
+                        androidx.compose.material3.IconButton(onClick = { showSyncDialog = true }) {
+                            androidx.compose.material3.Icon(
+                                imageVector = com.ican.tvplay.ui.components.AppIcons.CloudSync,
+                                contentDescription = "收藏同步",
+                                tint = MaterialTheme.colorScheme.onBackground,
+                            )
+                        }
+                    },
                     scrollBehavior = scrollBehavior,
                 )
             }
@@ -196,6 +221,186 @@ fun FavoritesScreen(
             editMode = false
         },
     )
+
+    // 收藏同步弹窗（照搬 fongmi SyncDialog：标题 + 模式切换 + 刷新 + 设备列表；
+    // 点设备按当前模式同步，长按且模式非双向时强制同步——接收端先清空再写入）
+    if (showSyncDialog) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showSyncDialog = false }) {
+            androidx.compose.material3.Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.pageHorizontal),
+                shape = RoundedCornerShape(Spacing.corner),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.sectionSpacing),
+                ) {
+                    // 标题行：选择设备 | 模式切换 | 重新扫描（fongmi dialog_device.xml）
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "选择设备",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        // 同步模式：双向 / 上传 / 下载（fongmi mode 按钮循环切换）
+                        Box(
+                            modifier = Modifier
+                                .clickable { viewModel.cycleSyncMode() }
+                                .background(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                    RoundedCornerShape(Spacing.corner),
+                                )
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = when (syncMode) {
+                                    com.ican.tvplay.data.FavoriteSync.MODE_UPLOAD -> "上传"
+                                    com.ican.tvplay.data.FavoriteSync.MODE_DOWNLOAD -> "下载"
+                                    else -> "双向"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(Spacing.titleContentGap))
+                        androidx.compose.material3.IconButton(
+                            onClick = {
+                                if (!scanning) {
+                                    scope.launch {
+                                        scanning = true
+                                        viewModel.rescanDevices(context)
+                                        scanning = false
+                                    }
+                                }
+                            },
+                        ) {
+                            Icon(
+                                imageVector = AppIcons.Refresh,
+                                contentDescription = "重新扫描",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+
+                    when {
+                        scanning && devices.isEmpty() -> {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                Spacer(modifier = Modifier.width(Spacing.titleContentGap))
+                                Text(
+                                    "正在扫描局域网设备…",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        devices.isEmpty() -> {
+                            Text(
+                                "未发现设备，请确保其他设备已打开本应用",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 24.dp),
+                            )
+                        }
+                        else -> {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                devices.forEach { device ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .tvCardEffect(
+                                                onClick = {
+                                                    // fongmi SyncDialog.onItemClick
+                                                    scope.launch {
+                                                        val ok = com.ican.tvplay.data.FavoriteSync
+                                                            .send(context, device, syncMode, false)
+                                                        android.widget.Toast.makeText(
+                                                            context,
+                                                            if (ok) "已发送到 ${device.name}" else "发送失败",
+                                                            android.widget.Toast.LENGTH_SHORT,
+                                                        ).show()
+                                                        if (ok) showSyncDialog = false
+                                                    }
+                                                },
+                                                shape = RoundedCornerShape(Spacing.corner),
+                                                focusedScale = 1.03f,
+                                                glow = false,
+                                                onLongClick = {
+                                                    // fongmi SyncDialog.onLongClick：模式非双向时强制同步
+                                                    if (syncMode == com.ican.tvplay.data.FavoriteSync.MODE_TWO_WAY) return@tvCardEffect
+                                                    scope.launch {
+                                                        val ok = com.ican.tvplay.data.FavoriteSync
+                                                            .send(context, device, syncMode, true)
+                                                        android.widget.Toast.makeText(
+                                                            context,
+                                                            if (ok) "已强制同步到 ${device.name}" else "发送失败",
+                                                            android.widget.Toast.LENGTH_SHORT,
+                                                        ).show()
+                                                        if (ok) showSyncDialog = false
+                                                    }
+                                                },
+                                            )
+                                            .background(
+                                                MaterialTheme.colorScheme.surfaceVariant,
+                                                RoundedCornerShape(Spacing.corner),
+                                            )
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        // 设备类型图标（fongmi adapter_device：type）
+                                        Icon(
+                                            imageVector = if (device.type == 0) AppIcons.Tv else AppIcons.Phone,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(24.dp),
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = device.name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                            Text(
+                                                text = device.ip,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /** 收藏卡片：与首页 [VideoCard] 同款 miuix Card 容器 + SinkFeedback 按压形变；

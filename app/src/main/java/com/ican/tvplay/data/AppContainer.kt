@@ -2,6 +2,7 @@ package com.ican.tvplay.data
 
 import android.content.Context
 import com.ican.tvplay.data.local.AppDatabase
+import com.ican.tvplay.data.local.DeviceDao
 import com.ican.tvplay.data.local.FavoriteDao
 import com.ican.tvplay.data.local.HistoryDao
 import kotlinx.coroutines.CoroutineScope
@@ -17,10 +18,11 @@ class AppContainer(context: Context) {
      */
     val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val database: AppDatabase by lazy { AppDatabase.create(context) }
+    private val database: AppDatabase by lazy { AppDatabase.get(context) }
 
     val favoriteDao: FavoriteDao by lazy { database.favoriteDao() }
     val historyDao: HistoryDao by lazy { database.historyDao() }
+    val deviceDao: DeviceDao by lazy { database.deviceDao() }
 
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(context) }
     val videoRepository: VideoRepository by lazy {

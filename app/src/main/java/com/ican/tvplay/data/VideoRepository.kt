@@ -332,6 +332,55 @@ class VideoRepository(
         result
     }
 
+    /**
+     * 链接解析播放（照搬 fongmi SiteApi.detailContent / playerContent 的 PUSH 分支）：
+     * 1. Sniffer.getUrl 提取链接；
+     * 2. 配置中存在 key="push_agent" 的 spider 站 → 构造元数据空壳 Video（id=链接）并缓存，
+     *    完整详情（网盘多集展开）交由播放页 needAsyncDetail 异步补拉，慢站源也能秒进播放页；
+     * 3. 无该站 → 本地构造直链 Vod 兜底（fongmi site.isEmpty() && PUSH 分支）。
+     * 返回缓存后的 videoId（站点信息一并缓存，播放页经 playerContent 解析真实地址），null 表示无法解析。
+     */
+    suspend fun processPushUrl(rawText: String): String? =
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            val url = com.ican.tvplay.ui.components.UrlPlayHelper.getUrl(rawText)
+            val configUrl = settingsRepository.configUrl.value
+            if (configUrl.isNotBlank()) {
+                runCatching {
+                    val config = apiClient.loadConfig(configUrl)
+                    val pushSite = config?.sites?.firstOrNull { it.key == "push_agent" && it.isSpider() }
+                    if (config != null && pushSite != null) {
+                        val jarSpec = pushSite.jar.ifBlank { config.spider }
+                        val spider = spiderManager.getSpider(pushSite, jarSpec)
+                        if (spider != null) {
+                            // 元数据空壳：id=原始链接，播放页 needAsyncDetail 会调用
+                            // detailContent(spider, listOf(url)) 展开网盘多集——慢站源秒进播放页
+                            val video = com.ican.tvplay.data.model.Video(
+                                id = url,
+                                title = "推送播放",
+                                cover = "",
+                                categoryId = "",
+                                categoryName = "推送播放",
+                                year = 0,
+                                rating = "",
+                                region = "",
+                                description = "推送：$url",
+                                tags = emptyList(),
+                                episodes = emptyList(),
+                                playFrom = "",
+                                playSources = emptyList(),
+                                sourceName = pushSite.name,
+                            )
+                            com.ican.tvplay.player.core.Players.cacheVideo(video, pushSite.key, pushSite, jarSpec)
+                            Log.d(REPO_TAG, "processPushUrl shell ready, defer detail to PlayerScreen")
+                            return@withContext url
+                        }
+                    }
+                }.onFailure { Log.e(REPO_TAG, "processPushUrl spider setup fail", it) }
+            }
+            // 无 push_agent 站 / spider 初始化失败：本地直链拆分（fongmi site.isEmpty() 分支同款）
+            com.ican.tvplay.ui.components.UrlPlayHelper.preparePushPlay(rawText)
+        }
+
     /** 切换站点：记录选择并重新加载分类（reload 内部已加 loadMutex，此处不可重复加锁——Mutex 不可重入会死锁） */
     suspend fun switchSite(siteKey: String) {
         settingsRepository.setSiteKey(siteKey)
@@ -601,6 +650,7 @@ class VideoRepository(
             episodes = playSources.firstOrNull()?.episodes.orEmpty(),
             playFrom = firstPlayFrom,
             playSources = playSources,
+            action = action,
         )
     }
 

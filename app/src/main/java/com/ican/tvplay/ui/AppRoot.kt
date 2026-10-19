@@ -24,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -58,6 +59,7 @@ import com.ican.tvplay.ui.theme.LightSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.TvPlayTheme
 import com.ican.tvplay.ui.theme.popupDimColor
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -90,6 +92,10 @@ fun AppRoot() {
             true
         }
     }
+
+    // 链接解析播放弹窗状态
+    var showUrlDialog by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val urlParseScope = androidx.compose.runtime.rememberCoroutineScope()
 
     TvPlayTheme(
         themeMode = themeMode,
@@ -194,6 +200,7 @@ fun AppRoot() {
                                 },
                                 onSearchClick = { navigator.push(Route.Search) },
                                 onHistoryClick = { navigator.push(Route.History) },
+                                onUrlPlayClick = { showUrlDialog = true },
                             )
 
                             1 -> FavoritesScreen(
@@ -296,6 +303,25 @@ fun AppRoot() {
                     }
                 }
             }
+
+            // 链接解析播放弹窗（fongmi PushActivity 同款）：show 驱动 OverlayDialog 进/退动画
+            com.ican.tvplay.ui.components.UrlPlayDialog(
+                show = showUrlDialog,
+                onDismiss = { showUrlDialog = false },
+                onConfirm = { text ->
+                    showUrlDialog = false
+                    // fongmi push 流程：processPushUrl 仅做空壳缓存（毫秒级），
+                    // 网盘多集展开由播放页 needAsyncDetail 异步补拉，慢站源也能秒进播放页
+                    urlParseScope.launch {
+                        val videoId = appViewModel.processPushUrl(text)
+                        if (videoId != null) {
+                            pushCardRouteThrottled(Route.Player(videoId = videoId, episodeIndex = 0))
+                        } else {
+                            Toast.makeText(context, "暂不支持此链接格式", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+            )
 
         }
         }

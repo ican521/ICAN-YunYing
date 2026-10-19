@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
@@ -40,6 +41,9 @@ class AppViewModel(container: AppContainer) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
+
+    /** 链接解析播放（fongmi PUSH 链路：push_agent spider 展开网盘链接，失败回退本地直链） */
+    suspend fun processPushUrl(rawText: String): String? = videoRepository.processPushUrl(rawText)
 }
 
 /** 首页：分类切换 + 各分区视频 + 站源切换 */
@@ -147,6 +151,7 @@ class SearchViewModel(container: AppContainer) : ViewModel() {
 class CollectionViewModel(container: AppContainer) : ViewModel() {
     private val favoriteDao = container.favoriteDao
     private val historyDao = container.historyDao
+    private val deviceDao = container.deviceDao
     private val settings = container.settingsRepository
     private val spiderManager = container.spiderManager
     private val apiClient = com.ican.tvplay.data.remote.VodApiClient()
@@ -156,6 +161,26 @@ class CollectionViewModel(container: AppContainer) : ViewModel() {
 
     val histories = historyDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 已发现的局域网同步设备（fongmi Device.getAll） */
+    val devices = deviceDao.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 收藏同步模式：0=双向 1=上传 2=下载（fongmi Setting.sync_mode） */
+    val syncMode: StateFlow<Int> = settings.syncMode
+
+    /** 点击模式按钮循环切换：双向 → 上传 → 下载 */
+    fun cycleSyncMode() {
+        settings.setSyncMode((syncMode.value + 1) % 3)
+    }
+
+    /** 清空设备表并重新扫描局域网（fongmi SyncDialog.onRefresh）；挂起函数，完成后 UI 收尾 */
+    suspend fun rescanDevices(context: android.content.Context) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            deviceDao.clear()
+            com.ican.tvplay.data.FavoriteSync.scan(context)
+        }
+    }
 
     /** 网格布局大小（小/中/大）：收藏/历史页列数跟随「设置-首页布局大小」，与首页同一规则 */
     val homeLayoutSize: StateFlow<com.ican.tvplay.data.HomeLayoutSize> = settings.homeLayoutSize
@@ -170,13 +195,20 @@ class CollectionViewModel(container: AppContainer) : ViewModel() {
     )
 
     /**
-     * 按记录的站源 key 拉取完整详情（含选集），返回可缓存进播放器的数据（收藏/历史通用）。
-     * 旧记录没有 sourceKey 时兜底当前站；站源已失效或详情拉取失败返回 null。
+     * 收藏/历史点击播放（fongmi 详情页异步加载语义 + 搜索页同款「先进骨架再补详情」）：
+     * 只做站点定位（配置已全局缓存，毫秒级），把元数据空壳视频直接交给播放页；
+     * 完整详情（选集/线路）由 PlayerScreen 的 needAsyncDetail 分支在页内异步补拉，
+     * 慢站源（如玩偶哥哥网盘类 spider）也能秒进播放页并看到骨架。
+     * 站源已失效返回 null。
      */
-    suspend fun preparePlay(
+    private suspend fun preparePlayShell(
         videoId: String,
+        title: String,
+        cover: String,
+        categoryName: String,
         sourceKey: String,
         sourceName: String,
+        lineFlag: String = "",
     ): PreparedFavoritePlay? =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val configUrl = settings.configUrl.value
@@ -188,33 +220,46 @@ class CollectionViewModel(container: AppContainer) : ViewModel() {
                 ?: return@withContext null
 
             val jarSpec = if (site.isSpider()) site.jar.ifBlank { config.spider } else ""
-            val item = runCatching {
-                if (site.isSpider()) {
-                    val spider = spiderManager.getSpider(site, jarSpec)
-                    if (spider != null) {
-                        com.ican.tvplay.data.remote.VodParse.parseVodListJson(
-                            spiderManager.detailContent(spider, listOf(videoId)),
-                        ).firstOrNull()
-                    } else null
-                } else {
-                    apiClient.detail(site, videoId)
-                }
-            }.getOrNull() ?: return@withContext null
-
-            val video = with(com.ican.tvplay.data.remote.VodParse) {
-                item.toVideo(withEpisodes = true)
-            }.copy(sourceName = sourceName)
-            val firstFlag = video.playSources.firstOrNull()?.flag ?: video.playFrom
-            PreparedFavoritePlay(video, site.key, site, jarSpec, firstFlag)
+            // 元数据空壳：playSources/episodes 为空，触发播放页 needAsyncDetail 补详情
+            val video = Video(
+                id = videoId,
+                title = title,
+                cover = cover,
+                categoryId = "",
+                categoryName = categoryName,
+                year = 0,
+                rating = "",
+                region = "",
+                description = "",
+                tags = emptyList(),
+                episodes = emptyList(),
+                playFrom = "",
+                playSources = emptyList(),
+                sourceName = sourceName,
+            )
+            PreparedFavoritePlay(video, site.key, site, jarSpec, firstFlag = lineFlag)
         }
 
-    /** 点击收藏卡片：按收藏记录的站源 key 拉详情 */
-    suspend fun prepareFavoritePlay(entity: FavoriteEntity): PreparedFavoritePlay? =
-        preparePlay(entity.videoId, entity.sourceKey, entity.sourceName)
+    /** 点击收藏卡片：元数据先进播放页，详情页内补拉。
+     *  若该视频有历史记录，复用其上次所选线路（lineFlag）。 */
+    suspend fun prepareFavoritePlay(entity: FavoriteEntity): PreparedFavoritePlay? {
+        // 收藏本身不存线路：查历史表取上次播放所选线路，无则留空兜底首条
+        val rememberedFlag = runCatching {
+            historyDao.observeOne(entity.videoId).first()?.lineFlag.orEmpty()
+        }.getOrDefault("")
+        return preparePlayShell(
+            entity.videoId, entity.title, entity.cover, entity.categoryName,
+            entity.sourceKey, entity.sourceName, rememberedFlag,
+        )
+    }
 
-    /** 点击历史卡片：按历史记录的站源 key 拉详情并续播 */
+    /** 点击历史卡片：元数据先进播放页，详情页内补拉（续播进度播放页读历史表）。
+     *  恢复历史记录中保存的线路。 */
     suspend fun prepareHistoryPlay(entity: HistoryEntity): PreparedFavoritePlay? =
-        preparePlay(entity.videoId, entity.sourceKey, entity.sourceName)
+        preparePlayShell(
+            entity.videoId, entity.title, entity.cover, entity.categoryName,
+            entity.sourceKey, entity.sourceName, entity.lineFlag,
+        )
 
     fun removeFavorite(videoId: String) {
         viewModelScope.launch { favoriteDao.delete(videoId) }
@@ -303,6 +348,20 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             videoRepository.switchSite(siteKey)
             launch { videoRepository.prewarmHome() }
+        }
+    }
+
+    /**
+     * 恢复备份成功后免重启生效（fongmi SettingFragment 恢复成功后 initConfig() 同款）：
+     * 重读全部 SharedPreferences 设置到 StateFlow，并重载接口配置/站点/分类，预热首页与 jar。
+     * 收藏/历史由 Room Flow 自动刷新。
+     */
+    fun applyRestoredBackup() {
+        settings.reloadFromPrefs()
+        viewModelScope.launch {
+            videoRepository.reload()
+            launch { videoRepository.prewarmHome() }
+            launch { videoRepository.prewarmJars() }
         }
     }
 }

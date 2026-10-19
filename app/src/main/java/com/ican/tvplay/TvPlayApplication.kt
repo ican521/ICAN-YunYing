@@ -66,7 +66,7 @@ class TvPlayApplication : Application(), SingletonImageLoader.Factory {
         // 启动本地代理服务器（fongmi 同款）：spider jar 返回 127.0.0.1/proxy 地址时由本机中转拉流
         appScope.launch {
             runCatching {
-                com.ican.tvplay.data.remote.LocalProxyServer.start(container.spiderManager)
+                com.ican.tvplay.data.remote.LocalProxyServer.start(this@TvPlayApplication, container.spiderManager)
             }.onFailure { android.util.Log.e("Startup", "LocalProxyServer start fail", it) }
         }
 
