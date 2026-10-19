@@ -1907,10 +1907,10 @@ private fun EpisodeGridDialog(
                     .fillMaxWidth()
                     .padding(top = Spacing.titleContentGap),
             )
-            // 标题 ↔ Tab 间距：3dp 实测补偿值——文字行高自带隐藏空隙（标题下缘约 4dp + Tab 内部约 7.8dp），
-            // 补偿后标题墨迹↔Tab 墨迹 ≈ 14.8dp，与「弹窗顶↔标题」14.5dp、「Tab↔网格」14.7dp 三段等距
-            Spacer(modifier = Modifier.height(3.dp))
             if (pageCount > 1) {
+                // 标题 ↔ Tab 间距：3dp 实测补偿值——文字行高自带隐藏空隙（标题下缘约 4dp + Tab 内部约 7.8dp），
+                // 补偿后标题墨迹↔Tab 墨迹 ≈ 14.8dp，与「弹窗顶↔标题」14.5dp、「Tab↔网格」14.5dp 三段等距
+                Spacer(modifier = Modifier.height(3.dp))
                 androidx.compose.material3.ScrollableTabRow(
                     selectedTabIndex = pagerState.currentPage,
                     containerColor = Color.Transparent,
@@ -1944,6 +1944,10 @@ private fun EpisodeGridDialog(
                 // Tab ↔ 网格间距：5dp 实测补偿值（Tab 行内部隐藏空隙），实测墨迹间距 13.5dp+1dp=14.5dp，
                 // 与「弹窗顶↔标题」14.5dp、「标题↔Tab」14.9dp 三段等距（误差 ≤1px）
                 Spacer(modifier = Modifier.height(5.dp))
+            } else {
+                // 无 Tab 栏（单页）时没有 Tab 行的隐藏空隙可补偿，直接给 10dp
+                // （+ 标题文字下缘约 4.4dp = 14.4dp，与三段等距体系一致）
+                Spacer(modifier = Modifier.height(10.dp))
             }
             HorizontalPager(
                 state = pagerState,
