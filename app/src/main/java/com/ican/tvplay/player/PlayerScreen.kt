@@ -1881,19 +1881,34 @@ private fun EpisodeGridDialog(
 
     OverlayDialog(
         show = show,
-        title = "选集",
-        titleColor = MiuixTheme.colorScheme.onBackground,
+        // 标题改为内容区自绘：miuix 自带标题的顶部留白与标题↔内容间距是库内部固定值，
+        // 无法参与「弹窗顶↔标题↔Tab↔网格」三段等距控制
+        title = "",
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         renderInRootScaffold = true,
         onDismissRequest = onDismiss,
         // 占满当前状态下允许的最大宽度（去掉库默认 maxWidth 上限），
-        // 左右外边距对齐播放页内容边距（pageHorizontalPadding），弹窗标题/网格与播放页大标题、按钮组件同左基线
+        // 左右外边距对齐播放页内容边距（pageHorizontalPadding）
         maxWidth = Dp.Infinity,
         outsideMargin = DpSize(pageHorizontalPadding(), 0.dp),
-        // 水平/垂直留白统一 titleContentGap：选集网格不再贴死弹窗左右边缘
-        insideMargin = DpSize(Spacing.titleContentGap, Spacing.titleContentGap),
+        // 弹窗内部边距全部归零、由内容区自控：选集网格左右不再内缩，
+        // 滑动切页时网格内容直接绘制到弹窗最左/最右边缘；Tab 单独保留 12dp 内缩
+        insideMargin = DpSize(0.dp, 0.dp),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            // 自绘标题：字号/字重/居中与 miuix 原标题一致，顶部间距走 titleContentGap
+            Text(
+                text = "选集",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.titleContentGap),
+            )
+            // 标题 ↔ Tab/网格 间距复用播放页「标题↔按钮」间距，不单独设值
+            Spacer(modifier = Modifier.height(Spacing.titleContentGap))
             if (pageCount > 1) {
                 androidx.compose.material3.ScrollableTabRow(
                     selectedTabIndex = pagerState.currentPage,
@@ -1903,6 +1918,8 @@ private fun EpisodeGridDialog(
                     divider = {},
                     // 删除 Tab 底部蓝色指示器（仅靠选中色区分当前页）
                     indicator = {},
+                    // Tab 行左右内缩 12dp（网格通到边缘后 Tab 仍与旧版视觉位置一致）
+                    modifier = Modifier.padding(horizontal = Spacing.titleContentGap),
                 ) {
                     pageTitles.forEachIndexed { idx, title ->
                         val isSelected = pagerState.currentPage == idx
@@ -1929,7 +1946,10 @@ private fun EpisodeGridDialog(
             }
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // 弹窗底部与末行选集的间距，与三段等距体系同值
+                    .padding(bottom = Spacing.titleContentGap),
                 // 页与页之间留出间隙（视觉上与 6dp 的 chip 间距区分开），滑动时能看到页与页不粘连
                 pageSpacing = Spacing.titleContentGap,
             ) { page ->
