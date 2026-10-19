@@ -1881,9 +1881,9 @@ private fun EpisodeGridDialog(
 
     OverlayDialog(
         show = show,
-        // 标题改为内容区自绘：miuix 自带标题的顶部留白与标题↔内容间距是库内部固定值，
-        // 无法参与「弹窗顶↔标题↔Tab↔网格」三段等距控制
-        title = "",
+        // 标题改为内容区自绘；必须传 null 而不是空串——miuix 对 title 只做 null 判断，
+        // 传 "" 仍会渲染空标题行+12dp 间距，导致弹窗顶部出现大片死空间
+        title = null,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         renderInRootScaffold = true,
         onDismissRequest = onDismiss,
@@ -1961,11 +1961,16 @@ private fun EpisodeGridDialog(
                 // 行距换算像素非整数（2.75x 密度下 16.5px），LazyGrid 逐项像素取整会在末行底边
                 // 裁掉 1~2px 圆角；视口略高于内容即可完整渲染末行（网格背景透明，余量不可见）
                 val pageHeight = 40.dp * rowsPerPage + 6.dp * (rowsPerPage - 1) + 4.dp
+                // 左右 12dp 内缩放在「每一页内部」并随页滑动：静止时网格有正常边距；
+                // 滑动切页时 pager 视口为弹窗全宽，内容可以一直绘制到弹窗最左/最右边缘
                 LazyVerticalGrid(
                     columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(spanCount),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.height(pageHeight),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.titleContentGap)
+                        .height(pageHeight),
                 ) {
                     itemsIndexed(pageEpisodes) { dispIdx, ep ->
                         // 倒序时本页内部反转：dispIdx 0 对应页内最后一集
