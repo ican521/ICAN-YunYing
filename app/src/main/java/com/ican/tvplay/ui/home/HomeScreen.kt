@@ -763,49 +763,37 @@ private fun CategoryChips(
     )
 }
 
-/** miuix TabRow 的下划线变体：尺寸/等宽计算/自动居中滚动与 miuix 源码一致 */
+/** 下划线式分类 Tab：文字贴合宽度，首个/末个 Tab 文字精确对齐页面 16dp 基线（与搜索栏/视频卡片同线） */
 @Composable
 private fun UnderlineTabRow(
     tabs: List<String>,
     selectedTabIndex: Int,
     onTabSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    minWidth: Dp = 76.dp,
-    maxWidth: Dp = 98.dp,
+    itemSpacing: Dp = 16.dp,
     height: Dp = TabRowHeight,
-    itemSpacing: Dp = 9.dp,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth().height(height)) {
         val availableWidth = this.maxWidth
-        // 照搬 miuix calculateTabWidth：均分可用宽度，钳制在 [minWidth, maxWidth]
-        val tabWidth = remember(tabs.size, availableWidth) {
-            val totalSpacing = if (tabs.size > 1) itemSpacing * (tabs.size - 1) else 0.dp
-            val contentWidth = availableWidth - totalSpacing
-            if (tabs.isEmpty() || contentWidth <= 0.dp) {
-                minWidth
-            } else {
-                val ideal = contentWidth / tabs.size
-                when {
-                    ideal < minWidth -> minWidth
-                    ideal > maxWidth ->
-                        if (maxWidth * tabs.size.toFloat() + totalSpacing < availableWidth) ideal else maxWidth
-                    else -> ideal
-                }
-            }
-        }
         val listState = rememberLazyListState()
         val density = LocalDensity.current
         // 通栏后首个 Tab 靠 contentPadding 对齐页面左基准线；指示器偏移需同步加上该边距
         val edgePadding = pageHorizontalPadding()
         val edgePaddingPx = with(density) { edgePadding.toPx() }
-        val tabWidthPx = with(density) { tabWidth.toPx() }
         val spacingPx = with(density) { itemSpacing.toPx() }
+        val availableWidthPx = with(density) { availableWidth.toPx() }
         var lastSettledIndex by remember { mutableIntStateOf(-1) }
 
-        // 照搬 miuix：选中 tab 自动滚动居中（首次/回退瞬移，前进动画滚动）
-        LaunchedEffect(selectedTabIndex, availableWidth, tabWidth) {
-            val centerOffset = (availableWidth - tabWidth) / 2
-            val offsetPx = with(density) { -centerOffset.toPx() }.fastRoundToInt()
+        // 各 tab 文字的实际渲染宽度（选中加粗后由 onGloballyPositioned 重新记录）
+        val textWidths = remember { mutableStateMapOf<Int, Int>() }
+        val fallbackIndicatorPx = with(density) { 20.dp.toPx() }
+        val indicatorWidthPx = textWidths[selectedTabIndex]?.toFloat() ?: fallbackIndicatorPx
+
+        // 照搬 miuix：选中 tab 自动滚动居中（首次/回退瞬移，前进动画滚动）；
+        // 文字宽度为异步实测，首次记录后 key 变化会重跑一次校正
+        LaunchedEffect(selectedTabIndex, textWidths[selectedTabIndex], availableWidth) {
+            val textW = textWidths[selectedTabIndex]?.toFloat() ?: fallbackIndicatorPx
+            val offsetPx = -((availableWidthPx - textW) / 2f).fastRoundToInt()
             if (lastSettledIndex < 0 || lastSettledIndex == selectedTabIndex) {
                 listState.scrollToItem(selectedTabIndex, offsetPx)
             } else {
@@ -816,17 +804,17 @@ private fun UnderlineTabRow(
 
         val scrollOffset by remember {
             derivedStateOf {
-                listState.firstVisibleItemIndex * (tabWidthPx + spacingPx) +
-                    listState.firstVisibleItemScrollOffset
+                // 文字贴合宽度后无固定步长：前缀 x = 前序各 tab 实测宽度 + 间距 累计
+                var x = 0f
+                for (i in 0 until listState.firstVisibleItemIndex) {
+                    x += (textWidths[i] ?: 0) + spacingPx
+                }
+                x + listState.firstVisibleItemScrollOffset
             }
         }
         val hasScrollRange by remember {
             derivedStateOf { listState.canScrollBackward || listState.canScrollForward }
         }
-        // 各 tab 文字的实际渲染宽度（选中加粗后由 onGloballyPositioned 重新记录）
-        val textWidths = remember { mutableStateMapOf<Int, Int>() }
-        val fallbackIndicatorPx = with(density) { 20.dp.toPx() }
-        val indicatorWidthPx = textWidths[selectedTabIndex]?.toFloat() ?: fallbackIndicatorPx
 
         Box(Modifier.fillMaxSize().clipToBounds()) {
             // 主题色小横条：宽度=选中文字实际宽度（文字左缘→右缘），随选中切换即时变化
@@ -835,11 +823,12 @@ private fun UnderlineTabRow(
                     .align(Alignment.BottomStart)
                     .padding(bottom = 3.dp)
                     .offset {
-                        IntOffset(
-                            ((edgePaddingPx + selectedTabIndex * (tabWidthPx + spacingPx)) - scrollOffset +
-                                (tabWidthPx - indicatorWidthPx) / 2).fastRoundToInt(),
-                            0,
-                        )
+                        // 指示条 x = 页面基线 + 前序各 tab 实测宽度累计 − 滚动偏移（文字贴合后无居中补偿项）
+                        var start = edgePaddingPx
+                        for (i in 0 until selectedTabIndex) {
+                            start += (textWidths[i] ?: 0) + spacingPx
+                        }
+                        IntOffset((start - scrollOffset).fastRoundToInt(), 0)
                     }
                     .width(with(density) { indicatorWidthPx.toDp() })
                     .height(3.dp)
@@ -864,14 +853,13 @@ private fun UnderlineTabRow(
                         contentAlignment = Alignment.BottomCenter,
                         modifier = Modifier
                             .fillMaxHeight()
-                            .width(tabWidth)
+                            // 文字贴合宽度：不再等宽居中，首个/末个 Tab 文字精确落在 16dp 基线
                             // 纯点击无任何按压/长按特效（无水波纹、无蒙层、无缩放）
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                                 onClick = { onTabSelected(index) },
-                            )
-                            .padding(horizontal = 12.dp),
+                            ),
                     ) {
                         Text(
                             text = tabText,
