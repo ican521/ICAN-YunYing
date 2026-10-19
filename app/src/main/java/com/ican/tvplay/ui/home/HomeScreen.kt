@@ -770,7 +770,7 @@ private fun UnderlineTabRow(
     selectedTabIndex: Int,
     onTabSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    itemSpacing: Dp = 16.dp,
+    itemSpacing: Dp = 24.dp,
     height: Dp = TabRowHeight,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth().height(height)) {
