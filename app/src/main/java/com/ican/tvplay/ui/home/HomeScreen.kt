@@ -81,6 +81,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastRoundToInt
@@ -96,7 +97,6 @@ import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.BlurredBar
-import com.ican.tvplay.ui.components.DriveConfigDialog
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.pageHorizontalPadding
@@ -144,30 +144,11 @@ fun HomeScreen(
     onVideoClick: (Video) -> Unit,
     onSearchClick: () -> Unit,
     onHistoryClick: () -> Unit,
+    onUrlPlayClick: () -> Unit,
 ) {
     val viewModel = appViewModel { HomeViewModel(this) }
-    val settings = viewModel.settings
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
-    var driveDialogVideo by remember { mutableStateOf<Video?>(null) }
-    val driveConfigs by settings.driveConfigs.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
-
-    // 网盘配置弹窗
-    driveDialogVideo?.let { video ->
-        DriveConfigDialog(
-            video = video,
-            drives = driveConfigs,
-            onDismiss = { driveDialogVideo = null },
-            onSave = { configs ->
-                settings.saveDriveConfigs(configs)
-                viewModel.executeDriveAction(video.action) { msg ->
-                    if (msg.isNotBlank()) {
-                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                }
-            },
-        )
-    }
 
     val contentPadding = topLevelContentPadding()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
@@ -452,8 +433,13 @@ fun HomeScreen(
                         VideoCardItem(
                             video = video,
                             onClick = {
+                                // fongmi 同款：action 卡片直接执行 SiteApi.action → Toast 返回 msg
                                 if (video.action.isNotBlank()) {
-                                    driveDialogVideo = video
+                                    viewModel.executeDriveAction(video.action) { msg ->
+                                        if (msg.isNotBlank()) {
+                                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 } else {
                                     onVideoClick(video)
                                 }
@@ -517,6 +503,7 @@ fun HomeScreen(
                             contentAlpha = contentAlpha,
                             onSearchClick = onSearchClick,
                             onHistoryClick = onHistoryClick,
+                            onUrlPlayClick = onUrlPlayClick,
                         )
                     }
                 }
@@ -545,6 +532,7 @@ fun HomeScreen(
  *  开=主题色，关=灰色；配置写死不支持（值为0）的开关锁定为灰色不可点。 */
 @Composable
 fun SitePickerDialog(
+    show: Boolean,
     sites: List<TvBoxSite>,
     currentKey: String,
     onSelect: (TvBoxSite) -> Unit,
@@ -556,12 +544,14 @@ fun SitePickerDialog(
     toggleVersion: Int = 0,
 ) {
     OverlayDialog(
-        show = true,
+        show = show,
         title = "选择站源",
         titleColor = MiuixTheme.colorScheme.onBackground,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
         renderInRootScaffold = true,
+        // 底部间距与选集弹窗一致：去掉 miuix 默认的底部 12dp，弹窗卡距屏底仅剩手势条避让高度
+        outsideMargin = DpSize(12.dp, 0.dp),
         onDismissRequest = onDismiss,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -679,6 +669,7 @@ private fun HomeTopBar(
     contentAlpha: Float,
     onSearchClick: () -> Unit,
     onHistoryClick: () -> Unit,
+    onUrlPlayClick: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -710,6 +701,23 @@ private fun HomeTopBar(
                 fontSize = 16.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        // 链接解析按钮：输入视频直链直接播放（fongmi PushActivity 同款）
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(Spacing.circleButton)
+                .tvCardEffect(onClick = onUrlPlayClick, shape = CircleShape, focusedScale = 1.1f, glow = false)
+                .clip(CircleShape)
+                .background(MiuixTheme.colorScheme.surfaceContainerHigh),
+        ) {
+            Icon(
+                imageVector = AppIcons.Link,
+                contentDescription = "链接解析",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+                modifier = Modifier.size(20.dp),
             )
         }
 

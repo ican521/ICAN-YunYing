@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
@@ -41,6 +42,8 @@ fun MiuixConfirmDialog(
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
         renderInRootScaffold = true,
+        // 底部间距与选集弹窗一致：去掉 miuix 默认的底部 12dp，弹窗卡距屏底仅剩手势条避让高度
+        outsideMargin = DpSize(12.dp, 0.dp),
         onDismissRequest = onDismiss,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {

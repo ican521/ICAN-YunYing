@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,9 +37,12 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -90,6 +94,41 @@ fun SettingsScreen(
         if (showSiteDialog) siteList = viewModel.listSites()
     }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // 备份与恢复：SAF 选择文件
+    val backupLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                val ok = com.ican.tvplay.data.BackupManager.backup(context, it)
+                Toast.makeText(
+                    context,
+                    if (ok) "备份成功" else "备份失败",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
+    val restoreLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                val ok = com.ican.tvplay.data.BackupManager.restore(context, it)
+                if (ok) {
+                    // fongmi 同款：恢复成功后立即重载配置与设置，无需重启 APP
+                    viewModel.applyRestoredBackup()
+                }
+                Toast.makeText(
+                    context,
+                    if (ok) "恢复成功" else "恢复失败",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+    }
 
     // Android 13+ 需要运行时通知权限，后台播放的通知栏控制才能显示
     val requestNotificationPermission = {
@@ -257,6 +296,24 @@ fun SettingsScreen(
 
         item {
         Card(modifier = Modifier.fillMaxWidth()) {
+            ArrowPreference(
+                title = "备份数据",
+                summary = "导出设置、收藏、历史到 JSON 文件",
+                onClick = {
+                    val name = "tvplay_backup_${java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())}.json"
+                    backupLauncher.launch(name)
+                },
+            )
+            ArrowPreference(
+                title = "恢复数据",
+                summary = "从 JSON 文件导入设置、收藏、历史",
+                onClick = { restoreLauncher.launch(arrayOf("application/json", "*/*")) },
+            )
+        }
+        }
+
+        item {
+        Card(modifier = Modifier.fillMaxWidth()) {
             OverlayDropdownPreference(
                 title = "后台播放",
                 summary = "全屏播放时切后台自动进入画中画",
@@ -285,34 +342,32 @@ fun SettingsScreen(
         }
     }
 
-    if (showConfigDialog) {
-        ConfigImportDialog(
-            initialUrl = configUrl,
-            onConfirm = {
-                viewModel.setConfigUrl(it)
-                showConfigDialog = false
-                Toast.makeText(context, "已保存", Toast.LENGTH_SHORT).show()
-            },
-            onDismiss = { showConfigDialog = false },
-        )
-    }
+    ConfigImportDialog(
+        show = showConfigDialog,
+        initialUrl = configUrl,
+        onConfirm = {
+            viewModel.setConfigUrl(it)
+            showConfigDialog = false
+            Toast.makeText(context, "已保存", Toast.LENGTH_SHORT).show()
+        },
+        onDismiss = { showConfigDialog = false },
+    )
 
-    if (showSiteDialog) {
-        com.ican.tvplay.ui.home.SitePickerDialog(
-            sites = siteList,
-            currentKey = currentSiteKey,
-            onSelect = { site ->
-                viewModel.switchSite(site.key)
-                showSiteDialog = false
-            },
-            onDismiss = { showSiteDialog = false },
-            isSearchable = { viewModel.isSiteSearchable(it) },
-            isChangeable = { viewModel.isSiteChangeable(it) },
-            onToggleSearchable = { viewModel.toggleSiteSearchable(it) },
-            onToggleChangeable = { viewModel.toggleSiteChangeable(it) },
-            toggleVersion = siteToggleVersion,
-        )
-    }
+    com.ican.tvplay.ui.home.SitePickerDialog(
+        show = showSiteDialog,
+        sites = siteList,
+        currentKey = currentSiteKey,
+        onSelect = { site ->
+            viewModel.switchSite(site.key)
+            showSiteDialog = false
+        },
+        onDismiss = { showSiteDialog = false },
+        isSearchable = { viewModel.isSiteSearchable(it) },
+        isChangeable = { viewModel.isSiteChangeable(it) },
+        onToggleSearchable = { viewModel.toggleSiteSearchable(it) },
+        onToggleChangeable = { viewModel.toggleSiteChangeable(it) },
+        toggleVersion = siteToggleVersion,
+    )
 }
 
 @Composable
@@ -329,21 +384,25 @@ private fun InfoRow(label: String, value: String) {
     )
 }
 
-/** 导入配置对话框：miuix WindowDialog + TextField，照搬 KernelSU 弹窗结构 */
+/** 导入配置对话框：miuix WindowDialog + TextField，照搬 KernelSU 弹窗结构。
+ *  通过 [show] 控制显隐，OverlayDialog 内部处理进入/退出动画。 */
 @Composable
 private fun ConfigImportDialog(
+    show: Boolean,
     initialUrl: String,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var url by remember { mutableStateOf(initialUrl) }
     OverlayDialog(
-        show = true,
+        show = show,
         title = "导入配置",
         titleColor = MiuixTheme.colorScheme.onBackground,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
         renderInRootScaffold = true,
+        // 底部间距与选集弹窗一致：去掉 miuix 默认的底部 12dp，弹窗卡距屏底仅剩手势条避让高度
+        outsideMargin = DpSize(12.dp, 0.dp),
         onDismissRequest = onDismiss,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
