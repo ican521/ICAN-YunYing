@@ -1901,22 +1901,8 @@ private fun EpisodeGridDialog(
                     contentColor = MiuixTheme.colorScheme.onBackground,
                     edgePadding = 0.dp,
                     divider = {},
-                    // 蓝色指示器（固定浅色主题蓝，深浅模式统一）
-                    indicator = { tabPositions ->
-                        if (pagerState.currentPage < tabPositions.size) {
-                            Box(
-                                with(TabRowDefaults) {
-                                    Modifier
-                                        .tabIndicatorOffset(tabPositions[pagerState.currentPage])
-                                        .height(3.dp)
-                                        .background(
-                                            color = Color(0xFF3482FF),
-                                            shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
-                                        )
-                                },
-                            )
-                        }
-                    },
+                    // 删除 Tab 底部蓝色指示器（仅靠选中色区分当前页）
+                    indicator = {},
                 ) {
                     pageTitles.forEachIndexed { idx, title ->
                         val isSelected = pagerState.currentPage == idx
@@ -1926,7 +1912,7 @@ private fun EpisodeGridDialog(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
                                 ) { scope.launch { pagerState.animateScrollToPage(idx) } }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
