@@ -1951,8 +1951,10 @@ private fun EpisodeGridDialog(
                 val rawPage = displayEps.subList(start, minOf(start + itemCount, displayEps.size))
                 // 倒序只反转本页内部的集顺序（分页本身保持正序）
                 val pageEpisodes = if (reversed) rawPage.asReversed() else rawPage
-                // 页高精确适配 rowsPerPage 行（chip 40dp + 行距 6dp），末行完整显示不被容器裁切
-                val pageHeight = 40.dp * rowsPerPage + 6.dp * (rowsPerPage - 1)
+                // 页高 = rowsPerPage 行（chip 40dp + 行距 6dp）+ 4dp 视口余量：
+                // 行距换算像素非整数（2.75x 密度下 16.5px），LazyGrid 逐项像素取整会在末行底边
+                // 裁掉 1~2px 圆角；视口略高于内容即可完整渲染末行（网格背景透明，余量不可见）
+                val pageHeight = 40.dp * rowsPerPage + 6.dp * (rowsPerPage - 1) + 4.dp
                 LazyVerticalGrid(
                     columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(spanCount),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
