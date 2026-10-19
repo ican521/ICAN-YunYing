@@ -1822,7 +1822,7 @@ private fun EpisodeSection(
 
 /** 选集「更多」分页网格弹窗（照搬 fongmi EpisodeGridDialog 框架 + MIUIX OverlayDialog 风格）：
  *  - 按集名平均长度动态计算列数 spanCount（1~5 列）
- *  - 每页 itemCount = spanCount × 行数（按 2/3 屏高再预留一整行推导，宁少一行不截断）
+ *  - 每页 itemCount = spanCount × 行数（按 2/3 窗口容器高再预留一整行推导，宁少一行不截断）
  *  - 顶部分页 Tab 显示每集范围（如 "1 - 10"），底部 HorizontalPager 切换页面
  *  - 打开自动跳转到当前播放集所在页 */
 @Composable
@@ -1834,7 +1834,6 @@ private fun EpisodeGridDialog(
     onSelect: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val configuration = LocalConfiguration.current
     // 分页与 Tab 始终正序（"1-10"、"11-20"…）；倒序只反转每页内部的集排列
     val displayEps = episodes
 
@@ -1849,11 +1848,12 @@ private fun EpisodeGridDialog(
         avgLen >= 2 -> 4
         else -> 5
     }
-    // 行数宁少勿截：miuix 弹窗硬限总高 2/3 屏高，在此基础再预留一整行(46dp)安全余量，
+    // 行数宁少勿截：反编译确认 miuix 硬限弹窗总高 = 2/3 × LocalWindowInfo.containerDpSize.height
+    // （窗口容器高，不含系统栏，与 screenHeightDp 不同源），此处用同一基准再预留一整行(46dp)安全余量，
     // 保证任意设备/横竖屏/视频下末行完整不截断。固定区 = 标题行28 + titleContentGap×5（留白+安全余量）+ Tab行44；
     // 每行占高 = chip 40dp（固定 dp，不随字体缩放）+ 行距 6dp
     val dialogFixedHeight = 28.dp + Spacing.titleContentGap * 5 + 44.dp
-    val dialogCapHeight = with(configuration) { (screenHeightDp * 2f / 3f).dp }
+    val dialogCapHeight = androidx.compose.ui.platform.LocalWindowInfo.current.containerDpSize.height * 2f / 3f
     val rowsPerPage = ((dialogCapHeight - dialogFixedHeight - 46.dp).value / 46f).toInt().coerceIn(3, 10)
     val itemCount = spanCount * rowsPerPage
     // 空集（详情加载中）时 pageCount 至少为 1，避免 coerceIn(0, -1) 崩溃
