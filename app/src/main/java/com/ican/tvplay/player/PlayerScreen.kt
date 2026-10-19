@@ -103,7 +103,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -120,7 +119,6 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
@@ -1820,9 +1818,9 @@ private fun EpisodeSection(
     )
 }
 
-/** 选集「更多」分页网格弹窗（照搬 fongmi EpisodeGridDialog 框架 + MIUIX OverlayDialog 风格）：
+/** 选集「更多」分页网格弹窗（照搬 fongmi EpisodeGridDialog 框架 + 自绘底部弹窗，miuix 配色）：
  *  - 按集名平均长度动态计算列数 spanCount（1~5 列）
- *  - 每页 itemCount = spanCount × (横屏 5 行 / 竖屏 10 行)
+ *  - 每页 itemCount = spanCount × 行数（竖屏按 85% 屏高自适应，横屏 5 行）
  *  - 顶部分页 Tab 显示每集范围（如 "1 - 10"），底部 HorizontalPager 切换页面
  *  - 打开自动跳转到当前播放集所在页 */
 @Composable
@@ -1850,7 +1848,13 @@ private fun EpisodeGridDialog(
         avgLen >= 2 -> 4
         else -> 5
     }
-    val rowsPerPage = if (isLandscape) 5 else 10
+    // 每页行数：竖屏按「85% 屏高 - 固定区」自适应（弹窗更高、盖过视频大标题），横屏保持 5 行。
+    // 固定区 = 标题块(titleContentGap×2 + 标题行高28) + Tab行44 + Tab↔网格间距 + 底部留白，均为 titleContentGap 体系；
+    // 每行占高 = chip 40dp + 行距 6dp。screenHeightDp 为 0（分屏异常）时 coerceIn 兜底
+    val dialogMaxHeight = with(configuration) { (screenHeightDp * 0.85f).dp }
+    val dialogFixedHeight = 28.dp + Spacing.titleContentGap * 4 + 44.dp
+    val rowsPerPage = if (isLandscape) 5
+    else ((dialogMaxHeight - dialogFixedHeight).value / 46f).toInt().coerceIn(5, 15)
     val itemCount = spanCount * rowsPerPage
     // 空集（详情加载中）时 pageCount 至少为 1，避免 coerceIn(0, -1) 崩溃
     val pageCount = ((displayEps.size + itemCount - 1) / itemCount).coerceAtLeast(1)
@@ -1875,21 +1879,41 @@ private fun EpisodeGridDialog(
         if (show) pagerState.scrollToPage(currentPage)
     }
 
-    OverlayDialog(
-        show = show,
-        title = "选集",
-        titleColor = MiuixTheme.colorScheme.onBackground,
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        renderInRootScaffold = true,
+    // 自绘底部弹窗：miuix OverlayDialog 在 DialogContent 内部硬限弹窗总高 ≤ 2/3 屏高（heightIn 0.6667f），
+    // 无法参数化放开；盖过视频大标题的高度需求超出该上限，改用 Dialog + 底部对齐容器，行数已按 85% 屏高适配
+    if (show) Dialog(
         onDismissRequest = onDismiss,
-        // 占满当前状态下允许的最大宽度（去掉库默认 maxWidth 上限），
-        // 左右外边距对齐播放页内容边距（pageHorizontalPadding），弹窗标题/网格与播放页大标题、按钮组件同左基线
-        maxWidth = Dp.Infinity,
-        outsideMargin = DpSize(pageHorizontalPadding(), 0.dp),
-        // 水平 0（网格贴弹窗边缘，与页面内容对齐）；垂直统一 titleContentGap，不再单独设间距
-        insideMargin = DpSize(0.dp, Spacing.titleContentGap),
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MiuixTheme.colorScheme.surfaceContainer,
+                        RoundedCornerShape(topStart = Spacing.corner, topEnd = Spacing.corner),
+                    )
+                    // 内容左右/底部留白复用 titleContentGap，选集网格不再贴死弹窗左右边缘
+                    .padding(horizontal = Spacing.titleContentGap)
+                    .padding(bottom = Spacing.titleContentGap),
+            ) {
+                // 弹窗标题居中（沿用 miuix 弹窗视觉），上下留白同为 titleContentGap
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = Spacing.titleContentGap),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "选集",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MiuixTheme.colorScheme.onBackground,
+                    )
+                }
             if (pageCount > 1) {
                 androidx.compose.material3.ScrollableTabRow(
                     selectedTabIndex = pagerState.currentPage,
@@ -1973,6 +1997,7 @@ private fun EpisodeGridDialog(
                         )
                     }
                 }
+            }
             }
         }
     }
