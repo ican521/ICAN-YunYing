@@ -1886,8 +1886,8 @@ private fun EpisodeGridDialog(
         // 左右外边距对齐播放页内容边距（pageHorizontalPadding），弹窗标题/网格与播放页大标题、按钮组件同左基线
         maxWidth = Dp.Infinity,
         outsideMargin = DpSize(pageHorizontalPadding(), 0.dp),
-        // 水平 0（网格贴弹窗边缘，与页面内容对齐）；垂直统一 titleContentGap，不再单独设间距
-        insideMargin = DpSize(0.dp, Spacing.titleContentGap),
+        // 水平/垂直留白统一 titleContentGap：选集网格不再贴死弹窗左右边缘
+        insideMargin = DpSize(Spacing.titleContentGap, Spacing.titleContentGap),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             if (pageCount > 1) {
