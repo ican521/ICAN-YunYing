@@ -1941,8 +1941,9 @@ private fun EpisodeGridDialog(
                         }
                     }
                 }
-                // Tab ↔ 网格间距：4dp 实测补偿值（Tab 行内部隐藏空隙约 6.7dp），补偿后墨迹间距 ≈14.7dp
-                Spacer(modifier = Modifier.height(4.dp))
+                // Tab ↔ 网格间距：5dp 实测补偿值（Tab 行内部隐藏空隙），实测墨迹间距 13.5dp+1dp=14.5dp，
+                // 与「弹窗顶↔标题」14.5dp、「标题↔Tab」14.9dp 三段等距（误差 ≤1px）
+                Spacer(modifier = Modifier.height(5.dp))
             }
             HorizontalPager(
                 state = pagerState,
