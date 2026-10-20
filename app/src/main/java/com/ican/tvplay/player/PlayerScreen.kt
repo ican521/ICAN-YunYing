@@ -114,8 +114,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -2112,7 +2110,9 @@ private fun FullscreenPlayLayout(
         modifier = Modifier
             .fillMaxSize()
             // 背景由根 Box 提供（此处若带背景会盖住常驻 PlayerView）
-            .pointerInput(locked) {
+            // 选集侧边弹窗打开期间（showEpisodes）抑制全部手势：弹窗改为组件内覆盖层后，
+            // 事件不再被子窗口拦截，需防止遮罩上的长按/拖动误触发快进/seek
+            .pointerInput(locked, showEpisodes) {
                 // fongmi CustomKeyDown 同款手势：单击显隐控制层、双击播放暂停、长按 2 倍速快进、横向拖动快进快退
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -2133,7 +2133,7 @@ private fun FullscreenPlayLayout(
                     while (true) {
                         // 在到达长按阈值的剩余时间内等事件；超时无事件 = 手指静止按住，
                         // 立即触发长按（对齐 fongmi GestureDetector.onLongPress 的系统阈值回调，约 400-500ms）
-                        val canLongPress = !isLong && axis == 0 && !locked && !gestureBlocked
+                        val canLongPress = !isLong && axis == 0 && !locked && !showEpisodes && !gestureBlocked
                         val event = if (canLongPress) {
                             val remaining = viewConfiguration.longPressTimeoutMillis -
                                 (SystemClock.uptimeMillis() - downTime)
@@ -2165,7 +2165,7 @@ private fun FullscreenPlayLayout(
 
                         if (event.changes.any { it.isConsumed }) gestureBlocked = true
                         if (event.changes.all { !it.pressed }) break // 手指抬起
-                        if (locked || gestureBlocked) continue // 锁定：拖动/长按失效，仅保留单击/双击
+                        if (locked || gestureBlocked || showEpisodes) continue // 锁定/弹窗打开：拖动/长按失效，仅保留单击/双击
                         val change = event.changes.firstOrNull() ?: continue
                         lastX = change.position.x
                         lastY = change.position.y
@@ -2197,7 +2197,7 @@ private fun FullscreenPlayLayout(
                         // fongmi onSeekEnd：真正 seek 到预览位置
                         Players.seekTo(seekTarget)
                         seekPreview = null
-                    } else if (axis == 0 && !gestureBlocked) {
+                    } else if (axis == 0 && !gestureBlocked && !showEpisodes) {
                         // 未移动未长按（且未点在控件上）：单击/双击判定（fongmi GestureDetector）
                         val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
                             awaitFirstDown(requireUnconsumed = false)
@@ -2595,10 +2595,12 @@ private fun EpisodeSideSheet(
         }
         with(density) { minOf(w, maxPx).toDp() }
     }
-    // 用 Popup 而非 Dialog：Dialog 会新建窗口并自动唤出状态栏/导航栏，破坏全屏沉浸；
-    // Popup 挂在当前窗口内，系统栏保持隐藏
+    // 用组件内全屏覆盖层而非 Popup/Dialog：
+    // - Dialog 会新建窗口并自动唤出状态栏/导航栏，破坏全屏沉浸；
+    // - Popup 子窗口的 layoutInDisplayCutoutMode 固定为 DEFAULT，横屏全屏时会避开左侧
+    //   挖孔/刘海区，遮罩左边留出一条盖不住的竖带；覆盖层跟随 Activity 窗口绘制，与视频区像素级对齐
     // 呼出：首帧面板停在屏外，挂载后从右往左滑入到位（fongmi 弹窗转场同款方向）
-    // 收回：sheetShown=false 触发原路从左往右滑出，动画结束再调用 onDismiss 移除 Popup
+    // 收回：sheetShown=false 触发原路从左往右滑出，动画结束再调用 onDismiss 移除覆盖层
     var sheetShown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { sheetShown = true }
     val sheetSlideX by animateDpAsState(
@@ -2623,11 +2625,9 @@ private fun EpisodeSideSheet(
             onDismiss()
         }
     }
-    Popup(
-        onDismissRequest = dismissWithAnim,
-        properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = false),
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+    // 返回键先收起弹窗（原为 Popup 的 dismissOnBackPress）
+    BackHandler(onBack = dismissWithAnim)
+    Box(modifier = Modifier.fillMaxSize()) {
             // MIUIX 风格遮罩：半透明黑色，点击收起；透明度随面板呼出/收回渐显渐隐
             Box(
                 modifier = Modifier
@@ -2709,7 +2709,6 @@ private fun EpisodeSideSheet(
             }
         }
     }
-}
 
 @Composable
 private fun MiniTag(text: String, onClick: () -> Unit = {}) {
