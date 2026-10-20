@@ -2542,9 +2542,14 @@ private fun EpisodeChip(
     showBorder: Boolean = false,
 ) {
     val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
-    // 描边：仅在"更多"弹窗里显示（showBorder=true）；选集栏不描边
-    val borderModifier = if (showBorder) {
-        Modifier.border(width = Spacing.optionBorder, color = optionBorderColor(selected), shape = shape)
+    // 描边：仅"更多"弹窗（showBorder=true）且仅深色模式；浅色模式选中/未选中一律不描边。
+    // 深色选中描边对齐全屏选集弹窗（BrandBlueDeep），未选中沿用 optionBorderColor
+    val borderModifier = if (showBorder && LocalDarkTheme.current) {
+        Modifier.border(
+            width = Spacing.optionBorder,
+            color = if (selected) BrandBlueDeep else optionBorderColor(false),
+            shape = shape,
+        )
     } else Modifier
     Box(
         contentAlignment = Alignment.Center,
@@ -2553,9 +2558,12 @@ private fun EpisodeChip(
             .height(40.dp)
             .defaultMinSize(minWidth = 40.dp)
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false)
+            // "更多"弹窗选中填充对齐全屏选集弹窗（BrandBlueDeep 25%）；选集栏维持主题色 20%
             .background(
-                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                else MaterialTheme.colorScheme.surfaceVariant,
+                if (selected) {
+                    if (showBorder) BrandBlueDeep.copy(alpha = 0.25f)
+                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                } else MaterialTheme.colorScheme.surfaceVariant,
                 shape,
             )
             .then(borderModifier)
