@@ -2312,15 +2312,11 @@ private fun FullscreenPlayLayout(
                 }
 
                 // 底部（fongmi: 容器 paddingBottom 8dp，seek 左右 16dp，动作栏左右 8dp）
+                // 进度条行 + 功能动作栏背后不加阴影/底色（用户要求：全屏底栏完全透明）
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, Color(0xCC000000)),
-                            ),
-                        )
                         .padding(bottom = 8.dp),
                 ) {
                     // 进度条行（时间 + 进度条 + 时长）：行整体下移 —— 去掉行底部内边距，
