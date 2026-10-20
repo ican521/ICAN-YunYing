@@ -7,6 +7,9 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="r">shortEdges</item>
+        <!-- 平台 Dialog 窗口遮罩（播放页倍速/缓冲/音轨/字幕等底部弹窗）：
+             取值必须与 Kotlin 常量 PopupScrim(0x66000000) 保持一致（黑色 40%，深浅主题一致） -->
+        <item name="android:backgroundDimAmount">0.4</item>
     </style>
 
 </resources>

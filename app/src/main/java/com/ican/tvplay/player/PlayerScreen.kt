@@ -20,6 +20,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
@@ -143,6 +144,7 @@ import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.BrandBlueDeep
 import com.ican.tvplay.ui.theme.LocalDarkTheme
+import com.ican.tvplay.ui.theme.PopupScrim
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.optionBorderColor
 import androidx.compose.runtime.snapshotFlow
@@ -1059,7 +1061,7 @@ fun PlayerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f)),
+                    .background(PopupScrim),
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(
@@ -2628,11 +2630,13 @@ private fun EpisodeSideSheet(
     // 返回键先收起弹窗（原为 Popup 的 dismissOnBackPress）
     BackHandler(onBack = dismissWithAnim)
     Box(modifier = Modifier.fillMaxSize()) {
-            // MIUIX 风格遮罩：半透明黑色，点击收起；透明度随面板呼出/收回渐显渐隐
+            // MIUIX 风格遮罩：引用全局 PopupScrim（黑色 40%），点击收起；
+            // 透明度随面板呼出/收回渐显渐隐（alpha 乘在遮罩层上）
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f * scrimAlpha))
+                    .alpha(scrimAlpha)
+                    .background(PopupScrim)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
