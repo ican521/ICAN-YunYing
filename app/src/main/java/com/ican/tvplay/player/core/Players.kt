@@ -18,8 +18,15 @@ import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.LoadControl
+import androidx.media3.exoplayer.analytics.PlayerId
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.TrackGroupArray
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.trackselection.ExoTrackSelection
+import androidx.media3.exoplayer.upstream.Allocator
+import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.upstream.BandwidthMeter
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.mpvplayer.MpvPlayer
@@ -115,6 +122,9 @@ object Players {
 
     var player: Player? = null
         private set
+
+    /** 当前 EXO 播放器的可热切换缓冲 LoadControl（重建播放器时随之重建） */
+    private var tieredLoadControl: TieredLoadControl? = null
 
     private var appContext: Context? = null
     private var currentSpec: PlaySpec? = null
@@ -425,6 +435,7 @@ object Players {
             release()
         }
         player = null
+        tieredLoadControl = null
         currentSpec = null
         appContext = null
         playbackContext = null
@@ -505,7 +516,15 @@ object Players {
     fun setBufferTier(tier: BufferTier) {
         if (_state.value.bufferTier == tier) return
         _state.value = _state.value.copy(bufferTier = tier)
-        rebuild()
+        // 热切换缓冲档位：只替换 LoadControl 的缓冲时长策略，绝不重建播放器——
+        // 播放不暂停、已缓冲数据不重置；播放头消耗到切换时的缓冲边缘后才按新档位继续缓冲。
+        // MPV 内核没有 LoadControl 概念，档位在下次构建播放器时自然生效。
+        val p = player
+        val lc = tieredLoadControl
+        if (p is ExoPlayer && lc != null) {
+            val remainingUs = (p.bufferedPosition - p.currentPosition).coerceAtLeast(0L) * 1000L
+            lc.setTier(tier, remainingUs)
+        }
     }
 
     // ---- 轨道 ----
@@ -620,15 +639,10 @@ object Players {
                 if (decode == Decode.SOFT) DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
                 else DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF,
             )
-        // 缓冲：默认时长 × 档位倍率（仿 fongmi buffer 设置）
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                DefaultLoadControl.DEFAULT_MIN_BUFFER_MS * tier.multiplier,
-                DefaultLoadControl.DEFAULT_MAX_BUFFER_MS * tier.multiplier,
-                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
-                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
-            )
-            .build()
+        // 缓冲：默认时长 × 档位倍率（仿 fongmi buffer 设置）。
+        // 用支持热切换的 TieredLoadControl 包装：切换档位不重建播放器，播放头追上旧缓冲边缘后换策略
+        val loadControl = TieredLoadControl(tier)
+        tieredLoadControl = loadControl
         // 带宽计：缓冲时实时网速显示
         val meter = DefaultBandwidthMeter.Builder(ctx)
             .build()
@@ -850,5 +864,128 @@ object Players {
             }
         }
         return out
+    }
+}
+
+/**
+ * 支持缓冲档位热切换的 LoadControl：
+ * 切换档位时不重建 ExoPlayer（播放不暂停、已缓冲数据不清空），
+ * 先记录切换瞬间「剩余已缓冲时长」，播放头消耗到该缓冲边缘后，才启用新档位的 DefaultLoadControl；
+ * 等待期间也不允许把缓冲扩到快照边缘之外（旧档位不再多缓冲）。
+ * 期间若换集/重新 prepare（旧缓冲已无意义），立即启用新档位。
+ */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+private class TieredLoadControl(initialTier: Players.BufferTier) : LoadControl {
+
+    private var active: DefaultLoadControl = buildDelegate(initialTier)
+    private var preparedPlayerId: PlayerId? = null
+    private var lastTracks: TracksSnapshot? = null
+
+    /** 待生效的新档位委托；null 表示无挂起切换 */
+    private var pending: DefaultLoadControl? = null
+    /** 切换瞬间「缓冲边缘 − 播放位置」剩余时长（us） */
+    private var pendingRemainingUs: Long = C.TIME_UNSET
+
+    private data class TracksSnapshot(
+        val params: LoadControl.Parameters,
+        val trackGroups: TrackGroupArray,
+        val trackSelections: Array<ExoTrackSelection>,
+    )
+
+    /**
+     * @param remainingBufferedUs 切换瞬间 bufferedPosition − currentPosition（us）
+     */
+    fun setTier(tier: Players.BufferTier, remainingBufferedUs: Long) {
+        // 连续切换：旧 pending 从未接收过回调，直接丢弃即可
+        pending = buildDelegate(tier)
+        pendingRemainingUs = remainingBufferedUs.coerceAtLeast(0L)
+    }
+
+    private fun activate(next: DefaultLoadControl) {
+        // 新委托此前没接收过任何生命周期回调，按当前轨道状态补齐，保证 targetBufferBytes 已计算
+        preparedPlayerId?.let { next.onPrepared(it) }
+        lastTracks?.let { next.onTracksSelected(it.params, it.trackGroups, it.trackSelections) }
+        active = next
+        pending = null
+        pendingRemainingUs = C.TIME_UNSET
+    }
+
+    override fun onPrepared(playerId: PlayerId) {
+        preparedPlayerId = playerId
+        // 新一轮 prepare（换集/重新加载）：旧缓冲随新媒体源失效，挂起的新档位立即生效
+        pending?.let {
+            active = it
+            pending = null
+            pendingRemainingUs = C.TIME_UNSET
+        }
+        active.onPrepared(playerId)
+    }
+
+    override fun onTracksSelected(
+        parameters: LoadControl.Parameters,
+        trackGroups: TrackGroupArray,
+        trackSelections: Array<ExoTrackSelection>,
+    ) {
+        lastTracks = TracksSnapshot(parameters, trackGroups, trackSelections)
+        active.onTracksSelected(parameters, trackGroups, trackSelections)
+    }
+
+    override fun onStopped(playerId: PlayerId) {
+        active.onStopped(playerId)
+    }
+
+    override fun onReleased(playerId: PlayerId) {
+        active.onReleased(playerId)
+        pending = null
+        pendingRemainingUs = C.TIME_UNSET
+    }
+
+    override fun getAllocator(playerId: PlayerId): Allocator = active.getAllocator(playerId)
+
+    override fun getBackBufferDurationUs(playerId: PlayerId): Long =
+        active.getBackBufferDurationUs(playerId)
+
+    override fun retainBackBufferFromKeyframe(playerId: PlayerId): Boolean =
+        active.retainBackBufferFromKeyframe(playerId)
+
+    override fun shouldStartPlayback(parameters: LoadControl.Parameters): Boolean =
+        active.shouldStartPlayback(parameters)
+
+    override fun shouldContinueLoading(parameters: LoadControl.Parameters): Boolean {
+        val next = pending
+        if (next != null) {
+            // 播放头已消耗到切换时的缓冲边缘（或期间 seek 导致剩余缓冲被跳空）→ 启用新档位
+            if (parameters.bufferedDurationUs <= ACTIVATE_THRESHOLD_US) {
+                activate(next)
+                return active.shouldContinueLoading(parameters)
+            }
+            // 等待期间：已缓冲到快照边缘就停止加载，旧档位不再向外扩缓冲
+            if (parameters.bufferedDurationUs >= pendingRemainingUs - ACTIVATE_THRESHOLD_US) {
+                return false
+            }
+        }
+        return active.shouldContinueLoading(parameters)
+    }
+
+    override fun shouldContinuePreloading(
+        playerId: PlayerId,
+        timeline: Timeline,
+        mediaPeriodId: MediaSource.MediaPeriodId,
+        positionUs: Long,
+    ): Boolean = active.shouldContinuePreloading(playerId, timeline, mediaPeriodId, positionUs)
+
+    private companion object {
+        /** 距缓冲边缘 ≤1s 即视为已追上（避免临界点抖动） */
+        const val ACTIVATE_THRESHOLD_US = 1_000_000L
+
+        fun buildDelegate(tier: Players.BufferTier): DefaultLoadControl =
+            DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    DefaultLoadControl.DEFAULT_MIN_BUFFER_MS * tier.multiplier,
+                    DefaultLoadControl.DEFAULT_MAX_BUFFER_MS * tier.multiplier,
+                    DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
+                    DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
+                )
+                .build()
     }
 }

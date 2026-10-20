@@ -53,6 +53,16 @@ class MainActivity : ComponentActivity() {
         if (resources.configuration.screenWidthDp < 600) {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
+        // targetSdk 35+ 对声明 supportsPictureInPicture 的 Activity 默认开启「手势回桌面自动进 PiP」，
+        // 导致平板横屏预览小窗上滑回桌面时被系统塞进画中画、视频继续播放。
+        // 显式关闭自动进入：本 App 只在「全屏 + 后台播放=画中画」时由 onUserLeaveHint 主动进 PiP。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            runCatching {
+                setPictureInPictureParams(
+                    PictureInPictureParams.Builder().setAutoEnterEnabled(false).build(),
+                )
+            }
+        }
         handleOpenPlayerIntent(intent)
         setContent {
             AppRoot()
@@ -80,6 +90,10 @@ class MainActivity : ComponentActivity() {
             .container.settingsRepository.playerBackgroundPlay.value
         // 仅「画中画」模式自动进入小窗
         if (mode != BACKGROUND_PIP) return
+        // 需求：切后台进小窗时暂停播放，不让画面在桌面继续播。
+        // 此处 Activity 进 PiP 后仍可见，paused 的前台服务不会被 MIUI 立即回收
+        // （与 PlayerScreen 生命周期里「后台不暂停」的既有约束不冲突）
+        Players.onPause()
         try {
             // 保持全屏时的横屏请求不释放（fongmi 同款做法）：PiP 任务沿用横屏配置，
             // 点击展开小窗时系统直接放大为横屏全屏；若进小窗前释放方向，
@@ -103,7 +117,12 @@ class MainActivity : ComponentActivity() {
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         Players.setPipMode(isInPictureInPictureMode)
-        if (isInPictureInPictureMode) wasInPip = true
+        if (isInPictureInPictureMode) {
+            wasInPip = true
+            // 兜底：非全屏（预览小窗）下进了 PiP（个别 ROM 无视 setAutoEnterEnabled(false)），
+            // 必须暂停播放——小窗状态不允许在桌面继续播；PlayerScreen 的 onPause 对 PiP 态是放行的
+            if (!Players.isFullscreen) Players.onPause()
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (isInPictureInPictureMode) {
                 // 监听播放/暂停状态翻转，实时更新 PiP 播放/暂停图标。

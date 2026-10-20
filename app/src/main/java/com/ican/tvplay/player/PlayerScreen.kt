@@ -10,10 +10,14 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
@@ -43,6 +47,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -138,7 +143,10 @@ import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.theme.BrandBlueDeep
+import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.Spacing
+import com.ican.tvplay.ui.theme.optionBorderColor
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
@@ -266,6 +274,10 @@ fun PlayerScreen(
     }
     // PiP 画中画模式（全屏播放时切后台触发）
     val inPip by Players.pipMode.collectAsStateWithLifecycle()
+    // 进 PiP 时收起控制层（对齐 fongmi onEnterPictureInPicture → hideControl）：
+    // 否则双击小窗放大回全屏时，缩放动画第一帧会带上控制层，
+    // 看上去像「全屏画面的缩小版」而不是当前小窗画面直接放大
+    LaunchedEffect(inPip) { if (inPip) controlsVisible = false }
     // 后台续播返回本页时跳过一次重新解析（直接接管在播的播放器）
     var resumeFromBackground by remember { mutableStateOf(false) }
 
@@ -877,19 +889,23 @@ fun PlayerScreen(
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
-                // 深色：小窗（非全屏）四周加圆角描边；圆角随放大动画归零，全屏时描边宽度归零不显示
+                // 深色：小窗（非全屏）四周加圆角描边；全屏时圆角归零且不挂描边修饰符
                 isLandscape -> {
                     val cornerShape = RoundedCornerShape(animCorner)
                     val isDark = com.ican.tvplay.ui.theme.LocalDarkTheme.current
-                    // 仅在有圆角（非全屏）时才显示描边；全屏时 animCorner=0，描边宽度归 0
-                    val borderWidth = if (isDark && animCorner > 0.dp) 1.dp else 0.dp
+                    // 深色 + 圆角尚存（非全屏）时才挂描边修饰符；全屏稳态圆角归零，直接不挂 ——
+                    // 若继续挂 0dp 宽的 border，Android Paint 会按「发丝线」画出 1px，
+                    // 导致平板深色全屏时四周残留一圈描边
+                    val borderModifier = if (isDark && animCorner > 1.dp) {
+                        Modifier.border(width = 1.dp, color = Color.White.copy(alpha = 0.15f), shape = cornerShape)
+                    } else Modifier
                     Modifier
                         .offset(x = animLeft, y = animTop)
                         .width(animWidth)
                         .height(animHeight)
                         .clip(cornerShape)
                         .background(Color.Black)
-                        .border(width = borderWidth, color = Color.White.copy(alpha = 0.15f), shape = cornerShape)
+                        .then(borderModifier)
                 }
                 else ->
                     Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f).background(Color.Black)
@@ -1147,35 +1163,25 @@ private fun PortraitPlayLayout(
         Spacer(modifier = Modifier.height(60.dp))
     }
 
-    // === 对话框 ===
-    if (showSpeed) {
-        OptionDialog("倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
-    }
-    if (showScale) {
-        OptionDialog("画面缩放", Players.ScaleMode.entries, playerState.scaleMode, { it.label }, { onScaleChange(it); showScale = false }) { showScale = false }
-    }
-    if (showBuffer) {
-        OptionDialog("缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
-    }
-    if (showAudio) {
-        OptionDialog("音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }) { showAudio = false }
-    }
-    if (showText) {
-        SubtitleDialog(
-            tracks = playerState.textTracks,
-            textDisabled = playerState.textDisabled,
-            onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
-            onDisable = { Players.selectTrack(null, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
-            onAddExternal = { showAddSub = true },
-            onDismiss = { showText = false },
-        )
-    }
-    if (showAddSub) {
-        AddSubtitleDialog(
-            onAdd = { n, u -> Players.addSubtitle(SubItem(name = n, url = u)); showAddSub = false },
-            onDismiss = { showAddSub = false },
-        )
-    }
+    // === 对话框（常驻组合：内部按 show 做「底部滑入 / 原路滑回」动画） ===
+    OptionDialog(showSpeed, "倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
+    OptionDialog(showScale, "画面缩放", Players.ScaleMode.entries, playerState.scaleMode, { it.label }, { onScaleChange(it); showScale = false }) { showScale = false }
+    OptionDialog(showBuffer, "缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
+    OptionDialog(showAudio, "音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }) { showAudio = false }
+    SubtitleDialog(
+        show = showText,
+        tracks = playerState.textTracks,
+        textDisabled = playerState.textDisabled,
+        onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
+        onDisable = { Players.selectTrack(null, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
+        onAddExternal = { showAddSub = true },
+        onDismiss = { showText = false },
+    )
+    AddSubtitleDialog(
+        show = showAddSub,
+        onAdd = { n, u -> Players.addSubtitle(SubItem(name = n, url = u)); showAddSub = false },
+        onDismiss = { showAddSub = false },
+    )
     } // Column 根结束
 }
 
@@ -1516,6 +1522,7 @@ private fun PreviewPlayerArea(
                     Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
                     LineSlider(
                         progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
+                        buffered = if (playerState.durationMs > 0) playerState.bufferedMs.toFloat() / playerState.durationMs else 0f,
                         onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
                         modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                         onDragFractionChange = { onSeekDragChange(it != null) },
@@ -1887,6 +1894,8 @@ private fun EpisodeGridDialog(
         title = null,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         renderInRootScaffold = true,
+        // 强制「非大屏」：平板宽窗口下 miuix 会改为屏幕居中，与手机底部呼出不一致
+        largeScreen = false,
         onDismissRequest = onDismiss,
         // 占满当前状态下允许的最大宽度（去掉库默认 maxWidth 上限），
         // 左右外边距对齐播放页内容边距（pageHorizontalPadding）
@@ -2324,6 +2333,7 @@ private fun FullscreenPlayLayout(
                         Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
                         LineSlider(
                             progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
+                            buffered = if (playerState.durationMs > 0) playerState.bufferedMs.toFloat() / playerState.durationMs else 0f,
                             onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
                             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                             onDragFractionChange = {
@@ -2441,40 +2451,34 @@ private fun FullscreenPlayLayout(
 
         // 动作栏对话框（与竖屏同款）
         // 播放内核（fongmi PlayerEngineDialog：EXO / MPV / 其他=系统选择器外部播放器）
-        if (showEngine) {
-            val engineOptions = Players.Kernel.entries.map { it.label } + "其他"
-            OptionDialog("播放内核", engineOptions, playerState.kernel.label, { it }, { label ->
-                when (label) {
-                    "其他" -> {
-                        // 仿 fongmi PlaybackIntent.choose：系统选择器外部播放器打开（url + headers + 进度）
-                        val info = Players.externalPlayInfo()
-                        if (info != null) {
-                            runCatching {
-                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                                    setDataAndType(android.net.Uri.parse(info.url), "video/*")
-                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    putExtra("title", info.title)
-                                    putExtra("position", info.positionMs.toInt())
-                                    putExtra("return_result", true)
-                                    if (info.headers.isNotEmpty()) {
-                                        putExtra("headers", info.headers.flatMap { (k, v) -> listOf(k, v) }.toTypedArray())
-                                    }
+        val engineOptions = Players.Kernel.entries.map { it.label } + "其他"
+        OptionDialog(showEngine, "播放内核", engineOptions, playerState.kernel.label, { it }, { label ->
+            when (label) {
+                "其他" -> {
+                    // 仿 fongmi PlaybackIntent.choose：系统选择器外部播放器打开（url + headers + 进度）
+                    val info = Players.externalPlayInfo()
+                    if (info != null) {
+                        runCatching {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                setDataAndType(android.net.Uri.parse(info.url), "video/*")
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                putExtra("title", info.title)
+                                putExtra("position", info.positionMs.toInt())
+                                putExtra("return_result", true)
+                                if (info.headers.isNotEmpty()) {
+                                    putExtra("headers", info.headers.flatMap { (k, v) -> listOf(k, v) }.toTypedArray())
                                 }
-                                context.startActivity(android.content.Intent.createChooser(intent, null))
                             }
+                            context.startActivity(android.content.Intent.createChooser(intent, null))
                         }
                     }
-                    else -> Players.Kernel.entries.firstOrNull { it.label == label }?.let(onEngineChange)
                 }
-                showEngine = false
-            }) { showEngine = false }
-        }
-        if (showSpeed) {
-            OptionDialog("倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
-        }
-        if (showBuffer) {
-            OptionDialog("缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
-        }
+                else -> Players.Kernel.entries.firstOrNull { it.label == label }?.let(onEngineChange)
+            }
+            showEngine = false
+        }, selectedBorderColor = BrandBlueDeep) { showEngine = false }
+        OptionDialog(showSpeed, "倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }, selectedBorderColor = BrandBlueDeep) { showSpeed = false }
+        OptionDialog(showBuffer, "缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }, selectedBorderColor = BrandBlueDeep) { showBuffer = false }
         if (showEpisodes) {
             EpisodeSideSheet(
                 episodes = lineEpisodes,
@@ -2486,25 +2490,22 @@ private fun FullscreenPlayLayout(
                 onDismiss = { showEpisodes = false },
             )
         }
-        if (showAudio) {
-            OptionDialog("音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }) { showAudio = false }
-        }
-        if (showText) {
-            SubtitleDialog(
-                tracks = playerState.textTracks,
-                textDisabled = playerState.textDisabled,
-                onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
-                onDisable = { Players.selectTrack(null, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
-                onAddExternal = { showAddSub = true },
-                onDismiss = { showText = false },
-            )
-        }
-        if (showAddSub) {
-            AddSubtitleDialog(
-                onAdd = { n, u -> Players.addSubtitle(SubItem(name = n, url = u)); showAddSub = false },
-                onDismiss = { showAddSub = false },
-            )
-        }
+        OptionDialog(showAudio, "音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }, selectedBorderColor = BrandBlueDeep) { showAudio = false }
+        SubtitleDialog(
+            show = showText,
+            tracks = playerState.textTracks,
+            textDisabled = playerState.textDisabled,
+            onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
+            onDisable = { Players.selectTrack(null, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
+            onAddExternal = { showAddSub = true },
+            onDismiss = { showText = false },
+            selectedBorderColor = BrandBlueDeep,
+        )
+        AddSubtitleDialog(
+            show = showAddSub,
+            onAdd = { n, u -> Players.addSubtitle(SubItem(name = n, url = u)); showAddSub = false },
+            onDismiss = { showAddSub = false },
+        )
     }
 }
 
@@ -2543,17 +2544,9 @@ private fun EpisodeChip(
     showBorder: Boolean = false,
 ) {
     val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
-    val isDark = com.ican.tvplay.ui.theme.LocalDarkTheme.current
     // 描边：仅在"更多"弹窗里显示（showBorder=true）；选集栏不描边
     val borderModifier = if (showBorder) {
-        val borderColor = if (selected) {
-            MaterialTheme.colorScheme.primary
-        } else if (isDark) {
-            Color.White.copy(alpha = 0.12f)
-        } else {
-            Color.Black.copy(alpha = 0.12f)
-        }
-        Modifier.border(width = 1.dp, color = borderColor, shape = shape)
+        Modifier.border(width = Spacing.optionBorder, color = optionBorderColor(selected), shape = shape)
     } else Modifier
     Box(
         contentAlignment = Alignment.Center,
@@ -2617,6 +2610,15 @@ private fun EpisodeSideSheet(
         animationSpec = tween(260, easing = FastOutSlowInEasing),
         label = "episodeSheetSlide",
     )
+    // 黑色遮罩渐显渐隐，与字幕/缓冲弹窗（Dialog 窗口 dim 淡入淡出）保持一致
+    val scrimAlpha by animateFloatAsState(
+        targetValue = if (sheetShown) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = if (sheetShown) 220 else 200,
+            easing = FastOutSlowInEasing,
+        ),
+        label = "episodeSheetScrim",
+    )
     // 收回：播放滑出动画后再通知父级
     val dismissWithAnim: () -> Unit = {
         scope.launch {
@@ -2630,11 +2632,11 @@ private fun EpisodeSideSheet(
         properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = false),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // MIUIX 风格遮罩：半透明黑色，点击收起
+            // MIUIX 风格遮罩：半透明黑色，点击收起；透明度随面板呼出/收回渐显渐隐
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f))
+                    .background(Color.Black.copy(alpha = 0.4f * scrimAlpha))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -2774,14 +2776,75 @@ private fun MiniLargeBtn(icon: ImageVector, desc: String, onClick: () -> Unit, i
 
 // ========== 对话框 ==========
 
+/**
+ * 播放页功能弹窗的统一容器：对话窗铺满全屏、内容贴底居中，
+ * 打开时从底部滑入、[show] 置 false 时原路滑回底部（对齐手机端 / miuix 的「底部呼出」观感）。
+ *
+ * [show] 由调用方持有：弹窗必须常驻组合（不能再写 `if (showX) { ... }`），
+ * 否则收起瞬间组件被移除，退出动画来不及播放。
+ */
+@Composable
+private fun BottomSlideDialog(
+    show: Boolean,
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val visibleState = remember { MutableTransitionState(false) }
+    LaunchedEffect(show) { visibleState.targetState = show }
+    // 退出动画播完（currentState 落到 false）前保持窗口存在
+    if (visibleState.currentState || visibleState.targetState) {
+        Dialog(
+            // 关闭平台默认宽度限制：窗口铺满全屏，内容才能贴底摆放
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                // 空白区 = 点按关闭（上一版由平台弹窗外点击触发，全屏窗口后需自己接）
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) { detectTapGestures { onDismiss() } },
+                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    AnimatedVisibility(
+                        visibleState = visibleState,
+                        enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(220)),
+                        exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(200)),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .widthIn(max = 560.dp)
+                                .fillMaxWidth()
+                                .padding(bottom = 24.dp)
+                                // 吞掉弹窗本体范围内的点按，避免点空白逻辑误关弹窗
+                                .pointerInput(Unit) { detectTapGestures { } },
+                        ) {
+                            content()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun <T> OptionDialog(
-    title: String, options: List<T>, current: T?, label: (T) -> String,
-    onSelect: (T) -> Unit, onDismiss: () -> Unit,
+    show: Boolean, title: String, options: List<T>, current: T?, label: (T) -> String,
+    onSelect: (T) -> Unit,
+    // 选中态描边色：默认走主题色（竖屏/横屏小窗与选集 chip 一致）；
+    // 全屏传入选集侧边栏同款 BrandBlueDeep，保证全屏功能弹窗与选集选中描边同色
+    selectedBorderColor: Color? = null,
+    onDismiss: () -> Unit,
 ) {
     // 选项过多（倍速档位/音轨）时限高可滚动，避免超出屏幕被裁、末项露出半截边缘
     val maxDialogHeight = with(LocalConfiguration.current) { (screenHeightDp * 0.65f).dp }
-    Dialog(onDismissRequest = onDismiss) {
+    // 深色模式才给选项描边（浅色底与选项底色对比已足够）
+    val isDark = LocalDarkTheme.current
+    BottomSlideDialog(show = show, onDismiss = onDismiss) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2800,6 +2863,11 @@ private fun <T> OptionDialog(
                 options.forEach { opt ->
                     val selected = opt == current
                     val shape = RoundedCornerShape(12.dp)
+                    val borderColor = when {
+                        !isDark -> null
+                        selected && selectedBorderColor != null -> selectedBorderColor
+                        else -> optionBorderColor(selected)
+                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -2808,6 +2876,12 @@ private fun <T> OptionDialog(
                             .background(
                                 if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
                                 else MaterialTheme.colorScheme.surfaceVariant, shape,
+                            )
+                            // 深色模式给每个选项描一圈（宽度/颜色走全局常量，与选集「更多」选项一致）
+                            .then(
+                                if (borderColor != null) {
+                                    Modifier.border(Spacing.optionBorder, borderColor, shape)
+                                } else Modifier,
                             )
                             .padding(horizontal = 14.dp, vertical = 12.dp),
                     ) {
@@ -2822,11 +2896,13 @@ private fun <T> OptionDialog(
 
 @Composable
 private fun SubtitleDialog(
-    tracks: List<Players.TrackOption>, textDisabled: Boolean,
+    show: Boolean, tracks: List<Players.TrackOption>, textDisabled: Boolean,
     onSelect: (Players.TrackOption) -> Unit, onDisable: () -> Unit,
     onAddExternal: () -> Unit, onDismiss: () -> Unit,
+    // 同 OptionDialog：全屏传入选集侧边栏同款蓝，选中描边与选集同色
+    selectedBorderColor: Color? = null,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    BottomSlideDialog(show = show, onDismiss = onDismiss) {
         Column(
             modifier = Modifier
                 .fillMaxWidth().padding(horizontal = 32.dp)
@@ -2836,17 +2912,23 @@ private fun SubtitleDialog(
             Text("字幕", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             // 行间距与 OptionDialog（倍速/缓冲等弹窗）统一为 6dp
             Column(modifier = Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                SubRow("关闭字幕", textDisabled) { onDisable() }
-                tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected) { onSelect(t) } }
-                SubRow("添加外挂字幕…", false) { onAddExternal() }
+                SubRow("关闭字幕", textDisabled, selectedBorderColor) { onDisable() }
+                tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected, selectedBorderColor) { onSelect(t) } }
+                SubRow("添加外挂字幕…", false, selectedBorderColor) { onAddExternal() }
             }
         }
     }
 }
 
 @Composable
-private fun SubRow(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color? = null, onClick: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
+    val isDark = LocalDarkTheme.current
+    val borderColor = when {
+        !isDark -> null
+        selected && selectedBorderColor != null -> selectedBorderColor
+        else -> optionBorderColor(selected)
+    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -2854,6 +2936,12 @@ private fun SubRow(label: String, selected: Boolean, onClick: () -> Unit) {
             .background(
                 if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
                 else MaterialTheme.colorScheme.surfaceVariant, shape,
+            )
+            // 深色模式给每个选项描一圈（与选集「更多」选项一致，全局常量）
+            .then(
+                if (borderColor != null) {
+                    Modifier.border(Spacing.optionBorder, borderColor, shape)
+                } else Modifier,
             )
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
@@ -2863,9 +2951,9 @@ private fun SubRow(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AddSubtitleDialog(onAdd: (String, String) -> Unit, onDismiss: () -> Unit) {
+private fun AddSubtitleDialog(show: Boolean, onAdd: (String, String) -> Unit, onDismiss: () -> Unit) {
     var url by remember { mutableStateOf("") }
-    Dialog(onDismissRequest = onDismiss) {
+    BottomSlideDialog(show = show, onDismiss = onDismiss) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp)).padding(20.dp),
@@ -2931,6 +3019,7 @@ private const val SEEK_HOLD_TOLERANCE = 0.002f
 @Composable
 private fun LineSlider(
     progress: Float,
+    buffered: Float,
     onSeek: (Float) -> Unit,
     modifier: Modifier = Modifier,
     onDragFractionChange: ((Float?) -> Unit)? = null,
@@ -2959,7 +3048,8 @@ private fun LineSlider(
     }
     BoxWithConstraints(
         modifier = modifier
-            .height(24.dp)
+            // 对齐 fongmi DefaultTimeBar：触摸目标高 26dp、轨道条高 4dp
+            .height(26.dp)
             .pointerInput(Unit) {
                 detectTapGestures { offset -> commitSeek(offset.x / size.width) }
             }
@@ -2993,15 +3083,24 @@ private fun LineSlider(
             Modifier
                 .align(Alignment.CenterStart)
                 .fillMaxWidth()
-                .height(2.dp)
+                .height(4.dp)
                 .background(Color(0x44FFFFFF), CircleShape),
+        )
+        // 缓冲进度轨道（fongmi 同款次级轨道）：能看出「已缓冲到哪里」，
+        // 也是缓冲档位差异唯一可见的地方（档位只影响 ExoPlayer 的缓冲时长上限）
+        Box(
+            Modifier
+                .align(Alignment.CenterStart)
+                .fillMaxWidth(buffered.coerceIn(0f, 1f))
+                .height(4.dp)
+                .background(Color(0x99FFFFFF), CircleShape),
         )
         // 已播放轨道
         Box(
             Modifier
                 .align(Alignment.CenterStart)
                 .fillMaxWidth(p)
-                .height(2.dp)
+                .height(4.dp)
                 .background(Color.White, CircleShape),
         )
         // 圆点滑块
