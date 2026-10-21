@@ -21,12 +21,13 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 链接解析输入框（MIUIX 风格）：
  * 打开时自动读取剪贴板内容填入输入框，支持视频直链与 TVBox 剧集格式。
- * 通过 [show] 控制显隐，AnimatedOverlayDialog 处理遮罩渐显渐隐与收回时序。
+ * 通过 [show] 控制显隐，遮罩走 miuix OverlayDialog 自带 windowDim（瞬现瞬消）。
  */
 @Composable
 fun UrlPlayDialog(
@@ -42,11 +43,13 @@ fun UrlPlayDialog(
         if (show) clipboard.getText()?.text?.let { input = it }
     }
 
-    AnimatedOverlayDialog(
+    OverlayDialog(
         show = show,
         title = "链接解析播放",
         titleColor = MiuixTheme.colorScheme.onBackground,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
+        renderInRootScaffold = true,
         // 三边统一 16dp：底部 = max(16dp, 系统导航栏高度)，跨设备自适应
         outsideMargin = DpSize(16.dp, dialogBottomMargin()),
         // 强制「非大屏」：平板宽窗口下 miuix 会改为屏幕居中，与手机底部呼出不一致
