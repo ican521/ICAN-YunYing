@@ -9,7 +9,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
@@ -59,6 +58,7 @@ import androidx.compose.material3.TabRowDefaults
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -86,6 +86,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -107,6 +108,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -118,6 +120,7 @@ import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.ican.tvplay.R
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.local.FavoriteEntity
@@ -2793,29 +2796,44 @@ private fun BottomSlideDialog(
     // 肉眼看到的正是「完全收回屏幕底部后又向上冒一下」。
     // 多留的这几帧里内容已画在屏幕外，肉眼不可见，可彻底吃掉这次回弹。
     var windowAlive by remember { mutableStateOf(show) }
+
+    // 位移进度：0 = 完全弹出，1 = 完全收到屏幕底部之外。
+    // 按内容自身高度位移（而非固定 dp），任意设备/任意弹窗高度都能彻底出屏。
+    // 用 Animatable 而非 animateFloatAsState：后者首次组合直接落在目标值，
+    // 打开时没有从底部滑入的动画；前者可先在屏外 snapTo(1f)，再从底部滑入。
+    val slide = remember { Animatable(1f) }
+
     LaunchedEffect(show) {
         if (show) {
             windowAlive = true
+            // 打开：先钉在屏外一帧，再从底部滑入（纯位移，无淡入）
+            slide.snapTo(1f)
+            slide.animateTo(0f, animationSpec = tween(220))
         } else {
-            kotlinx.coroutines.delay(200L + 64L)
+            slide.animateTo(1f, animationSpec = tween(200))
+            // 多留几帧等平台异步销毁窗口，吃掉「收回后又冒一下」的回弹
+            kotlinx.coroutines.delay(64L)
             windowAlive = false
         }
     }
     if (!windowAlive) return
-
-    // 位移进度：0 = 完全弹出，1 = 完全收到屏幕底部之外。
-    // 按内容自身高度位移（而非固定 dp），任意设备/任意弹窗高度都能彻底出屏
-    val slide by animateFloatAsState(
-        targetValue = if (show) 0f else 1f,
-        animationSpec = tween(if (show) 220 else 200),
-        label = "bottomSlideDialog",
-    )
 
     Dialog(
         // 关闭平台默认宽度限制：窗口铺满全屏，内容才能贴底摆放
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
+        // 平台 Dialog 窗口默认带进出场淡入淡出（内容 + 遮罩一起渐隐）。
+        // 本弹窗内容已自带纵向滑入/滑出，这里把窗口动画样式置空并强制同步到
+        // WindowManager（setAttributes 会触发一次 relayout 让服务端读到新样式），
+        // 收回销毁窗口时不再播放「渐影」。
+        val dialogWindow = (LocalView.current as? DialogWindowProvider)?.window
+        SideEffect {
+            val w = dialogWindow ?: return@SideEffect
+            val lp = w.attributes
+            lp.windowAnimations = R.style.DialogNoWindowAnimation
+            w.attributes = lp
+        }
         Box(modifier = Modifier.fillMaxSize()) {
             // 空白区 = 点按关闭（上一版由平台弹窗外点击触发，全屏窗口后需自己接）；
             // 收起过程中不再响应，避免重复触发
@@ -2834,7 +2852,7 @@ private fun BottomSlideDialog(
                         .fillMaxWidth()
                         .padding(bottom = 24.dp)
                         // 位移放在 graphicsLayer：只改绘制不改布局，滑动过程不触发重组/重新测量
-                        .graphicsLayer { translationY = slide * size.height }
+                        .graphicsLayer { translationY = slide.value * size.height }
                         // 吞掉弹窗本体范围内的点按，避免点空白逻辑误关弹窗
                         .pointerInput(Unit) { detectTapGestures { } },
                 ) {

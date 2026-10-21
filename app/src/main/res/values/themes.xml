@@ -12,4 +12,11 @@
         <item name="android:backgroundDimAmount">0.4</item>
     </style>
 
+    <!-- 播放页底部弹窗（BottomSlideDialog）：内容自带纵向滑入/滑出动画，
+         这里把平台窗口默认的进出场淡入淡出置空，避免「渐影」叠在滑动上 -->
+    <style name="DialogNoWindowAnimation">
+        <item name="android:windowEnterAnimation">@null</item>
+        <item name="android:windowExitAnimation">@null</item>
+    </style>
+
 </resources>
