@@ -312,6 +312,11 @@ fun PlayerScreen(
             initialized = true
             return@LaunchedEffect
         }
+        // 每次重新进入观看视频：倍速重置为 1 倍速（用户要求），不沿用上次会话的设定值；
+        // 同步写回设置，保证全屏长按快进松手恢复的 playbackSpeed（实时读取设置）与此一致；
+        // 切集（videoId 不变）与后台续播返回（上方提前 return）不受影响
+        Players.setSpeed(1f)
+        settings.setPlayerSpeed(1f)
         // 跨站源场景优先：MultiSourceSearchScreen 提前 cache 的视频直接命中，
         // 避免先在 VideoRepository 的当前站点上发起慢查询（错站查询既慢又可能查错视频）
         var v = Players.consumeCachedVideo(videoId)?.video
