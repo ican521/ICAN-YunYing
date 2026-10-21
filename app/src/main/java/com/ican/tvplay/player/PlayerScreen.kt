@@ -1774,26 +1774,46 @@ private fun EpisodeSection(
         // 选中集在显示序列中的位置（倒序时需换算）
         val selectedDispIdx = if (reversedEp) lineEpisodes.size - 1 - episodeIndex else episodeIndex
         val listState = rememberLazyListState()
-        // 只在「刚进入播放页、剧集加载完成」时，把当前正在播放的这一集滚动到选集栏中间显示；
-        // 之后手动切集/倒序切换不再触发任何自动滚动（原「每选中一集就滚回最左」已删除）。
-        // 用 snapshotFlow 等待列表项实际布局完成（totalItemsCount > selectedDispIdx）后再滚动，
-        // 避免剧集从空加载到有数据时立即调用 scrollToItem 因未布局而失效；
-        // 再等选中项可见拿到真实宽度，按「视口宽 − 项宽」负偏移滚到居中（与首页 Tab 居中同法）。
+        // 只在「刚进入播放页、剧集首次加载完成」时，把当前正在播放的这一集滚动到选集栏中间显示。
+        // 长列表下目标项初始不在可视区，直接等宽度会拿不到而卡死：先瞬移到左缘使其完成布局，
+        // 再按真实宽度负偏移瞬移到居中（负偏移与首页 Tab 选中居中同法）；remember 标记保证只执行一次。
         var centeredInitial by remember { mutableStateOf(false) }
         LaunchedEffect(lineEpisodes.size) {
             if (!centeredInitial && lineEpisodes.isNotEmpty() && selectedDispIdx in 0 until lineEpisodes.size) {
                 snapshotFlow { listState.layoutInfo.totalItemsCount }
                     .filter { it > selectedDispIdx }
                     .first()
+                listState.scrollToItem(selectedDispIdx)
                 val itemWidth = snapshotFlow {
                     listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedDispIdx }?.size
                 }.filterNotNull().first()
                 val viewportWidth = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-                listState.scrollToItem(
-                    selectedDispIdx,
-                    -((viewportWidth - itemWidth) / 2).coerceAtLeast(0),
-                )
+                listState.scrollToItem(selectedDispIdx, -((viewportWidth - itemWidth) / 2).coerceAtLeast(0))
                 centeredInitial = true
+            }
+        }
+        // 手动切集/倒序切换：做轻微滚动——仅当新选中集不在可视范围内时才滚动到刚好露出
+        // （贴最近边缘，不强制居中/贴最左），已完全可见则完全不动；动画滚动带过渡。
+        // 首次组合跳过：进入页面的定位交给上面的居中 effect（居中 effect 完成后才置 centeredInitial）。
+        LaunchedEffect(selectedDispIdx) {
+            if (centeredInitial && lineEpisodes.isNotEmpty() && selectedDispIdx in 0 until lineEpisodes.size) {
+                snapshotFlow { listState.layoutInfo.totalItemsCount }
+                    .filter { it > selectedDispIdx }
+                    .first()
+                val info = listState.layoutInfo
+                val viewportStart = info.viewportStartOffset
+                val viewportEnd = info.viewportEndOffset
+                val viewportWidth = viewportEnd - viewportStart
+                val item = info.visibleItemsInfo.firstOrNull { it.index == selectedDispIdx }
+                when {
+                    item == null || item.offset < viewportStart ->
+                        // 完全不可见 / 左侧外：滚到贴左显示
+                        listState.animateScrollToItem(selectedDispIdx, 0)
+                    item.offset + item.size > viewportEnd ->
+                        // 右侧外：滚到右缘刚好露出（负偏移 = 目标项起点靠右）
+                        listState.animateScrollToItem(selectedDispIdx, -(viewportWidth - item.size).coerceAtLeast(0))
+                    else -> Unit // 已完全可见：不滚动
+                }
             }
         }
         // 默认横向滚动（fongmi: adapter_episode_hori）
