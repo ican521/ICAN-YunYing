@@ -2389,7 +2389,8 @@ private fun FullscreenPlayLayout(
                         ActionBtn(playerState.kernel.label) { showEngine = true; onControlInteract() }
                         ActionBtn("缓冲") { showBuffer = true; onControlInteract() }
                         ActionBtn("重播") { Players.seekTo(0); onControlInteract() }
-                        ActionBtn("倍速") { showSpeed = true; onControlInteract() }
+                        // 倍速：按钮直接显示当前倍速值（与内核/缩放按钮同款「显示当前态」）
+                        ActionBtn(formatSpeed(playerState.speed)) { showSpeed = true; onControlInteract() }
                         ActionBtn(playerState.scaleMode.label) {
                             val modes = Players.ScaleMode.entries
                             onScaleChange(modes[(playerState.scaleMode.ordinal + 1) % modes.size])
@@ -3108,7 +3109,7 @@ private fun LineSlider(
 }
 
 private fun formatSpeed(speed: Float): String =
-    if (speed == speed.toInt().toFloat()) "${speed.toInt()}.0x" else "${speed}x"
+    if (speed == speed.toInt().toFloat()) "${speed.toInt()}.0X" else "${speed}X"
 
 private const val RESUME_THRESHOLD_MS = 5_000L
 private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
