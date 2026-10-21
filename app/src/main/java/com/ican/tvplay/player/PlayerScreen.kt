@@ -142,7 +142,6 @@ import com.ican.tvplay.ui.theme.optionBorderColor
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
@@ -1773,30 +1772,38 @@ private fun EpisodeSection(
         val displayEps = if (reversedEp) lineEpisodes.asReversed() else lineEpisodes
         // 选中集在显示序列中的位置（倒序时需换算）
         val selectedDispIdx = if (reversedEp) lineEpisodes.size - 1 - episodeIndex else episodeIndex
-        val listState = rememberLazyListState()
-        // 只在「刚进入播放页、剧集首次加载完成」时，把当前正在播放的这一集滚动到选集栏中间显示。
-        // 长列表下目标项初始不在可视区，直接等宽度会拿不到而卡死：先瞬移到左缘使其完成布局，
-        // 再按真实宽度负偏移瞬移到居中（负偏移与首页 Tab 选中居中同法）；remember 标记保证只执行一次。
-        var centeredInitial by remember { mutableStateOf(false) }
+        // 进入页面定位：优先用初始滚动状态让列表首次布局直接落在当前集（贴左可见）——
+        // 布局前滚动即已就位，无动画、无瞬移闪现；异步补拉场景（进入时无数据）由下方
+        // 加载兜底 effect 在剧集加载完成后瞬移定位一次。
+        val initialDispIdx = if (reversedEp) lineEpisodes.size - 1 - episodeIndex else episodeIndex
+        val listState = rememberLazyListState(
+            initialFirstVisibleItemIndex = if (lineEpisodes.isNotEmpty() && initialDispIdx in 0 until lineEpisodes.size) {
+                initialDispIdx
+            } else 0,
+        )
+        // 异步加载兜底：仅当进入页面时选集尚未加载完成（首次 size 变化）时定位一次——
+        // 当前集已可见则不动，否则瞬移（无动画）到贴左可见。
+        var positionedInitial by remember { mutableStateOf(false) }
         LaunchedEffect(lineEpisodes.size) {
-            if (!centeredInitial && lineEpisodes.isNotEmpty() && selectedDispIdx in 0 until lineEpisodes.size) {
+            if (!positionedInitial && lineEpisodes.isNotEmpty() && selectedDispIdx in 0 until lineEpisodes.size) {
                 snapshotFlow { listState.layoutInfo.totalItemsCount }
                     .filter { it > selectedDispIdx }
                     .first()
-                listState.scrollToItem(selectedDispIdx)
-                val itemWidth = snapshotFlow {
-                    listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedDispIdx }?.size
-                }.filterNotNull().first()
-                val viewportWidth = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-                listState.scrollToItem(selectedDispIdx, -((viewportWidth - itemWidth) / 2).coerceAtLeast(0))
-                centeredInitial = true
+                val info = listState.layoutInfo
+                val viewportStart = info.viewportStartOffset
+                val viewportEnd = info.viewportEndOffset
+                val item = info.visibleItemsInfo.firstOrNull { it.index == selectedDispIdx }
+                if (item == null || item.offset < viewportStart || item.offset + item.size > viewportEnd) {
+                    listState.scrollToItem(selectedDispIdx)
+                }
+                positionedInitial = true
             }
         }
         // 手动切集/倒序切换：做轻微滚动——仅当新选中集不在可视范围内时才滚动到刚好露出
         // （贴最近边缘，不强制居中/贴最左），已完全可见则完全不动；动画滚动带过渡。
-        // 首次组合跳过：进入页面的定位交给上面的居中 effect（居中 effect 完成后才置 centeredInitial）。
+        // 首次组合跳过：进入页面的定位交给上面的初始滚动状态/加载兜底。
         LaunchedEffect(selectedDispIdx) {
-            if (centeredInitial && lineEpisodes.isNotEmpty() && selectedDispIdx in 0 until lineEpisodes.size) {
+            if (positionedInitial && lineEpisodes.isNotEmpty() && selectedDispIdx in 0 until lineEpisodes.size) {
                 snapshotFlow { listState.layoutInfo.totalItemsCount }
                     .filter { it > selectedDispIdx }
                     .first()
