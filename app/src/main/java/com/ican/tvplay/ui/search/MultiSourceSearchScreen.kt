@@ -37,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
@@ -50,9 +49,6 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
-import androidx.compose.ui.platform.LocalContext
-import coil3.compose.AsyncImage
-import com.ican.tvplay.util.posterModel
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.player.core.PlaySpec
 import com.ican.tvplay.player.core.Players
@@ -62,11 +58,15 @@ import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixSearchInput
+import com.ican.tvplay.ui.components.PosterImage
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.theme.PosterBadgeScrim
+import com.ican.tvplay.ui.theme.PosterBottomScrim
+import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -276,7 +276,7 @@ private fun SiteSourceChip(
     // 未选中底色：仅浅色模式用 miuix surfaceContainerHigh（KernelSU 搜索栏同款 #E8E8E8），
     // 深色模式保持项目 DarkSurfaceVariant（#242424 全局板块色）不变
     val bg = if (selected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+        MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
     } else if (com.ican.tvplay.ui.theme.LocalDarkTheme.current) {
         MaterialTheme.colorScheme.surfaceVariant
     } else {
@@ -363,7 +363,6 @@ private fun CrossSourceVideoCard(
     onClick: () -> Unit,
 ) {
     val (_, tags) = buildVideoStatus(video)
-    val context = LocalContext.current
 
     Card(
         modifier = Modifier
@@ -387,10 +386,9 @@ private fun CrossSourceVideoCard(
                 .fillMaxWidth()
                 .aspectRatio(3f / 4f),
         ) {
-            AsyncImage(
-                model = posterModel(context, video.cover),
-                contentDescription = video.title,
-                contentScale = ContentScale.Crop,
+            PosterImage(
+                title = video.title,
+                cover = video.cover,
                 modifier = Modifier.fillMaxSize(),
             )
 
@@ -399,7 +397,7 @@ private fun CrossSourceVideoCard(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(8.dp)
-                    .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
+                    .background(PosterBadgeScrim, RoundedCornerShape(Spacing.corner))
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             ) {
                 Text(
@@ -419,7 +417,7 @@ private fun CrossSourceVideoCard(
                     .fillMaxWidth()
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Transparent, Color(0xE6000000)),
+                            listOf(Color.Transparent, PosterBottomScrim),
                         ),
                     )
                     .padding(horizontal = 10.dp, vertical = 10.dp),
@@ -430,7 +428,7 @@ private fun CrossSourceVideoCard(
                         Box(
                             modifier = Modifier
                                 .background(
-                                    Color(0x66000000),
+                                    PosterBadgeScrim,
                                     RoundedCornerShape(Spacing.corner),
                                 )
                                 .padding(horizontal = 6.dp, vertical = 2.dp),

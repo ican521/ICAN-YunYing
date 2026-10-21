@@ -51,6 +51,8 @@ import com.ican.tvplay.ui.theme.BrandBlue
 import com.ican.tvplay.ui.theme.BrandBlueDeep
 import com.ican.tvplay.ui.theme.BrandTeal
 import com.ican.tvplay.ui.theme.BrandViolet
+import com.ican.tvplay.ui.theme.CheckScrim
+import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.keyColorOptions
 
 /**
@@ -95,7 +97,7 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
                 contentPadding = PaddingValues(
                     start = pageHorizontalPadding(),
                     end = pageHorizontalPadding(),
-                    top = innerPadding.calculateTopPadding() + 16.dp,
+                    top = innerPadding.calculateTopPadding() + Spacing.pageTop,
                     bottom = 24.dp,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -161,7 +163,7 @@ private fun ColorButton(
                 modifier = Modifier
                     .size(52.dp)
                     .clip(CircleShape)
-                    .background(Color(0x55000000)),
+                    .background(CheckScrim),
             ) {
                 Icon(
                     imageVector = AppIcons.Check,

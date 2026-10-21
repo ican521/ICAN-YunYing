@@ -143,8 +143,14 @@ import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.BrandBlueDeep
+import com.ican.tvplay.ui.theme.BrandPink
+import com.ican.tvplay.ui.theme.DarkOnSurface
+import com.ican.tvplay.ui.theme.DarkOnSurfaceMuted
+import com.ican.tvplay.ui.theme.DarkSurfaceElevated
+import com.ican.tvplay.ui.theme.EpisodeSelectedFillAlpha
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.PopupScrim
+import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.optionBorderColor
 import androidx.compose.runtime.snapshotFlow
@@ -1680,7 +1686,7 @@ private fun FavoriteButton(v: Video) {
         Icon(
             imageVector = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
             contentDescription = if (isFav) "取消收藏" else "收藏",
-            tint = if (isFav) Color(0xFFFF5C8A) else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (isFav) BrandPink else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp),
         )
     }
@@ -1718,7 +1724,7 @@ private fun LineSection(
                     )
                     .background(
                         // 与选集 EpisodeChip 选中态完全一致：浅主色填充、无描边
-                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
                         else MaterialTheme.colorScheme.surfaceVariant,
                         shape,
                     )
@@ -2558,11 +2564,11 @@ private fun EpisodeChip(
             .height(40.dp)
             .defaultMinSize(minWidth = 40.dp)
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false)
-            // "更多"弹窗选中填充对齐全屏选集弹窗（BrandBlueDeep 25%）；选集栏维持主题色 20%
+            // "更多"弹窗选中填充对齐全屏选集弹窗（BrandBlueDeep 25%）；选集栏用全局选中填充透明度
             .background(
                 if (selected) {
-                    if (showBorder) BrandBlueDeep.copy(alpha = 0.25f)
-                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    if (showBorder) BrandBlueDeep.copy(alpha = EpisodeSelectedFillAlpha)
+                    else MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
                 } else MaterialTheme.colorScheme.surfaceVariant,
                 shape,
             )
@@ -2658,7 +2664,7 @@ private fun EpisodeSideSheet(
                     .fillMaxHeight()
                     .width(panelWidth)
                     .background(
-                        Color(0xFF2C2C2C),
+                        DarkSurfaceElevated,
                         RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp),
                     )
                     // 面板本体消费点击，避免点面板空白处误触发外层收起
@@ -2673,7 +2679,7 @@ private fun EpisodeSideSheet(
                     text = "选集",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFFEDEDF5),
+                    color = DarkOnSurface,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2695,12 +2701,12 @@ private fun EpisodeSideSheet(
                                 .fillMaxWidth()
                                 .clip(shape)
                                 .background(
-                                    if (selected) Color(0xFF277AF7).copy(alpha = 0.25f)
+                                    if (selected) BrandBlueDeep.copy(alpha = EpisodeSelectedFillAlpha)
                                     else Color.Transparent,
                                 )
                                 .border(
                                     width = 1.dp,
-                                    color = if (selected) Color(0xFF277AF7)
+                                    color = if (selected) BrandBlueDeep
                                     else Color.White.copy(alpha = 0.12f),
                                     shape = shape,
                                 )
@@ -2711,7 +2717,7 @@ private fun EpisodeSideSheet(
                                 text = ep.title,
                                 fontSize = 14.sp,
                                 color = if (selected) Color.White
-                                else Color(0xFFA6A6BA),
+                                else DarkOnSurfaceMuted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -2856,8 +2862,8 @@ private fun <T> OptionDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = maxDialogHeight)
-                .padding(horizontal = 32.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                .padding(horizontal = 16.dp)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
                 .padding(20.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
@@ -2881,7 +2887,7 @@ private fun <T> OptionDialog(
                             .fillMaxWidth()
                             .clickable(onClick = { onSelect(opt) })
                             .background(
-                                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
                                 else MaterialTheme.colorScheme.surfaceVariant, shape,
                             )
                             // 深色模式给每个选项描一圈（宽度/颜色走全局常量，与选集「更多」选项一致）
@@ -2912,8 +2918,8 @@ private fun SubtitleDialog(
     BottomSlideDialog(show = show, onDismiss = onDismiss) {
         Column(
             modifier = Modifier
-                .fillMaxWidth().padding(horizontal = 32.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                .fillMaxWidth().padding(horizontal = 16.dp)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
                 .padding(20.dp),
         ) {
             Text("字幕", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
@@ -2941,7 +2947,7 @@ private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color?
         modifier = Modifier
             .fillMaxWidth().clickable(onClick = onClick)
             .background(
-                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
                 else MaterialTheme.colorScheme.surfaceVariant, shape,
             )
             // 深色模式给每个选项描一圈（与选集「更多」选项一致，全局常量）
@@ -2962,8 +2968,8 @@ private fun AddSubtitleDialog(show: Boolean, onAdd: (String, String) -> Unit, on
     var url by remember { mutableStateOf("") }
     BottomSlideDialog(show = show, onDismiss = onDismiss) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp)).padding(20.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner)).padding(20.dp),
         ) {
             Text("添加外挂字幕", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             androidx.compose.material3.TextField(

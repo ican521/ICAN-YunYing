@@ -36,22 +36,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
-import androidx.compose.ui.platform.LocalContext
-import coil3.compose.AsyncImage
-import com.ican.tvplay.util.posterModel
+import com.ican.tvplay.ui.components.PosterImage
 import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.ui.CollectionViewModel
@@ -61,10 +62,15 @@ import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
+import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.components.videoGridColumns
+import com.ican.tvplay.ui.theme.PosterActionScrim
+import com.ican.tvplay.ui.theme.PosterBadgeScrim
+import com.ican.tvplay.ui.theme.PosterBottomScrim
+import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -120,12 +126,12 @@ fun FavoritesScreen(
                     titleColor = MaterialTheme.colorScheme.onBackground,
                     largeTitleColor = MaterialTheme.colorScheme.onBackground,
                     navigationIcon = {
-                        // 云同步按钮：上传/导入收藏
-                        androidx.compose.material3.IconButton(onClick = { showSyncDialog = true }) {
-                            androidx.compose.material3.Icon(
-                                imageVector = com.ican.tvplay.ui.components.AppIcons.CloudSync,
+                        // 云同步按钮：上传/导入收藏（与二级页返回钮同款 miuix 裸图标按钮）
+                        IconButton(onClick = { showSyncDialog = true }) {
+                            Icon(
+                                imageVector = AppIcons.CloudSync,
                                 contentDescription = "收藏同步",
-                                tint = MaterialTheme.colorScheme.onBackground,
+                                tint = MaterialTheme.colorScheme.onSurface,
                             )
                         }
                     },
@@ -149,7 +155,7 @@ fun FavoritesScreen(
                     contentPadding = PaddingValues(
                         start = pageHorizontalPadding(),
                         end = pageHorizontalPadding(),
-                        top = innerPadding.calculateTopPadding() + Spacing.titleContentGap,
+                        top = innerPadding.calculateTopPadding() + Spacing.pageTop,
                         bottom = Spacing.bottomBarInset,
                     ),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
@@ -224,73 +230,67 @@ fun FavoritesScreen(
 
     // 收藏同步弹窗（照搬 fongmi SyncDialog：标题 + 模式切换 + 刷新 + 设备列表；
     // 点设备按当前模式同步，长按且模式非双向时强制同步——接收端先清空再写入）
-    if (showSyncDialog) {
-        androidx.compose.ui.window.Dialog(onDismissRequest = { showSyncDialog = false }) {
-            androidx.compose.material3.Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.pageHorizontal),
-                shape = RoundedCornerShape(Spacing.corner),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp,
+    // 与其他弹窗统一：miuix OverlayDialog（App 内覆盖层渲染），容器色/圆角/三边距同源
+    OverlayDialog(
+        show = showSyncDialog,
+        title = "选择设备",
+        titleColor = MiuixTheme.colorScheme.onBackground,
+        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
+        renderInRootScaffold = true,
+        // 左右跟随页面边距（手机 16dp / 平板 24dp），底部 = max(16dp, 系统导航栏高度)
+        outsideMargin = DpSize(pageHorizontalPadding(), dialogBottomMargin()),
+        largeScreen = false,
+        onDismissRequest = { showSyncDialog = false },
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // 操作行：模式切换 | 重新扫描（标题「选择设备」由弹窗提供）
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
+                // 同步模式：双向 / 上传 / 下载（fongmi mode 按钮循环切换）
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(Spacing.sectionSpacing),
-                ) {
-                    // 标题行：选择设备 | 模式切换 | 重新扫描（fongmi dialog_device.xml）
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "选择设备",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f),
+                        .clickable { viewModel.cycleSyncMode() }
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha),
+                            RoundedCornerShape(Spacing.corner),
                         )
-                        // 同步模式：双向 / 上传 / 下载（fongmi mode 按钮循环切换）
-                        Box(
-                            modifier = Modifier
-                                .clickable { viewModel.cycleSyncMode() }
-                                .background(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                    RoundedCornerShape(Spacing.corner),
-                                )
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
-                        ) {
-                            Text(
-                                text = when (syncMode) {
-                                    com.ican.tvplay.data.FavoriteSync.MODE_UPLOAD -> "上传"
-                                    com.ican.tvplay.data.FavoriteSync.MODE_DOWNLOAD -> "下载"
-                                    else -> "双向"
-                                },
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Medium,
-                            )
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = when (syncMode) {
+                            com.ican.tvplay.data.FavoriteSync.MODE_UPLOAD -> "上传"
+                            com.ican.tvplay.data.FavoriteSync.MODE_DOWNLOAD -> "下载"
+                            else -> "双向"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+                Spacer(modifier = Modifier.width(Spacing.titleContentGap))
+                IconButton(
+                    onClick = {
+                        if (!scanning) {
+                            scope.launch {
+                                scanning = true
+                                viewModel.rescanDevices(context)
+                                scanning = false
+                            }
                         }
-                        Spacer(modifier = Modifier.width(Spacing.titleContentGap))
-                        androidx.compose.material3.IconButton(
-                            onClick = {
-                                if (!scanning) {
-                                    scope.launch {
-                                        scanning = true
-                                        viewModel.rescanDevices(context)
-                                        scanning = false
-                                    }
-                                }
-                            },
-                        ) {
-                            Icon(
-                                imageVector = AppIcons.Refresh,
-                                contentDescription = "重新扫描",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+                    },
+                ) {
+                    Icon(
+                        imageVector = AppIcons.Refresh,
+                        contentDescription = "重新扫描",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(Spacing.titleContentGap))
 
                     when {
                         scanning && devices.isEmpty() -> {
@@ -397,8 +397,6 @@ fun FavoritesScreen(
                             }
                         }
                     }
-                }
-            }
         }
     }
 }
@@ -413,7 +411,6 @@ private fun FavoriteCard(
     onDelete: () -> Unit,
     onLongClick: () -> Unit,
 ) {
-    val context = LocalContext.current
     Card(
         modifier = Modifier
             // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
@@ -437,10 +434,9 @@ private fun FavoriteCard(
                 .fillMaxWidth()
                 .aspectRatio(3f / 4f),
         ) {
-            AsyncImage(
-                model = posterModel(context, entity.cover),
-                contentDescription = entity.title,
-                contentScale = ContentScale.Crop,
+            PosterImage(
+                title = entity.title,
+                cover = entity.cover,
                 modifier = Modifier.fillMaxSize(),
             )
 
@@ -450,7 +446,7 @@ private fun FavoriteCard(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(8.dp)
-                        .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
+                        .background(PosterBadgeScrim, RoundedCornerShape(Spacing.corner))
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
                     Text(
@@ -477,7 +473,7 @@ private fun FavoriteCard(
                             focusedScale = 1.15f,
                             glow = false,
                         )
-                        .background(Color(0x88000000), CircleShape),
+                        .background(PosterActionScrim, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -496,7 +492,7 @@ private fun FavoriteCard(
                     .fillMaxWidth()
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Transparent, Color(0xE6000000)),
+                            listOf(Color.Transparent, PosterBottomScrim),
                         ),
                     )
                     .padding(horizontal = 10.dp, vertical = 10.dp),
@@ -573,7 +569,7 @@ fun HistoryScreen(
                     contentPadding = PaddingValues(
                         start = pageHorizontalPadding(),
                         end = pageHorizontalPadding(),
-                        top = innerPadding.calculateTopPadding() + Spacing.titleContentGap,
+                        top = innerPadding.calculateTopPadding() + Spacing.pageTop,
                         bottom = Spacing.bottomBarInset,
                     ),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
@@ -664,7 +660,6 @@ private fun HistoryCard(
     } else {
         0f
     }
-    val context = LocalContext.current
     Card(
         modifier = Modifier
             // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
@@ -688,10 +683,9 @@ private fun HistoryCard(
                 .fillMaxWidth()
                 .aspectRatio(3f / 4f),
         ) {
-            AsyncImage(
-                model = posterModel(context, history.cover),
-                contentDescription = history.title,
-                contentScale = ContentScale.Crop,
+            PosterImage(
+                title = history.title,
+                cover = history.cover,
                 modifier = Modifier.fillMaxSize(),
             )
 
@@ -701,7 +695,7 @@ private fun HistoryCard(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(8.dp)
-                        .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
+                        .background(PosterBadgeScrim, RoundedCornerShape(Spacing.corner))
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
                     Text(
@@ -728,7 +722,7 @@ private fun HistoryCard(
                             focusedScale = 1.15f,
                             glow = false,
                         )
-                        .background(Color(0x88000000), CircleShape),
+                        .background(PosterActionScrim, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -747,7 +741,7 @@ private fun HistoryCard(
                     .fillMaxWidth()
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Transparent, Color(0xE6000000)),
+                            listOf(Color.Transparent, PosterBottomScrim),
                         ),
                     )
                     .padding(horizontal = 10.dp, vertical = 10.dp),
@@ -756,7 +750,7 @@ private fun HistoryCard(
                 // 看到的集数：胶囊样式与收藏卡片站源标签一致
                 Box(
                     modifier = Modifier
-                        .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
+                        .background(PosterBadgeScrim, RoundedCornerShape(Spacing.corner))
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
                     Text(

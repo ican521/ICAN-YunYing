@@ -1,9 +1,6 @@
 package com.ican.tvplay.ui.home
 
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.TargetBasedAnimation
-import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -30,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
@@ -74,10 +72,12 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
@@ -105,19 +105,16 @@ import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /** 顶部分类 Tab 行高度（与 [UnderlineTabRow] 默认高度一致，用于确定性计算顶区展开总高） */
 private val TabRowHeight = 42.dp
-
-/** 搜索行松手吸附缓动：CubicBezier(0.22, 0.95, 0.25, 1) —— 起步干脆、尾巴更长 */
-private val SnapEasing = CubicBezierEasing(0.22f, 0.95f, 0.25f, 1.0f)
 
 /**
  * 把网格重置到「折叠态顶部」：滚动 0 + 折叠量偏移，即 glued 不变量要求的
@@ -201,11 +198,6 @@ fun HomeScreen(
     val searchRowMaxCollapsePx = with(density) {
         (48.dp + Spacing.pageTop).toPx()
     }
-    // HomeTopBar 内容高（48dp）：渐隐锚点基准
-    val searchRowContentPx = with(density) { 48.dp.toPx() }
-    // 完全隐去的推迟量：让文字/图标在搜索栏可视高度「快要小于内容高」时才彻底隐形
-    // （即可视高度 = 内容高 - 该推迟量时 alpha 才降到 0）
-    val searchRowFadeEndDelayPx = with(density) { 8.dp.toPx() }
     // 顶区「展开状态」总高度 → 每页网格固定顶部 contentPadding。
     // 确定性计算，不做实测回写：实测值会受「顶栏毛玻璃」开关引起的重排影响出现瞬时偏差，
     // 从而抖动网格 padding 并导致搜索行折叠短时卡住 / 内容错位
@@ -219,10 +211,8 @@ fun HomeScreen(
     val gridStates = remember { mutableStateMapOf<Int, LazyGridState>() }
     val collapseConnection = remember {
         object : NestedScrollConnection {
-            /** 切页对齐/吸附动画滚动期间抑制折叠回调，防止程序性滚动回写折叠量 */
+            /** 切页对齐期间的程序性滚动抑制标记，防止回写折叠量 */
             var suppress: Boolean = false
-            /** 最后一次手势拖动方向（松手吸附判定用）：>0 上滑收起、<0 下拉展开 */
-            var lastDy: Float = 0f
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 if (suppress) return Offset.Zero
@@ -233,7 +223,6 @@ fun HomeScreen(
                 val dy = -(if (consumed.y != 0f) consumed.y else available.y)
                 if (dy != 0f) {
                     searchRowCollapsePx = (searchRowCollapsePx + dy).coerceIn(0f, max)
-                    lastDy = dy
                 }
                 return Offset.Zero
             }
@@ -250,15 +239,10 @@ fun HomeScreen(
     // 那会把预渲染邻页拉回滚动 0（顶部空出折叠量像素），越过中点后新旧页角色互换，
     // 表现为「右侧页上移、左侧页下移、空白左右横跳」。
 
-    // 松手吸附（AppBarLayout snap 语义）：
-    // 最后方向向上 → 吸附完全收起；向下且已展开量 > 阈值 → 吸附完全展开；向下不足阈值 → 吸回收起。
-    // collapse 与网格滚动同 spec 同步动画（suppress 防回流），保持「折叠量 = 滚动量」不脱开；
-    // 动画期间再拖动立即打断接管
-    val snapThresholdPx = with(density) { 48.dp.toPx() }
-    var snapJob by remember { mutableStateOf<Job?>(null) }
+    // 折叠纯跟手、松手无吸附：手指停在哪，搜索行就停在哪（对齐 fongmi）
 
     // 钩子②：横向拖动 / 翻页（含点击 chip 的翻页动画）期间，持续把离屏页对齐到当前折叠量。
-    // 关键覆盖：用户先纵向滚动改变折叠量、松手吸附动画尚未结束时又横向切页——
+    // 关键覆盖：用户先纵向滚动改变折叠量、松手后又横向切页——
     // 邻页必须跟着吸附动画逐帧同步，否则滑入瞬间顶部会空出折叠量像素。
     // 对齐函数在「已对齐」时直接返回，故静止/已对齐状态下不产生任何额外滚动与布局开销
     LaunchedEffect(Unit) {
@@ -285,55 +269,7 @@ fun HomeScreen(
             }
     }
 
-    LaunchedEffect(Unit) {
-        var wasScrolling = false
-        snapshotFlow { gridStates[pagerState.settledPage]?.isScrollInProgress == true }
-            .collect { scrolling ->
-                if (scrolling) {
-                    wasScrolling = true
-                    snapJob?.cancel()
-                } else if (wasScrolling) {
-                    wasScrolling = false
-                    val max = searchRowMaxCollapsePx
-                    val cur = searchRowCollapsePx
-                    val target = when {
-                        cur <= 0f || cur >= max -> cur
-                        collapseConnection.lastDy > 0f -> max
-                        collapseConnection.lastDy < 0f && cur <= max - snapThresholdPx -> 0f
-                        collapseConnection.lastDy < 0f -> max
-                        else -> if (cur > max / 2f) max else 0f
-                    }
-                    val gs = gridStates[pagerState.settledPage]
-                    snapJob = scope.launch {
-                        collapseConnection.suppress = true
-                        try {
-                            if (target != cur) {
-                                // 逐帧低级循环：collapse 赋值与网格 scrollBy 同帧同步，严格保持 glued；
-                                // 本版本无 LazyGridState.animateScrollBy，故不用双动画并行方案
-                                // 缓动曲线改用 CubicBezier(0.22, 0.95, 0.25, 1)：起步更干脆、尾巴更长
-                                val anim = TargetBasedAnimation(
-                                    tween(240, easing = SnapEasing), Float.VectorConverter, cur, target, 0f,
-                                )
-                                val durationNanos = 240L * 1_000_000
-                                val startNanos = withFrameNanos { it }
-                                var prev = cur
-                                var playTime: Long
-                                do {
-                                    playTime = withFrameNanos { it } - startNanos
-                                    val v = anim.getValueFromNanos(playTime)
-                                    val d = v - prev
-                                    prev = v
-                                    searchRowCollapsePx = v
-                                    if (gs != null && d != 0f) gs.scrollBy(d)
-                                } while (playTime < durationNanos)
-                            }
-                        } finally {
-                            collapseConnection.suppress = false
-                        }
-                    }
-                }
-            }
-    }
+    // 折叠纯跟手（对齐 fongmi）：松手不做吸附，手指停在哪搜索行就停在哪
 
     Box(
         modifier = Modifier
@@ -379,10 +315,47 @@ fun HomeScreen(
             val pageVideos = remember(page, pageCategory?.id, currentSiteKey) {
                 mutableStateOf<List<Video>>(emptyList())
             }
-            // 首次进入该页、分类变化或切换站源时，触发加载（协程结果缓存到 pageVideos）
-            LaunchedEffect(pageCategory?.id, currentSiteKey) {
-                if (pageCategory != null) {
-                    pageVideos.value = viewModel.getCategoryVideos(pageCategory.id)
+            // 网盘目录钻取栈：每项 = (文件夹 id, 文件夹名)。进入子目录压栈，返回键退栈
+            // （对齐 fongmi FolderFragment.openFolder 的 hide+add+addToBackStack）
+            val folderStack = remember(page, pageCategory?.id, currentSiteKey) {
+                mutableStateOf<List<Pair<String, String>>>(emptyList())
+            }
+            // 网盘行样式（单列、全宽、64dp 高）：该分类出现「文件夹」卡片即锁定，
+            // 钻进子目录后沿用同一样式。
+            // 不能用 action 卡片判断 —— 「云盘配置」这个 tab 里放的就是配置卡片（action），
+            // 但它的卡片样式要保持原海报网格不变；只有配置好云盘后新出现的那些 tab
+            // （内容是文件夹 / 文件）才切到行样式
+            val driveStyle = remember(page, pageCategory?.id, currentSiteKey) { mutableStateOf(false) }
+            // 首次进入该页、分类变化、切站源或进出子目录时触发加载
+            LaunchedEffect(pageCategory?.id, currentSiteKey, folderStack.value) {
+                if (pageCategory == null) return@LaunchedEffect
+                val folder = folderStack.value.lastOrNull()
+                val list = if (folder == null) {
+                    viewModel.getCategoryVideos(pageCategory.id)
+                } else {
+                    viewModel.getFolderVideos(folder.first)
+                }
+                if (!driveStyle.value && list.any { it.isFolder }) {
+                    driveStyle.value = true
+                }
+                pageVideos.value = list
+            }
+            // 子目录内按返回键退回上一级（fongmi FolderFragment.goBack → popBackStack）
+            BackHandler(enabled = folderStack.value.isNotEmpty()) {
+                folderStack.value = folderStack.value.dropLast(1)
+            }
+            // 卡片点击：fongmi onItemClick 顺序 —— action → folder → 播放
+            val onItemClick: (Video) -> Unit = { video ->
+                when {
+                    // 网盘配置入口：执行 SiteApi.action → Toast 返回 msg
+                    video.action.isNotBlank() -> viewModel.executeDriveAction(video.action) { msg ->
+                        if (msg.isNotBlank()) {
+                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    // 网盘文件夹：进入该目录（压栈），不再跳搜索/详情
+                    video.isFolder -> folderStack.value = folderStack.value + (video.id to video.title)
+                    else -> onVideoClick(video)
                 }
             }
             val gridState = remember(page) { LazyGridState() }
@@ -419,33 +392,56 @@ fun HomeScreen(
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background),
             ) {
-                // 列数由「设置-首页布局大小」驱动（收藏/历史页共用同一规则 videoGridColumns）：
+                // 普通分类：列数由「设置-首页布局大小」驱动（收藏/历史页共用 videoGridColumns）：
                 // 手机（<600dp）小=3列/中=2列（大不开放），平板自适应最小卡宽：小≈7列、中≈5列、大≈3列
-                val columns = com.ican.tvplay.ui.components.videoGridColumns(homeLayoutSize)
+                // 网盘分类：单列固定 —— 行宽贴首页左右边距、屏宽越大整行越宽
+                val gridCells = if (driveStyle.value) {
+                    GridCells.Fixed(1)
+                } else {
+                    com.ican.tvplay.ui.components.videoGridColumns(homeLayoutSize)
+                }
                 LazyVerticalGrid(
                     state = gridState,
-                    columns = columns,
+                    columns = gridCells,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = pageContentPadding,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                     verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                 ) {
                     gridItems(pageVideos.value, key = { it.id }) { video ->
-                        VideoCardItem(
-                            video = video,
-                            onClick = {
-                                // fongmi 同款：action 卡片直接执行 SiteApi.action → Toast 返回 msg
-                                if (video.action.isNotBlank()) {
-                                    viewModel.executeDriveAction(video.action) { msg ->
-                                        if (msg.isNotBlank()) {
-                                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                } else {
-                                    onVideoClick(video)
-                                }
-                            },
-                        )
+                        if (driveStyle.value) {
+                            DriveRowItem(video = video, onClick = { onItemClick(video) })
+                        } else {
+                            VideoCardItem(video = video, onClick = { onItemClick(video) })
+                        }
+                    }
+                    // 网盘文件夹页短列表兜底：让「最大可上滑距离」恰好 = 搜索行最大折叠量（62dp）。
+                    // 完全上滑后第一行贴着分类 Tab 下缘完整显示，不能再往上滑。
+                    // 纯确定性计算（不读 layoutInfo，避免与 Spacer 高度互相循环）：
+                    //   内容总高 = 项数×行高 + (项数-1)×行间距
+                    //   网格可视区高 = BoxWithConstraints.maxHeight（外层容器高，不含 contentPadding）
+                    //   顶栏占位 = topBarHeightPx（contentPadding.top），底部占位 = contentPadding.bottom
+                    //   可滚距离 = (内容总高 + Spacer高 + cardGapV) - (可视区高 - 顶栏占位 - 底部占位)
+                    //   令其 = searchRowMaxCollapsePx，反解 Spacer 高
+                    if (driveStyle.value && pageVideos.value.isNotEmpty()) {
+                        item(key = "drive_bottom_spacer", span = { GridItemSpan(maxLineSpan) }) {
+                            val itemCount = pageVideos.value.size
+                            val rowHeightPx = with(density) { 64.dp.toPx() }
+                            val gapPx = with(density) { Spacing.cardGapV.toPx() }
+                            val topPadPx = with(density) { pageContentPadding.calculateTopPadding().toPx() }
+                            val bottomPadPx = with(density) { pageContentPadding.calculateBottomPadding().toPx() }
+                            // constraints 来自 BoxWithConstraints 作用域
+                            val viewportPx = constraints.maxHeight.toFloat()
+                            val contentHeightPx = itemCount * rowHeightPx + (itemCount - 1).coerceAtLeast(0) * gapPx
+                            val spacerPx =
+                                (searchRowMaxCollapsePx + viewportPx - topPadPx - bottomPadPx - contentHeightPx - gapPx)
+                                    .coerceAtLeast(0f)
+                            Spacer(
+                                Modifier
+                                    .height(with(density) { spacerPx.toDp() })
+                                    .fillMaxWidth(),
+                            )
+                        }
                     }
                 }
             }
@@ -466,62 +462,63 @@ fun HomeScreen(
                 // 状态栏固定占位：不随折叠收起，收起后 Tab 行停在状态栏下缘而非屏幕最顶端
                 Spacer(Modifier.height(contentPadding.calculateTopPadding() - Spacing.pageTop))
 
-                // 搜索行：上滑时高度连续收到 0（约束传入，胶囊/按钮随高度压缩变形 +
-                // 内部占位文字与图标同步渐隐），下滑任意位置展开；
-                // 高度 = 固定最大收起量 - 折叠量，全程计算值无实测回写
-                Box(
+                // 顶区（搜索行 + 分类 Tab）用自定义 Layout 精确摆放：
+                // 搜索行整体按折叠量上移、被容器顶部裁掉（滑到状态栏后面），
+                // Tab 行始终跟在搜索行底缘下方固定间距处 —— 折叠到底时 Tab 行停在状态栏下缘，不会被一起藏掉。
+                // 不用「Box + 收缩高度」：父容器比内容矮时，Compose 会按对齐把搜索行额外上移并压扁
+                val gapPx = with(density) { Spacing.categoryTabVertical.toPx() }
+                val tabRowPx = with(density) { TabRowHeight.toPx() }
+                Layout(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(
                             with(density) {
-                                (searchRowMaxCollapsePx - searchRowCollapsePx).coerceAtLeast(0f).toDp()
+                                (searchRowMaxCollapsePx + gapPx * 2 + tabRowPx - searchRowCollapsePx)
+                                    .coerceAtLeast(0f)
+                                    .toDp()
                             },
                         )
                         .clipToBounds(),
-                ) {
-                    // 渐隐锚点 = 内容高 - 推迟量：上滑即开始渐隐，搜索栏可视高度收到
-                    // 「快要小于内容高」（比内容高再低 8dp）时才完全隐去，之后保持全隐
-                    val contentAlpha = run {
-                        val fadeFullHidePx = searchRowContentPx - searchRowFadeEndDelayPx
-                        val denom = searchRowMaxCollapsePx - fadeFullHidePx
-                        if (denom > 0f) {
-                            ((searchRowMaxCollapsePx - searchRowCollapsePx - fadeFullHidePx) / denom)
-                                .coerceIn(0f, 1f)
-                        } else {
-                            1f
+                    content = {
+                        // 0：搜索行（含顶部间距；左右边距走页面基准，分类 Tab 保持通栏）
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Spacer(Modifier.height(Spacing.pageTop))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                                        end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
+                                    ),
+                            ) {
+                                HomeTopBar(
+                                    contentAlpha = 1f,
+                                    onSearchClick = onSearchClick,
+                                    onHistoryClick = onHistoryClick,
+                                    onUrlPlayClick = onUrlPlayClick,
+                                )
+                            }
                         }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                                end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-                                top = Spacing.pageTop,
-                            ),
-                    ) {
-                        HomeTopBar(
-                            contentAlpha = contentAlpha,
-                            onSearchClick = onSearchClick,
-                            onHistoryClick = onHistoryClick,
-                            onUrlPlayClick = onUrlPlayClick,
-                        )
+                        // 1：固定分类 Tab：通栏可滑至屏幕最左/最右缘，静止时首个 Tab 由内部 contentPadding 对齐页面基准线
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            CategoryChips(
+                                categories = categories,
+                                pagerState = pagerState,
+                                tappedIndex = tappedChipIndex,
+                                onSelect = onChipClick,
+                            )
+                        }
+                    },
+                ) { measurables, constraints ->
+                    val search = measurables[0].measure(Constraints(maxWidth = constraints.maxWidth))
+                    val tabs = measurables[1].measure(Constraints(maxWidth = constraints.maxWidth))
+                    val shift = searchRowCollapsePx.roundToInt()
+                    layout(constraints.maxWidth, constraints.maxHeight) {
+                        // 搜索行上移（负 y）＝ 顶部被容器裁掉，底缘与 Tab 行间距恒定
+                        search.place(0, -shift)
+                        tabs.place(0, search.height - shift + gapPx.roundToInt())
                     }
                 }
-
-                Spacer(Modifier.height(Spacing.categoryTabVertical))
-
-                // 固定分类 Tab：通栏可滑至屏幕最左/最右缘，静止时首个 Tab 由内部 contentPadding 对齐页面基准线
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    CategoryChips(
-                        categories = categories,
-                        pagerState = pagerState,
-                        tappedIndex = tappedChipIndex,
-                        onSelect = onChipClick,
-                    )
-                }
-
-                Spacer(Modifier.height(Spacing.categoryTabVertical))
             }
         }
         }
@@ -553,6 +550,8 @@ fun SitePickerDialog(
         renderInRootScaffold = true,
         // 三边统一 16dp：底部 = max(16dp, 系统导航栏高度)，跨设备自适应
         outsideMargin = DpSize(16.dp, dialogBottomMargin()),
+        // 强制「非大屏」：平板宽窗口下 miuix 会改为屏幕居中，与手机底部呼出不一致
+        largeScreen = false,
         onDismissRequest = onDismiss,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -584,7 +583,7 @@ fun SitePickerDialog(
                                     glow = false,
                                 )
                                 .background(
-                                    if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                    if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
                                     else MaterialTheme.colorScheme.surfaceVariant,
                                     shape,
                                 )
@@ -818,10 +817,12 @@ private fun UnderlineTabRow(
 
         Box(Modifier.fillMaxSize().clipToBounds()) {
             // 主题色小横条：宽度=选中文字实际宽度（文字左缘→右缘），随选中切换即时变化
+            // padding(bottom)：控制指示条在 Tab 行底部的位置。视觉居中需考虑中文字形下方留白，
+            // 实测后调整（3dp → 视觉偏下；增大值让指示条上移）
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(bottom = 3.dp)
+                    .padding(bottom = 4.5.dp)
                     .offset {
                         // 指示条 x = 页面基线 + 前序各 tab 实测宽度累计 − 滚动偏移（文字贴合后无居中补偿项）
                         var start = edgePaddingPx
@@ -895,4 +896,64 @@ private fun VideoCardItem(
         video = video,
         onClick = onClick,
     )
+}
+
+/**
+ * 网盘文件 / 目录行（对齐 fongmi adapter_vod_list.xml 的列表行）：
+ * 单列全宽、固定 64dp 高（上下各 12dp padding + 40dp 图标），
+ * 左侧文件夹（目录）/ 影片（文件）图标，右侧标题 + 备注（vod_remarks）。
+ *
+ * 宽度不写死：由所在网格的 contentPadding 决定 —— 左右贴首页页面边距，
+ * 屏宽越大整行越宽（自适应）。
+ */
+@Composable
+private fun DriveRowItem(
+    video: Video,
+    onClick: () -> Unit,
+) {
+    top.yukonga.miuix.kmp.basic.Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .tvCardEffect(onClick = onClick, shape = RoundedCornerShape(Spacing.corner), glow = false),
+        insideMargin = PaddingValues(0.dp),
+        colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+        ) {
+            Icon(
+                imageVector = if (video.isFolder) AppIcons.Folder else AppIcons.Movie,
+                contentDescription = null,
+                tint = if (video.isFolder) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(40.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = video.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (video.rating.isNotBlank()) {
+                    Text(
+                        text = video.rating,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
+        }
+    }
 }

@@ -2,12 +2,10 @@ package com.ican.tvplay.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,11 +17,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.SubcomposeAsyncImageContent
 import com.ican.tvplay.data.model.Video
+import com.ican.tvplay.ui.theme.PosterBadgeScrim
+import com.ican.tvplay.ui.theme.PosterBottomScrim
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.util.posterModel
 import androidx.tv.material3.MaterialTheme
@@ -51,7 +53,6 @@ fun VideoCard(
     modifier: Modifier = Modifier,
     width: Dp = 148.dp,
 ) {
-    val context = LocalContext.current
     Card(
         modifier = modifier
             .width(width)
@@ -69,44 +70,23 @@ fun VideoCard(
                 .fillMaxWidth()
                 .aspectRatio(3f / 4f),
         ) {
-            AsyncImage(
-                model = posterModel(context, video.cover),
-                contentDescription = video.title,
-                contentScale = ContentScale.Crop,
+            PosterImage(
+                title = video.title,
+                cover = video.cover,
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 底部渐变，保证标题可读
+            // 底部渐变 + 标题（与收藏/历史/搜索结果卡片统一：渐变随标题内容收缩，不再固定 72dp）
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp)
                     .align(Alignment.BottomCenter)
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Transparent, Color(0xCC000000)),
+                            listOf(Color.Transparent, PosterBottomScrim),
                         ),
-                    ),
-            )
-
-            // 右上角：评分胶囊
-            Text(
-                text = video.rating,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .background(Color(0x66000000), RoundedCornerShape(Spacing.corner))
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-            )
-
-            // 底部：标题
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                    )
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
             ) {
                 Text(
                     text = video.title,
@@ -117,6 +97,58 @@ fun VideoCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+
+            // 右上角：评分胶囊
+            Text(
+                text = video.rating,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .background(PosterBadgeScrim, RoundedCornerShape(Spacing.corner))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
         }
+    }
+}
+
+/**
+ * 海报统一渲染入口（首页 / 搜索 / 收藏 / 历史共用）。
+ *
+ * 封面缺失或加载失败（如糯米站源）时，不再只留一块灰色底，
+ * 而是在海报位置直接显示标题文字——对齐 fongmi 的失败兜底，但用文字代替首字色块。
+ */
+@Composable
+fun PosterImage(
+    title: String,
+    cover: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+) {
+    val context = LocalContext.current
+    SubcomposeAsyncImage(
+        model = posterModel(context, cover),
+        contentDescription = title,
+        contentScale = contentScale,
+        modifier = modifier,
+        error = { PosterTextFallback(title) },
+        success = { SubcomposeAsyncImageContent() },
+    )
+}
+
+/** 无海报时的文字兜底：居中显示标题（最多 3 行，超出省略） */
+@Composable
+private fun PosterTextFallback(title: String) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
     }
 }
