@@ -2150,7 +2150,10 @@ private fun FullscreenPlayLayout(
             // 背景由根 Box 提供（此处若带背景会盖住常驻 PlayerView）
             // 选集侧边弹窗打开期间（showEpisodes）抑制全部手势：弹窗改为组件内覆盖层后，
             // 事件不再被子窗口拦截，需防止遮罩上的长按/拖动误触发快进/seek
-            .pointerInput(locked, showEpisodes) {
+            // keys 必须含 playbackSpeed：长按快进松手时恢复「用户设定的倍速」，
+            // 该值变化（如从 1.0 调为 3.0）若不重启本手势层，闭包会一直捕获进入全屏时的旧值，
+            // 导致松手后错误地恢复成旧倍速
+            .pointerInput(locked, showEpisodes, playbackSpeed) {
                 // fongmi CustomKeyDown 同款手势：单击显隐控制层、双击播放暂停、长按 2 倍速快进、横向拖动快进快退
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
