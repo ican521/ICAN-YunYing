@@ -19,3 +19,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Deliverable APKs (kept on disk, not tracked)
+*.apk
