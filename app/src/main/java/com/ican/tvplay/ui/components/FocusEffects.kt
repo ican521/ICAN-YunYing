@@ -69,6 +69,12 @@ fun Modifier.tvCardEffect(
     /** 按住保持：为 true 时向 interactionSource 发射 HoldDownInteraction.HoldDown，MiuixIndication 保持按压蒙层（alpha 0.10），
      *  为 false 时发射 Release 渐隐恢复——即 miuix BasicComponent holdDownState 的同款机制（KernelSU OverlayDropdownPreference 用法） */
     holdDownState: Boolean = false,
+    /** 触摸按压蒙层开关：false 时点击仍生效但无任何按压/点击视觉反馈。
+     *  用于本身带选中态的互斥选择列表（站源/线路/选集等），选中色已是足够的状态反馈 */
+    pressEffect: Boolean = true,
+    /** 按压蒙层颜色覆盖：null 时取主题 onSurface（浅色深灰、深色浅白，随主题适配）。
+     *  视频卡片等海报类组件固定传浅黑色，保证深色模式按压特效与浅色模式完全一致 */
+    pressColor: Color? = null,
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
@@ -119,8 +125,9 @@ fun Modifier.tvCardEffect(
     val accent = MaterialTheme.colorScheme.primary
     val isDark = LocalDarkTheme.current
 
-    // KernelSU 同款按压特效：miuix 库 MiuixIndication，蒙层色取主题文字色（深浅色模式自动适配）
-    val pressIndicationColor = MaterialTheme.colorScheme.onSurface
+    // KernelSU 同款按压特效：miuix 库 MiuixIndication，蒙层色默认取主题文字色（深浅色模式自动适配）；
+    // pressColor 显式指定时用指定色（视频卡片固定浅黑，深色模式与浅色表现一致）
+    val pressIndicationColor = pressColor ?: MaterialTheme.colorScheme.onSurface
     val pressIndication = remember(pressIndicationColor) { MiuixIndication(color = pressIndicationColor) }
     // 深色模式补强：弹窗展开期间暗遮罩（60% 黑）会把 MiuixIndication 的 10% 白蒙层压到不可见，
     // 保持态再叠一层同色 20% 蒙层（仅深色），保证「弹窗存活期卡片持续按压变色」肉眼可见
@@ -139,7 +146,7 @@ fun Modifier.tvCardEffect(
         .clip(shape)
         .combinedClickable(
             interactionSource = interactionSource,
-            indication = pressIndication,
+            indication = if (pressEffect) pressIndication else null,
             enabled = enabled,
             onClick = onClick,
             onLongClick = onLongClick,

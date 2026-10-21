@@ -1,12 +1,19 @@
 package com.ican.tvplay.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
+import com.ican.tvplay.ui.theme.Spacing
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurColors
@@ -69,16 +76,28 @@ fun BlurredBar(
     }
 }
 
-/** 二级页顶栏返回按钮：KernelSU 同款 miuix 裸图标（IconButton + MiuixIcons.Back，无圆底） */
+/**
+ * 二级页顶栏返回按钮：圆形底 + miuix Back 图标。
+ * 圆底样式与首页顶栏「链接解析 / 历史」按钮完全一致（48dp 圆形、surfaceContainerHigh 底色、
+ * 同款按压缩放），保证全局顶栏按钮形态统一。
+ */
 @Composable
 fun MiuixBackButton(
     onClick: () -> Unit,
 ) {
-    IconButton(onClick = onClick) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(Spacing.circleButton)
+            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.1f, glow = false)
+            .clip(CircleShape)
+            .background(MiuixTheme.colorScheme.surfaceContainerHigh),
+    ) {
         Icon(
             imageVector = MiuixIcons.Back,
             contentDescription = "返回",
-            tint = MaterialTheme.colorScheme.onSurface,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
         )
     }
 }

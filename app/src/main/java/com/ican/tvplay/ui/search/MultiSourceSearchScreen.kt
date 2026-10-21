@@ -64,6 +64,7 @@ import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
 import com.ican.tvplay.ui.theme.PosterBottomScrim
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
@@ -291,7 +292,8 @@ private fun SiteSourceChip(
         modifier = Modifier
             .fillMaxWidth()
             .height(40.dp)
-            .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false)
+            // 站源列表自带选中态：整列表（含未选中项）统一不要按压/点击蒙层，选中色即反馈
+            .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false, pressEffect = false)
             .background(bg, shape)
             .padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center,
@@ -377,6 +379,8 @@ private fun CrossSourceVideoCard(
                 shape = RoundedCornerShape(Spacing.corner),
                 focusedScale = 1.05f,
                 glow = false,
+                // 按压蒙层固定浅色模式同款浅黑：深色模式与浅色表现一致
+                pressColor = LightOnSurface,
             ),
         insideMargin = androidx.compose.foundation.layout.PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),

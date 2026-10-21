@@ -67,6 +67,7 @@ import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.components.videoGridColumns
+import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterActionScrim
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
 import com.ican.tvplay.ui.theme.PosterBottomScrim
@@ -425,6 +426,8 @@ private fun FavoriteCard(
                     focusedScale = 1.05f,
                     glow = false,
                     onLongClick = onLongClick,
+                    // 按压蒙层固定浅色模式同款浅黑：收藏/历史卡片深色模式与浅色表现一致
+                    pressColor = LightOnSurface,
                 ),
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
@@ -674,6 +677,8 @@ private fun HistoryCard(
                     focusedScale = 1.05f,
                     glow = false,
                     onLongClick = onLongClick,
+                    // 按压蒙层固定浅色模式同款浅黑：收藏/历史卡片深色模式与浅色表现一致
+                    pressColor = LightOnSurface,
                 ),
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),

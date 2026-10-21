@@ -4,17 +4,14 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
@@ -93,7 +90,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -1506,16 +1502,12 @@ private fun PreviewPlayerArea(
                 }
 
                 // 底部：进度条（fongmi: PlayerSeekView 左右 16dp padding，容器 paddingBottom 8dp）
+                // 不挂底部渐变阴影：进度条行直接叠加在视频画面上
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, Color(0xAA000000)),
-                            ),
-                        )
                         .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
                 ) {
                     Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
@@ -1713,6 +1705,8 @@ private fun LineSection(
                     .tvCardEffect(
                         onClick = { onLineChange(source.flag) },
                         shape = shape, focusedScale = 1.06f, glow = false,
+                        // 线路列表自带选中态：整列表统一去掉按压/点击蒙层，选中色即反馈
+                        pressEffect = false,
                     )
                     .background(
                         // 与选集 EpisodeChip 选中态完全一致：浅主色填充、无描边
@@ -1878,11 +1872,21 @@ private fun EpisodeGridDialog(
     } else 0
 
     val pagerState = rememberPagerState(initialPage = currentPage, pageCount = { pageCount })
+    // 顶部 Tab 行自绘为 LazyRow（不用 material3 ScrollableTabRow，避免其内部 edgePadding 几何不可控）：
+    // 打开弹窗时与 pager 同步瞬时定位到当前页，之后翻页再动画跟随
+    val tabListState = rememberLazyListState(initialFirstVisibleItemIndex = currentPage)
     val scope = rememberCoroutineScope()
 
     // 每次弹窗打开时，强制跳回当前播放集所在页（不记忆上次浏览页）
     LaunchedEffect(show) {
-        if (show) pagerState.scrollToPage(currentPage)
+        if (show) {
+            pagerState.scrollToPage(currentPage)
+            tabListState.scrollToItem(currentPage)
+        }
+    }
+    // 手势滑动翻页后，Tab 行动画跟随到对应页（点击 Tab 时该 Tab 本就可见，animateScrollToItem 不会多余滚动）
+    LaunchedEffect(pagerState.currentPage) {
+        tabListState.animateScrollToItem(pagerState.currentPage)
     }
 
     OverlayDialog(
@@ -1921,19 +1925,19 @@ private fun EpisodeGridDialog(
                 // 标题 ↔ Tab 间距：3dp 实测补偿值——文字行高自带隐藏空隙（标题下缘约 4dp + Tab 内部约 7.8dp），
                 // 补偿后标题墨迹↔Tab 墨迹 ≈ 14.8dp，与「弹窗顶↔标题」14.5dp、「Tab↔网格」14.5dp 三段等距
                 Spacer(modifier = Modifier.height(3.dp))
-                androidx.compose.material3.ScrollableTabRow(
-                    selectedTabIndex = pagerState.currentPage,
-                    containerColor = Color.Transparent,
-                    contentColor = MiuixTheme.colorScheme.onBackground,
-                    // 与选集网格同款行为：静止时首个 Tab 距弹窗边 12dp，滚动时 Tab 可贴到弹窗最边缘
-                    edgePadding = Spacing.titleContentGap,
-                    divider = {},
-                    // 删除 Tab 底部蓝色指示器（仅靠选中色区分当前页）
-                    indicator = {},
+                // 自绘分页 Tab（LazyRow）：
+                // 几何对齐——内容左右内缩 12dp（与选集网格 LazyVerticalGrid 的 horizontal padding 同源），
+                // 每个 Tab 盒内左右再内缩 16dp，故静止时首个 Tab 文字墨迹起点 = 12 + 16 = 28dp，
+                // 恰好落在第一个选集按钮左缘(12dp) + 圆角半径(Spacing.corner=16dp) 的圆角/直线相切点上；
+                // 12dp 内容内边距随滚动滑走，故滚动时 Tab 仍可贴到弹窗最左/最右边缘。
+                LazyRow(
+                    state = tabListState,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.titleContentGap),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    pageTitles.forEachIndexed { idx, title ->
+                    itemsIndexed(pageTitles) { idx, title ->
                         val isSelected = pagerState.currentPage == idx
-                        androidx.compose.foundation.layout.Box(
+                        Box(
                             modifier = Modifier
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
@@ -2555,7 +2559,8 @@ private fun EpisodeChip(
             // 高度固定，最小宽度为正方形（40dp）；文字长时宽度自适应撑开
             .height(40.dp)
             .defaultMinSize(minWidth = 40.dp)
-            .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false)
+            // 选集列表自带选中态：整列表（含未选中项）统一不要按压/点击蒙层，选中色即反馈
+            .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false, pressEffect = false)
             // "更多"弹窗选中填充对齐全屏选集弹窗（BrandBlueDeep 25%）；选集栏用全局选中填充透明度
             .background(
                 if (selected) {
@@ -2686,7 +2691,11 @@ private fun EpisodeSideSheet(
                                     else Color.White.copy(alpha = 0.12f),
                                     shape = shape,
                                 )
-                                .clickable { onSelect(idx); dismissWithAnim() }
+                                // 选集列表自带选中态：去掉按压/点击涟漪，选中色即反馈
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) { onSelect(idx); dismissWithAnim() }
                                 .padding(horizontal = 12.dp, vertical = 10.dp),
                         ) {
                             Text(
@@ -2778,42 +2787,58 @@ private fun BottomSlideDialog(
     onDismiss: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val visibleState = remember { MutableTransitionState(false) }
-    LaunchedEffect(show) { visibleState.targetState = show }
-    // 退出动画播完（currentState 落到 false）前保持窗口存在
-    if (visibleState.currentState || visibleState.targetState) {
-        Dialog(
-            // 关闭平台默认宽度限制：窗口铺满全屏，内容才能贴底摆放
-            onDismissRequest = onDismiss,
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                // 空白区 = 点按关闭（上一版由平台弹窗外点击触发，全屏窗口后需自己接）
+    // 窗口存活标记：显示时立刻建窗；收起时等「滑出动画播完 + 数帧」再销毁窗口。
+    // 原因：Compose Dialog 是独立的平台窗口，销毁由 WindowManager 异步执行；
+    // 若在滑出动画结束的同一帧销毁，会有一帧把无位移的旧内容重新上屏，
+    // 肉眼看到的正是「完全收回屏幕底部后又向上冒一下」。
+    // 多留的这几帧里内容已画在屏幕外，肉眼不可见，可彻底吃掉这次回弹。
+    var windowAlive by remember { mutableStateOf(show) }
+    LaunchedEffect(show) {
+        if (show) {
+            windowAlive = true
+        } else {
+            kotlinx.coroutines.delay(200L + 64L)
+            windowAlive = false
+        }
+    }
+    if (!windowAlive) return
+
+    // 位移进度：0 = 完全弹出，1 = 完全收到屏幕底部之外。
+    // 按内容自身高度位移（而非固定 dp），任意设备/任意弹窗高度都能彻底出屏
+    val slide by animateFloatAsState(
+        targetValue = if (show) 0f else 1f,
+        animationSpec = tween(if (show) 220 else 200),
+        label = "bottomSlideDialog",
+    )
+
+    Dialog(
+        // 关闭平台默认宽度限制：窗口铺满全屏，内容才能贴底摆放
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // 空白区 = 点按关闭（上一版由平台弹窗外点击触发，全屏窗口后需自己接）；
+            // 收起过程中不再响应，避免重复触发
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(show) { if (show) detectTapGestures { onDismiss() } },
+            )
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) { detectTapGestures { onDismiss() } },
-                )
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.BottomCenter,
+                        .widthIn(max = 560.dp)
+                        .fillMaxWidth()
+                        .padding(bottom = 24.dp)
+                        // 位移放在 graphicsLayer：只改绘制不改布局，滑动过程不触发重组/重新测量
+                        .graphicsLayer { translationY = slide * size.height }
+                        // 吞掉弹窗本体范围内的点按，避免点空白逻辑误关弹窗
+                        .pointerInput(Unit) { detectTapGestures { } },
                 ) {
-                    AnimatedVisibility(
-                        visibleState = visibleState,
-                        enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(220)),
-                        exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(200)),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .widthIn(max = 560.dp)
-                                .fillMaxWidth()
-                                .padding(bottom = 24.dp)
-                                // 吞掉弹窗本体范围内的点按，避免点空白逻辑误关弹窗
-                                .pointerInput(Unit) { detectTapGestures { } },
-                        ) {
-                            content()
-                        }
-                    }
+                    content()
                 }
             }
         }

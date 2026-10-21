@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
 import com.ican.tvplay.data.model.Video
+import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
 import com.ican.tvplay.ui.theme.PosterBottomScrim
 import com.ican.tvplay.ui.theme.Spacing
@@ -61,7 +62,8 @@ fun VideoCard(
                 indication = SinkFeedback(),
                 delay = null,
             )
-            .tvCardEffect(onClick = onClick, shape = RoundedCornerShape(Spacing.corner), glow = false),
+            // 按压蒙层固定浅色模式同款浅黑(#15161D)：深色模式不再出现浅白按压块，两套模式完全一致
+            .tvCardEffect(onClick = onClick, shape = RoundedCornerShape(Spacing.corner), glow = false, pressColor = LightOnSurface),
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
     ) {
