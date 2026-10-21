@@ -2362,7 +2362,22 @@ private fun FullscreenPlayLayout(
                     // （功能栏到屏幕底 = 容器 8dp 底部内边距 + 按钮自身 8dp 内边距）
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 0.dp),
+                        modifier = Modifier
+                            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 0.dp)
+                            // 屏蔽本行点击穿透：消费行内空白区（时间文字/进度条两侧）的全部手势，
+                            // 手势层收到 consumed 事件即 gestureBlocked，不再误触发
+                            // 单击显隐/双击暂停/长按快进/横向拖动 seek；进度条自身拖动不受影响
+                            // （子组件先处理事件，此处仅在之后补消费）
+                            .pointerInput(Unit) {
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false)
+                                    while (true) {
+                                        val e = awaitPointerEvent()
+                                        e.changes.forEach { it.consume() }
+                                        if (e.changes.all { !it.pressed }) break
+                                    }
+                                }
+                            },
                     ) {
                         Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
                         LineSlider(
@@ -2382,7 +2397,20 @@ private fun FullscreenPlayLayout(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp),
+                            .padding(horizontal = 8.dp)
+                            // 屏蔽本栏点击穿透：消费栏内空白区（按钮间隙/两端 padding）的全部手势，
+                            // 手势层 gestureBlocked，不再误触发单击显隐/双击暂停/长按快进/拖动 seek；
+                            // 按钮自身的点击/长按（片头/片尾清除）不受影响
+                            .pointerInput(Unit) {
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false)
+                                    while (true) {
+                                        val e = awaitPointerEvent()
+                                        e.changes.forEach { it.consume() }
+                                        if (e.changes.all { !it.pressed }) break
+                                    }
+                                }
+                            },
                     ) {
                         // 左组：内核（EXO/MPV/其他弹窗，fongmi PlayerEngineDialog）/ 缓冲 / 重播 / 倍速 / 缩放（点击循环切换）
                         // 点击动作栏按钮重置 5 秒自动隐藏计时（fongmi setR1Callback 同款），不立即消失
