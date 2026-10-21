@@ -48,7 +48,6 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
@@ -57,6 +56,7 @@ import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.ui.CollectionViewModel
 import com.ican.tvplay.ui.appViewModel
+import com.ican.tvplay.ui.components.AnimatedOverlayDialog
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
@@ -230,14 +230,12 @@ fun FavoritesScreen(
 
     // 收藏同步弹窗（照搬 fongmi SyncDialog：标题 + 模式切换 + 刷新 + 设备列表；
     // 点设备按当前模式同步，长按且模式非双向时强制同步——接收端先清空再写入）
-    // 与其他弹窗统一：miuix OverlayDialog（App 内覆盖层渲染），容器色/圆角/三边距同源
-    OverlayDialog(
+    // 与其他弹窗统一：AnimatedOverlayDialog（App 内覆盖层渲染 + 渐显渐隐遮罩），容器色/圆角/三边距同源
+    AnimatedOverlayDialog(
         show = showSyncDialog,
         title = "选择设备",
         titleColor = MiuixTheme.colorScheme.onBackground,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
-        renderInRootScaffold = true,
         // 左右跟随页面边距（手机 16dp / 平板 24dp），底部 = max(16dp, 系统导航栏高度)
         outsideMargin = DpSize(pageHorizontalPadding(), dialogBottomMargin()),
         largeScreen = false,

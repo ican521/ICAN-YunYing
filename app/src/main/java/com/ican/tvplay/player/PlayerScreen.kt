@@ -10,7 +10,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
@@ -20,7 +19,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
@@ -67,6 +65,7 @@ import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -124,7 +123,6 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
@@ -137,7 +135,10 @@ import com.ican.tvplay.player.core.PlaySpec
 import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.player.core.SubItem
 import com.ican.tvplay.ui.appContainer
+import com.ican.tvplay.ui.components.AnimatedOverlayDialog
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.FadingScrim
+import com.ican.tvplay.ui.components.ScrimFadeMillis
 import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
@@ -149,7 +150,6 @@ import com.ican.tvplay.ui.theme.DarkOnSurfaceMuted
 import com.ican.tvplay.ui.theme.DarkSurfaceElevated
 import com.ican.tvplay.ui.theme.EpisodeSelectedFillAlpha
 import com.ican.tvplay.ui.theme.LocalDarkTheme
-import com.ican.tvplay.ui.theme.PopupScrim
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.optionBorderColor
@@ -1063,18 +1063,15 @@ fun PlayerScreen(
         // === 全屏居中缓冲转圈 ===
         // 详情（文字/线路/选集/简介）加载期间，整屏只有这一个居中转圈；
         // 详情回来后即隐藏。视频自身的缓冲转圈仍由预览小窗内部 playerState.buffering 控制。
-        if (detailLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(PopupScrim),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    modifier = Modifier.size(48.dp),
-                )
-            }
+        // 遮罩走统一 FadingScrim：PopupScrim + 200ms 淡入淡出（与全 App 弹窗遮罩一致）。
+        FadingScrim(
+            visible = detailLoading,
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(
+                color = Color.White,
+                modifier = Modifier.size(48.dp),
+            )
         }
     }
 }
@@ -1539,11 +1536,16 @@ private fun PreviewPlayerArea(
         }
 
         // 播放/解析错误轻量提示（替代黑屏卡死；自动换源失败后停留在此提示）
-        if (playerState.error != null && !playerState.buffering) {
+        // 仅淡入淡出、不做位移；时长与全 App 遮罩统一（ScrimFadeMillis）
+        AnimatedVisibility(
+            visible = playerState.error != null && !playerState.buffering,
+            modifier = Modifier.align(Alignment.Center),
+            enter = fadeIn(tween(ScrimFadeMillis)),
+            exit = fadeOut(tween(ScrimFadeMillis)),
+        ) {
             PlayerErrorOverlay(
                 message = playerState.error!!,
                 onBack = onBack,
-                modifier = Modifier.align(Alignment.Center),
             )
         }
     }
@@ -1893,13 +1895,12 @@ private fun EpisodeGridDialog(
         if (show) pagerState.scrollToPage(currentPage)
     }
 
-    OverlayDialog(
+    AnimatedOverlayDialog(
         show = show,
         // 标题改为内容区自绘；必须传 null 而不是空串——miuix 对 title 只做 null 判断，
         // 传 "" 仍会渲染空标题行+12dp 间距，导致弹窗顶部出现大片死空间
         title = null,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        renderInRootScaffold = true,
         // 强制「非大屏」：平板宽窗口下 miuix 会改为屏幕居中，与手机底部呼出不一致
         largeScreen = false,
         onDismissRequest = onDismiss,
@@ -2445,11 +2446,16 @@ private fun FullscreenPlayLayout(
         }
 
         // 播放/解析错误浮层（锁定状态下也显示，点击返回先退出全屏）
-        if (playerState.error != null && !playerState.buffering) {
+        // 仅淡入淡出、不做位移；时长与全 App 遮罩统一（ScrimFadeMillis）
+        AnimatedVisibility(
+            visible = playerState.error != null && !playerState.buffering,
+            modifier = Modifier.align(Alignment.Center),
+            enter = fadeIn(tween(ScrimFadeMillis)),
+            exit = fadeOut(tween(ScrimFadeMillis)),
+        ) {
             PlayerErrorOverlay(
                 message = playerState.error!!,
                 onBack = onBack,
-                modifier = Modifier.align(Alignment.Center),
             )
         }
 
@@ -2624,15 +2630,7 @@ private fun EpisodeSideSheet(
         animationSpec = tween(260, easing = FastOutSlowInEasing),
         label = "episodeSheetSlide",
     )
-    // 黑色遮罩渐显渐隐，与字幕/缓冲弹窗（Dialog 窗口 dim 淡入淡出）保持一致
-    val scrimAlpha by animateFloatAsState(
-        targetValue = if (sheetShown) 1f else 0f,
-        animationSpec = tween(
-            durationMillis = if (sheetShown) 220 else 200,
-            easing = FastOutSlowInEasing,
-        ),
-        label = "episodeSheetScrim",
-    )
+    // 黑色遮罩统一走 FadingScrim（PopupScrim + ScrimFadeMillis 淡入淡出，点击收起）
     // 收回：播放滑出动画后再通知父级
     val dismissWithAnim: () -> Unit = {
         scope.launch {
@@ -2644,18 +2642,10 @@ private fun EpisodeSideSheet(
     // 返回键先收起弹窗（原为 Popup 的 dismissOnBackPress）
     BackHandler(onBack = dismissWithAnim)
     Box(modifier = Modifier.fillMaxSize()) {
-            // MIUIX 风格遮罩：引用全局 PopupScrim（黑色 40%），点击收起；
-            // 透明度随面板呼出/收回渐显渐隐（alpha 乘在遮罩层上）
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(scrimAlpha)
-                    .background(PopupScrim)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = dismissWithAnim,
-                    ),
+            // 统一遮罩层：PopupScrim（黑色 40%）+ 200ms 渐显渐隐，点击收起面板
+            FadingScrim(
+                visible = sheetShown,
+                onClick = dismissWithAnim,
             )
             Column(
                 modifier = Modifier
@@ -2806,6 +2796,13 @@ private fun BottomSlideDialog(
     LaunchedEffect(show) { visibleState.targetState = show }
     // 退出动画播完（currentState 落到 false）前保持窗口存在
     if (visibleState.currentState || visibleState.targetState) {
+        // 遮罩 200ms 淡入淡出走 Dialog 专用主题（ContextThemeWrapper 只包裹本窗口，
+        // 不改变 Activity 主题与页面转场；时长与 ScrimFadeMillis 一致）
+        val dialogContext = android.view.ContextThemeWrapper(
+            LocalContext.current,
+            com.ican.tvplay.R.style.Theme_TvPlay_Dialog,
+        )
+        CompositionLocalProvider(LocalContext provides dialogContext) {
         Dialog(
             // 关闭平台默认宽度限制：窗口铺满全屏，内容才能贴底摆放
             onDismissRequest = onDismiss,
@@ -2840,6 +2837,7 @@ private fun BottomSlideDialog(
                     }
                 }
             }
+        }
         }
     }
 }

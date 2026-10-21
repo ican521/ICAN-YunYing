@@ -12,4 +12,17 @@
         <item name="android:backgroundDimAmount">0.4</item>
     </style>
 
+    <!-- 平台 Dialog 专用主题：只覆盖窗口动画（遮罩 200ms 淡入淡出，与 ScrimFadeMillis 一致）。
+         不挂在 Activity 主题上，避免影响页面转场；
+         由 BottomSlideDialog 用 ContextThemeWrapper 仅包裹对应 Dialog 生效 -->
+    <style name="Theme.TvPlay.Dialog" parent="Theme.TvPlay">
+        <item name="android:windowAnimationStyle">@style/ScrimDialogAnimation</item>
+    </style>
+
+    <!-- 弹窗窗口动画：遮罩随窗口整体 200ms 淡入/淡出，卡片自身的上下滑动不受影响 -->
+    <style name="ScrimDialogAnimation" parent="@android:style/Animation">
+        <item name="android:windowEnterAnimation">@anim/scrim_fade_in</item>
+        <item name="android:windowExitAnimation">@anim/scrim_fade_out</item>
+    </style>
+
 </resources>

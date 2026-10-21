@@ -39,7 +39,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import kotlinx.coroutines.launch
@@ -49,7 +48,6 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -62,6 +60,7 @@ import com.ican.tvplay.data.ThemeMode
 import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
+import com.ican.tvplay.ui.components.AnimatedOverlayDialog
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
@@ -395,15 +394,15 @@ private fun ConfigImportDialog(
     onDismiss: () -> Unit,
 ) {
     var url by remember { mutableStateOf(initialUrl) }
-    OverlayDialog(
+    AnimatedOverlayDialog(
         show = show,
         title = "导入配置",
         titleColor = MiuixTheme.colorScheme.onBackground,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
-        renderInRootScaffold = true,
         // 三边统一 16dp：底部 = max(16dp, 系统导航栏高度)，跨设备自适应
         outsideMargin = DpSize(16.dp, dialogBottomMargin()),
+        // 强制「非大屏」：平板宽窗口下 miuix 会改为屏幕居中，与手机底部呼出不一致
+        largeScreen = false,
         onDismissRequest = onDismiss,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
