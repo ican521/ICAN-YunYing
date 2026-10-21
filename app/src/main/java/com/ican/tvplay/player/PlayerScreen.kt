@@ -142,6 +142,7 @@ import com.ican.tvplay.ui.theme.optionBorderColor
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
@@ -1773,15 +1774,26 @@ private fun EpisodeSection(
         // 选中集在显示序列中的位置（倒序时需换算）
         val selectedDispIdx = if (reversedEp) lineEpisodes.size - 1 - episodeIndex else episodeIndex
         val listState = rememberLazyListState()
-        // 选中集变化、倒序切换、或剧集加载完成时，把选中项滚动到选集栏最左侧。
+        // 只在「刚进入播放页、剧集加载完成」时，把当前正在播放的这一集滚动到选集栏中间显示；
+        // 之后手动切集/倒序切换不再触发任何自动滚动（原「每选中一集就滚回最左」已删除）。
         // 用 snapshotFlow 等待列表项实际布局完成（totalItemsCount > selectedDispIdx）后再滚动，
-        // 避免剧集从空加载到有数据时立即调用 scrollToItem 因未布局而失效。
-        LaunchedEffect(selectedDispIdx, lineEpisodes.size) {
-            if (lineEpisodes.isNotEmpty() && selectedDispIdx in 0 until lineEpisodes.size) {
+        // 避免剧集从空加载到有数据时立即调用 scrollToItem 因未布局而失效；
+        // 再等选中项可见拿到真实宽度，按「视口宽 − 项宽」负偏移滚到居中（与首页 Tab 居中同法）。
+        var centeredInitial by remember { mutableStateOf(false) }
+        LaunchedEffect(lineEpisodes.size) {
+            if (!centeredInitial && lineEpisodes.isNotEmpty() && selectedDispIdx in 0 until lineEpisodes.size) {
                 snapshotFlow { listState.layoutInfo.totalItemsCount }
                     .filter { it > selectedDispIdx }
                     .first()
-                listState.scrollToItem(selectedDispIdx)
+                val itemWidth = snapshotFlow {
+                    listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedDispIdx }?.size
+                }.filterNotNull().first()
+                val viewportWidth = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
+                listState.scrollToItem(
+                    selectedDispIdx,
+                    -((viewportWidth - itemWidth) / 2).coerceAtLeast(0),
+                )
+                centeredInitial = true
             }
         }
         // 默认横向滚动（fongmi: adapter_episode_hori）
