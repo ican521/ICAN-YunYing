@@ -83,9 +83,6 @@ fun AppRoot() {
     val configReady by appViewModel.configReady.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    // 全局遮罩宿主状态：AnimatedOverlayDialog 通过 LocalScrimHost 申请渐显渐隐遮罩
-    val scrimHostState = remember { com.ican.tvplay.ui.components.ScrimHostState() }
-
     /** 未配置接口时拦截播放，统一提示 */
     val guardPlay: () -> Boolean = {
         if (!configReady) {
@@ -134,7 +131,6 @@ fun AppRoot() {
             LocalEnableBlur provides enableBlur,
             LocalEnableTopBarBlur provides topBarBlur,
             LocalContentColor provides MiuixTheme.colorScheme.onBackground,
-            com.ican.tvplay.ui.components.LocalScrimHost provides scrimHostState,
         ) {
 
         // 通知栏点击 → 恢复播放页（后台续播场景）
@@ -325,13 +321,6 @@ fun AppRoot() {
                         }
                     }
                 },
-            )
-
-            // 全局遮罩层：AnimatedOverlayDialog 的渐显渐隐黑色遮罩统一在此渲染。
-            // 作为内容 Box 最后一个子级，盖住页面与底栏；miuix 弹窗卡片在根 Scaffold 宿主层，位于本遮罩之上。
-            com.ican.tvplay.ui.components.ScrimHost(
-                state = scrimHostState,
-                modifier = Modifier.fillMaxSize(),
             )
 
         }

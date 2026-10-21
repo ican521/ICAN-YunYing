@@ -85,6 +85,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastRoundToInt
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -93,7 +94,6 @@ import com.ican.tvplay.data.model.VideoCategory
 import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
-import com.ican.tvplay.ui.components.AnimatedOverlayDialog
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.dialogBottomMargin
@@ -540,11 +540,13 @@ fun SitePickerDialog(
     onToggleChangeable: (TvBoxSite) -> Unit = {},
     toggleVersion: Int = 0,
 ) {
-    AnimatedOverlayDialog(
+    OverlayDialog(
         show = show,
         title = "选择站源",
         titleColor = MiuixTheme.colorScheme.onBackground,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
+        renderInRootScaffold = true,
         // 三边统一 16dp：底部 = max(16dp, 系统导航栏高度)，跨设备自适应
         outsideMargin = DpSize(16.dp, dialogBottomMargin()),
         // 强制「非大屏」：平板宽窗口下 miuix 会改为屏幕居中，与手机底部呼出不一致

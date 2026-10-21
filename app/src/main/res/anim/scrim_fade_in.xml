@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- 全 App 弹窗遮罩统一淡入：时长必须与 Kotlin 常量 ScrimFadeMillis(200ms) 一致 -->
-<alpha xmlns:android="http://schemas.android.com/apk/res/android"
-    android:interpolator="@android:interpolator/fast_out_slow_in"
-    android:fromAlpha="0.0"
-    android:toAlpha="1.0"
-    android:duration="200" />

@@ -65,7 +65,6 @@ import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -123,6 +122,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
@@ -135,7 +135,6 @@ import com.ican.tvplay.player.core.PlaySpec
 import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.player.core.SubItem
 import com.ican.tvplay.ui.appContainer
-import com.ican.tvplay.ui.components.AnimatedOverlayDialog
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.FadingScrim
 import com.ican.tvplay.ui.components.ScrimFadeMillis
@@ -1895,12 +1894,14 @@ private fun EpisodeGridDialog(
         if (show) pagerState.scrollToPage(currentPage)
     }
 
-    AnimatedOverlayDialog(
+    OverlayDialog(
         show = show,
         // 标题改为内容区自绘；必须传 null 而不是空串——miuix 对 title 只做 null 判断，
         // 传 "" 仍会渲染空标题行+12dp 间距，导致弹窗顶部出现大片死空间
         title = null,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
+        renderInRootScaffold = true,
         // 强制「非大屏」：平板宽窗口下 miuix 会改为屏幕居中，与手机底部呼出不一致
         largeScreen = false,
         onDismissRequest = onDismiss,
@@ -2796,13 +2797,6 @@ private fun BottomSlideDialog(
     LaunchedEffect(show) { visibleState.targetState = show }
     // 退出动画播完（currentState 落到 false）前保持窗口存在
     if (visibleState.currentState || visibleState.targetState) {
-        // 遮罩 200ms 淡入淡出走 Dialog 专用主题（ContextThemeWrapper 只包裹本窗口，
-        // 不改变 Activity 主题与页面转场；时长与 ScrimFadeMillis 一致）
-        val dialogContext = android.view.ContextThemeWrapper(
-            LocalContext.current,
-            com.ican.tvplay.R.style.Theme_TvPlay_Dialog,
-        )
-        CompositionLocalProvider(LocalContext provides dialogContext) {
         Dialog(
             // 关闭平台默认宽度限制：窗口铺满全屏，内容才能贴底摆放
             onDismissRequest = onDismiss,
@@ -2837,7 +2831,6 @@ private fun BottomSlideDialog(
                     }
                 }
             }
-        }
         }
     }
 }
