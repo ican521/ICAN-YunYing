@@ -2160,9 +2160,12 @@ private fun FullscreenPlayLayout(
                     var axis = 0 // 0 未定 | 1 横向seek | 2 纵向/放弃
                     var isLong = false
                     var seekTarget: Long? = null
-                    // 点在控制层按钮等可点击控件上（事件被消费）：手势全程让位，
+                    // 点在控制层按钮等可点击控件上（down 事件被消费）：手势全程让位，
                     // 不触发长按快进/拖动seek/单击双击（否则点动作栏按钮会被误判为视频区单击而收起控制层）
-                    var gestureBlocked = false
+                    // 必须用 down 的消费状态立即置位：长按判定走「无后续事件超时」路径，
+                    // 若只靠后续事件的 consumed 检查，手指静止长按时 gestureBlocked 永远不会置位，
+                    // 底部功能栏按钮/空白区的长按就会穿透触发二倍速快进
+                    var gestureBlocked = down.isConsumed
                     // 手指最后已知位置（长按位移判定用）：手指静止时不产生触摸事件，
                     // 裸 await 会让长按判定饿死——必须靠下方超时等待到点主动判定
                     var lastX = downX
