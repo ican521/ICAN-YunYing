@@ -47,8 +47,15 @@ class MainActivity : ComponentActivity() {
         // 擦掉小窗重开是热恢复（onRestart，无 onCreate）：搜索框仍持有 Compose 焦点，
         // 窗口重新聚焦时系统自动弹出输入法，adjustResize 随之把界面顶得跳动——
         // fongmi 重开是安静的：窗口聚焦时始终不自动弹键盘（冷启/热恢复/进程恢复全覆盖），
-        // 用户点击输入框是显式唤起，不受该状态位影响
-        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
+        // 用户点击输入框是显式唤起，不受该状态位影响。
+        // 同时强制 ADJUST_NOTHING：部分 ROM（MIUI/HyperOS）在 edge-to-edge 下仍会做
+        // 旧式窗口级 IME 避让（把内容区整体抬高一个键盘高），而 miuix OverlayDialog 内部
+        // 又用 imePadding 再抬一次，导致导入配置/链接解析弹窗与键盘之间空出约一个键盘高的间隙。
+        // 禁止窗口避让后，IME 边衬区照常派发，弹窗内 imePadding 成为唯一一次抬升，全机型一致。
+        window.setSoftInputMode(
+            android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or
+                android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+        )
         // 小屏（手机）禁用自动横向：锁定竖屏，仅播放全屏时由播放页临时请求横屏；平板保持系统方向
         if (resources.configuration.screenWidthDp < 600) {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT

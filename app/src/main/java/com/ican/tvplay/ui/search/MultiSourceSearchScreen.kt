@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -156,10 +157,12 @@ fun MultiSourceSearchScreen(
                 .padding(horizontal = pageHorizontalPadding()),
         ) {
             // 左侧站源列表（纵向；顶部 4dp 与右侧网格第一行卡片齐平）
+            // imePadding：窗口禁用系统避让后，键盘弹出时列表底部仍可滚动到键盘上方
             LazyColumn(
                 modifier = Modifier
                     .width(100.dp)
-                    .fillMaxHeight(),
+                    .fillMaxHeight()
+                    .imePadding(),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 4.dp, bottom = 16.dp),
             ) {
@@ -212,7 +215,8 @@ fun MultiSourceSearchScreen(
 
                 LazyVerticalGrid(
                     columns = columns,
-                    modifier = Modifier.fillMaxSize(),
+                    // imePadding：键盘弹出时网格底部内容不被遮挡，可滚动到键盘上方
+                    modifier = Modifier.fillMaxSize().imePadding(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         top = 4.dp,
                         bottom = 16.dp,

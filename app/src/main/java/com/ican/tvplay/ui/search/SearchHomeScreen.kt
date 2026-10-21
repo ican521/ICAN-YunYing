@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
@@ -114,6 +115,9 @@ fun SearchHomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                // 窗口已禁用系统级 IME 避让（MainActivity ADJUST_NOTHING），
+                // 键盘弹出时靠 imePadding 让历史/热搜底部内容仍可滚动到键盘上方
+                .imePadding()
                 .padding(horizontal = pageHorizontalPadding()),
             verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
         ) {
