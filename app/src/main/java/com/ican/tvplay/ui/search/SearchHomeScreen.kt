@@ -23,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,8 +65,12 @@ fun SearchHomeScreen(
 ) {
     val vm = appViewModel { SearchViewModel(this) }
     val history by vm.history.collectAsStateWithLifecycle()
+    val hotWords by vm.hotWords.collectAsStateWithLifecycle(initialValue = emptyList())
 
     var queryText by remember { mutableStateOf("") }
+
+    // 进页面即后台刷新热搜榜（缓存先展示，刷新成功后词表自动更新）
+    LaunchedEffect(Unit) { vm.refreshHotWords() }
 
     fun submit(keyword: String) {
         val q = keyword.trim()
@@ -148,7 +153,7 @@ fun SearchHomeScreen(
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 Spacer(Modifier.height(Spacing.titleContentGap))
-                WordFlowRow(words = vm.hotWords, onWordClick = { submit(it) })
+                WordFlowRow(words = hotWords, onWordClick = { submit(it) })
             }
         }
         }

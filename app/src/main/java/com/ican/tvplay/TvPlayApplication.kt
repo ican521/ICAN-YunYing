@@ -60,6 +60,8 @@ class TvPlayApplication : Application(), SingletonImageLoader.Factory {
         android.util.Log.d("Startup", "app onCreate begin")
         super.onCreate()
         container = AppContainer(this)
+        // 屏蔽 spider jar 弹出的弹幕类杂音 Toast（如「弹幕加载失败」），只过滤不显示，不影响视频加载
+        com.ican.tvplay.util.ToastBlocker.install()
         applyPredictiveBack(applicationInfo, container.settingsRepository.enablePredictiveBack.value)
         android.util.Log.d("Startup", "app onCreate end")
 

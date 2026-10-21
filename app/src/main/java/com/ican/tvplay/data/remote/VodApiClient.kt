@@ -78,7 +78,14 @@ data class VodItem(
     @SerialName("vod_play_url") val vodPlayUrl: String = "",
     @SerialName("type_name") val typeName: String = "",
     @SerialName("action") val action: String = "",
-)
+    /** 目录标记（fongmi Vod.vod_tag）：等于 "folder" 时该卡片是网盘文件夹，点击进入子目录 */
+    @SerialName("vod_tag") val vodTag: String = "",
+    /** 目录元数据（fongmi Vod.cate）：非空同样表示文件夹（部分网盘站源用 cate 而非 vod_tag 标记） */
+    @SerialName("cate") val cate: JsonElement? = null,
+) {
+    /** fongmi Vod.isFolder()：vod_tag == "folder" 或带 cate 目录元数据 */
+    fun isFolderItem(): Boolean = vodTag == "folder" || (cate != null && cate.toString() != "null")
+}
 
 /** 列表/分类接口返回 */
 @Serializable

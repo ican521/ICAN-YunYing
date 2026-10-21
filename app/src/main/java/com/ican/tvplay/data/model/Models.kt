@@ -47,4 +47,6 @@ data class Video(
     val playSources: List<PlayLine> = emptyList(),
     /** 网盘配置动作标识（fongmi Vod.action）：非空表示此卡片为网盘配置入口，点击弹出配置弹窗而非进入播放页 */
     val action: String = "",
+    /** 网盘文件夹标记（fongmi Vod.isFolder）：true 表示点击后进入该目录，而不是直接播放 */
+    val isFolder: Boolean = false,
 )

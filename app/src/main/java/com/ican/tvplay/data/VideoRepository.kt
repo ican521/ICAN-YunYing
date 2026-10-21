@@ -28,6 +28,9 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -133,7 +136,13 @@ class VideoRepository(
             }
         }
 
-    private val rawJson = Json { ignoreUnknownKeys = true }
+    // isLenient + coerceInputValues：兼容网盘站源返回的类型不规范字段
+    // （如 vod_id 直接给数字），否则单条解码失败会被静默丢掉 —— 表现为「文件夹解析不出来」
+    private val rawJson = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        coerceInputValues = true
+    }
 
     /** 当前站点对应的 Spider 实例（仅 type=3 时非空） */
     @Volatile
@@ -417,6 +426,29 @@ class VideoRepository(
         return loadCategoryVideos(loaded, cat, page = 1)
     }
 
+    /**
+     * 网盘目录钻取（fongmi FolderFragment.openFolder 同款）：
+     * 用文件夹自身 id 当 tid 调 spider 的 categoryContent 取子目录内容 ——
+     * 子目录 id 不在分类表里，所以不能复用 [getVideos]。
+     * 文件夹内无筛选条件，filter 传 false。
+     */
+    suspend fun getFolderVideos(folderId: String): List<Video> {
+        val tid = folderId.trim()
+        if (tid.isEmpty()) return emptyList()
+        ensureLoaded()
+        val loaded = _currentSite.value ?: return emptyList()
+        if (!loaded.site.isSpider()) return emptyList()
+        val spider = currentSpider ?: return emptyList()
+        val json = spiderManager.categoryContent(spider, tid, 1, filter = false)
+        val list = parseList(json).map { it.toVideo(VideoCategory(id = tid, name = it.typeName.ifBlank { tid })) }
+        Log.d(
+            REPO_TAG,
+            "folder[$tid] n=${list.size} " +
+                list.take(8).joinToString { "${it.title}(${it.id})${if (it.isFolder) "[dir]" else ""}" },
+        )
+        return list
+    }
+
     /** 详情：补全选集 / 播放地址等（带内存缓存，重复进详情秒开） */
     suspend fun getVideo(videoId: String): Video? {
         detailCache[videoId]?.let { return it }
@@ -509,14 +541,18 @@ class VideoRepository(
         page: Int,
     ): List<Video> {
         // 首页第一页走缓存（预热的收益点）；翻页不缓存
-        if (page == 1) {
+        val list = if (page == 1) {
             val key = "${loaded.site.key}|${cat.id}"
-            homeCache[key]?.let { return it }
-            val list = fetchCategoryVideos(loaded, cat)
-            homeCache[key] = list
-            return list
+            homeCache[key] ?: fetchCategoryVideos(loaded, cat).also { homeCache[key] = it }
+        } else {
+            fetchCategoryVideos(loaded, cat)
         }
-        return fetchCategoryVideos(loaded, cat)
+        Log.d(
+            REPO_TAG,
+            "category[${cat.id}] n=${list.size} " +
+                list.take(8).joinToString { "${it.title}(${it.id})${if (it.isFolder) "[dir]" else ""}" },
+        )
+        return list
     }
 
     private suspend fun fetchCategoryVideos(
@@ -611,9 +647,37 @@ class VideoRepository(
             val root = rawJson.parseToJsonElement(json).jsonObject
             val arr = root["list"]?.jsonArray ?: return emptyList()
             arr.mapNotNull { el ->
-                runCatching { rawJson.decodeFromJsonElement(VodItem.serializer(), el) }.getOrNull()
+                runCatching { rawJson.decodeFromJsonElement(VodItem.serializer(), el) }
+                    // 单条解码失败不再静默丢掉（网盘文件夹丢了就点不进去），
+                    // 打日志 + 按字段宽松兜底，保证条目不缺
+                    .onFailure {
+                        Log.e(REPO_TAG, "parseList item fail: ${el.toString().take(400)}", it)
+                        Log.d(REPO_TAG, "parseList item json=${el.toString().take(400)}")
+                    }
+                    .getOrElse { lenientVodItem(el) }
             }
         }.onFailure { Log.e(REPO_TAG, "parseList fail", it) }.getOrDefault(emptyList())
+    }
+
+    /** 兜底解析：严格解码失败时逐字段宽松取值，避免整条被丢弃 */
+    private fun lenientVodItem(el: JsonElement): VodItem? {
+        val obj = el as? JsonObject ?: return null
+        fun s(key: String) = (obj[key] as? JsonPrimitive)?.content.orEmpty()
+        return VodItem(
+            vodId = s("vod_id"),
+            vodName = s("vod_name"),
+            vodPic = s("vod_pic"),
+            vodRemarks = s("vod_remarks"),
+            vodYear = s("vod_year"),
+            vodArea = s("vod_area"),
+            vodContent = s("vod_content"),
+            vodPlayFrom = s("vod_play_from"),
+            vodPlayUrl = s("vod_play_url"),
+            typeName = s("type_name"),
+            action = s("action"),
+            vodTag = s("vod_tag"),
+            cate = obj["cate"],
+        )
     }
 
     /** spider homeContent 返回 JSON 中的 class 数组 */
@@ -651,6 +715,8 @@ class VideoRepository(
             playFrom = firstPlayFrom,
             playSources = playSources,
             action = action,
+            // 文件夹判定对齐 fongmi Vod.isFolder()：vod_tag == "folder" 或带 cate 目录元数据
+            isFolder = isFolderItem(),
         )
     }
 

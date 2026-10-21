@@ -1,5 +1,8 @@
 package com.ican.tvplay.ui.theme
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
@@ -53,4 +56,20 @@ object Spacing {
 
     /** 底部内容避让悬浮胶囊导航的高度 */
     val bottomBarInset = 120.dp
+
+    /** 选项描边宽度（播放页弹窗选项与选集「更多」选项共用，全局统一） */
+    val optionBorder = 1.dp
+}
+
+/**
+ * 选项描边颜色（选集「更多」选项与播放页功能弹窗选项共用）：
+ * 选中用主题色，未选中描 12% 中性色（深色模式白、浅色模式黑）。
+ * 播放页功能弹窗仅在深色模式下描边——浅色模式底与选项底色对比已足够；
+ * 选集「更多」选项沿用原有「两种模式都描边」的表现。
+ */
+@Composable
+fun optionBorderColor(selected: Boolean): Color = when {
+    selected -> MaterialTheme.colorScheme.primary
+    LocalDarkTheme.current -> Color.White.copy(alpha = 0.12f)
+    else -> Color.Black.copy(alpha = 0.12f)
 }

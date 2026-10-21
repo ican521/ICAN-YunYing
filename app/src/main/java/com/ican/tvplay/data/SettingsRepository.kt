@@ -235,6 +235,17 @@ class SettingsRepository(context: Context) {
         _searchHistory.value = updated
     }
 
+    // ---- 热搜词缓存（fongmi Setting.hot：先读缓存立即展示，网络刷新成功后回写）----
+
+    private val _hotWordsJson = MutableStateFlow(prefs.getString(KEY_HOT, null).orEmpty())
+    val hotWordsJson: StateFlow<String> = _hotWordsJson.asStateFlow()
+
+    fun setHotWordsJson(hot: String) {
+        if (hot.isBlank()) return
+        prefs.edit().putString(KEY_HOT, hot).apply()
+        _hotWordsJson.value = hot
+    }
+
     /**
      * 从 SharedPreferences 重新读取全部设置到 StateFlow（恢复备份后调用，免重启生效，
      * 对齐 fongmi SettingFragment 恢复成功后 initConfig() 的重载语义）。
@@ -263,6 +274,7 @@ class SettingsRepository(context: Context) {
         _searchHistory.value = runCatching {
             prefs.getStringSet(KEY_SEARCH_HISTORY, emptySet()).orEmpty().toList()
         }.getOrDefault(emptyList())
+        _hotWordsJson.value = prefs.getString(KEY_HOT, null).orEmpty()
         _siteToggleVersion.value += 1
     }
 
@@ -284,6 +296,7 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_BACKGROUND = "player_background"
         const val KEY_SYNC_MODE = "sync_mode"
         const val KEY_SEARCH_HISTORY = "search_history"
+        const val KEY_HOT = "hot"
         const val MAX_SEARCH_HISTORY = 10
     }
 }

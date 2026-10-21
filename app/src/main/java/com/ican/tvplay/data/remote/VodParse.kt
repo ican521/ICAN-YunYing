@@ -13,7 +13,11 @@ import kotlinx.serialization.json.jsonPrimitive
  * VodItem JSON / Video 映射的共享工具：跨站源搜索与收藏播放共用，避免两处重复解析逻辑。
  */
 object VodParse {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        coerceInputValues = true
+    }
 
     /** 解析 spider searchContent/detailContent 返回的 {list:[...]} JSON */
     fun parseVodListJson(jsonStr: String): List<VodItem> {
@@ -50,6 +54,8 @@ object VodParse {
             playFrom = firstPlayFrom,
             playSources = playSources,
             action = action,
+            // 文件夹判定对齐 fongmi Vod.isFolder()：vod_tag == "folder" 或带 cate 目录元数据
+            isFolder = isFolderItem(),
         )
     }
 

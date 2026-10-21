@@ -11,6 +11,7 @@ import com.ican.tvplay.data.model.VideoCategory
 import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.components.siteShortName
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +25,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/** 热搜榜不可用（无缓存/首次启动/离线）时的兜底推荐词 */
+private val DEFAULT_HOT_WORDS = listOf("仙逆", "狂飙", "三体", "庆余年", "繁花", "凡人修仙传", "长风渡")
 
 /** 全局：主题模式 / 主题色板 / 全局模糊 / 接口配置状态 */
 class AppViewModel(container: AppContainer) : ViewModel() {
@@ -92,6 +96,9 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     /** 按分类 id 独立取该分类下视频（每页独立加载，不依赖 selectedCategory 选中态） */
     suspend fun getCategoryVideos(categoryId: String): List<Video> = repo.getVideos(categoryId)
 
+    /** 网盘目录钻取：按文件夹 id 取子目录内容（fongmi openFolder 同款） */
+    suspend fun getFolderVideos(folderId: String): List<Video> = repo.getFolderVideos(folderId)
+
     /**
      * 执行当前站点 action 卡片的 jar 操作（网盘配置等），完成后回调 msg（空串不提示）。
      */
@@ -125,8 +132,22 @@ class SearchViewModel(container: AppContainer) : ViewModel() {
 
     val history: StateFlow<List<String>> = settings.searchHistory
 
-    /** 热门推荐词（空查询时显示，fongmi 式） */
-    val hotWords = listOf("仙逆", "狂飙", "三体", "庆余年", "繁花", "凡人修仙传", "长风渡")
+    /**
+     * 热门推荐词（空查询时显示）：本地缓存优先立即展示（fongmi Setting.getHot 同款），
+     * 网络榜单由 [refreshHotWords] 在进入搜索页时后台刷新并回写缓存；
+     * 无缓存时用固定兜底词，避免首屏空白。
+     */
+    val hotWords: Flow<List<String>> = settings.hotWordsJson.map { cached ->
+        com.ican.tvplay.data.remote.HotWordSource.parse(cached).ifEmpty { DEFAULT_HOT_WORDS }
+    }
+
+    /** 拉取最新热搜榜（360 影视热搜榜，取前 12 条）并回写缓存；失败静默保留现有词表 */
+    suspend fun refreshHotWords() {
+        val body = com.ican.tvplay.data.remote.HotWordSource.fetch() ?: return
+        if (com.ican.tvplay.data.remote.HotWordSource.parse(body).isNotEmpty()) {
+            settings.setHotWordsJson(body)
+        }
+    }
 
     fun onQueryChange(value: String) {
         query.value = value

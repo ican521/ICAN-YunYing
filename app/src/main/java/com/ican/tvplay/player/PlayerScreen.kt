@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
@@ -17,7 +16,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -40,7 +38,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -58,7 +55,6 @@ import androidx.compose.material3.TabRowDefaults
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -86,7 +82,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -106,9 +101,6 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -120,7 +112,6 @@ import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import com.ican.tvplay.R
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.local.FavoriteEntity
@@ -2776,92 +2767,10 @@ private fun MiniLargeBtn(icon: ImageVector, desc: String, onClick: () -> Unit, i
 }
 
 // ========== 对话框 ==========
+// 播放页底部功能弹窗（倍速/缓冲/音轨/播放内核/画面缩放/字幕/添加字幕）统一走
+// miuix OverlayDialog，与设置页「站源设置」同款实现：底部呼出、滑入滑出与遮罩
+// 均由库处理，不再自建 Dialog 窗口（避免平台窗口淡入淡出与遮罩动画不一致）。
 
-/**
- * 播放页功能弹窗的统一容器：对话窗铺满全屏、内容贴底居中，
- * 打开时从底部滑入、[show] 置 false 时原路滑回底部（对齐手机端 / miuix 的「底部呼出」观感）。
- *
- * [show] 由调用方持有：弹窗必须常驻组合（不能再写 `if (showX) { ... }`），
- * 否则收起瞬间组件被移除，退出动画来不及播放。
- */
-@Composable
-private fun BottomSlideDialog(
-    show: Boolean,
-    onDismiss: () -> Unit,
-    content: @Composable () -> Unit,
-) {
-    // 窗口存活标记：显示时立刻建窗；收起时等「滑出动画播完 + 数帧」再销毁窗口。
-    // 原因：Compose Dialog 是独立的平台窗口，销毁由 WindowManager 异步执行；
-    // 若在滑出动画结束的同一帧销毁，会有一帧把无位移的旧内容重新上屏，
-    // 肉眼看到的正是「完全收回屏幕底部后又向上冒一下」。
-    // 多留的这几帧里内容已画在屏幕外，肉眼不可见，可彻底吃掉这次回弹。
-    var windowAlive by remember { mutableStateOf(show) }
-
-    // 位移进度：0 = 完全弹出，1 = 完全收到屏幕底部之外。
-    // 按内容自身高度位移（而非固定 dp），任意设备/任意弹窗高度都能彻底出屏。
-    // 用 Animatable 而非 animateFloatAsState：后者首次组合直接落在目标值，
-    // 打开时没有从底部滑入的动画；前者可先在屏外 snapTo(1f)，再从底部滑入。
-    val slide = remember { Animatable(1f) }
-
-    LaunchedEffect(show) {
-        if (show) {
-            windowAlive = true
-            // 打开：先钉在屏外一帧，再从底部滑入（纯位移，无淡入）
-            slide.snapTo(1f)
-            slide.animateTo(0f, animationSpec = tween(220))
-        } else {
-            slide.animateTo(1f, animationSpec = tween(200))
-            // 多留几帧等平台异步销毁窗口，吃掉「收回后又冒一下」的回弹
-            kotlinx.coroutines.delay(64L)
-            windowAlive = false
-        }
-    }
-    if (!windowAlive) return
-
-    Dialog(
-        // 关闭平台默认宽度限制：窗口铺满全屏，内容才能贴底摆放
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        // 平台 Dialog 窗口默认带进出场淡入淡出（内容 + 遮罩一起渐隐）。
-        // 本弹窗内容已自带纵向滑入/滑出，这里把窗口动画样式置空并强制同步到
-        // WindowManager（setAttributes 会触发一次 relayout 让服务端读到新样式），
-        // 收回销毁窗口时不再播放「渐影」。
-        val dialogWindow = (LocalView.current as? DialogWindowProvider)?.window
-        SideEffect {
-            val w = dialogWindow ?: return@SideEffect
-            val lp = w.attributes
-            lp.windowAnimations = R.style.DialogNoWindowAnimation
-            w.attributes = lp
-        }
-        Box(modifier = Modifier.fillMaxSize()) {
-            // 空白区 = 点按关闭（上一版由平台弹窗外点击触发，全屏窗口后需自己接）；
-            // 收起过程中不再响应，避免重复触发
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(show) { if (show) detectTapGestures { onDismiss() } },
-            )
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .widthIn(max = 560.dp)
-                        .fillMaxWidth()
-                        .padding(bottom = 24.dp)
-                        // 位移放在 graphicsLayer：只改绘制不改布局，滑动过程不触发重组/重新测量
-                        .graphicsLayer { translationY = slide.value * size.height }
-                        // 吞掉弹窗本体范围内的点按，避免点空白逻辑误关弹窗
-                        .pointerInput(Unit) { detectTapGestures { } },
-                ) {
-                    content()
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun <T> OptionDialog(
@@ -2876,19 +2785,24 @@ private fun <T> OptionDialog(
     val maxDialogHeight = with(LocalConfiguration.current) { (screenHeightDp * 0.65f).dp }
     // 深色模式才给选项描边（浅色底与选项底色对比已足够）
     val isDark = LocalDarkTheme.current
-    BottomSlideDialog(show = show, onDismiss = onDismiss) {
+    // 与设置页「站源设置」同款：miuix OverlayDialog 底部呼出（滑入滑出 + 遮罩由库处理）
+    OverlayDialog(
+        show = show,
+        title = title,
+        titleColor = MiuixTheme.colorScheme.onBackground,
+        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        renderInRootScaffold = true,
+        largeScreen = false,
+        onDismissRequest = onDismiss,
+        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = maxDialogHeight)
-                .padding(horizontal = 16.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
-                .padding(20.dp),
+                .heightIn(max = maxDialogHeight),
         ) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Column(
                 modifier = Modifier
-                    .padding(top = 14.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -2934,20 +2848,22 @@ private fun SubtitleDialog(
     // 同 OptionDialog：全屏传入选集侧边栏同款蓝，选中描边与选集同色
     selectedBorderColor: Color? = null,
 ) {
-    BottomSlideDialog(show = show, onDismiss = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth().padding(horizontal = 16.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner))
-                .padding(20.dp),
-        ) {
-            Text("字幕", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-            // 行间距与 OptionDialog（倍速/缓冲等弹窗）统一为 6dp
-            Column(modifier = Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                SubRow("关闭字幕", textDisabled, selectedBorderColor) { onDisable() }
-                tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected, selectedBorderColor) { onSelect(t) } }
-                SubRow("添加外挂字幕…", false, selectedBorderColor) { onAddExternal() }
-            }
+    // 与设置页「站源设置」同款：miuix OverlayDialog 底部呼出
+    OverlayDialog(
+        show = show,
+        title = "字幕",
+        titleColor = MiuixTheme.colorScheme.onBackground,
+        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        renderInRootScaffold = true,
+        largeScreen = false,
+        onDismissRequest = onDismiss,
+        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
+    ) {
+        // 行间距与 OptionDialog（倍速/缓冲等弹窗）统一为 6dp
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            SubRow("关闭字幕", textDisabled, selectedBorderColor) { onDisable() }
+            tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected, selectedBorderColor) { onSelect(t) } }
+            SubRow("添加外挂字幕…", false, selectedBorderColor) { onAddExternal() }
         }
     }
 }
@@ -2985,16 +2901,22 @@ private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color?
 @Composable
 private fun AddSubtitleDialog(show: Boolean, onAdd: (String, String) -> Unit, onDismiss: () -> Unit) {
     var url by remember { mutableStateOf("") }
-    BottomSlideDialog(show = show, onDismiss = onDismiss) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Spacing.corner)).padding(20.dp),
-        ) {
-            Text("添加外挂字幕", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+    // 与设置页「站源设置」同款：miuix OverlayDialog 底部呼出
+    OverlayDialog(
+        show = show,
+        title = "添加外挂字幕",
+        titleColor = MiuixTheme.colorScheme.onBackground,
+        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        renderInRootScaffold = true,
+        largeScreen = false,
+        onDismissRequest = onDismiss,
+        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             androidx.compose.material3.TextField(
                 value = url, onValueChange = { url = it },
                 placeholder = { androidx.compose.material3.Text("字幕文件 URL（srt/ass/vtt）") },
-                singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                singleLine = true, modifier = Modifier.fillMaxWidth(),
             )
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
                 Text("取消", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,

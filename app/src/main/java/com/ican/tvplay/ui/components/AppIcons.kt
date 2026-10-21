@@ -70,6 +70,18 @@ object AppIcons {
 
     val Play: ImageVector = vector("play", "M8 5v14l11-7z")
 
+    // 文件夹图标（网盘目录行）
+    val Folder: ImageVector = vector(
+        "folder",
+        "M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8z",
+    )
+
+    // 视频文件图标（网盘文件行）
+    val Movie: ImageVector = vector(
+        "movie",
+        "M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4z",
+    )
+
     val Pause: ImageVector = vector(
         "pause",
         "M6 19h4V5H6z M14 5v14h4V5z",
