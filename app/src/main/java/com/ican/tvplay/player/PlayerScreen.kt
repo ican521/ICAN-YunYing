@@ -12,8 +12,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -137,7 +135,6 @@ import com.ican.tvplay.player.core.SubItem
 import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.FadingScrim
-import com.ican.tvplay.ui.components.ScrimFadeMillis
 import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
@@ -1535,26 +1532,11 @@ private fun PreviewPlayerArea(
         }
 
         // 播放/解析错误轻量提示（替代黑屏卡死；自动换源失败后停留在此提示）
-        // 仅淡入淡出、不做位移；时长与全 App 遮罩统一（ScrimFadeMillis）
-        // 注意：退出动画期间 error 已被清空，内容 lambda 仍会重组，
-        // 因此消息必须取缓存值，绝不能在内容里直接 playerState.error!!
-        val errorMessage = playerState.error
-        var lastErrorMessage by remember { mutableStateOf<String?>(null) }
-        LaunchedEffect(errorMessage) {
-            if (errorMessage != null) lastErrorMessage = errorMessage
-        }
-        AnimatedVisibility(
-            visible = errorMessage != null && !playerState.buffering,
-            modifier = Modifier.align(Alignment.Center),
-            enter = fadeIn(tween(ScrimFadeMillis)),
-            exit = fadeOut(tween(ScrimFadeMillis)),
-        ) {
-            lastErrorMessage?.let { msg ->
-                PlayerErrorOverlay(
-                    message = msg,
-                    onBack = onBack,
-                )
-            }
+        if (playerState.error != null && !playerState.buffering) {
+            PlayerErrorOverlay(
+                message = playerState.error!!,
+                onBack = onBack,
+            )
         }
     }
 }
@@ -2456,25 +2438,11 @@ private fun FullscreenPlayLayout(
         }
 
         // 播放/解析错误浮层（锁定状态下也显示，点击返回先退出全屏）
-        // 仅淡入淡出、不做位移；时长与全 App 遮罩统一（ScrimFadeMillis）
-        // 同竖屏：内容 lambda 在退出动画期间仍重组，消息取缓存值，禁止 error!!
-        val fullscreenError = playerState.error
-        var lastFullscreenError by remember { mutableStateOf<String?>(null) }
-        LaunchedEffect(fullscreenError) {
-            if (fullscreenError != null) lastFullscreenError = fullscreenError
-        }
-        AnimatedVisibility(
-            visible = fullscreenError != null && !playerState.buffering,
-            modifier = Modifier.align(Alignment.Center),
-            enter = fadeIn(tween(ScrimFadeMillis)),
-            exit = fadeOut(tween(ScrimFadeMillis)),
-        ) {
-            lastFullscreenError?.let { msg ->
-                PlayerErrorOverlay(
-                    message = msg,
-                    onBack = onBack,
-                )
-            }
+        if (playerState.error != null && !playerState.buffering) {
+            PlayerErrorOverlay(
+                message = playerState.error!!,
+                onBack = onBack,
+            )
         }
 
         // 动作栏对话框（与竖屏同款）
