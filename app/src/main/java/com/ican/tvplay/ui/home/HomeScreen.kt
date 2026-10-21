@@ -498,7 +498,7 @@ fun HomeScreen(
                                 )
                             }
                         }
-                        // 1：固定分类 Tab：通栏可滑至屏幕最左/最右缘，静止时首个 Tab 由内部 contentPadding 对齐卡片圆角/直线交界处，末个对齐页面右基线
+                        // 1：固定分类 Tab：通栏可滑至屏幕最左/最右缘，静止时首个/末个 Tab 由内部 contentPadding 对齐卡片圆角/直线交界处（左右对称）
                         Box(modifier = Modifier.fillMaxWidth()) {
                             CategoryChips(
                                 categories = categories,
@@ -761,7 +761,7 @@ private fun CategoryChips(
     )
 }
 
-/** 下划线式分类 Tab：文字贴合宽度，末个 Tab 文字对齐页面右基线；首个 Tab 默认初始位置落在下方视频卡片「圆角与直线交界处」（页面基线 + 卡片圆角半径） */
+/** 下划线式分类 Tab：文字贴合宽度，首个/末个 Tab 默认初始位置均落在下方视频卡片「圆角与直线交界处」（页面基线 + 卡片圆角半径，左右对称） */
 @Composable
 private fun UnderlineTabRow(
     tabs: List<String>,
@@ -775,12 +775,11 @@ private fun UnderlineTabRow(
         val availableWidth = this.maxWidth
         val listState = rememberLazyListState()
         val density = LocalDensity.current
-        // 右端基准：末个 Tab 文字对齐页面右基线（与搜索栏/视频卡片同线）
+        // 左右基准对称：首个/末个 Tab 的默认初始位置 = 页面基线 + 卡片圆角半径（Spacing.corner），
+        // 分别落在下方视频卡片左/右「圆角与直线交界处」（与选集「更多」弹窗 Tab 对齐逻辑同源）
         val edgePadding = pageHorizontalPadding()
-        // 左端基准：首个 Tab 的默认初始位置 = 页面基线 + 卡片圆角半径（Spacing.corner），
-        // 落在下方视频卡片「圆角与直线交界处」（与选集「更多」弹窗 Tab 对齐逻辑同源）
         val tabStartPadding = edgePadding + Spacing.corner
-        val edgePaddingPx = with(density) { edgePadding.toPx() }
+        val tabEndPadding = edgePadding + Spacing.corner
         val tabStartPaddingPx = with(density) { tabStartPadding.toPx() }
         val spacingPx = with(density) { itemSpacing.toPx() }
         val availableWidthPx = with(density) { availableWidth.toPx() }
@@ -841,7 +840,7 @@ private fun UnderlineTabRow(
             )
             LazyRow(
                 state = listState,
-                contentPadding = PaddingValues(start = tabStartPadding, end = edgePadding),
+                contentPadding = PaddingValues(start = tabStartPadding, end = tabEndPadding),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(itemSpacing),
                 overscrollEffect = null,
@@ -857,7 +856,7 @@ private fun UnderlineTabRow(
                         contentAlignment = Alignment.BottomCenter,
                         modifier = Modifier
                             .fillMaxHeight()
-                            // 文字贴合宽度：不再等宽居中，首个 Tab 落在卡片圆角/直线交界处，末个 Tab 落在页面右基线
+                            // 文字贴合宽度：不再等宽居中，首个/末个 Tab 均落在卡片圆角/直线交界处（左右对称）
                             // 纯点击无任何按压/长按特效（无水波纹、无蒙层、无缩放）
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
