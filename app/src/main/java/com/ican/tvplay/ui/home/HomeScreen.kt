@@ -360,17 +360,19 @@ fun HomeScreen(
                     else -> onVideoClick(video)
                 }
             }
-            val gridState = remember(page) { LazyGridState() }
+            val initialCollapse = searchRowCollapsePx.toInt()
+            val gridState = remember(page) {
+                LazyGridState(firstVisibleItemIndex = 0, firstVisibleItemScrollOffset = initialCollapse)
+            }
             // 注册到页表：切页/同步时按页取用；页面销毁时一并移除，避免残留 stale state 被同步逻辑空转
             DisposableEffect(page) {
                 gridStates[page] = gridState
                 onDispose { gridStates.remove(page) }
             }
-            // 钩子①/③：非当前页在「组合 / 数据装载完成 / settle 变化」后立即把网格对齐到折叠量
-            // （此时该页已完全离屏，重置到顶部不会产生可见跳动）。
-            // 预渲染邻页因此在其滑入前就处于「顶部 = 折叠量」位置 → 滑入瞬间无空白、无上下跳动
-            LaunchedEffect(pageVideos.value, pagerState.settledPage) {
-                if (page == pagerState.settledPage || pageVideos.value.isEmpty()) return@LaunchedEffect
+            // 钩子①：数据装载完成后立即把网格对齐到折叠量（不管是否当前页）
+            // 快速滑动切页时，新页数据刚加载就同步，避免 grid 从 0 位置布局出现空白
+            LaunchedEffect(pageVideos.value) {
+                if (pageVideos.value.isEmpty()) return@LaunchedEffect
                 collapseConnection.suppress = true
                 try {
                     resetGridToCollapseTop(gridState, searchRowCollapsePx)
@@ -378,10 +380,10 @@ fun HomeScreen(
                     collapseConnection.suppress = false
                 }
             }
-            // 钩子③（当前页）：settle 到本页后重置到「顶部」——折叠态顶部 = 对齐折叠量处
-            // （Tab 行直接连内容），展开态回到真正的滚动 0；程序性滚动用 suppress 抑制，防止回写折叠量
-            LaunchedEffect(pagerState.settledPage) {
-                if (pagerState.settledPage != page) return@LaunchedEffect
+            // 钩子③（当前页）：currentPage 变化时立即重置到「顶部」——折叠态顶部 = 对齐折叠量处
+            // 快速滑动切页时不等 settle，直接重置，避免保留之前的滚动进度
+            LaunchedEffect(pagerState.currentPage) {
+                if (pagerState.currentPage != page) return@LaunchedEffect
                 collapseConnection.suppress = true
                 try {
                     resetGridToCollapseTop(gridState, searchRowCollapsePx)
