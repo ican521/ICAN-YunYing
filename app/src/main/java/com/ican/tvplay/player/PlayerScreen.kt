@@ -957,8 +957,10 @@ fun PlayerScreen(
             modifier = when {
                 // 画中画（含退出过渡）：铺满整个（已被系统缩小的）Activity 窗口
                 inPip || pipExitHold -> Modifier.fillMaxSize().background(Color.Black)
-                // 手机旋转进入的全屏：直接铺满
-                fullscreen && !landscapeFullscreen -> Modifier.fillMaxSize().background(Color.Black)
+                // 全屏（手机旋转 / 平板横屏）：无条件铺满，fongmi MATCH_PARENT 同款。
+                // 平板横屏全屏稳态若走下面 isLandscape 定尺寸分支（宽高取自 Configuration），
+                // PiP 退出放大期间可能拿到中间态尺寸，Surface 与系统动画窗口错位跳变
+                fullscreen -> Modifier.fillMaxSize().background(Color.Black)
                 // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
                 // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感
                 pendingFullscreen != null ->

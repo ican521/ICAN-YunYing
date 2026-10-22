@@ -97,6 +97,10 @@ class MainActivity : ComponentActivity() {
             PictureInPictureParams.Builder().apply {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     setSeamlessResizeEnabled(true)
+                    // onCreate 里关自动进 PiP 用的是一次性 builder，之后经本 builder
+                    // setPictureInPictureParams 会把 autoEnter 冲回默认（targetSdk 35 默认开），
+                    // 必须在本 builder 上同步关闭，保证整个小窗生命周期参数一致
+                    setAutoEnterEnabled(false)
                 }
             }
         } else null
@@ -176,13 +180,14 @@ class MainActivity : ComponentActivity() {
             } else {
                 pipStateJob?.cancel()
                 pipStateJob = null
-                // 退出 PiP：仍处全屏 → 手机恢复横屏；否则手机锁回竖屏，平板自由方向
-                val smallScreen = resources.configuration.screenWidthDp < 600
-                requestedOrientation = when {
-                    Players.isFullscreen ->
-                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                    smallScreen -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                    else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                // 退出 PiP：fongmi 同款——全屏展开不碰方向（进全屏时已请求横屏，
+                // 放大动画中途重写方向会让 ROM 重算窗口、出现跳位）；
+                // 仅非全屏兜底：手机锁回竖屏，平板恢复自由方向
+                if (!Players.isFullscreen) {
+                    requestedOrientation =
+                        if (resources.configuration.screenWidthDp < 600)
+                            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                        else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                 }
             }
         }
