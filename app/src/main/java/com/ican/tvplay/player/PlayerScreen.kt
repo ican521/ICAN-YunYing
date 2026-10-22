@@ -2,10 +2,7 @@ package com.ican.tvplay.player
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
-import android.os.Build
 import android.os.SystemClock
-import android.os.VibrationEffect
-import android.os.Vibrator
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
@@ -101,8 +98,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -3006,7 +3005,7 @@ private fun SubtitleSettingSideSheet(
     val subtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
     val subtitlePosition by settings.subtitlePosition.collectAsStateWithLifecycle()
     // 默认点磁吸：记录上一次是否处于吸附区，仅在“进入”时震动一次
-    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     var positionAtKeyPoint by remember { mutableStateOf(subtitlePosition == 0f) }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -3112,7 +3111,10 @@ private fun SubtitleSettingSideSheet(
                 onValueChange = { raw ->
                     val snapped = snapSubtitlePosition(raw)
                     val atKeyPoint = snapped == 0f
-                    if (atKeyPoint && !positionAtKeyPoint) vibrateKeyPoint(context)
+                    if (atKeyPoint && !positionAtKeyPoint) {
+                        // 使用系统触感反馈，不自行定制震动时长/振幅
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
                     positionAtKeyPoint = atKeyPoint
                     settings.setSubtitlePosition(snapped)
                 },
@@ -3239,18 +3241,6 @@ private const val SUBTITLE_POSITION_SNAP_DELTA = 8f
 private fun snapSubtitlePosition(raw: Float): Float {
     if (abs(raw) <= SUBTITLE_POSITION_SNAP_DELTA) return 0f
     return raw.roundToInt().toFloat().coerceIn(SUBTITLE_MIN_POSITION, SUBTITLE_MAX_POSITION)
-}
-
-/** 抵达吸附点震动一次（无马达设备静默跳过） */
-private fun vibrateKeyPoint(context: android.content.Context) {
-    val vibrator = context.getSystemService(Vibrator::class.java) ?: return
-    if (!vibrator.hasVibrator()) return
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        vibrator.vibrate(VibrationEffect.createOneShot(20L, VibrationEffect.DEFAULT_AMPLITUDE))
-    } else {
-        @Suppress("DEPRECATION")
-        vibrator.vibrate(20L)
-    }
 }
 
 @Composable
