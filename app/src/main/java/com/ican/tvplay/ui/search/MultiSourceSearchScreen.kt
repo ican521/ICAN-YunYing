@@ -417,7 +417,7 @@ private fun CrossSourceVideoCard(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(8.dp)
-                    .background(PosterBadgeScrim, RoundedCornerShape(Spacing.corner))
+                    .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             ) {
                 Text(

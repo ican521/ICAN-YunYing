@@ -108,7 +108,7 @@ fun VideoCard(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(8.dp)
-                    .background(PosterBadgeScrim, RoundedCornerShape(Spacing.corner))
+                    .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             )
         }

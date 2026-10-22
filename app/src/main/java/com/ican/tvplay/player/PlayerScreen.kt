@@ -2315,7 +2315,7 @@ private fun FullscreenPlayLayout(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 24.dp)
-                    .clip(RoundedCornerShape(28.dp))
+                    .clip(RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner))
                     .background(Color(0x4D000000))
                     .padding(horizontal = 16.dp, vertical = 6.dp),
             )
@@ -2525,14 +2525,6 @@ private fun FullscreenPlayLayout(
             }
         }
 
-        // 播放/解析错误浮层（锁定状态下也显示，点击返回先退出全屏）
-        if (playerState.error != null && !playerState.buffering) {
-            PlayerErrorOverlay(
-                message = playerState.error!!,
-                onBack = onBack,
-            )
-        }
-
         // 动作栏对话框（与竖屏同款）
         // 播放内核（fongmi PlayerEngineDialog：EXO / MPV / 其他=系统选择器外部播放器）
         val engineOptions = Players.Kernel.entries.map { it.label } + "其他"
@@ -2731,7 +2723,7 @@ private fun EpisodeSideSheet(
                     .width(panelWidth)
                     .background(
                         DarkSurfaceElevated,
-                        RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp),
+                        RoundedCornerShape(topStart = com.ican.tvplay.ui.theme.Spacing.corner, bottomStart = com.ican.tvplay.ui.theme.Spacing.corner),
                     )
                     // 面板本体消费点击，避免点面板空白处误触发外层收起
                     .clickable(
@@ -2902,7 +2894,7 @@ private fun <T> OptionDialog(
             ) {
                 options.forEach { opt ->
                     val selected = opt == current
-                    val shape = RoundedCornerShape(12.dp)
+                    val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
                     val borderColor = when {
                         !isDark -> null
                         selected && selectedBorderColor != null -> selectedBorderColor
@@ -2967,7 +2959,7 @@ private fun SubtitleDialog(
 
 @Composable
 private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color? = null, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
     val isDark = LocalDarkTheme.current
     val borderColor = when {
         !isDark -> null
@@ -3195,46 +3187,6 @@ private const val RESUME_THRESHOLD_MS = 5_000L
 private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
 
 // ========== 视频加载失败全屏错误态 ==========
-
-/**
- * 视频区内的轻量错误浮层（竖屏小窗 / 全屏共用）：
- * 播放或解析失败时在画面中央显示具体原因 + 返回按钮，替代黑屏卡死，绝不闪退。
- */
-@Composable
-private fun PlayerErrorOverlay(
-    message: String,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .padding(24.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xCC000000))
-            .padding(horizontal = 24.dp, vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(
-            imageVector = AppIcons.Close,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(40.dp),
-        )
-        Text(
-            text = "无法播放",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.White,
-        )
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.85f),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
-    }
-}
 
 /**
  * 当 VideoRepository.getVideo + Players.consumeCachedVideo 都查不到时，

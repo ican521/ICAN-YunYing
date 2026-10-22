@@ -258,7 +258,7 @@ private fun FavoriteCard(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(8.dp)
-                        .background(PosterBadgeScrim, RoundedCornerShape(Spacing.corner))
+                        .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
                     Text(
@@ -515,7 +515,7 @@ private fun HistoryCard(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(8.dp)
-                        .background(PosterBadgeScrim, RoundedCornerShape(Spacing.corner))
+                        .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
                     Text(
@@ -570,7 +570,7 @@ private fun HistoryCard(
                 // 看到的集数：胶囊样式与收藏卡片站源标签一致
                 Box(
                     modifier = Modifier
-                        .background(PosterBadgeScrim, RoundedCornerShape(Spacing.corner))
+                        .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
                     Text(
