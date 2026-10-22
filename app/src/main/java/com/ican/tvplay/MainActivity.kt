@@ -88,10 +88,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** fongmi PiP 类同款：整个画中画生命周期复用同一个 builder。
+     *  宽高比/矩形/图标全部增量更新，任何一次 setPictureInPictureParams
+     *  都不会把已设置的 sourceRectHint 等参数冲掉（新建 builder 会清空 hint，
+     *  导致退出放大动画失去目标矩形、先跳到默认小窗位置再放大）。 */
+    private val pipBuilder: PictureInPictureParams.Builder? by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PictureInPictureParams.Builder().apply {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    setSeamlessResizeEnabled(true)
+                }
+            }
+        } else null
+    }
+
     /** 全屏播放中切后台（Home/上滑）→ 自动进入画中画（后台播放选「画中画」时） */
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val builder = pipBuilder ?: return
         if (!Players.isFullscreen) return
         val mode = (application as TvPlayApplication)
             .container.settingsRepository.playerBackgroundPlay.value
@@ -103,13 +117,10 @@ class MainActivity : ComponentActivity() {
             // 点击展开小窗时系统直接放大为横屏全屏；若进小窗前释放方向，
             // 展开会先按竖屏放大再旋转，动画割裂。
             // sourceRectHint 提供进入/退出小窗的平滑缩放动画目标
-            val builder = PictureInPictureParams.Builder()
+            builder
                 .setAspectRatio(videoAspectRational())
                 .setActions(buildPipActions())
                 .setSourceRectHint(Rect().apply { window.decorView.getGlobalVisibleRect(this) })
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                builder.setSeamlessResizeEnabled(true)
-            }
             enterPictureInPictureMode(builder.build())
         } catch (_: Exception) {
         }
@@ -133,15 +144,10 @@ class MainActivity : ComponentActivity() {
 
     /** fongmi PiP.update 同款：视频区矩形持续同步给系统，进/出小窗动画（含圆角）按此计算 */
     fun syncPipSourceRect(rect: Rect) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val builder = pipBuilder ?: return
         try {
-            setPictureInPictureParams(
-                PictureInPictureParams.Builder()
-                    .setAspectRatio(videoAspectRational())
-                    .setActions(buildPipActions())
-                    .setSourceRectHint(rect)
-                    .build(),
-            )
+            builder.setSourceRectHint(rect)
+            setPictureInPictureParams(builder.build())
         } catch (_: Exception) {
         }
     }
@@ -210,15 +216,11 @@ class MainActivity : ComponentActivity() {
 
     @android.annotation.TargetApi(Build.VERSION_CODES.O)
     private fun updatePipActions() {
+        val builder = pipBuilder ?: return
         try {
-            // 宽高比必须与进入时一致（fongmi 靠复用同一 builder 保持），
-            // 否则此处更新会把视频真实比例覆盖回 16:9，小窗形状不贴合画面
-            setPictureInPictureParams(
-                PictureInPictureParams.Builder()
-                    .setAspectRatio(videoAspectRational())
-                    .setActions(buildPipActions())
-                    .build(),
-            )
+            // fongmi 同款：复用同一 builder 仅换图标，保留宽高比与 sourceRectHint
+            builder.setActions(buildPipActions())
+            setPictureInPictureParams(builder.build())
         } catch (_: Exception) {
         }
     }
