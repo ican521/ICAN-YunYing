@@ -121,8 +121,10 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.darkColorScheme
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.SUBTITLE_MAX_POSITION
@@ -3042,6 +3044,8 @@ private fun SubtitleSettingSideSheet(
                 .padding(horizontal = 16.dp, vertical = 16.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
+            // 侧栏固定深色底，miuix 滑杆强制使用深色色板，避免浅色主题下滑杆轨道看不清
+            MiuixTheme(colors = darkColorScheme()) {
             Text(
                 text = "字幕设置",
                 style = MaterialTheme.typography.titleMedium,
@@ -3067,16 +3071,11 @@ private fun SubtitleSettingSideSheet(
                     .fillMaxWidth()
                     .padding(top = 4.dp),
             )
-            androidx.compose.material3.Slider(
+            Slider(
                 value = subtitleScale,
                 onValueChange = { settings.setSubtitleScale(it) },
                 valueRange = SUBTITLE_MIN_SCALE..SUBTITLE_MAX_SCALE,
                 steps = ((SUBTITLE_MAX_SCALE - SUBTITLE_MIN_SCALE) / 0.1f).toInt() - 1,
-                colors = androidx.compose.material3.SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = BrandBlueDeep,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.2f),
-                ),
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
@@ -3100,16 +3099,11 @@ private fun SubtitleSettingSideSheet(
                     .fillMaxWidth()
                     .padding(top = 4.dp),
             )
-            androidx.compose.material3.Slider(
+            Slider(
                 value = subtitlePosition,
                 onValueChange = { settings.setSubtitlePosition(it) },
                 valueRange = SUBTITLE_MIN_POSITION..SUBTITLE_MAX_POSITION,
                 steps = (SUBTITLE_MAX_POSITION - SUBTITLE_MIN_POSITION).toInt() - 1,
-                colors = androidx.compose.material3.SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = BrandBlueDeep,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.2f),
-                ),
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
@@ -3130,6 +3124,7 @@ private fun SubtitleSettingSideSheet(
                 color = DarkOnSurfaceMuted,
                 modifier = Modifier.padding(top = 8.dp),
             )
+            }
         }
     }
 }
