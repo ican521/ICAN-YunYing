@@ -2,7 +2,10 @@ package com.ican.tvplay.player
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.os.Build
 import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
@@ -77,6 +80,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import kotlin.math.hypot
+import kotlin.math.round
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -122,6 +126,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Slider
+import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
@@ -3001,6 +3006,10 @@ private fun SubtitleSettingSideSheet(
     val playerState by Players.state.collectAsStateWithLifecycle()
     val subtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
     val subtitlePosition by settings.subtitlePosition.collectAsStateWithLifecycle()
+    // 默认点磁吸：记录上一次是否处于吸附区，仅在“进入”时震动一次
+    val context = LocalContext.current
+    var scaleAtKeyPoint by remember { mutableStateOf(subtitleScale == 1f) }
+    var positionAtKeyPoint by remember { mutableStateOf(subtitlePosition == 0f) }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
@@ -3073,13 +3082,20 @@ private fun SubtitleSettingSideSheet(
             )
             Slider(
                 value = subtitleScale,
-                onValueChange = { settings.setSubtitleScale(it) },
+                onValueChange = { raw ->
+                    val snapped = snapSubtitleScale(raw)
+                    val atKeyPoint = snapped == 1f
+                    if (atKeyPoint && !scaleAtKeyPoint) vibrateKeyPoint(context)
+                    scaleAtKeyPoint = atKeyPoint
+                    settings.setSubtitleScale(snapped)
+                },
                 valueRange = SUBTITLE_MIN_SCALE..SUBTITLE_MAX_SCALE,
-                steps = ((SUBTITLE_MAX_SCALE - SUBTITLE_MIN_SCALE) / 0.1f).toInt() - 1,
-                // 默认 100% 处显示刻度点并磁吸
+                steps = ((SUBTITLE_MAX_SCALE - SUBTITLE_MIN_SCALE) / 0.05f).toInt() - 1,
+                // 默认 100% 处显示刻度点，进入吸附区时吸住并震动
                 showKeyPoints = true,
                 keyPoints = listOf(1.0f),
-                magnetThreshold = 0.02f,
+                magnetThreshold = 0f,
+                hapticEffect = SliderDefaults.SliderHapticEffect.None,
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
@@ -3105,13 +3121,20 @@ private fun SubtitleSettingSideSheet(
             )
             Slider(
                 value = subtitlePosition,
-                onValueChange = { settings.setSubtitlePosition(it) },
+                onValueChange = { raw ->
+                    val snapped = snapSubtitlePosition(raw)
+                    val atKeyPoint = snapped == 0f
+                    if (atKeyPoint && !positionAtKeyPoint) vibrateKeyPoint(context)
+                    positionAtKeyPoint = atKeyPoint
+                    settings.setSubtitlePosition(snapped)
+                },
                 valueRange = SUBTITLE_MIN_POSITION..SUBTITLE_MAX_POSITION,
                 steps = (SUBTITLE_MAX_POSITION - SUBTITLE_MIN_POSITION).toInt() - 1,
-                // 默认 0（居中）处显示刻度点并磁吸
+                // 默认 0（居中）处显示刻度点，进入吸附区时吸住并震动
                 showKeyPoints = true,
                 keyPoints = listOf(0f),
-                magnetThreshold = 0.02f,
+                magnetThreshold = 0f,
+                hapticEffect = SliderDefaults.SliderHapticEffect.None,
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
@@ -3219,6 +3242,36 @@ private fun OffsetAdjustRow(offsetMs: Long, modifier: Modifier = Modifier) {
 private fun formatSubtitleOffsetInput(offsetMs: Long): String {
     val seconds = if (abs(offsetMs) < 50) 0f else offsetMs / 1000f
     return String.format(java.util.Locale.getDefault(), "%+.1f", seconds)
+}
+
+/** 字幕大小吸附区：默认 100%（1.0）附近 ±15% 内吸住 */
+private const val SUBTITLE_SCALE_SNAP_DELTA = 0.15f
+
+/** 字幕位置吸附区：默认 0 附近 ±8% 内吸住 */
+private const val SUBTITLE_POSITION_SNAP_DELTA = 8f
+
+/** 字幕大小：默认点磁吸，其余按 5% 粒度取整 */
+private fun snapSubtitleScale(raw: Float): Float {
+    if (abs(raw - 1f) <= SUBTITLE_SCALE_SNAP_DELTA) return 1f
+    return (round(raw / 0.05f) * 0.05f).coerceIn(SUBTITLE_MIN_SCALE, SUBTITLE_MAX_SCALE)
+}
+
+/** 字幕位置：默认点磁吸，其余按 1% 粒度取整 */
+private fun snapSubtitlePosition(raw: Float): Float {
+    if (abs(raw) <= SUBTITLE_POSITION_SNAP_DELTA) return 0f
+    return raw.roundToInt().toFloat().coerceIn(SUBTITLE_MIN_POSITION, SUBTITLE_MAX_POSITION)
+}
+
+/** 抵达吸附点震动一次（无马达设备静默跳过） */
+private fun vibrateKeyPoint(context: android.content.Context) {
+    val vibrator = context.getSystemService(Vibrator::class.java) ?: return
+    if (!vibrator.hasVibrator()) return
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        vibrator.vibrate(VibrationEffect.createOneShot(20L, VibrationEffect.DEFAULT_AMPLITUDE))
+    } else {
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(20L)
+    }
 }
 
 @Composable

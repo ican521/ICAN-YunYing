@@ -4,6 +4,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 字幕设置滑杆抵达吸附点时短震反馈 -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- 播放保活前台服务（设置开关控制，Android 14+ 需声明类型权限） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
