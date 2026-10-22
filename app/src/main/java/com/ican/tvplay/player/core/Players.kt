@@ -31,16 +31,22 @@ import androidx.media3.exoplayer.upstream.BandwidthMeter
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.mpvplayer.MpvPlayer
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.SubtitleView
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.ican.tvplay.TvPlayApplication
+import com.ican.tvplay.data.SUBTITLE_MAX_SCALE
+import com.ican.tvplay.data.SUBTITLE_MIN_SCALE
+import com.ican.tvplay.data.SUBTITLE_OFFSET_MAX_MS
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.data.model.Episode
 import com.ican.tvplay.data.model.PlayLine
@@ -55,6 +61,7 @@ import com.ican.tvplay.data.model.Video
  * - 解码/缓冲切换需重建 ExoPlayer，自动恢复位置与播放状态
  * - 横竖屏 Activity 重建不丢播放：单例持有 player，视图仅 attach/detach
  */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 object Players {
 
     private const val TAG = "Players"
@@ -100,6 +107,8 @@ object Players {
         val audioTracks: List<TrackOption> = emptyList(),
         val textTracks: List<TrackOption> = emptyList(),
         val textDisabled: Boolean = false,
+        /** 外挂字幕时间偏移（ms，仿 fongmi 播放内状态，新开播重置） */
+        val subtitleOffsetMs: Long = 0L,
         val error: String? = null,
         /** 实时网络速度（bps），缓冲时显示在转圈下方 */
         val networkSpeedBps: Long = 0L,
@@ -129,6 +138,13 @@ object Players {
     private var appContext: Context? = null
     private var currentSpec: PlaySpec? = null
     private var retryCount = 0
+
+    /** 字幕字号倍率（持久化设置，绑定视图 / 修改时应用到 SubtitleView） */
+    private var subtitleScale = 1.0f
+
+    /** 播放前源类型探测任务：换源/切集时取消上一个，避免旧探测结果覆盖新播放 */
+    private var probeJob: Job? = null
+    private var startToken = 0
 
     /** fongmi 同款：只保存绑定的 PlayerView，Surface 全权交给 PlayerView 内部管理（绝不手动 setVideoSurface） */
     private var playerView: PlayerView? = null
@@ -382,6 +398,7 @@ object Players {
         playerView = view
         view.useController = false
         view.player = player
+        applySubtitleScale()
         Log.d(TAG, "bindPlayerView view=$view player=$player")
     }
 
@@ -397,9 +414,34 @@ object Players {
     /** 开始播放（或换源/换线路） */
     fun start(context: Context, spec: PlaySpec, startPositionMs: Long = 0L) {
         appContext = context.applicationContext
+        probeJob?.cancel()
+        val token = ++startToken
         currentSpec = spec
         retryCount = 0  // 新源重置错误计数
-        _state.value = _state.value.copy(error = null)  // 新源开播清除旧错误，避免换源后错误页残留
+        // 新源开播清除旧错误，并重置播放内的字幕偏移（偏移只对当前这一集有效，仿 fongmi）
+        _state.value = _state.value.copy(error = null, subtitleOffsetMs = 0L)
+        val inferred = spec.format ?: ContentTypeProbe.fromUrl(spec.url)
+        val needProbe = inferred == null && _state.value.kernel == Kernel.EXO &&
+            (spec.url.startsWith("http://") || spec.url.startsWith("https://"))
+        if (!needProbe) {
+            startResolved(spec.copy(format = inferred), startPositionMs)
+            return
+        }
+        // 未标注格式：先探测容器再起播，期间停掉旧画面并显示缓冲
+        player?.stop()
+        _state.value = _state.value.copy(buffering = true)
+        probeJob = scope.launch {
+            val format = withContext(Dispatchers.IO) {
+                ContentTypeProbe.probe(spec.url, MediaItemFactory.checkUa(spec.headers))
+            }
+            if (token != startToken) return@launch
+            startResolved(spec.copy(format = format), startPositionMs)
+        }
+    }
+
+    /** 源类型已确定（或探测完成）后同步起播 */
+    private fun startResolved(spec: PlaySpec, startPositionMs: Long) {
+        currentSpec = spec
         try {
             val p = ensurePlayer()
             startInternal(p, spec, startPositionMs)
@@ -408,6 +450,31 @@ object Players {
             Log.e(TAG, "start fail url=${spec.url.take(120)}", t)
             notifyError(describeError(t))
         }
+    }
+
+    /** 字幕字号（0.5x - 4.0x）：实时应用到已绑定的 SubtitleView */
+    fun setSubtitleScale(scale: Float) {
+        subtitleScale = scale.coerceIn(SUBTITLE_MIN_SCALE, SUBTITLE_MAX_SCALE)
+        applySubtitleScale()
+    }
+
+    private fun applySubtitleScale() {
+        playerView?.subtitleView?.setFractionalTextSize(
+            SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * subtitleScale,
+        )
+    }
+
+    /** 外挂字幕时间偏移（ms）：重新解析字幕并保持当前播放位置 */
+    fun setSubtitleOffset(offsetMs: Long) {
+        val value = offsetMs.coerceIn(-SUBTITLE_OFFSET_MAX_MS, SUBTITLE_OFFSET_MAX_MS)
+        if (_state.value.subtitleOffsetMs == value) return
+        _state.value = _state.value.copy(subtitleOffsetMs = value)
+        val spec = currentSpec ?: return
+        if (spec.subs.isEmpty()) return   // 内置字幕轨道无法在解析阶段平移
+        val p = player ?: return
+        val wasPlaying = p.playWhenReady
+        startInternal(p, spec, p.currentPosition)
+        if (!wasPlaying) p.pause()   // 调偏移前处于暂停时，重载后保持暂停
     }
 
     /** 播放页解析阶段（spider playerContent / jx 二次解析）致命错误上报：转错误页提示而不是崩溃 */
@@ -424,6 +491,9 @@ object Players {
 
     /** 退出播放页时释放 */
     fun release() {
+        probeJob?.cancel()
+        probeJob = null
+        startToken++
         handler.removeCallbacks(ticker)
         bandwidthMeter?.removeEventListener(bandwidthListener)
         bandwidthMeter = null
@@ -444,7 +514,8 @@ object Players {
         _state.value = _state.value.copy(
             ready = false, playing = false, buffering = false,
             positionMs = 0L, durationMs = 0L, bufferedMs = 0L,
-            audioTracks = emptyList(), textTracks = emptyList(), error = null,
+            audioTracks = emptyList(), textTracks = emptyList(),
+            subtitleOffsetMs = 0L, error = null,
             networkSpeedBps = 0L,
         )
     }
@@ -707,7 +778,13 @@ object Players {
             val ds = DefaultHttpDataSource.Factory()
                 .setDefaultRequestProperties(headers)
                 .setAllowCrossProtocolRedirects(true)
-            p.setMediaSource(DefaultMediaSourceFactory(ds).createMediaSource(item), positionMs)
+            p.setMediaSource(
+                DefaultMediaSourceFactory(ds)
+                    // 外挂字幕解析阶段平移时间轴（media3 官方无播放器级偏移 API）
+                    .setSubtitleParserFactory(SubtitleOffsetParserFactory { _state.value.subtitleOffsetMs })
+                    .createMediaSource(item),
+                positionMs,
+            )
         } else {
             p.setMediaItem(item, positionMs)
         }

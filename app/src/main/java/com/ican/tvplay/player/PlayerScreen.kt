@@ -59,6 +59,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.core.view.WindowCompat
@@ -74,6 +75,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import kotlin.math.hypot
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.defaultMinSize
@@ -115,6 +118,9 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
+import com.ican.tvplay.data.SUBTITLE_MAX_SCALE
+import com.ican.tvplay.data.SUBTITLE_MIN_SCALE
+import com.ican.tvplay.data.SUBTITLE_OFFSET_MAX_MS
 import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.data.model.Episode
@@ -173,6 +179,7 @@ fun PlayerScreen(
     val savedScale by settings.playerScale.collectAsStateWithLifecycle()
     val savedEngine by settings.playerEngine.collectAsStateWithLifecycle()
     val savedBuffer by settings.playerBuffer.collectAsStateWithLifecycle()
+    val savedSubtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
 
     var video by remember { mutableStateOf<Video?>(null) }
     var episodeIndex by remember { mutableIntStateOf(startEpisode) }
@@ -258,6 +265,8 @@ fun PlayerScreen(
                 ?: Players.BufferTier.LOW,
         )
     }
+    // 字幕字号（持久化，仿 fongmi SubtitleSetting）：修改后实时作用到当前 PlayerView
+    LaunchedEffect(savedSubtitleScale) { Players.setSubtitleScale(savedSubtitleScale) }
 
     // 后台播放（设置三态：关闭/开启/画中画）：非关闭时退出播放页转交前台服务后台续播
     var backgroundMode by remember { mutableIntStateOf(BACKGROUND_OFF) }
@@ -2943,7 +2952,94 @@ private fun SubtitleDialog(
             SubRow("关闭字幕", textDisabled, selectedBorderColor) { onDisable() }
             tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected, selectedBorderColor) { onSelect(t) } }
             SubRow("添加外挂字幕…", false, selectedBorderColor) { onAddExternal() }
+
+            // 字号/偏移（仿 fongmi SubtitleSettingPanel）：字号持久化，偏移只对当前播放生效
+            val settings = appContainer().settingsRepository
+            val subtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
+            val playerState by Players.state.collectAsStateWithLifecycle()
+            var offsetDraft by remember(show, playerState.subtitleOffsetMs) {
+                mutableFloatStateOf(playerState.subtitleOffsetMs / 1000f)
+            }
+            val scaleSteps = ((SUBTITLE_MAX_SCALE - SUBTITLE_MIN_SCALE) / 0.1f).toInt() - 1
+            val offsetSteps = ((SUBTITLE_OFFSET_MAX_MS * 2) / 100).toInt() - 1
+            SubtitleSliderRow(
+                label = "字幕大小",
+                valueText = "${(subtitleScale * 100).roundToInt()}%",
+                value = subtitleScale,
+                valueRange = SUBTITLE_MIN_SCALE..SUBTITLE_MAX_SCALE,
+                steps = scaleSteps,
+                onValueChange = { settings.setSubtitleScale(it) },
+                onValueChangeFinished = {},
+            )
+            SubtitleSliderRow(
+                label = "字幕偏移（外挂）",
+                valueText = formatSubtitleOffset(offsetDraft),
+                value = offsetDraft,
+                valueRange = -SUBTITLE_OFFSET_MAX_MS / 1000f..SUBTITLE_OFFSET_MAX_MS / 1000f,
+                steps = offsetSteps,
+                onValueChange = { offsetDraft = it },
+                onValueChangeFinished = { Players.setSubtitleOffset((offsetDraft * 1000).roundToLong()) },
+            )
         }
+    }
+}
+
+/** 格式化字幕偏移：+1.2s / -0.5s */
+private fun formatSubtitleOffset(seconds: Float): String {
+    val value = if (abs(seconds) < 0.05f) 0f else seconds
+    return String.format(java.util.Locale.getDefault(), "%+.1fs", value)
+}
+
+/** 字幕字号/偏移滑杆行：与 SubRow 同款卡片 + 深色描边 */
+@Composable
+private fun SubtitleSliderRow(
+    label: String,
+    valueText: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit,
+) {
+    val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
+    val isDark = LocalDarkTheme.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant, shape)
+            .then(
+                if (isDark) {
+                    Modifier.border(Spacing.optionBorder, optionBorderColor(selected = false), shape)
+                } else Modifier,
+            )
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = valueText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        androidx.compose.material3.Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            steps = steps,
+            onValueChangeFinished = onValueChangeFinished,
+            colors = androidx.compose.material3.SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

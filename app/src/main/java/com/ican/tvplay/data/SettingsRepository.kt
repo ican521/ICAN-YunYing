@@ -17,6 +17,14 @@ const val BACKGROUND_OFF = 0 // 关闭：退出播放页即停止（默认）
 const val BACKGROUND_ON = 1  // 开启：后台续播 + 通知栏控制
 const val BACKGROUND_PIP = 2 // 画中画：开启基础上，全屏播放切后台自动进 PiP
 
+/** 字幕字号倍率范围（仿 fongmi SubtitleSetting，5.8.0 起上限 4.0） */
+const val SUBTITLE_MIN_SCALE = 0.5f
+const val SUBTITLE_MAX_SCALE = 4.0f
+
+/** 字幕时间偏移范围与步长（仿 fongmi SubtitleOffsetUtil，±300 秒 / 100 毫秒） */
+const val SUBTITLE_OFFSET_MAX_MS = 300_000L
+const val SUBTITLE_OFFSET_STEP_MS = 100L
+
 /**
  * 应用设置。初始骨架阶段使用 SharedPreferences 持久化，
  * 后续新增设置项可继续在此扩展。
@@ -218,6 +226,19 @@ class SettingsRepository(context: Context) {
         _playerBackgroundPlay.value = mode
     }
 
+    /** 字幕字号倍率（0.5x - 4.0x，默认 1.0，仿 fongmi SubtitleSetting.getScale） */
+    private val _subtitleScale = MutableStateFlow(
+        prefs.getFloat(KEY_PLAYER_SUBTITLE_SCALE, 1.0f)
+            .coerceIn(SUBTITLE_MIN_SCALE, SUBTITLE_MAX_SCALE),
+    )
+    val subtitleScale: StateFlow<Float> = _subtitleScale.asStateFlow()
+
+    fun setSubtitleScale(scale: Float) {
+        val value = scale.coerceIn(SUBTITLE_MIN_SCALE, SUBTITLE_MAX_SCALE)
+        prefs.edit().putFloat(KEY_PLAYER_SUBTITLE_SCALE, value).apply()
+        _subtitleScale.value = value
+    }
+
     /** 收藏同步模式（fongmi Setting.sync_mode）：0=双向 1=上传 2=下载 */
     private val _syncMode = MutableStateFlow(prefs.getInt(KEY_SYNC_MODE, 0))
     val syncMode: StateFlow<Int> = _syncMode.asStateFlow()
@@ -293,6 +314,8 @@ class SettingsRepository(context: Context) {
         _playerEngine.value = prefs.getString(KEY_PLAYER_ENGINE, null).orEmpty()
         _playerBuffer.value = prefs.getInt(KEY_PLAYER_BUFFER, 1)
         _playerBackgroundPlay.value = prefs.getInt(KEY_PLAYER_BACKGROUND, BACKGROUND_OFF)
+        _subtitleScale.value = prefs.getFloat(KEY_PLAYER_SUBTITLE_SCALE, 1.0f)
+            .coerceIn(SUBTITLE_MIN_SCALE, SUBTITLE_MAX_SCALE)
         _syncMode.value = prefs.getInt(KEY_SYNC_MODE, 0)
         _searchHistory.value = runCatching {
             prefs.getStringSet(KEY_SEARCH_HISTORY, emptySet()).orEmpty().toList()
@@ -318,6 +341,7 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_ENGINE = "player_engine"
         const val KEY_PLAYER_BUFFER = "player_buffer"
         const val KEY_PLAYER_BACKGROUND = "player_background"
+        const val KEY_PLAYER_SUBTITLE_SCALE = "player_subtitle_scale"
         const val KEY_SYNC_MODE = "sync_mode"
         const val KEY_SEARCH_HISTORY = "search_history"
         const val KEY_HOT = "hot"
