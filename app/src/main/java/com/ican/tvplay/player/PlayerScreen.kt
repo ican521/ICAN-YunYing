@@ -3004,8 +3004,9 @@ private fun SubtitleSettingSideSheet(
     val playerState by Players.state.collectAsStateWithLifecycle()
     val subtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
     val subtitlePosition by settings.subtitlePosition.collectAsStateWithLifecycle()
-    // 默认点磁吸：记录上一次是否处于吸附区，仅在“进入”时震动一次
+    // 默认点震动：记录上一次是否处于吸附区，仅在“进入”时震动一次
     val haptic = LocalHapticFeedback.current
+    var scaleAtKeyPoint by remember { mutableStateOf(abs(subtitleScale - 1f) < 0.02f) }
     var positionAtKeyPoint by remember { mutableStateOf(subtitlePosition == 0f) }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -3079,7 +3080,15 @@ private fun SubtitleSettingSideSheet(
             )
             Slider(
                 value = subtitleScale,
-                onValueChange = { settings.setSubtitleScale(it) },
+                onValueChange = { raw ->
+                    val atKeyPoint = abs(raw - 1f) < 0.02f
+                    if (atKeyPoint && !scaleAtKeyPoint) {
+                        // 抵达默认 100% 刻度点时使用系统触感反馈
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
+                    scaleAtKeyPoint = atKeyPoint
+                    settings.setSubtitleScale(raw)
+                },
                 valueRange = SUBTITLE_MIN_SCALE..SUBTITLE_MAX_SCALE,
                 steps = ((SUBTITLE_MAX_SCALE - SUBTITLE_MIN_SCALE) / 0.05f).toInt() - 1,
                 // 只在默认 100% 处显示刻度点，不做吸附
