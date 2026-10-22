@@ -25,6 +25,10 @@ const val SUBTITLE_MAX_SCALE = 4.0f
 const val SUBTITLE_OFFSET_MAX_MS = 300_000L
 const val SUBTITLE_OFFSET_STEP_MS = 100L
 
+/** 字幕位置范围（仿 fongmi SubtitleSetting，-100% - +100%，正数上移） */
+const val SUBTITLE_MIN_POSITION = -100f
+const val SUBTITLE_MAX_POSITION = 100f
+
 /**
  * 应用设置。初始骨架阶段使用 SharedPreferences 持久化，
  * 后续新增设置项可继续在此扩展。
@@ -239,6 +243,19 @@ class SettingsRepository(context: Context) {
         _subtitleScale.value = value
     }
 
+    /** 字幕位置（-100% - +100%，正数上移，仿 fongmi SubtitleSetting.getPosition） */
+    private val _subtitlePosition = MutableStateFlow(
+        prefs.getFloat(KEY_PLAYER_SUBTITLE_POSITION, 0f)
+            .coerceIn(SUBTITLE_MIN_POSITION, SUBTITLE_MAX_POSITION),
+    )
+    val subtitlePosition: StateFlow<Float> = _subtitlePosition.asStateFlow()
+
+    fun setSubtitlePosition(position: Float) {
+        val value = position.coerceIn(SUBTITLE_MIN_POSITION, SUBTITLE_MAX_POSITION)
+        prefs.edit().putFloat(KEY_PLAYER_SUBTITLE_POSITION, value).apply()
+        _subtitlePosition.value = value
+    }
+
     /** 收藏同步模式（fongmi Setting.sync_mode）：0=双向 1=上传 2=下载 */
     private val _syncMode = MutableStateFlow(prefs.getInt(KEY_SYNC_MODE, 0))
     val syncMode: StateFlow<Int> = _syncMode.asStateFlow()
@@ -316,6 +333,8 @@ class SettingsRepository(context: Context) {
         _playerBackgroundPlay.value = prefs.getInt(KEY_PLAYER_BACKGROUND, BACKGROUND_OFF)
         _subtitleScale.value = prefs.getFloat(KEY_PLAYER_SUBTITLE_SCALE, 1.0f)
             .coerceIn(SUBTITLE_MIN_SCALE, SUBTITLE_MAX_SCALE)
+        _subtitlePosition.value = prefs.getFloat(KEY_PLAYER_SUBTITLE_POSITION, 0f)
+            .coerceIn(SUBTITLE_MIN_POSITION, SUBTITLE_MAX_POSITION)
         _syncMode.value = prefs.getInt(KEY_SYNC_MODE, 0)
         _searchHistory.value = runCatching {
             prefs.getStringSet(KEY_SEARCH_HISTORY, emptySet()).orEmpty().toList()
@@ -342,6 +361,7 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_BUFFER = "player_buffer"
         const val KEY_PLAYER_BACKGROUND = "player_background"
         const val KEY_PLAYER_SUBTITLE_SCALE = "player_subtitle_scale"
+        const val KEY_PLAYER_SUBTITLE_POSITION = "player_subtitle_position"
         const val KEY_SYNC_MODE = "sync_mode"
         const val KEY_SEARCH_HISTORY = "search_history"
         const val KEY_HOT = "hot"

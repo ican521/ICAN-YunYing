@@ -1,6 +1,7 @@
 package com.ican.tvplay.player.core
 
 import android.content.Context
+import android.view.View
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -45,7 +46,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.ican.tvplay.TvPlayApplication
+import com.ican.tvplay.data.SUBTITLE_MAX_POSITION
 import com.ican.tvplay.data.SUBTITLE_MAX_SCALE
+import com.ican.tvplay.data.SUBTITLE_MIN_POSITION
 import com.ican.tvplay.data.SUBTITLE_MIN_SCALE
 import com.ican.tvplay.data.SUBTITLE_OFFSET_MAX_MS
 import com.ican.tvplay.data.local.HistoryEntity
@@ -142,6 +145,14 @@ object Players {
 
     /** 字幕字号倍率（持久化设置，绑定视图 / 修改时应用到 SubtitleView） */
     private var subtitleScale = 1.0f
+
+    /** 字幕位置百分比（正数上移，0 为默认贴底） */
+    private var subtitlePosition = 0f
+
+    private var subtitleViewRef: SubtitleView? = null
+    private val subtitleLayoutListener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+        applySubtitlePosition()
+    }
 
     /** 播放前源类型探测任务：换源/切集时取消上一个，避免旧探测结果覆盖新播放 */
     private var probeJob: Job? = null
@@ -402,13 +413,15 @@ object Players {
         playerView = view
         view.useController = false
         view.player = player
-        applySubtitleScale()
+        attachSubtitleView(view.subtitleView)
         Log.d(TAG, "bindPlayerView view=$view player=$player")
     }
 
     /** 视图销毁时解绑（仅当是当前绑定的视图才清空，防止全屏/竖屏切换时误清新绑定） */
     fun unbindPlayerView(view: PlayerView) {
         if (playerView === view) {
+            subtitleViewRef?.removeOnLayoutChangeListener(subtitleLayoutListener)
+            subtitleViewRef = null
             playerView = null
             view.player = null
             Log.d(TAG, "unbindPlayerView view=$view")
@@ -463,10 +476,34 @@ object Players {
         applySubtitleScale()
     }
 
+    /** 字幕位置（-100% - +100%，正数上移）：media3 官方无 bottomPosition API，用视图位移实现 */
+    fun setSubtitlePosition(position: Float) {
+        subtitlePosition = position.coerceIn(SUBTITLE_MIN_POSITION, SUBTITLE_MAX_POSITION)
+        applySubtitlePosition()
+    }
+
     private fun applySubtitleScale() {
-        playerView?.subtitleView?.setFractionalTextSize(
+        subtitleViewRef?.setFractionalTextSize(
             SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * subtitleScale,
         )
+    }
+
+    private fun applySubtitlePosition() {
+        val view = subtitleViewRef ?: return
+        val height = view.height
+        if (height <= 0) return   // 尚未布局完成，等 OnLayoutChange 回调再应用
+        view.translationY = -(subtitlePosition / 100f) * height
+    }
+
+    /** 绑定 PlayerView 内部的 SubtitleView，并在尺寸变化（竖屏/全屏切换）后重算位置 */
+    private fun attachSubtitleView(view: SubtitleView?) {
+        if (subtitleViewRef !== view) {
+            subtitleViewRef?.removeOnLayoutChangeListener(subtitleLayoutListener)
+            subtitleViewRef = view
+            view?.addOnLayoutChangeListener(subtitleLayoutListener)
+        }
+        applySubtitleScale()
+        applySubtitlePosition()
     }
 
     /** 外挂字幕时间偏移（ms）：重新解析字幕并保持当前播放位置 */

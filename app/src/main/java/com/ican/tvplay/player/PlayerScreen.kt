@@ -125,7 +125,9 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.data.BACKGROUND_ON
+import com.ican.tvplay.data.SUBTITLE_MAX_POSITION
 import com.ican.tvplay.data.SUBTITLE_MAX_SCALE
+import com.ican.tvplay.data.SUBTITLE_MIN_POSITION
 import com.ican.tvplay.data.SUBTITLE_MIN_SCALE
 import com.ican.tvplay.data.SUBTITLE_OFFSET_MAX_MS
 import com.ican.tvplay.data.SUBTITLE_OFFSET_STEP_MS
@@ -188,6 +190,7 @@ fun PlayerScreen(
     val savedEngine by settings.playerEngine.collectAsStateWithLifecycle()
     val savedBuffer by settings.playerBuffer.collectAsStateWithLifecycle()
     val savedSubtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
+    val savedSubtitlePosition by settings.subtitlePosition.collectAsStateWithLifecycle()
 
     var video by remember { mutableStateOf<Video?>(null) }
     var episodeIndex by remember { mutableIntStateOf(startEpisode) }
@@ -275,8 +278,9 @@ fun PlayerScreen(
                 ?: Players.BufferTier.LOW,
         )
     }
-    // 字幕字号（持久化，仿 fongmi SubtitleSetting）：修改后实时作用到当前 PlayerView
+    // 字幕字号/位置（持久化，仿 fongmi SubtitleSetting）：修改后实时作用到当前 PlayerView
     LaunchedEffect(savedSubtitleScale) { Players.setSubtitleScale(savedSubtitleScale) }
+    LaunchedEffect(savedSubtitlePosition) { Players.setSubtitlePosition(savedSubtitlePosition) }
 
     // 后台播放（设置三态：关闭/开启/画中画）：非关闭时退出播放页转交前台服务后台续播
     var backgroundMode by remember { mutableIntStateOf(BACKGROUND_OFF) }
@@ -2994,6 +2998,7 @@ private fun SubtitleSettingSideSheet(
     val settings = appContainer().settingsRepository
     val playerState by Players.state.collectAsStateWithLifecycle()
     val subtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
+    val subtitlePosition by settings.subtitlePosition.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
@@ -3067,6 +3072,39 @@ private fun SubtitleSettingSideSheet(
                 onValueChange = { settings.setSubtitleScale(it) },
                 valueRange = SUBTITLE_MIN_SCALE..SUBTITLE_MAX_SCALE,
                 steps = ((SUBTITLE_MAX_SCALE - SUBTITLE_MIN_SCALE) / 0.1f).toInt() - 1,
+                colors = androidx.compose.material3.SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = BrandBlueDeep,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.2f),
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "字幕位置（正值上移）",
+                fontSize = 14.sp,
+                color = DarkOnSurfaceMuted,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp),
+            )
+            Text(
+                text = String.format(
+                    java.util.Locale.getDefault(),
+                    "%+.0f%%",
+                    subtitlePosition,
+                ),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+            )
+            androidx.compose.material3.Slider(
+                value = subtitlePosition,
+                onValueChange = { settings.setSubtitlePosition(it) },
+                valueRange = SUBTITLE_MIN_POSITION..SUBTITLE_MAX_POSITION,
+                steps = (SUBTITLE_MAX_POSITION - SUBTITLE_MIN_POSITION).toInt() - 1,
                 colors = androidx.compose.material3.SliderDefaults.colors(
                     thumbColor = Color.White,
                     activeTrackColor = BrandBlueDeep,
