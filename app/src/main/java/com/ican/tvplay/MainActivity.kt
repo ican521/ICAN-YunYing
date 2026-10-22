@@ -201,9 +201,11 @@ class MainActivity : ComponentActivity() {
     @android.annotation.TargetApi(Build.VERSION_CODES.O)
     private fun updatePipActions() {
         try {
+            // 宽高比必须与进入时一致（fongmi 靠复用同一 builder 保持），
+            // 否则此处更新会把视频真实比例覆盖回 16:9，小窗形状不贴合画面
             setPictureInPictureParams(
                 PictureInPictureParams.Builder()
-                    .setAspectRatio(Rational(16, 9))
+                    .setAspectRatio(videoAspectRational())
                     .setActions(buildPipActions())
                     .build(),
             )
