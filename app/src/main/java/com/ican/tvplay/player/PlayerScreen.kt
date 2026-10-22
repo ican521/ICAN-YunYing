@@ -3076,6 +3076,10 @@ private fun SubtitleSettingSideSheet(
                 onValueChange = { settings.setSubtitleScale(it) },
                 valueRange = SUBTITLE_MIN_SCALE..SUBTITLE_MAX_SCALE,
                 steps = ((SUBTITLE_MAX_SCALE - SUBTITLE_MIN_SCALE) / 0.1f).toInt() - 1,
+                // 默认 100% 处显示刻度点并磁吸
+                showKeyPoints = true,
+                keyPoints = listOf(1.0f),
+                magnetThreshold = 0.02f,
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
@@ -3104,6 +3108,10 @@ private fun SubtitleSettingSideSheet(
                 onValueChange = { settings.setSubtitlePosition(it) },
                 valueRange = SUBTITLE_MIN_POSITION..SUBTITLE_MAX_POSITION,
                 steps = (SUBTITLE_MAX_POSITION - SUBTITLE_MIN_POSITION).toInt() - 1,
+                // 默认 0（居中）处显示刻度点并磁吸
+                showKeyPoints = true,
+                keyPoints = listOf(0f),
+                magnetThreshold = 0.02f,
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
