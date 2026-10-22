@@ -37,6 +37,7 @@ import java.net.UnknownHostException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -145,6 +146,9 @@ object Players {
     /** 播放前源类型探测任务：换源/切集时取消上一个，避免旧探测结果覆盖新播放 */
     private var probeJob: Job? = null
     private var startToken = 0
+
+    /** 字幕偏移重载任务：+/- 连点时合并为一次重解析，避免反复 stop/prepare */
+    private var offsetApplyJob: Job? = null
 
     /** fongmi 同款：只保存绑定的 PlayerView，Surface 全权交给 PlayerView 内部管理（绝不手动 setVideoSurface） */
     private var playerView: PlayerView? = null
@@ -415,6 +419,7 @@ object Players {
     fun start(context: Context, spec: PlaySpec, startPositionMs: Long = 0L) {
         appContext = context.applicationContext
         probeJob?.cancel()
+        offsetApplyJob?.cancel()
         val token = ++startToken
         currentSpec = spec
         retryCount = 0  // 新源重置错误计数
@@ -469,12 +474,17 @@ object Players {
         val value = offsetMs.coerceIn(-SUBTITLE_OFFSET_MAX_MS, SUBTITLE_OFFSET_MAX_MS)
         if (_state.value.subtitleOffsetMs == value) return
         _state.value = _state.value.copy(subtitleOffsetMs = value)
-        val spec = currentSpec ?: return
-        if (spec.subs.isEmpty()) return   // 内置字幕轨道无法在解析阶段平移
-        val p = player ?: return
-        val wasPlaying = p.playWhenReady
-        startInternal(p, spec, p.currentPosition)
-        if (!wasPlaying) p.pause()   // 调偏移前处于暂停时，重载后保持暂停
+        // 连点 +/- 时只重解析一次：延迟合并，期间只更新状态供 UI 显示
+        offsetApplyJob?.cancel()
+        offsetApplyJob = scope.launch {
+            delay(400)
+            val spec = currentSpec ?: return@launch
+            if (spec.subs.isEmpty()) return@launch   // 内置字幕轨道无法在解析阶段平移
+            val p = player ?: return@launch
+            val wasPlaying = p.playWhenReady
+            startInternal(p, spec, p.currentPosition)
+            if (!wasPlaying) p.pause()   // 调偏移前处于暂停时，重载后保持暂停
+        }
     }
 
     /** 播放页解析阶段（spider playerContent / jx 二次解析）致命错误上报：转错误页提示而不是崩溃 */
@@ -493,6 +503,8 @@ object Players {
     fun release() {
         probeJob?.cancel()
         probeJob = null
+        offsetApplyJob?.cancel()
+        offsetApplyJob = null
         startToken++
         handler.removeCallbacks(ticker)
         bandwidthMeter?.removeEventListener(bandwidthListener)

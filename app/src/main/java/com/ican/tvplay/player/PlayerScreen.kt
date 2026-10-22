@@ -47,6 +47,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -59,7 +62,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.core.view.WindowCompat
@@ -91,12 +93,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -121,6 +128,7 @@ import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.SUBTITLE_MAX_SCALE
 import com.ican.tvplay.data.SUBTITLE_MIN_SCALE
 import com.ican.tvplay.data.SUBTITLE_OFFSET_MAX_MS
+import com.ican.tvplay.data.SUBTITLE_OFFSET_STEP_MS
 import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.data.model.Episode
@@ -212,6 +220,8 @@ fun PlayerScreen(
     var pendingFullscreen by remember { mutableStateOf<Boolean?>(null) }
     // 平板已处于横屏时进入全屏：不会触发方向配置变化，无需等待旋转，退出时也不请求旋转
     var landscapeFullscreen by remember { mutableStateOf(false) }
+    // 字幕设置侧边栏：根级渲染，保证竖屏/全屏/横屏都能全高覆盖
+    var showSubtitleSettings by remember { mutableStateOf(false) }
     // 横屏小窗↔全屏放大/缩回动画进行中：期间只渲染纯视频，不挂任何覆盖层
     var landZooming by remember { mutableStateOf(false) }
     // 缩放会话令牌：每次进入/退出全屏自增，作为收敛监听 LaunchedEffect 的 key，
@@ -973,6 +983,8 @@ fun PlayerScreen(
                 saveProgress()
             },
             onSeekDragChange = { seekDragging = it },
+            onOpenSubtitleSettings = { showSubtitleSettings = true },
+            subtitleSettingsOpen = showSubtitleSettings,
         )
         }
         // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
@@ -1071,6 +1083,7 @@ fun PlayerScreen(
             onScaleChange = { settings.setPlayerScale(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
             onSeekDragChange = { seekDragging = it },
+            onOpenSubtitleSettings = { showSubtitleSettings = true },
         )
         }
         }
@@ -1086,6 +1099,14 @@ fun PlayerScreen(
             CircularProgressIndicator(
                 color = Color.White,
                 modifier = Modifier.size(48.dp),
+            )
+        }
+
+        // 字幕设置侧边栏：与选集侧边栏同款，从右侧滑入；竖屏时避让状态栏
+        if (showSubtitleSettings) {
+            SubtitleSettingSideSheet(
+                statusBarInset = !(fullscreen || landscapeFullscreen || isLandscape),
+                onDismiss = { showSubtitleSettings = false },
             )
         }
     }
@@ -1116,6 +1137,7 @@ private fun PortraitPlayLayout(
     onScaleChange: (Players.ScaleMode) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
     onSeekDragChange: (Boolean) -> Unit,
+    onOpenSubtitleSettings: () -> Unit,
 ) {
     var showSpeed by remember { mutableStateOf(false) }
     var showScale by remember { mutableStateOf(false) }
@@ -1193,6 +1215,7 @@ private fun PortraitPlayLayout(
         onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
         onDisable = { Players.selectTrack(null, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
         onAddExternal = { showAddSub = true },
+        onSettings = { showText = false; onOpenSubtitleSettings() },
         onDismiss = { showText = false },
     )
     AddSubtitleDialog(
@@ -2133,6 +2156,8 @@ private fun FullscreenPlayLayout(
     onClearOpening: () -> Unit,
     onClearEnding: () -> Unit,
     onSeekDragChange: (Boolean) -> Unit,
+    onOpenSubtitleSettings: () -> Unit,
+    subtitleSettingsOpen: Boolean,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -2152,6 +2177,8 @@ private fun FullscreenPlayLayout(
     var showText by remember { mutableStateOf(false) }
     var showAddSub by remember { mutableStateOf(false) }
     var showEpisodes by remember { mutableStateOf(false) }
+    // 选集或字幕设置侧栏打开期间抑制全部播放手势
+    val sideSheetOpen = showEpisodes || subtitleSettingsOpen
     // fongmi 同款手势反馈浮层：拖动 seek 预览目标 / 长按倍速提示
     var seekPreview by remember { mutableStateOf<Long?>(null) }
     var speedUpHint by remember { mutableStateOf(false) }
@@ -2174,7 +2201,7 @@ private fun FullscreenPlayLayout(
             // keys 必须含 playbackSpeed：长按快进松手时恢复「用户设定的倍速」，
             // 该值变化（如从 1.0 调为 3.0）若不重启本手势层，闭包会一直捕获进入全屏时的旧值，
             // 导致松手后错误地恢复成旧倍速
-            .pointerInput(locked, showEpisodes, playbackSpeed) {
+            .pointerInput(locked, sideSheetOpen, playbackSpeed) {
                 // fongmi CustomKeyDown 同款手势：单击显隐控制层、双击播放暂停、长按 2 倍速快进、横向拖动快进快退
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -2198,7 +2225,7 @@ private fun FullscreenPlayLayout(
                     while (true) {
                         // 在到达长按阈值的剩余时间内等事件；超时无事件 = 手指静止按住，
                         // 立即触发长按（对齐 fongmi GestureDetector.onLongPress 的系统阈值回调，约 400-500ms）
-                        val canLongPress = !isLong && axis == 0 && !locked && !showEpisodes && !gestureBlocked
+                        val canLongPress = !isLong && axis == 0 && !locked && !sideSheetOpen && !gestureBlocked
                         val event = if (canLongPress) {
                             val remaining = viewConfiguration.longPressTimeoutMillis -
                                 (SystemClock.uptimeMillis() - downTime)
@@ -2230,7 +2257,7 @@ private fun FullscreenPlayLayout(
 
                         if (event.changes.any { it.isConsumed }) gestureBlocked = true
                         if (event.changes.all { !it.pressed }) break // 手指抬起
-                        if (locked || gestureBlocked || showEpisodes) continue // 锁定/弹窗打开：拖动/长按失效，仅保留单击/双击
+                        if (locked || gestureBlocked || sideSheetOpen) continue // 锁定/弹窗打开：拖动/长按失效，仅保留单击/双击
                         val change = event.changes.firstOrNull() ?: continue
                         lastX = change.position.x
                         lastY = change.position.y
@@ -2262,7 +2289,7 @@ private fun FullscreenPlayLayout(
                         // fongmi onSeekEnd：真正 seek 到预览位置
                         Players.seekTo(seekTarget)
                         seekPreview = null
-                    } else if (axis == 0 && !gestureBlocked && !showEpisodes) {
+                    } else if (axis == 0 && !gestureBlocked && !sideSheetOpen) {
                         // 未移动未长按（且未点在控件上）：单击/双击判定（fongmi GestureDetector）
                         val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
                             awaitFirstDown(requireUnconsumed = false)
@@ -2589,6 +2616,7 @@ private fun FullscreenPlayLayout(
             onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
             onDisable = { Players.selectTrack(null, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
             onAddExternal = { showAddSub = true },
+            onSettings = { showText = false; onOpenSubtitleSettings() },
             onDismiss = { showText = false },
             selectedBorderColor = BrandBlueDeep,
         )
@@ -2932,7 +2960,7 @@ private fun <T> OptionDialog(
 private fun SubtitleDialog(
     show: Boolean, tracks: List<Players.TrackOption>, textDisabled: Boolean,
     onSelect: (Players.TrackOption) -> Unit, onDisable: () -> Unit,
-    onAddExternal: () -> Unit, onDismiss: () -> Unit,
+    onAddExternal: () -> Unit, onSettings: () -> Unit, onDismiss: () -> Unit,
     // 同 OptionDialog：全屏传入选集侧边栏同款蓝，选中描边与选集同色
     selectedBorderColor: Color? = null,
 ) {
@@ -2952,94 +2980,221 @@ private fun SubtitleDialog(
             SubRow("关闭字幕", textDisabled, selectedBorderColor) { onDisable() }
             tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected, selectedBorderColor) { onSelect(t) } }
             SubRow("添加外挂字幕…", false, selectedBorderColor) { onAddExternal() }
+            SubRow("字幕设置", false, selectedBorderColor) { onSettings() }
+        }
+    }
+}
 
-            // 字号/偏移（仿 fongmi SubtitleSettingPanel）：字号持久化，偏移只对当前播放生效
-            val settings = appContainer().settingsRepository
-            val subtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
-            val playerState by Players.state.collectAsStateWithLifecycle()
-            var offsetDraft by remember(show, playerState.subtitleOffsetMs) {
-                mutableFloatStateOf(playerState.subtitleOffsetMs / 1000f)
-            }
-            val scaleSteps = ((SUBTITLE_MAX_SCALE - SUBTITLE_MIN_SCALE) / 0.1f).toInt() - 1
-            val offsetSteps = ((SUBTITLE_OFFSET_MAX_MS * 2) / 100).toInt() - 1
-            SubtitleSliderRow(
-                label = "字幕大小",
-                valueText = "${(subtitleScale * 100).roundToInt()}%",
-                value = subtitleScale,
-                valueRange = SUBTITLE_MIN_SCALE..SUBTITLE_MAX_SCALE,
-                steps = scaleSteps,
-                onValueChange = { settings.setSubtitleScale(it) },
-                onValueChangeFinished = {},
+/** 字幕设置侧边栏：与 EpisodeSideSheet 同款右侧滑入面板 */
+@Composable
+private fun SubtitleSettingSideSheet(
+    statusBarInset: Boolean,
+    onDismiss: () -> Unit,
+) {
+    val settings = appContainer().settingsRepository
+    val playerState by Players.state.collectAsStateWithLifecycle()
+    val subtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    // 侧栏宽度：手机横屏约 42% 屏宽，限制在 280-400dp
+    val panelWidth = remember(configuration) {
+        val screenPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+        with(density) { (screenPx * 0.42f).coerceIn(280.dp.toPx(), 400.dp.toPx()).toDp() }
+    }
+    var sheetShown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { sheetShown = true }
+    val sheetSlideX by animateDpAsState(
+        targetValue = if (sheetShown) 0.dp else panelWidth + 20.dp,
+        animationSpec = tween(260, easing = FastOutSlowInEasing),
+        label = "subtitleSheetSlide",
+    )
+    val dismissWithAnim: () -> Unit = {
+        scope.launch {
+            sheetShown = false
+            delay(260)
+            onDismiss()
+        }
+    }
+    BackHandler(onBack = dismissWithAnim)
+    Box(modifier = Modifier.fillMaxSize()) {
+        FadingScrim(visible = sheetShown, onClick = dismissWithAnim)
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .offset(x = sheetSlideX)
+                .fillMaxHeight()
+                .width(panelWidth)
+                .background(
+                    DarkSurfaceElevated,
+                    RoundedCornerShape(topStart = Spacing.corner, bottomStart = Spacing.corner),
+                )
+                .then(if (statusBarInset) Modifier.statusBarsPadding() else Modifier)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) {}
+                .padding(horizontal = 16.dp, vertical = 16.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Text(
+                text = "字幕设置",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = DarkOnSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
             )
-            SubtitleSliderRow(
-                label = "字幕偏移（外挂）",
-                valueText = formatSubtitleOffset(offsetDraft),
-                value = offsetDraft,
-                valueRange = -SUBTITLE_OFFSET_MAX_MS / 1000f..SUBTITLE_OFFSET_MAX_MS / 1000f,
-                steps = offsetSteps,
-                onValueChange = { offsetDraft = it },
-                onValueChangeFinished = { Players.setSubtitleOffset((offsetDraft * 1000).roundToLong()) },
+            Text(
+                text = "字幕大小",
+                fontSize = 14.sp,
+                color = DarkOnSurfaceMuted,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "${(subtitleScale * 100).roundToInt()}%",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+            )
+            androidx.compose.material3.Slider(
+                value = subtitleScale,
+                onValueChange = { settings.setSubtitleScale(it) },
+                valueRange = SUBTITLE_MIN_SCALE..SUBTITLE_MAX_SCALE,
+                steps = ((SUBTITLE_MAX_SCALE - SUBTITLE_MIN_SCALE) / 0.1f).toInt() - 1,
+                colors = androidx.compose.material3.SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = BrandBlueDeep,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.2f),
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "字幕偏移",
+                fontSize = 14.sp,
+                color = DarkOnSurfaceMuted,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp),
+            )
+            OffsetAdjustRow(
+                offsetMs = playerState.subtitleOffsetMs,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            Text(
+                text = "正数延后显示，负数提前显示，单位秒；仅对外挂字幕生效",
+                fontSize = 11.sp,
+                color = DarkOnSurfaceMuted,
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
     }
 }
 
-/** 格式化字幕偏移：+1.2s / -0.5s */
-private fun formatSubtitleOffset(seconds: Float): String {
-    val value = if (abs(seconds) < 0.05f) 0f else seconds
-    return String.format(java.util.Locale.getDefault(), "%+.1fs", value)
+/**
+ * 字幕偏移调节行：−/+ 按钮按 100ms 步进，中间输入框可直接输入秒数。
+ * 输入框失焦或点键盘完成时提交，非法输入恢复为当前值。
+ */
+@Composable
+private fun OffsetAdjustRow(offsetMs: Long, modifier: Modifier = Modifier) {
+    var text by remember(offsetMs) { mutableStateOf(formatSubtitleOffsetInput(offsetMs)) }
+    val focusManager = LocalFocusManager.current
+    var hadFocus by remember { mutableStateOf(false) }
+
+    fun commit() {
+        val seconds = text.trim().removeSuffix("s").toFloatOrNull()
+        if (seconds == null) {
+            text = formatSubtitleOffsetInput(offsetMs)
+            return
+        }
+        val ms = (seconds * 1000).roundToLong()
+            .coerceIn(-SUBTITLE_OFFSET_MAX_MS, SUBTITLE_OFFSET_MAX_MS)
+        Players.setSubtitleOffset(ms)
+        text = formatSubtitleOffsetInput(ms)
+    }
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OffsetStepButton("−") {
+            // 读取最新状态而非组合时快照：输入框先提交时也能基于新值步进
+            Players.setSubtitleOffset(Players.state.value.subtitleOffsetMs - SUBTITLE_OFFSET_STEP_MS)
+        }
+        val inputShape = RoundedCornerShape(Spacing.corner)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .weight(1f)
+                .clip(inputShape)
+                .border(1.dp, Color.White.copy(alpha = 0.15f), inputShape)
+                .padding(horizontal = 12.dp),
+        ) {
+            BasicTextField(
+                value = text,
+                onValueChange = { raw ->
+                    text = raw.filter { it.isDigit() || it == '-' || it == '+' || it == '.' }.take(8)
+                },
+                singleLine = true,
+                textStyle = TextStyle(
+                    fontSize = 16.sp,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                ),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        commit()
+                        focusManager.clearFocus()
+                    },
+                ),
+                cursorBrush = SolidColor(BrandBlueDeep),
+                modifier = Modifier
+                    .weight(1f)
+                    .onFocusChanged { state ->
+                        if (!state.isFocused && hadFocus) commit()
+                        hadFocus = state.isFocused
+                    }
+                    .padding(vertical = 10.dp),
+            )
+            Text("s", fontSize = 12.sp, color = DarkOnSurfaceMuted)
+        }
+        OffsetStepButton("+") {
+            Players.setSubtitleOffset(Players.state.value.subtitleOffsetMs + SUBTITLE_OFFSET_STEP_MS)
+        }
+    }
 }
 
-/** 字幕字号/偏移滑杆行：与 SubRow 同款卡片 + 深色描边 */
+/** 字幕偏移输入框格式：+1.5 / -0.5（不带单位，单位固定显示在右侧） */
+private fun formatSubtitleOffsetInput(offsetMs: Long): String {
+    val seconds = if (abs(offsetMs) < 50) 0f else offsetMs / 1000f
+    return String.format(java.util.Locale.getDefault(), "%+.1f", seconds)
+}
+
 @Composable
-private fun SubtitleSliderRow(
-    label: String,
-    valueText: String,
-    value: Float,
-    valueRange: ClosedFloatingPointRange<Float>,
-    steps: Int,
-    onValueChange: (Float) -> Unit,
-    onValueChangeFinished: () -> Unit,
-) {
-    val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
-    val isDark = LocalDarkTheme.current
-    Column(
+private fun OffsetStepButton(text: String, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(Spacing.corner)
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant, shape)
-            .then(
-                if (isDark) {
-                    Modifier.border(Spacing.optionBorder, optionBorderColor(selected = false), shape)
-                } else Modifier,
-            )
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .size(width = 44.dp, height = 42.dp)
+            .clip(shape)
+            .border(1.dp, Color.White.copy(alpha = 0.15f), shape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { onClick() },
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = valueText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        androidx.compose.material3.Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            steps = steps,
-            onValueChangeFinished = onValueChangeFinished,
-            colors = androidx.compose.material3.SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-                inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-            ),
-            modifier = Modifier.fillMaxWidth(),
-        )
+        Text(text, fontSize = 18.sp, color = Color.White)
     }
 }
 
