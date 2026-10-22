@@ -43,7 +43,9 @@ import androidx.compose.foundation.pager.rememberPagerState
 import top.yukonga.miuix.kmp.utils.PagerGestureNestedScrollConnection
 import top.yukonga.miuix.kmp.utils.PagerInterceptionMode
 import top.yukonga.miuix.kmp.utils.PagerNavigationSpringSpec
+import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pagerGestureOverride
+import top.yukonga.miuix.kmp.utils.pressable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -66,6 +68,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -682,6 +685,12 @@ private fun HomeTopBar(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
+                // pressable 在外层：Sink 按压缩放跟随 tvCardEffect 一起缩小（与视频卡片同序）
+                .pressable(
+                    interactionSource = null,
+                    indication = SinkFeedback(),
+                    delay = null,
+                )
                 .tvCardEffect(onClick = onSearchClick, shape = CircleShape, focusedScale = 1.04f, glow = false)
                 .clip(CircleShape)
                 .background(MiuixTheme.colorScheme.surfaceContainerHigh)
@@ -708,6 +717,11 @@ private fun HomeTopBar(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(Spacing.circleButton)
+                .pressable(
+                    interactionSource = null,
+                    indication = SinkFeedback(),
+                    delay = null,
+                )
                 .tvCardEffect(onClick = onUrlPlayClick, shape = CircleShape, focusedScale = 1.1f, glow = false)
                 .clip(CircleShape)
                 .background(MiuixTheme.colorScheme.surfaceContainerHigh),
@@ -725,6 +739,11 @@ private fun HomeTopBar(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(Spacing.circleButton)
+                .pressable(
+                    interactionSource = null,
+                    indication = SinkFeedback(),
+                    delay = null,
+                )
                 .tvCardEffect(onClick = onHistoryClick, shape = CircleShape, focusedScale = 1.1f, glow = false)
                 .clip(CircleShape)
                 .background(MiuixTheme.colorScheme.surfaceContainerHigh),

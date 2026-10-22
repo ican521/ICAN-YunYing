@@ -51,9 +51,31 @@ class SettingsRepository(context: Context) {
     private val _enableBlur = MutableStateFlow(prefs.getBoolean(KEY_ENABLE_BLUR, false))
     val enableBlur: StateFlow<Boolean> = _enableBlur.asStateFlow()
 
+    /**
+     * 液态玻璃开关。与底部毛玻璃互斥：打开液态玻璃时自动关闭底部毛玻璃；
+     * 关闭液态玻璃不影响底部毛玻璃（允许两个都关 = 纯色胶囊）。
+     */
     fun setEnableBlur(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_ENABLE_BLUR, enabled).apply()
         _enableBlur.value = enabled
+        if (enabled && _bottomBarBlurEnabled.value) {
+            prefs.edit().putBoolean(KEY_BOTTOM_BAR_BLUR, false).apply()
+            _bottomBarBlurEnabled.value = false
+        }
+    }
+
+    /** 底部胶囊毛玻璃（与顶栏同款 textureBlur，独立于液态玻璃），默认关闭；与液态玻璃互斥 */
+    private val _bottomBarBlurEnabled = MutableStateFlow(prefs.getBoolean(KEY_BOTTOM_BAR_BLUR, false))
+    val bottomBarBlurEnabled: StateFlow<Boolean> = _bottomBarBlurEnabled.asStateFlow()
+
+    /** 底部毛玻璃开关。与液态玻璃互斥：打开时自动关闭液态玻璃；关闭不影响液态玻璃 */
+    fun setBottomBarBlurEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BOTTOM_BAR_BLUR, enabled).apply()
+        _bottomBarBlurEnabled.value = enabled
+        if (enabled && _enableBlur.value) {
+            prefs.edit().putBoolean(KEY_ENABLE_BLUR, false).apply()
+            _enableBlur.value = false
+        }
     }
 
     /** 顶栏毛玻璃（独立于全局模糊开关，互不影响），默认开启 */
@@ -256,6 +278,7 @@ class SettingsRepository(context: Context) {
         }.getOrDefault(ThemeMode.SYSTEM)
         _themeColor.value = prefs.getInt(KEY_THEME_COLOR, 0)
         _enableBlur.value = prefs.getBoolean(KEY_ENABLE_BLUR, false)
+        _bottomBarBlurEnabled.value = prefs.getBoolean(KEY_BOTTOM_BAR_BLUR, false)
         _topBarBlurEnabled.value = prefs.getBoolean(KEY_TOP_BAR_BLUR, true)
         _enablePredictiveBack.value = prefs.getBoolean(KEY_PREDICTIVE_BACK, false)
         _homeLayoutSize.value = runCatching {
@@ -282,6 +305,7 @@ class SettingsRepository(context: Context) {
         const val KEY_THEME = "theme_mode"
         const val KEY_THEME_COLOR = "theme_color"
         const val KEY_ENABLE_BLUR = "enable_blur"
+        const val KEY_BOTTOM_BAR_BLUR = "bottom_bar_blur"
         const val KEY_TOP_BAR_BLUR = "top_bar_blur"
         const val KEY_PREDICTIVE_BACK = "enable_predictive_back"
         const val KEY_HOME_LAYOUT_SIZE = "home_layout_size"

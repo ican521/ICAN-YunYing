@@ -17,12 +17,7 @@ import com.ican.tvplay.ui.theme.Spacing
  * 一级页、二级页、顶栏、内容区必须统一走此函数，禁止各页面写死 16/24dp。
  */
 @Composable
-fun pageHorizontalPadding(): Dp =
-    if (LocalConfiguration.current.screenWidthDp >= 600) {
-        Spacing.pageHorizontalMax
-    } else {
-        Spacing.pageHorizontal
-    }
+fun pageHorizontalPadding(): Dp = Spacing.pageHorizontal
 
 /**
  * 二级页面顶栏（返回圆钮 / 搜索栏）统一内容边距：

@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -32,12 +34,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -59,6 +63,7 @@ import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
+import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.components.videoGridColumns
 import com.ican.tvplay.ui.theme.LightOnSurface
@@ -90,8 +95,7 @@ fun FavoritesScreen(
     // 编辑模式下按返回 = 取消编辑（不退出页面）；清空弹窗打开时返回由弹窗自行消费
     BackHandler(enabled = editMode && !showConfirm) { editMode = false }
 
-    // KernelSU 同款：折叠顶栏 + 毛玻璃
-    val scrollBehavior = MiuixScrollBehavior()
+    // 固定居中大标题顶栏 + 毛玻璃
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
@@ -100,13 +104,21 @@ fun FavoritesScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             BlurredBar(backdrop) {
-                TopAppBar(
-                    color = barColor,
-                    title = "我的收藏",
-                    titleColor = MaterialTheme.colorScheme.onBackground,
-                    largeTitleColor = MaterialTheme.colorScheme.onBackground,
-                    scrollBehavior = scrollBehavior,
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(barColor)
+                        .padding(WindowInsets.statusBars.asPaddingValues())
+                        .height(48.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "我的收藏",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         },
         contentWindowInsets = WindowInsets.systemBars
@@ -120,8 +132,7 @@ fun FavoritesScreen(
                 LazyVerticalGrid(
                     columns = videoGridColumns(homeLayoutSize),
                     modifier = Modifier
-                        .fillMaxSize()
-                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                        .fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = pageHorizontalPadding(),
                         end = pageHorizontalPadding(),
@@ -331,8 +342,7 @@ fun HistoryScreen(
     // 非编辑模式不拦截，保持原有返回上一页行为
     BackHandler(enabled = editMode && !showConfirm) { editMode = false }
 
-    // KernelSU 同款：折叠顶栏 + 毛玻璃
-    val scrollBehavior = MiuixScrollBehavior()
+    // 固定居中大标题顶栏 + 毛玻璃
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
@@ -341,17 +351,25 @@ fun HistoryScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             BlurredBar(backdrop) {
-                TopAppBar(
-                    color = barColor,
-                    title = "播放历史",
-                    titleColor = MaterialTheme.colorScheme.onBackground,
-                    largeTitleColor = MaterialTheme.colorScheme.onBackground,
-                    navigationIcon = {
-                        // 编辑模式下返回 = 取消编辑
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(barColor)
+                        .padding(topBarPadding()),
+                ) {
+                    // 返回按钮靠左
+                    Box(modifier = Modifier.align(Alignment.CenterStart)) {
                         MiuixBackButton(onClick = { if (editMode) editMode = false else onBack() })
-                    },
-                    scrollBehavior = scrollBehavior,
-                )
+                    }
+                    // 标题居中
+                    Text(
+                        text = "播放历史",
+                        modifier = Modifier.align(Alignment.Center),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         },
         contentWindowInsets = WindowInsets.systemBars
@@ -365,8 +383,7 @@ fun HistoryScreen(
                 LazyVerticalGrid(
                     columns = videoGridColumns(homeLayoutSize),
                     modifier = Modifier
-                        .fillMaxSize()
-                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                        .fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = pageHorizontalPadding(),
                         end = pageHorizontalPadding(),

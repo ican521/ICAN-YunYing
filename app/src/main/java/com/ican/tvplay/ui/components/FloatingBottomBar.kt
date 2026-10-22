@@ -75,7 +75,9 @@ import com.ican.tvplay.ui.components.liquid.vibrancy
 import com.ican.tvplay.ui.theme.DarkSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.blur.Backdrop
+import top.yukonga.miuix.kmp.blur.BlendColorEntry
+import top.yukonga.miuix.kmp.blur.BlurColors
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.blur
 import top.yukonga.miuix.kmp.blur.drawBackdrop
 import top.yukonga.miuix.kmp.blur.highlight.BloomStroke
@@ -85,6 +87,8 @@ import top.yukonga.miuix.kmp.blur.highlight.LightSource
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.sensor.rememberDeviceTilt
+import top.yukonga.miuix.kmp.blur.textureBlur
+import top.yukonga.miuix.kmp.shader.isRenderEffectSupported
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -210,9 +214,10 @@ fun FloatingBottomBar(
     modifier: Modifier = Modifier,
     selectedIndex: Int,
     onSelected: (index: Int) -> Unit,
-    backdrop: Backdrop,
+    backdrop: LayerBackdrop,
     tabsCount: Int,
     isBlurEnabled: Boolean = true,
+    isFrostedBlur: Boolean = false,
     content: @Composable RowScope.((Int) -> Unit) -> Unit
 ) {
     // 用 App 内主题模式的实际深浅色状态，而非系统深浅色（App 内可独立切换浅色/深色）
@@ -231,6 +236,9 @@ fun FloatingBottomBar(
     }
     // 关闭毛玻璃时指示器：浅色为 #E1ECFE（KernelSU 浅色模式同款视觉），深色用主题色 15% 透明
     val plainIndicatorColor = if (isInDark) accentColor.copy(alpha = 0.15f) else Color(0xFFE1ECFE)
+
+    // 底部普通毛玻璃（与顶栏同款 textureBlur）：仅在液态玻璃关闭、设备支持 RenderEffect 时生效
+    val frostedActive = isFrostedBlur && !isBlurEnabled && isRenderEffectSupported()
 
     val tabsBackdrop = rememberLayerBackdrop()
     val density = LocalDensity.current
@@ -367,8 +375,8 @@ fun FloatingBottomBar(
                     ),
                 )
                 .then(
-                    if (isBlurEnabled) {
-                        Modifier.drawBackdrop(
+                    when {
+                        isBlurEnabled -> Modifier.drawBackdrop(
                             backdrop = backdrop,
                             shape = { pillShape },
                             effects = {
@@ -389,8 +397,20 @@ fun FloatingBottomBar(
                             },
                             onDrawSurface = { drawRect(containerColor) },
                         )
-                    } else {
-                        Modifier.background(containerColor, pillShape)
+                        // 底部普通毛玻璃：与顶栏 BlurredBar 完全同款 textureBlur（25f 模糊 + 背景色 87% 混合）
+                        frostedActive -> Modifier.textureBlur(
+                            backdrop = backdrop,
+                            shape = pillShape,
+                            blurRadius = 25f,
+                            colors = BlurColors(
+                                blendColors = listOf(
+                                    BlendColorEntry(
+                                        color = MaterialTheme.colorScheme.background.copy(alpha = 0.87f),
+                                    ),
+                                ),
+                            ),
+                        )
+                        else -> Modifier.background(containerColor, pillShape)
                     }
                 )
                 .then(

@@ -296,8 +296,20 @@ private fun SiteSourceChip(
         modifier = Modifier
             .fillMaxWidth()
             .height(40.dp)
-            // 站源列表自带选中态：整列表（含未选中项）统一不要按压/点击蒙层，选中色即反馈
-            .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false, pressEffect = false)
+            // pressable 在外层：按压缩放跟随 Sink 动画（与右侧视频卡片同序）；
+            // 站源列表自带选中态，蒙层关闭（pressEffect=false），选中色即状态反馈
+            .pressable(
+                interactionSource = null,
+                indication = SinkFeedback(),
+                delay = null,
+            )
+            .tvCardEffect(
+                onClick = onClick,
+                shape = shape,
+                focusedScale = 1.05f,
+                glow = false,
+                pressEffect = false,
+            )
             .background(bg, shape)
             .padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center,

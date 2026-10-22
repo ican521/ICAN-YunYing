@@ -79,6 +79,7 @@ fun AppRoot() {
     val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by appViewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by appViewModel.enableBlur.collectAsStateWithLifecycle()
+    val bottomBarBlur by appViewModel.bottomBarBlurEnabled.collectAsStateWithLifecycle()
     val topBarBlur by appViewModel.topBarBlurEnabled.collectAsStateWithLifecycle()
     val configReady by appViewModel.configReady.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -279,6 +280,7 @@ fun AppRoot() {
                     backdrop = backdrop,
                     tabsCount = topDestinations.size,
                     isBlurEnabled = enableBlur,
+                    isFrostedBlur = bottomBarBlur,
                 ) { activateTab ->
                     topDestinations.forEachIndexed { index, destination ->
                         FloatingBottomBarItem(

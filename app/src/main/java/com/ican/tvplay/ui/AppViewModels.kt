@@ -37,9 +37,8 @@ class AppViewModel(container: AppContainer) : ViewModel() {
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
+    val bottomBarBlurEnabled: StateFlow<Boolean> = settings.bottomBarBlurEnabled
     val topBarBlurEnabled: StateFlow<Boolean> = settings.topBarBlurEnabled
-
-    /** 接口配置是否已就绪（已导入并成功加载站点） */
     val configReady: StateFlow<Boolean> = videoRepository.currentSite
         .map { it != null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
@@ -313,6 +312,7 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
+    val bottomBarBlurEnabled: StateFlow<Boolean> = settings.bottomBarBlurEnabled
     val topBarBlurEnabled: StateFlow<Boolean> = settings.topBarBlurEnabled
     val enablePredictiveBack: StateFlow<Boolean> = settings.enablePredictiveBack
     val homeLayoutSize: StateFlow<com.ican.tvplay.data.HomeLayoutSize> = settings.homeLayoutSize
@@ -332,6 +332,7 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
     fun setEnableBlur(enabled: Boolean) = settings.setEnableBlur(enabled)
+    fun setBottomBarBlurEnabled(enabled: Boolean) = settings.setBottomBarBlurEnabled(enabled)
     fun setTopBarBlurEnabled(enabled: Boolean) = settings.setTopBarBlurEnabled(enabled)
     fun setEnablePredictiveBack(enabled: Boolean) = settings.setEnablePredictiveBack(enabled)
     fun setHomeLayoutSize(size: com.ican.tvplay.data.HomeLayoutSize) =

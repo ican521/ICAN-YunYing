@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +37,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -44,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import kotlinx.coroutines.launch
@@ -90,6 +94,7 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
+    val bottomBarBlur by viewModel.bottomBarBlurEnabled.collectAsStateWithLifecycle()
     val topBarBlur by viewModel.topBarBlurEnabled.collectAsStateWithLifecycle()
     val enablePredictiveBack by viewModel.enablePredictiveBack.collectAsStateWithLifecycle()
     val backgroundPlay by viewModel.playerBackgroundPlay.collectAsStateWithLifecycle()
@@ -163,8 +168,7 @@ fun SettingsScreen(
     } else {
         listOf("小", "中")
     }
-    // KernelSU 同款：折叠顶栏 + 毛玻璃（关闭毛玻璃时顶栏退化为页面背景色）
-    val scrollBehavior = MiuixScrollBehavior()
+    // 固定居中大标题顶栏 + 毛玻璃（关闭毛玻璃时顶栏退化为页面背景色）
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
@@ -173,13 +177,21 @@ fun SettingsScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             BlurredBar(backdrop) {
-                TopAppBar(
-                    color = barColor,
-                    title = "设置",
-                    titleColor = MaterialTheme.colorScheme.onBackground,
-                    largeTitleColor = MaterialTheme.colorScheme.onBackground,
-                    scrollBehavior = scrollBehavior,
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(barColor)
+                        .padding(WindowInsets.statusBars.asPaddingValues())
+                        .height(48.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "设置",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         },
         contentWindowInsets = WindowInsets.systemBars
@@ -189,8 +201,7 @@ fun SettingsScreen(
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
         LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
+                .fillMaxSize(),
             contentPadding = PaddingValues(
                 start = horizontal,
                 end = horizontal,
@@ -269,6 +280,12 @@ fun SettingsScreen(
                 summary = "底部导航液态玻璃效果",
                 checked = enableBlur,
                 onCheckedChange = { viewModel.setEnableBlur(it) },
+            )
+            SwitchPreference(
+                title = "底部毛玻璃",
+                summary = "底部导航毛玻璃效果，与液态玻璃互斥",
+                checked = bottomBarBlur,
+                onCheckedChange = { viewModel.setBottomBarBlurEnabled(it) },
             )
             SwitchPreference(
                 title = "顶栏毛玻璃",
@@ -638,6 +655,7 @@ private fun FavoriteSyncDialog(
                                     Text(
                                         text = device.name,
                                         style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )

@@ -661,15 +661,23 @@ fun PlayerScreen(
 
     // Surface 生命周期
     DisposableEffect(Unit) {
-        // 监听 Activity 生命周期：切后台自动 pause（仅后台播放关闭时），回前台 resume
+        // 监听 Activity 生命周期：切后台自动 pause（仅「全屏 + 已进 PiP」与后台续播模式除外），回前台 resume
         val activity = context as? android.app.Activity
         val lifecycle = (activity as? androidx.lifecycle.LifecycleOwner)?.lifecycle
         val lifecycleObserver = object : DefaultLifecycleObserver {
             override fun onPause(owner: LifecycleOwner) {
-                // PiP 画中画中不暂停（小窗继续播）；
-                // 后台播放开启/画中画模式下退后台也不暂停——否则已暂停的 mediaPlayback
-                // 前台服务会被系统（尤其 MIUI）立即回收，进程被杀，表现为"退后台直接死掉"
-                if (activity?.isInPictureInPictureMode != true && backgroundMode == BACKGROUND_OFF) {
+                // 只有「全屏 + 已在 PiP」才保持播放；预览小窗（非全屏）回桌面一律暂停，
+                // 即使后台播放设为「画中画」也不例外（画中画仅全屏时触发，非全屏不回退会留在后台继续播）
+                val pipPlaying = activity?.isInPictureInPictureMode == true && Players.isFullscreen
+                if (!pipPlaying && backgroundMode != BACKGROUND_ON) {
+                    Players.onPause()
+                }
+            }
+            // 平板横屏预览小窗上滑回桌面时，部分 ROM 只走 onStop 不走 onPause 兜底：
+            // Activity 完全不可见时强制 pause（与 onPause 同条件，幂等无副作用）
+            override fun onStop(owner: LifecycleOwner) {
+                val pipPlaying = activity?.isInPictureInPictureMode == true && Players.isFullscreen
+                if (!pipPlaying && backgroundMode != BACKGROUND_ON) {
                     Players.onPause()
                 }
             }
@@ -1520,14 +1528,6 @@ private fun PreviewPlayerArea(
                     Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
                 }
             }
-        }
-
-        // 播放/解析错误轻量提示（替代黑屏卡死；自动换源失败后停留在此提示）
-        if (playerState.error != null && !playerState.buffering) {
-            PlayerErrorOverlay(
-                message = playerState.error!!,
-                onBack = onBack,
-            )
         }
     }
 }
@@ -2466,7 +2466,7 @@ private fun FullscreenPlayLayout(
                     .align(Alignment.CenterEnd)
                     .padding(end = 4.dp)
                     .size(48.dp)
-                    .tvCardEffect(onClick = { onLockToggle() }, shape = CircleShape, focusedScale = 1.08f, glow = false),
+                    .tvCardEffect(onClick = { onLockToggle() }, shape = CircleShape, focusedScale = 1.08f, glow = false, pressEffect = false),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(AppIcons.LockOpen, "锁屏", tint = Color.White, modifier = Modifier.size(24.dp))
@@ -2478,7 +2478,7 @@ private fun FullscreenPlayLayout(
                     .align(Alignment.CenterEnd)
                     .padding(end = 4.dp)
                     .size(48.dp)
-                    .tvCardEffect(onClick = { onUnlock() }, shape = CircleShape, focusedScale = 1.08f, glow = false),
+                    .tvCardEffect(onClick = { onUnlock() }, shape = CircleShape, focusedScale = 1.08f, glow = false, pressEffect = false),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(AppIcons.Lock, "解锁", tint = Color.White, modifier = Modifier.size(24.dp))
@@ -2603,6 +2603,7 @@ private fun ActionBtn(
                 shape = RoundedCornerShape(percent = 50),
                 focusedScale = 1.08f,
                 glow = false,
+                pressEffect = false,
             )
             .padding(8.dp),
     )
@@ -2791,7 +2792,10 @@ private fun MiniTag(text: String, onClick: () -> Unit = {}) {
     val shape = RoundedCornerShape(6.dp)
     Box(
         modifier = Modifier
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+            ) { onClick() }
             .background(MaterialTheme.colorScheme.surfaceVariant, shape)
             .padding(horizontal = 10.dp, vertical = 5.dp),
     ) {
@@ -2823,7 +2827,7 @@ private fun PlainTopBtn(icon: ImageVector, desc: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(48.dp)
-            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.08f, glow = false),
+            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.08f, glow = false, pressEffect = false),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, desc, tint = Color.White, modifier = Modifier.size(24.dp)) }
 }
@@ -2837,7 +2841,7 @@ private fun MiniLargeBtn(icon: ImageVector, desc: String, onClick: () -> Unit, i
     Box(
         modifier = Modifier
             .size(size)
-            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = if (isPrimary) 1.12f else 1.08f, glow = false)
+            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = if (isPrimary) 1.12f else 1.08f, glow = false, pressEffect = false)
             .background(Color(0x4D000000), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
@@ -2897,7 +2901,10 @@ private fun <T> OptionDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable(onClick = { onSelect(opt) })
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null,
+                            ) { onSelect(opt) }
                             .background(
                                 if (selected) MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
                                 else MaterialTheme.colorScheme.surfaceVariant, shape,
@@ -2959,7 +2966,11 @@ private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color?
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .fillMaxWidth().clickable(onClick = onClick)
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+            ) { onClick() }
             .background(
                 if (selected) MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
                 else MaterialTheme.colorScheme.surfaceVariant, shape,
@@ -2999,7 +3010,12 @@ private fun AddSubtitleDialog(show: Boolean, onAdd: (String, String) -> Unit, on
             )
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
                 Text("取消", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clickable(onClick = onDismiss).padding(horizontal = 14.dp, vertical = 10.dp))
+                    modifier = Modifier
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null,
+                        ) { onDismiss() }
+                        .padding(horizontal = 14.dp, vertical = 10.dp))
                 Text("添加", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable(enabled = url.isNotBlank()) {
                         onAdd(url.substringAfterLast('/').ifBlank { "外挂字幕" }, url.trim())
