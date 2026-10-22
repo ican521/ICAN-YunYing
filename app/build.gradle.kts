@@ -57,6 +57,8 @@ android {
 
     buildFeatures {
         compose = true
+        // 生成 BuildConfig：debug 版保留诊断日志（PipTrace），release 版自动剔除
+        buildConfig = true
     }
 }
 

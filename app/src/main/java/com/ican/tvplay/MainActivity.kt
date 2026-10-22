@@ -15,6 +15,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import com.ican.tvplay.player.core.PlaybackService
 import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.data.BACKGROUND_PIP
@@ -31,6 +33,9 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private var pipStateJob: Job? = null
+
+    /** 小窗期间监听视频尺寸：进小窗瞬间尺寸可能尚未解析，回退 16:9 会一直错下去 */
+    private var pipVideoSizeListener: Player.Listener? = null
 
     /** 进过画中画且尚未回过前台：onStop 时据此识别「小窗被关闭」 */
     private var wasInPip = false
@@ -56,8 +61,19 @@ class MainActivity : ComponentActivity() {
             android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or
                 android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
         )
-        // 小屏（手机）禁用自动横向：锁定竖屏，仅播放全屏时由播放页临时请求横屏；平板保持系统方向
-        if (resources.configuration.screenWidthDp < 600) {
+        // 窗口底色强制不透明黑：小窗/过渡期间 Compose 内容可能比窗口少 1px（dp 取整），
+        // 窗口底色若为透明，这条缝会直接透出桌面的图标/壁纸。
+        window.setBackgroundDrawable(
+            android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
+        )
+        // 实测窗口格式为 TRANSLUCENT（系统/edge-to-edge 造成），即使铺了黑色背景，
+        // 1px 的结构缝仍会透出壁纸，表现为小窗底部/放大过程中的白线。强制不透明表面。
+        window.setFormat(android.graphics.PixelFormat.OPAQUE)
+        // 小屏（手机）禁用自动横向：锁定竖屏，仅播放全屏时由播放页临时请求横屏；平板保持系统方向。
+        // 必须按「物理屏幕」判断，不能用 resources.configuration.screenWidthDp：
+        // Activity 处于小窗或被信箱化时，该值是小窗/信箱宽度（实测平板 548dp < 600），
+        // 会把自己锁成竖屏 → 系统再信箱化成竖条 → 下次启动又读到 548dp，越锁越死。
+        if (isSmallScreenDevice()) {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
         // targetSdk 35+ 对声明 supportsPictureInPicture 的 Activity 默认开启「手势回桌面自动进 PiP」，
@@ -88,6 +104,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** 是否小屏设备（手机）：按物理屏幕短边 dp 判断，不受小窗/信箱化窗口尺寸影响 */
+    private fun isSmallScreenDevice(): Boolean {
+        val bounds: Rect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            windowManager.maximumWindowMetrics.bounds
+        } else {
+            val point = android.graphics.Point()
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay.getRealSize(point)
+            Rect(0, 0, point.x, point.y)
+        }
+        val shortSideDp = minOf(bounds.width(), bounds.height()) / resources.displayMetrics.density
+        return shortSideDp < 600
+    }
+
+    /** 退出全屏/离开播放页后恢复屏幕方向：小屏手机锁竖屏，平板恢复系统自由方向。
+     *  由播放页调用，判定同样按物理屏（播放页所在窗口可能已被信箱化） */
+    fun restoreDefaultOrientation() {
+        requestedOrientation = if (isSmallScreenDevice()) {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
     /** fongmi PiP 类同款：整个画中画生命周期复用同一个 builder。
      *  宽高比/矩形/图标全部增量更新，任何一次 setPictureInPictureParams
      *  都不会把已设置的 sourceRectHint 等参数冲掉（新建 builder 会清空 hint，
@@ -96,6 +136,8 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             PictureInPictureParams.Builder().apply {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    // fongmi 同款：开启 seamless 缩放。系统把窗口表面整体当纹理缩放，
+                    // 窗口与内容始终同步；关闭时窗口先变大、内容晚一帧，底部会闪出透壁纸的亮条
                     setSeamlessResizeEnabled(true)
                     // onCreate 里关自动进 PiP 用的是一次性 builder，之后经本 builder
                     // setPictureInPictureParams 会把 autoEnter 冲回默认（targetSdk 35 默认开），
@@ -164,6 +206,14 @@ class MainActivity : ComponentActivity() {
         Players.setPipMode(isInPictureInPictureMode)
         if (isInPictureInPictureMode) {
             wasInPip = true
+            // 画中画窗口在 HyperOS 上是透明表面（fongmi 同样透明，但它内容铺满 100%）：
+            // 我们的装饰视图若仍按系统栏避让，内容会在窗口内留出顶部一条 + 底部 1px 的边距，
+            // 透明缝隙直接露出桌面图标/白线。进小窗后强制内容铺满整个窗口表面。
+            runCatching {
+                androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+                androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
+                    .hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            }
             // fongmi 同款：进小窗不暂停，继续播放
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -177,18 +227,21 @@ class MainActivity : ComponentActivity() {
                         .distinctUntilChanged()
                         .collect { updatePipActions() }
                 }
+                // 进小窗瞬间视频尺寸可能还没解析出来，宽高比会退回 16:9；
+                // 尺寸一旦就绪立刻改回真实比例（fongmi 是在 enter 时直接读宽度，没有这个时间差）
+                pipVideoSizeListener = object : Player.Listener {
+                    override fun onVideoSizeChanged(videoSize: VideoSize) = updatePipAspect()
+                }.also { listener -> Players.player?.addListener(listener) }
             } else {
                 pipStateJob?.cancel()
                 pipStateJob = null
-                // 退出 PiP：fongmi 同款——全屏展开不碰方向（进全屏时已请求横屏，
-                // 放大动画中途重写方向会让 ROM 重算窗口、出现跳位）；
-                // 仅非全屏兜底：手机锁回竖屏，平板恢复自由方向
-                if (!Players.isFullscreen) {
-                    requestedOrientation =
-                        if (resources.configuration.screenWidthDp < 600)
-                            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                        else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                }
+                pipVideoSizeListener?.let { listener -> Players.player?.removeListener(listener) }
+                pipVideoSizeListener = null
+                // 退出 PiP：fongmi 同款——不改方向。
+                // 注意此时 resources.configuration 仍是小窗尺寸（平板约 371dp×158dp），
+                // 用它判断「小屏」会把平板误锁成竖屏：关闭小窗后再打开 App，
+                // 就变成横屏窗口里摆一列竖屏界面、不占满屏幕。
+                // 全屏展开时也不碰方向：进全屏时已请求横屏，中途重写会让 ROM 重算窗口、出现跳位
             }
         }
     }
@@ -220,6 +273,16 @@ class MainActivity : ComponentActivity() {
     }
 
     @android.annotation.TargetApi(Build.VERSION_CODES.O)
+    private fun updatePipAspect() {
+        val builder = pipBuilder ?: return
+        try {
+            builder.setAspectRatio(videoAspectRational())
+            setPictureInPictureParams(builder.build())
+        } catch (_: Exception) {
+        }
+    }
+
+    @android.annotation.TargetApi(Build.VERSION_CODES.O)
     private fun updatePipActions() {
         val builder = pipBuilder ?: return
         try {
@@ -246,7 +309,9 @@ class MainActivity : ComponentActivity() {
             // 恢复方向 + 清全屏标记：不解除横屏请求的话，下次打开 App 会先横屏再转竖屏，
             // 且残留的 isFullscreen 会让首页按 Home 误触画中画
             Players.isFullscreen = false
-            requestedOrientation = if (resources.configuration.screenWidthDp < 600) {
+            // 小屏判定同样必须按物理屏：此时窗口还是小窗尺寸（371dp），
+            // 用窗口宽度会把平板误锁成竖屏，重开 App 就成横屏里的竖条
+            requestedOrientation = if (isSmallScreenDevice()) {
                 ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             } else {
                 ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED

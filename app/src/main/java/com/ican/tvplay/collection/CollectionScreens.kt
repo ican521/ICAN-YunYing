@@ -58,6 +58,7 @@ import com.ican.tvplay.ui.CollectionViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.BlurredBar
+import com.ican.tvplay.ui.components.EmptyState
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
@@ -127,7 +128,7 @@ fun FavoritesScreen(
     ) { innerPadding ->
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             if (favorites.isEmpty()) {
-                EmptyText(text = "还没有收藏，去首页发现好片吧")
+                EmptyState()
             } else {
                 LazyVerticalGrid(
                     columns = videoGridColumns(homeLayoutSize),
@@ -378,7 +379,7 @@ fun HistoryScreen(
     ) { innerPadding ->
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             if (histories.isEmpty()) {
-                EmptyText(text = "还没有播放记录")
+                EmptyState()
             } else {
                 LazyVerticalGrid(
                     columns = videoGridColumns(homeLayoutSize),
@@ -608,16 +609,5 @@ private fun HistoryCard(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun EmptyText(text: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }

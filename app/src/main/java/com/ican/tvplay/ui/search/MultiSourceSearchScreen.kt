@@ -56,6 +56,7 @@ import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.ui.MultiSourceSearchViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
+import com.ican.tvplay.ui.components.EmptyState
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixSearchInput
@@ -213,34 +214,39 @@ fun MultiSourceSearchScreen(
                     GridCells.Adaptive(minSize = 160.dp)
                 }
 
-                LazyVerticalGrid(
-                    columns = columns,
-                    // imePadding：键盘弹出时网格底部内容不被遮挡，可滚动到键盘上方
-                    modifier = Modifier.fillMaxSize().imePadding(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        top = 4.dp,
-                        bottom = 16.dp,
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
-                ) {
-                    items(displayVideos, key = { "${it.video.id}_${it.siteKey}" }) { dv ->
-                        CrossSourceVideoCard(
-                            video = dv.video,
-                            siteName = dv.siteName,
-                            onClick = {
-                                // fongmi 同款：action 卡片直接执行 jar action → Toast 返回 msg
-                                if (dv.video.action.isNotBlank()) {
-                                    vm.executeAction(dv.siteKey, dv.video.action) { msg ->
-                                        if (msg.isNotBlank()) {
-                                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                // 搜索结束且无结果时显示统一空状态；搜索中不显示，避免结果流式上屏前闪现
+                if (displayVideos.isEmpty() && !loading) {
+                    EmptyState()
+                } else {
+                    LazyVerticalGrid(
+                        columns = columns,
+                        // imePadding：键盘弹出时网格底部内容不被遮挡，可滚动到键盘上方
+                        modifier = Modifier.fillMaxSize().imePadding(),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            top = 4.dp,
+                            bottom = 16.dp,
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
+                    ) {
+                        items(displayVideos, key = { "${it.video.id}_${it.siteKey}" }) { dv ->
+                            CrossSourceVideoCard(
+                                video = dv.video,
+                                siteName = dv.siteName,
+                                onClick = {
+                                    // fongmi 同款：action 卡片直接执行 jar action → Toast 返回 msg
+                                    if (dv.video.action.isNotBlank()) {
+                                        vm.executeAction(dv.siteKey, dv.video.action) { msg ->
+                                            if (msg.isNotBlank()) {
+                                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                            }
                                         }
+                                    } else {
+                                        handlePlayClick(vm, dv.video, dv.siteKey, onPlay)
                                     }
-                                } else {
-                                    handlePlayClick(vm, dv.video, dv.siteKey, onPlay)
-                                }
-                            },
-                        )
+                                },
+                            )
+                        }
                     }
                 }
             }

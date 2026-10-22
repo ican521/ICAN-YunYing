@@ -2,6 +2,8 @@ package com.ican.tvplay.player
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.graphics.Point
+import android.os.Build
 import android.os.SystemClock
 import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
@@ -100,6 +102,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -171,6 +174,43 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
+
+/** 等待画中画→全屏放大动画收敛（替代固定 delay）。
+ *  系统 PiP→全屏放大动画时长不固定（负载高时会超过 900ms），固定延时会在动画未结束时
+ *  把根底色提前翻回浅色，窗口底部最后 1px 仍由根底色绘制，露出 #F9F9F9 白色闪条。
+ *  改为轮询 decorView 尺寸：连续 3 帧铺满物理屏（容 2px 舍入误差）即视为动画收敛并返回；
+ *  带 2s 超时兜底，极端情况下也不会卡住过渡。 */
+private suspend fun waitForPipExpansion(activity: Activity) {
+    val decorView = activity.window.decorView
+    val fullW: Int
+    val fullH: Int
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        val bounds = activity.windowManager.maximumWindowMetrics.bounds
+        fullW = bounds.width()
+        fullH = bounds.height()
+    } else {
+        val point = Point()
+        @Suppress("DEPRECATION")
+        activity.windowManager.defaultDisplay.getRealSize(point)
+        fullW = point.x
+        fullH = point.y
+    }
+    var lastW = -1
+    var lastH = -1
+    var stable = 0
+    val start = SystemClock.elapsedRealtime()
+    while (true) {
+        val w = decorView.width
+        val h = decorView.height
+        val reachedFull = w >= fullW - 2 && h >= fullH - 2
+        stable = if (reachedFull && w == lastW && h == lastH) stable + 1 else 0
+        lastW = w
+        lastH = h
+        if (stable >= 3) break
+        if (SystemClock.elapsedRealtime() - start > 2000) break // 兜底
+        delay(16)
+    }
+}
 
 /**
  * FongMi 风格播放界面：
@@ -277,6 +317,13 @@ fun PlayerScreen(
         addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
             val rect = android.graphics.Rect()
             if (v.getGlobalVisibleRect(rect)) {
+                // 诊断日志：仅 debug 构建保留（release 自动剔除），排查画中画进出动画用
+                if (com.ican.tvplay.BuildConfig.DEBUG) {
+                    android.util.Log.i(
+                        "PipTrace",
+                        "videoRect=${rect.width()}x${rect.height()}@${rect.left},${rect.top}",
+                    )
+                }
                 (context as? com.ican.tvplay.MainActivity)?.syncPipSourceRect(rect)
             }
         }
@@ -332,12 +379,57 @@ fun PlayerScreen(
         } else if (wasInPip) {
             wasInPip = false
             pipExitHold = true
-            delay(350)
+            // 不固定延时，改为等窗口真正放大到全屏尺寸再释放保护期：
+            // 系统 PiP→全屏放大动画时长不固定（负载高时会超过 900ms），
+            // 固定 delay(900) 会在动画还没结束时把根底色翻回浅色，
+            // 窗口底部最后 1px 仍由根底色绘制，露出 #F9F9F9 白色闪条。
+            // 改为轮询 decorView 尺寸：连续多帧铺满物理屏（动画收敛）才释放，
+            // 带超时兜底，极端情况也不会卡住过渡。
+            (context as? Activity)?.let { waitForPipExpansion(it) }
             pipExitHold = false
         }
     }
     // 后台续播返回本页时跳过一次重新解析（直接接管在播的播放器）
     var resumeFromBackground by remember { mutableStateOf(false) }
+    // 画中画进出过渡（含退出保护期）上报给 AppRoot：根底色转黑、关闭导航圆角裁剪，
+    // 避免退出放大时配置晚一帧造成的浅色根底（底部白条）与自绘小圆角
+    LaunchedEffect(inPip, pipExitHold) {
+        Players.setPipTransition(inPip || pipExitHold)
+    }
+    // 视频铺满全屏/画中画（含过渡期）时上报给 AppRoot：根底色保持黑色。
+    // 仅靠 pipTransition（进出过渡）覆盖不到稳态全屏——全屏下窗口底部最后约 1px
+    // 仍由根底色绘制，浅色主题会露出一条白色细线。
+    val videoPresent = inPip || pipExitHold || fullscreen || pendingFullscreen != null
+    LaunchedEffect(inPip, pipExitHold, fullscreen, pendingFullscreen) {
+        Players.setVideoPresent(videoPresent)
+    }
+    // 画中画窗口在 HyperOS 上是透明表面（fongmi 同样透明，但它内容铺满 100%）：
+    // 应用内容只要没稳定铺满整个窗口，底部缝隙就会透过透明窗口露出浅色桌面/白线。
+    // 设 decorView.setBackgroundColor 不影响 HyperOS 画中画窗口的表面透明与否——
+    // 决定它的是 window 背景。视频铺满全屏/画中画期间把 window 背景设成不透明黑色，
+    // 任何未覆盖缝隙都显示黑色；退出后恢复原窗口背景。
+    val activityWindow = (context as? Activity)?.window
+    // HyperOS 画中画窗口是透明表面，透明与否由 window 背景决定（decorView 背景无效）。
+    // 视频铺满全屏/画中画期间把 window 背景设成不透明黑色，任何未覆盖缝隙都显示黑色；
+    // 退出后恢复主题根底色。
+    val themeWindowBg = MaterialTheme.colorScheme.background.toArgb()
+    LaunchedEffect(videoPresent) {
+        val window = activityWindow ?: return@LaunchedEffect
+        window.setBackgroundDrawable(
+            android.graphics.drawable.ColorDrawable(
+                if (videoPresent) android.graphics.Color.BLACK else themeWindowBg,
+            ),
+        )
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            Players.setPipTransition(false)
+            Players.setVideoPresent(false)
+            activityWindow?.setBackgroundDrawable(
+                android.graphics.drawable.ColorDrawable(themeWindowBg),
+            )
+        }
+    }
 
     // 按站点补拉完整详情（spider 站走 detailContent，采集站走 VodApiClient.detail）：
     // 搜索页点击卡片不再阻塞等详情，详情下沉到播放页内异步加载（慢站源也能秒进播放页）
@@ -990,6 +1082,26 @@ fun PlayerScreen(
                     Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f).background(Color.Black)
             },
         )
+        // 诊断日志：仅 debug 构建保留（release 自动剔除）
+        val branchName = when {
+            inPip -> "pip"
+            pipExitHold -> "pipHold"
+            fullscreen -> "full"
+            pendingFullscreen != null -> "pending"
+            isLandscape -> "land"
+            else -> "portrait"
+        }
+        LaunchedEffect(branchName) {
+            if (com.ican.tvplay.BuildConfig.DEBUG) {
+                val dv = (context as? Activity)?.window?.decorView
+                android.util.Log.i(
+                    "PipTrace",
+                    "branch=$branchName inPip=$inPip hold=$pipExitHold full=$fullscreen " +
+                        "landFull=$landscapeFullscreen land=$isLandscape " +
+                        "screen=${screenW.value}x${screenH.value} win=${dv?.width}x${dv?.height}",
+                )
+            }
+        }
         when {
         // 画中画（含退出过渡）：只保留最底层视频，不挂任何覆盖层/信息流
         inPip || pipExitHold -> Unit
@@ -2152,13 +2264,7 @@ private fun cleanDescription(raw: String): String = raw.replace(htmlTagRegex, ""
 
 /** 退出全屏/离开播放页后恢复屏幕方向：小屏手机锁回竖屏（禁用自动横向），平板恢复系统自由方向 */
 private fun Activity?.restoreDefaultOrientation() {
-    val activity = this ?: return
-    val smallScreen = activity.resources.configuration.screenWidthDp < 600
-    activity.requestedOrientation = if (smallScreen) {
-        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-    } else {
-        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-    }
+    (this as? com.ican.tvplay.MainActivity)?.restoreDefaultOrientation()
 }
 
 /** 简介区块：直接全部显示，不折叠、不可点击 */

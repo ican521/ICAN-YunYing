@@ -166,21 +166,32 @@ fun AppRoot() {
 
         // miuix 根 Scaffold（照搬 KernelSU MainActivity）：内部提供根级弹窗状态列表与默认弹窗宿主，
         // renderInRootScaffold=true 的弹窗渲染在其宿主层，层级高于底栏，遮罩覆盖全屏
+        // 画中画进出过渡：根底色转黑、关闭导航自绘圆角。
+        // 退出小窗时系统先放大窗口、配置晚一帧，播放页仍按小窗尺寸布局，
+        // 若不处理会露出浅色根底（底部白条）和导航自绘的小圆角
+        val pipTransition by Players.pipTransition.collectAsStateWithLifecycle()
+        // 视频铺满全屏/画中画时根底色也保持黑色：全屏下窗口底部最后约 1px 由根底色绘制，
+        // 仅靠 pipTransition（进出过渡）覆盖不到稳态全屏，浅色主题会露出底部白色细线
+        val videoPresent by Players.videoPresent.collectAsStateWithLifecycle()
+        val rootBackground =
+            if (pipTransition || videoPresent) androidx.compose.ui.graphics.Color.Black
+            else MaterialTheme.colorScheme.background
+        val navCornerRadius = if (pipTransition) 0.dp else rememberNavSystemCornerRadius()
         Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
+            containerColor = rootBackground,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
         ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .background(rootBackground),
         ) {
             NavDisplay(
                 backStack = navigator.backStack,
                 modifier = Modifier
                     .fillMaxSize()
                     .layerBackdrop(backdrop),
-                effects = NavDisplayEffects(cornerClipRadius = rememberNavSystemCornerRadius()),
+                effects = NavDisplayEffects(cornerClipRadius = navCornerRadius),
                 onBack = { navigator.pop() },
             ) {
                 entry<Route.Main>(swipeDismiss = NavSwipeDirection.None) {

@@ -212,6 +212,24 @@ object Players {
     val pipMode: StateFlow<Boolean> = _pipMode.asStateFlow()
     fun setPipMode(inPip: Boolean) { _pipMode.value = inPip }
 
+    private val _pipTransition = MutableStateFlow(false)
+
+    /** 画中画进出过渡（含退出后的短暂保护期）：
+     *  AppRoot 据此把根底色切成黑色并关闭导航圆角裁剪。
+     *  退出小窗时系统先放大窗口、配置更新晚一帧，此时播放页仍按小窗尺寸布局，
+     *  露出的根底色（浅色主题为白）会被看到，形成底部白色闪条。 */
+    val pipTransition: StateFlow<Boolean> = _pipTransition.asStateFlow()
+    fun setPipTransition(active: Boolean) { _pipTransition.value = active }
+
+    private val _videoPresent = MutableStateFlow(false)
+
+    /** 视频是否以铺满全屏/画中画的方式呈现（全屏播放 + PiP + 相关过渡期）。
+     *  AppRoot 据此把根底色保持黑色：全屏/小窗下窗口底部最后约 1px 由根底色绘制，
+     *  浅色主题为白，会露出一条白色细线。仅靠 pipTransition（进出过渡）覆盖不到
+     *  稳态全屏，故单独上报。 */
+    val videoPresent: StateFlow<Boolean> = _videoPresent.asStateFlow()
+    fun setVideoPresent(active: Boolean) { _videoPresent.value = active }
+
     /** 通知栏点击 → 回到播放页（AppRoot 收集后导航） */
     data class OpenPlayerRequest(
         val token: Long,

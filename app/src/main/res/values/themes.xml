@@ -4,6 +4,10 @@
     <!-- 纯 Compose 应用：使用平台 NoActionBar 主题，不含任何 Leanback 样式 -->
     <style name="Theme.TvPlay" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
+        <!-- 父主题是浅色 Material：colorBackground 默认近白（#F9F9F9），窗口/视图层在最底部
+             那 1px 结构缝里会露出它，表现为画中画放大时底部的白色细线。显式压成黑色 -->
+        <item name="android:colorBackground">@android:color/black</item>
+        <item name="android:windowIsTranslucent">false</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="r">shortEdges</item>
