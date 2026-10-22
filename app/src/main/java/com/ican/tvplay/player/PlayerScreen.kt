@@ -265,9 +265,8 @@ fun PlayerScreen(
 
     // 共享 PlayerView（fongmi 同思路：全屏/竖屏只是改容器尺寸，PlayerView 从不销毁重建）。
     // 常驻唯一 AndroidView，竖屏↔全屏↔画中画切换时 Surface 不销毁，消除切换黑屏。
-    // fongmi 用 surface_type="none" + setRender(SURFACE)；我们 media3 无 setRender，
-    // 故从 XML inflate，surface_type=texture_view：TextureView 不挖窗口洞，
-    // 彻底消除视频 FIT 模式边缘 1px 白缝/亮色闪烁，黑边区由本视图黑色背景提供。
+    // fongmi 用 surface_type="none" + setRender(SURFACE)（默认 SurfaceView）；
+    // 我们对齐用 surface_view：视频由系统合成器独立缩放，画中画退出放大无残帧。
     val sharedPlayerView = remember {
         android.view.LayoutInflater.from(context)
             .inflate(com.ican.tvplay.R.layout.player_view, null) as PlayerView
@@ -943,7 +942,7 @@ fun PlayerScreen(
             factory = { sharedPlayerView },
             update = { view ->
                 view.resizeMode = playerState.scaleMode.resizeMode
-                // TextureView 不挖洞，PlayerView 背景直接用黑色：视频 FIT 模式黑边区显示黑色。
+                // PlayerView 背景直接用黑色：视频 FIT 模式黑边区显示黑色。
                 view.setBackgroundColor(android.graphics.Color.BLACK)
                 if (view.player !== Players.player) Players.bindPlayerView(view)
             },

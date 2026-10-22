@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
             // 展开会先按竖屏放大再旋转，动画割裂。
             // sourceRectHint 提供进入/退出小窗的平滑缩放动画目标
             val builder = PictureInPictureParams.Builder()
-                .setAspectRatio(Rational(16, 9))
+                .setAspectRatio(videoAspectRational())
                 .setActions(buildPipActions())
                 .setSourceRectHint(Rect().apply { window.decorView.getGlobalVisibleRect(this) })
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -115,6 +115,22 @@ class MainActivity : ComponentActivity() {
             }
             enterPictureInPictureMode(builder.build())
         } catch (_: Exception) {
+        }
+    }
+
+    /** 画中画窗口宽高比：fongmi getRational 同款——用视频真实宽高比，钳制在系统允许的 0.418~2.39 之间 */
+    private fun videoAspectRational(): Rational {
+        val size = Players.player?.videoSize
+        val w = size?.width ?: 0
+        val h = size?.height ?: 0
+        if (w <= 0 || h <= 0) return Rational(16, 9)
+        val limitWide = Rational(239, 100)
+        val limitTall = Rational(100, 239)
+        val rational = Rational(w, h)
+        return when {
+            rational.toFloat() > limitWide.toFloat() -> limitWide
+            rational.toFloat() < limitTall.toFloat() -> limitTall
+            else -> rational
         }
     }
 
