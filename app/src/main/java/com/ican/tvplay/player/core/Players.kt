@@ -467,6 +467,12 @@ object Players {
         player?.let { if (it.isPlaying) it.pause() else it.play() }
     }
 
+    /** 直接从 player 读当前位置（不依赖 state，避免 release 重置后读到 0） */
+    fun currentPositionMs(): Long = player?.currentPosition?.coerceAtLeast(0L) ?: 0L
+
+    /** 直接从 player 读总时长 */
+    fun durationMs(): Long = player?.let { if (it.duration != C.TIME_UNSET) it.duration.coerceAtLeast(0L) else 0L } ?: 0L
+
     fun seekTo(positionMs: Long) {
         player?.seekTo(positionMs.coerceIn(0L, _state.value.durationMs.takeIf { it > 0 } ?: Long.MAX_VALUE))
     }

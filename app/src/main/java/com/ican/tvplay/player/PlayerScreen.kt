@@ -356,8 +356,8 @@ fun PlayerScreen(
             val eps = v.playSources
                 .let { s -> s.firstOrNull { it.flag == lineFlag } ?: s.firstOrNull() }
                 ?.episodes ?: v.episodes
-            if (history != null && history.episodeIndex in eps.indices) {
-                episodeIndex = history.episodeIndex
+            if (history != null && (eps.isEmpty() || history.episodeIndex in eps.indices)) {
+                episodeIndex = history.episodeIndex.coerceIn(0, (eps.size - 1).coerceAtLeast(0))
                 val nearEnd = history.durationMs > 0 &&
                     history.durationMs - history.positionMs < RESUME_THRESHOLD_MS
                 val resume = if (nearEnd) 0L else history.positionMs
@@ -493,8 +493,14 @@ fun PlayerScreen(
 
     fun saveProgress() {
         val v = video ?: return
-        val episode = lineEpisodes.getOrNull(episodeIndex) ?: return
-        val st = Players.state.value
+        // 集标题：从实际播放上下文里取（页面 lineEpisodes 可能为空，playbackContext 才是真实数据）
+        val epTitle = Players.playbackContext
+            ?.takeIf { it.video.id == v.id }
+            ?.episodes?.getOrNull(episodeIndex)?.title.orEmpty()
+        // 直接从 player 读当前位置，不依赖 state（release 会重置 state，导致最后一次保存读到 0）
+        val pos = Players.currentPositionMs()
+        val dur = Players.durationMs()
+        val st = Players.state.value.copy(positionMs = pos, durationMs = dur)
         // 同步片头/片尾标记到播放上下文（后台切集/通知栏用）
         Players.playbackContext?.takeIf { it.video.id == v.id }?.let {
             Players.playbackContext = it.copy(openingMs = openingMs, endingMs = endingMs)
@@ -519,7 +525,7 @@ fun PlayerScreen(
                         cover = v.cover,
                         categoryName = v.categoryName,
                         episodeIndex = episodeIndex,
-                        episodeTitle = episode.title,
+                        episodeTitle = epTitle,
                         positionMs = st.positionMs,
                         durationMs = st.durationMs,
                         updatedAt = System.currentTimeMillis(),
@@ -2789,22 +2795,6 @@ private fun EpisodeSideSheet(
             }
         }
     }
-
-@Composable
-private fun MiniTag(text: String, onClick: () -> Unit = {}) {
-    val shape = RoundedCornerShape(6.dp)
-    Box(
-        modifier = Modifier
-            .clickable(
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                indication = null,
-            ) { onClick() }
-            .background(MaterialTheme.colorScheme.surfaceVariant, shape)
-            .padding(horizontal = 10.dp, vertical = 5.dp),
-    ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
 
 /** 播放器底部动作栏文字按钮（fongmi: style/Control，白色小字横向滚动） */
 @Composable

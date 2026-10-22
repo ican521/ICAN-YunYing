@@ -567,20 +567,22 @@ private fun HistoryCard(
                     .padding(horizontal = 10.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                // 看到的集数：胶囊样式与收藏卡片站源标签一致
-                Box(
-                    modifier = Modifier
-                        .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                ) {
-                    Text(
-                        text = history.episodeTitle.ifBlank { "第${history.episodeIndex + 1}集" },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                // 集数小标签：直接显示集标题
+                if (history.episodeTitle.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            text = history.episodeTitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 Text(
                     text = history.title,
@@ -594,14 +596,14 @@ private fun HistoryCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(3.dp)
-                        .background(Color(0x55FFFFFF), RoundedCornerShape(2.dp)),
+                        .height(4.dp)
+                        .background(Color(0x44FFFFFF), CircleShape),
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(progress)
-                            .height(3.dp)
-                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
+                            .height(4.dp)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape),
                     )
                 }
             }
