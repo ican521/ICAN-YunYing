@@ -3,7 +3,10 @@ package com.ican.tvplay.player
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.os.SystemClock
+import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
@@ -186,6 +189,18 @@ fun PlayerScreen(
     val container = appContainer()
     val scope = rememberCoroutineScope()
 
+    // 添加字幕：直接调起系统文件选择器，选中后立即加载外挂字幕
+    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val name = runCatching {
+                context.contentResolver
+                    .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+            }.getOrNull()?.takeIf { it.isNotBlank() } ?: "外挂字幕"
+            Players.addSubtitle(SubItem(name = name, url = uri.toString()))
+        }
+    }
+
     val playerState by Players.state.collectAsStateWithLifecycle()
 
     // 设置持久化
@@ -298,7 +313,22 @@ fun PlayerScreen(
     // 进 PiP 时收起控制层（对齐 fongmi onEnterPictureInPicture → hideControl）：
     // 否则双击小窗放大回全屏时，缩放动画第一帧会带上控制层，
     // 看上去像「全屏画面的缩小版」而不是当前小窗画面直接放大
-    LaunchedEffect(inPip) { if (inPip) controlsVisible = false }
+    // 退出 PiP 的过渡保护：系统放大动画期间继续只渲染纯视频（同 PiP 态）。
+    // 若立即挂载全屏控制层，首帧要同步完成整套 UI 的首组合，主线程被占满，
+    // 窗口已放大但视频 Surface 仍停在小窗尺寸（贴左上角），看上去「先小后大」
+    var pipExitHold by remember { mutableStateOf(false) }
+    var wasInPip by remember { mutableStateOf(false) }
+    LaunchedEffect(inPip) {
+        if (inPip) {
+            controlsVisible = false
+            wasInPip = true
+        } else if (wasInPip) {
+            wasInPip = false
+            pipExitHold = true
+            delay(350)
+            pipExitHold = false
+        }
+    }
     // 后台续播返回本页时跳过一次重新解析（直接接管在播的播放器）
     var resumeFromBackground by remember { mutableStateOf(false) }
 
@@ -811,7 +841,7 @@ fun PlayerScreen(
         // 横版布局未显式刷底色的空档（播放器上方/左侧、信息列底部与下方区块之间）
         // 会透出黑色，与刷白的区块拼成黑白块
         MaterialTheme.colorScheme.background
-    } else if (inPip || fullscreen || pendingFullscreen != null || landscapeFullscreen) {
+    } else if (inPip || pipExitHold || fullscreen || pendingFullscreen != null || landscapeFullscreen) {
         Color.Black
     } else {
         MaterialTheme.colorScheme.background
@@ -918,8 +948,8 @@ fun PlayerScreen(
                 if (view.player !== Players.player) Players.bindPlayerView(view)
             },
             modifier = when {
-                // 画中画：铺满整个（已被系统缩小的）Activity 窗口
-                inPip -> Modifier.fillMaxSize().background(Color.Black)
+                // 画中画（含退出过渡）：铺满整个（已被系统缩小的）Activity 窗口
+                inPip || pipExitHold -> Modifier.fillMaxSize().background(Color.Black)
                 // 手机旋转进入的全屏：直接铺满
                 fullscreen && !landscapeFullscreen -> Modifier.fillMaxSize().background(Color.Black)
                 // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
@@ -952,8 +982,8 @@ fun PlayerScreen(
             },
         )
         when {
-        // 画中画：只保留最底层视频，不挂任何覆盖层/信息流
-        inPip -> Unit
+        // 画中画（含退出过渡）：只保留最底层视频，不挂任何覆盖层/信息流
+        inPip || pipExitHold -> Unit
         fullscreen -> {
         FullscreenPlayLayout(
             current = current,
@@ -993,6 +1023,7 @@ fun PlayerScreen(
             },
             onSeekDragChange = { seekDragging = it },
             onOpenSubtitleSettings = { showSubtitleSettings = true },
+            onAddSubtitle = { subtitlePicker.launch(SUBTITLE_MIME_TYPES) },
             subtitleSettingsOpen = showSubtitleSettings,
         )
         }
@@ -1093,6 +1124,7 @@ fun PlayerScreen(
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
             onSeekDragChange = { seekDragging = it },
             onOpenSubtitleSettings = { showSubtitleSettings = true },
+            onAddSubtitle = { subtitlePicker.launch(SUBTITLE_MIME_TYPES) },
         )
         }
         }
@@ -1147,13 +1179,13 @@ private fun PortraitPlayLayout(
     onBufferChange: (Players.BufferTier) -> Unit,
     onSeekDragChange: (Boolean) -> Unit,
     onOpenSubtitleSettings: () -> Unit,
+    onAddSubtitle: () -> Unit,
 ) {
     var showSpeed by remember { mutableStateOf(false) }
     var showScale by remember { mutableStateOf(false) }
     var showBuffer by remember { mutableStateOf(false) }
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
-    var showAddSub by remember { mutableStateOf(false) }
 
     // 单一 Column 根：NavHost 目的地容器会给多个顶层子元素传播 fill 约束，
     // 多顶层发射会让底部标签栏被拉伸成全屏、白色背景盖住视频区（"纯白底+只有按钮"的根因）
@@ -1222,15 +1254,9 @@ private fun PortraitPlayLayout(
         tracks = playerState.textTracks,
         textDisabled = playerState.textDisabled,
         onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
-        onDisable = { Players.selectTrack(null, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
-        onAddExternal = { showAddSub = true },
+        onAddSubtitle = { showText = false; onAddSubtitle() },
         onSettings = { showText = false; onOpenSubtitleSettings() },
         onDismiss = { showText = false },
-    )
-    AddSubtitleDialog(
-        show = showAddSub,
-        onAdd = { n, u -> Players.addSubtitle(SubItem(name = n, url = u)); showAddSub = false },
-        onDismiss = { showAddSub = false },
     )
     } // Column 根结束
 }
@@ -1242,6 +1268,18 @@ private const val LAND_PLAYER_WIDTH_FRACTION = 0.38f
 
 /** 横屏小窗↔全屏放大/缩回动画时长（对齐 fongmi ChangeBounds 150ms） */
 private const val LAND_ZOOM_DURATION_MS = 150
+
+/** 外挂字幕文件选择器的 MIME 过滤：覆盖 srt/ass/ssa/vtt/ttml，以及文件管理器把字幕标成 octet-stream 的情况 */
+private val SUBTITLE_MIME_TYPES = arrayOf(
+    "text/*",
+    "application/octet-stream",
+    "application/x-subrip",
+    "text/x-ssa",
+    "text/x-ass",
+    "application/x-ass",
+    "text/vtt",
+    "application/ttml+xml",
+)
 
 /**
  * 横版布局（fongmi activity_detail_land + ChangeBounds 联动）：
@@ -2166,6 +2204,7 @@ private fun FullscreenPlayLayout(
     onClearEnding: () -> Unit,
     onSeekDragChange: (Boolean) -> Unit,
     onOpenSubtitleSettings: () -> Unit,
+    onAddSubtitle: () -> Unit,
     subtitleSettingsOpen: Boolean,
 ) {
     val context = LocalContext.current
@@ -2184,7 +2223,6 @@ private fun FullscreenPlayLayout(
     var showBuffer by remember { mutableStateOf(false) }
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
-    var showAddSub by remember { mutableStateOf(false) }
     var showEpisodes by remember { mutableStateOf(false) }
     // 选集或字幕设置侧栏打开期间抑制全部播放手势
     val sideSheetOpen = showEpisodes || subtitleSettingsOpen
@@ -2623,16 +2661,10 @@ private fun FullscreenPlayLayout(
             tracks = playerState.textTracks,
             textDisabled = playerState.textDisabled,
             onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
-            onDisable = { Players.selectTrack(null, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
-            onAddExternal = { showAddSub = true },
+            onAddSubtitle = { showText = false; onAddSubtitle() },
             onSettings = { showText = false; onOpenSubtitleSettings() },
             onDismiss = { showText = false },
             selectedBorderColor = BrandBlueDeep,
-        )
-        AddSubtitleDialog(
-            show = showAddSub,
-            onAdd = { n, u -> Players.addSubtitle(SubItem(name = n, url = u)); showAddSub = false },
-            onDismiss = { showAddSub = false },
         )
     }
 }
@@ -2968,8 +3000,8 @@ private fun <T> OptionDialog(
 @Composable
 private fun SubtitleDialog(
     show: Boolean, tracks: List<Players.TrackOption>, textDisabled: Boolean,
-    onSelect: (Players.TrackOption) -> Unit, onDisable: () -> Unit,
-    onAddExternal: () -> Unit, onSettings: () -> Unit, onDismiss: () -> Unit,
+    onSelect: (Players.TrackOption) -> Unit,
+    onAddSubtitle: () -> Unit, onSettings: () -> Unit, onDismiss: () -> Unit,
     // 同 OptionDialog：全屏传入选集侧边栏同款蓝，选中描边与选集同色
     selectedBorderColor: Color? = null,
 ) {
@@ -2986,9 +3018,13 @@ private fun SubtitleDialog(
     ) {
         // 行间距与 OptionDialog（倍速/缓冲等弹窗）统一为 6dp
         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            SubRow("关闭字幕", textDisabled, selectedBorderColor) { onDisable() }
+            // 纯展示：当前正在生效的字幕（无字幕/已关闭时显示「无」）
+            SubInfoRow(
+                label = "显示当前字幕",
+                value = if (textDisabled) "无" else tracks.firstOrNull { it.selected }?.name ?: "无",
+            )
             tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected, selectedBorderColor) { onSelect(t) } }
-            SubRow("添加外挂字幕…", false, selectedBorderColor) { onAddExternal() }
+            SubRow("添加字幕", false, selectedBorderColor) { onAddSubtitle() }
             SubRow("字幕设置", false, selectedBorderColor) { onSettings() }
         }
     }
@@ -3275,6 +3311,33 @@ private fun OffsetStepButton(text: String, onClick: () -> Unit) {
 }
 
 @Composable
+private fun SubInfoRow(label: String, value: String) {
+    val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
+    val isDark = LocalDarkTheme.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant, shape)
+            .then(
+                if (isDark) {
+                    Modifier.border(Spacing.optionBorder, optionBorderColor(false), shape)
+                } else Modifier,
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
 private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color? = null, onClick: () -> Unit) {
     val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
     val isDark = LocalDarkTheme.current
@@ -3305,43 +3368,6 @@ private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color?
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
         if (selected) Icon(AppIcons.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-    }
-}
-
-@Composable
-private fun AddSubtitleDialog(show: Boolean, onAdd: (String, String) -> Unit, onDismiss: () -> Unit) {
-    var url by remember { mutableStateOf("") }
-    // 与设置页「站源设置」同款：miuix OverlayDialog 底部呼出
-    OverlayDialog(
-        show = show,
-        title = "添加外挂字幕",
-        titleColor = MiuixTheme.colorScheme.onBackground,
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        renderInRootScaffold = true,
-        largeScreen = false,
-        onDismissRequest = onDismiss,
-        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            androidx.compose.material3.TextField(
-                value = url, onValueChange = { url = it },
-                placeholder = { androidx.compose.material3.Text("字幕文件 URL（srt/ass/vtt）") },
-                singleLine = true, modifier = Modifier.fillMaxWidth(),
-            )
-            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                Text("取消", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .clickable(
-                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                            indication = null,
-                        ) { onDismiss() }
-                        .padding(horizontal = 14.dp, vertical = 10.dp))
-                Text("添加", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable(enabled = url.isNotBlank()) {
-                        onAdd(url.substringAfterLast('/').ifBlank { "外挂字幕" }, url.trim())
-                    }.padding(horizontal = 14.dp, vertical = 10.dp))
-            }
-        }
     }
 }
 
