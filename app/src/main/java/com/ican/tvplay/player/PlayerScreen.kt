@@ -3082,6 +3082,10 @@ private fun SubtitleSettingSideSheet(
                 onValueChange = { settings.setSubtitleScale(it) },
                 valueRange = SUBTITLE_MIN_SCALE..SUBTITLE_MAX_SCALE,
                 steps = ((SUBTITLE_MAX_SCALE - SUBTITLE_MIN_SCALE) / 0.05f).toInt() - 1,
+                // 只在默认 100% 处显示刻度点，不做吸附
+                showKeyPoints = true,
+                keyPoints = listOf(1.0f),
+                magnetThreshold = 0f,
                 hapticEffect = SliderDefaults.SliderHapticEffect.None,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -3234,8 +3238,8 @@ private fun formatSubtitleOffsetInput(offsetMs: Long): String {
     return String.format(java.util.Locale.getDefault(), "%+.1f", seconds)
 }
 
-/** 字幕位置吸附区：默认 0 附近 ±8% 内吸住 */
-private const val SUBTITLE_POSITION_SNAP_DELTA = 8f
+/** 字幕位置吸附区：默认 0 附近 ±2% 内吸住 */
+private const val SUBTITLE_POSITION_SNAP_DELTA = 2f
 
 /** 字幕位置：默认点磁吸，其余按 1% 粒度取整 */
 private fun snapSubtitlePosition(raw: Float): Float {
