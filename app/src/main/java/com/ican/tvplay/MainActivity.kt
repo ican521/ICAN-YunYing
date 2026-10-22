@@ -97,10 +97,7 @@ class MainActivity : ComponentActivity() {
             .container.settingsRepository.playerBackgroundPlay.value
         // 仅「画中画」模式自动进入小窗
         if (mode != BACKGROUND_PIP) return
-        // 需求：切后台进小窗时暂停播放，不让画面在桌面继续播。
-        // 此处 Activity 进 PiP 后仍可见，paused 的前台服务不会被 MIUI 立即回收
-        // （与 PlayerScreen 生命周期里「后台不暂停」的既有约束不冲突）
-        Players.onPause()
+        // fongmi 同款：进小窗不暂停，画面持续出帧，退出放大时系统逐帧缩放无残帧
         try {
             // 保持全屏时的横屏请求不释放（fongmi 同款做法）：PiP 任务沿用横屏配置，
             // 点击展开小窗时系统直接放大为横屏全屏；若进小窗前释放方向，
@@ -142,9 +139,7 @@ class MainActivity : ComponentActivity() {
         Players.setPipMode(isInPictureInPictureMode)
         if (isInPictureInPictureMode) {
             wasInPip = true
-            // 兜底：非全屏（预览小窗）下进了 PiP（个别 ROM 无视 setAutoEnterEnabled(false)），
-            // 必须暂停播放——小窗状态不允许在桌面继续播；PlayerScreen 的 onPause 对 PiP 态是放行的
-            if (!Players.isFullscreen) Players.onPause()
+            // fongmi 同款：进小窗不暂停，继续播放
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (isInPictureInPictureMode) {
