@@ -80,6 +80,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -2378,10 +2379,12 @@ private fun FullscreenPlayLayout(
                             // 屏蔽本行点击穿透：消费行内空白区（时间文字/进度条两侧）的全部手势，
                             // 手势层收到 consumed 事件即 gestureBlocked，不再误触发
                             // 单击显隐/双击暂停/长按快进/横向拖动 seek；进度条自身拖动不受影响
-                            // （子组件先处理事件，此处仅在之后补消费）
+                            // （子组件先处理事件，此处仅在之后补消费；
+                            //   awaitFirstDown 返回的 down 也必须立即消费——手指静止长按期间无后续事件，
+                            //   若不消费 down，手势层 gestureBlocked 永远不置位，长按穿透触发 2 倍速）
                             .pointerInput(Unit) {
                                 awaitEachGesture {
-                                    awaitFirstDown(requireUnconsumed = false)
+                                    awaitFirstDown(requireUnconsumed = false).consume()
                                     while (true) {
                                         val e = awaitPointerEvent()
                                         e.changes.forEach { it.consume() }
@@ -2428,8 +2431,16 @@ private fun FullscreenPlayLayout(
                         ActionBtn(playerState.kernel.label) { showEngine = true; onControlInteract() }
                         ActionBtn("缓冲") { showBuffer = true; onControlInteract() }
                         ActionBtn("重播") { Players.seekTo(0); onControlInteract() }
-                        // 倍速：按钮直接显示当前倍速值（与内核/缩放按钮同款「显示当前态」）
-                        ActionBtn(formatSpeed(playerState.speed)) { showSpeed = true; onControlInteract() }
+                        // 倍速：按钮直接显示当前倍速值（与内核/缩放按钮同款「显示当前态」）；
+                        // 当前倍速非 1 倍时，长按一键重置为 1 倍（已是 1 倍则长按无效，不干扰点击弹窗）
+                        ActionBtn(
+                            formatSpeed(playerState.speed),
+                            onLongClick = if (playerState.speed != 1f) {
+                                { onSpeedChange(1f); onControlInteract() }
+                            } else {
+                                null
+                            },
+                        ) { showSpeed = true; onControlInteract() }
                         ActionBtn(playerState.scaleMode.label) {
                             val modes = Players.ScaleMode.entries
                             onScaleChange(modes[(playerState.scaleMode.ordinal + 1) % modes.size])
@@ -3099,29 +3110,43 @@ private fun LineSlider(
         modifier = modifier
             // 对齐 fongmi DefaultTimeBar：触摸目标高 26dp、轨道条高 4dp
             .height(26.dp)
+            // 单 pointerInput 统一处理 tap + drag（合并原因：detectTapGestures 会消费 down 事件，
+            // 导致后注册的 detectHorizontalDragGestures 收到已消费 down 而 awaitTouchSlopOrCancellation 取消，
+            // 进度条拖不动）。down 由本组件自行 consume：手势层收到已消费 down 即 gestureBlocked，
+            // 不再误触发长按 2 倍速/横向 seek，无需依赖外层 Row 的屏蔽
             .pointerInput(Unit) {
-                detectTapGestures { offset -> commitSeek(offset.x / size.width) }
-            }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragStart = { offset ->
-                        val f = (offset.x / size.width).coerceIn(0f, 1f)
-                        dragProgress = f
-                        onDragFractionChange?.invoke(f)
-                    },
-                    onDragEnd = {
-                        dragProgress?.let(commitSeek)
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    val downX = down.position.x
+                    val slop = viewConfiguration.touchSlop
+                    var dragging = false
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            change.consume() // 消费后续事件，手势层 gestureBlocked 全程让位
+                            if (change.changedToUpIgnoreConsumed()) {
+                                if (dragging) {
+                                    dragProgress?.let(commitSeek)
+                                } else {
+                                    commitSeek(change.position.x / size.width)
+                                }
+                                break
+                            }
+                            val dx = change.position.x - downX
+                            if (!dragging && abs(dx) >= slop) dragging = true
+                            if (dragging) {
+                                val f = (change.position.x / size.width).coerceIn(0f, 1f)
+                                dragProgress = f
+                                onDragFractionChange?.invoke(f)
+                            }
+                        }
+                    } finally {
+                        // 手势被打断（来电/切后台/弹窗覆盖）也要复位，避免滑块卡在拖动位置
                         dragProgress = null
                         onDragFractionChange?.invoke(null)
-                    },
-                    onDragCancel = {
-                        dragProgress = null
-                        onDragFractionChange?.invoke(null)
-                    },
-                ) { change, _ ->
-                    val f = (change.position.x / size.width).coerceIn(0f, 1f)
-                    dragProgress = f
-                    onDragFractionChange?.invoke(f)
+                    }
                 }
             },
     ) {
