@@ -1528,7 +1528,7 @@ private fun PreviewPlayerArea(
                     LineSlider(
                         progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
                         buffered = if (playerState.durationMs > 0) playerState.bufferedMs.toFloat() / playerState.durationMs else 0f,
-                        onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
+                        onSeek = { Players.seekTo((it * Players.durationMs()).toLong()) },
                         modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                         onDragFractionChange = { onSeekDragChange(it != null) },
                     )
@@ -2403,7 +2403,7 @@ private fun FullscreenPlayLayout(
                         LineSlider(
                             progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
                             buffered = if (playerState.durationMs > 0) playerState.bufferedMs.toFloat() / playerState.durationMs else 0f,
-                            onSeek = { Players.seekTo((it * playerState.durationMs).toLong()) },
+                            onSeek = { Players.seekTo((it * Players.durationMs()).toLong()) },
                             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                             onDragFractionChange = {
                                 sliderSeekFraction = it

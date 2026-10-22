@@ -474,7 +474,8 @@ object Players {
     fun durationMs(): Long = player?.let { if (it.duration != C.TIME_UNSET) it.duration.coerceAtLeast(0L) else 0L } ?: 0L
 
     fun seekTo(positionMs: Long) {
-        player?.seekTo(positionMs.coerceIn(0L, _state.value.durationMs.takeIf { it > 0 } ?: Long.MAX_VALUE))
+        val dur = durationMs().takeIf { it > 0 } ?: Long.MAX_VALUE
+        player?.seekTo(positionMs.coerceIn(0L, dur))
     }
 
     fun setSpeed(speed: Float) {
