@@ -131,6 +131,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** fongmi PiP.update 同款：视频区矩形持续同步给系统，进/出小窗动画（含圆角）按此计算 */
+    fun syncPipSourceRect(rect: Rect) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        try {
+            setPictureInPictureParams(
+                PictureInPictureParams.Builder()
+                    .setAspectRatio(videoAspectRational())
+                    .setActions(buildPipActions())
+                    .setSourceRectHint(rect)
+                    .build(),
+            )
+        } catch (_: Exception) {
+        }
+    }
+
     override fun onPictureInPictureModeChanged(
         isInPictureInPictureMode: Boolean,
         newConfig: Configuration,

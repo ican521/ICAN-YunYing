@@ -272,6 +272,14 @@ fun PlayerScreen(
             .inflate(com.ican.tvplay.R.layout.player_view, null) as PlayerView
     }.apply {
         Players.bindPlayerView(this)
+        // fongmi VideoActivity 同款：视频区矩形变化即同步 sourceRectHint，
+        // 系统进/出画中画动画（含圆角插值）以最新矩形计算
+        addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            val rect = android.graphics.Rect()
+            if (v.getGlobalVisibleRect(rect)) {
+                (context as? com.ican.tvplay.MainActivity)?.syncPipSourceRect(rect)
+            }
+        }
     }
     DisposableEffect(Unit) {
         onDispose { Players.unbindPlayerView(sharedPlayerView) }
