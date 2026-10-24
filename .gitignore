@@ -22,3 +22,11 @@ Thumbs.db
 
 # Deliverable APKs (kept on disk, not tracked)
 *.apk
+
+# 调试垃圾：根目录截图 / UI dump / 图标设计稿，避免再次误提交
+/ui.xml
+/.ui_dump*.xml
+/screen*.png
+/icon_*.*
+apk_check_tmp/
+.kotlin/
