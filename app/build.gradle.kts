@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     // AGP 9 内置 Kotlin，无需应用 org.jetbrains.kotlin.android
@@ -6,6 +9,13 @@ plugins {
     // AGP 9 内置 Kotlin 已在 classpath 提供 parcelize，无版本直接应用（KernelSU Route 需要 @Parcelize）
     id("org.jetbrains.kotlin.plugin.parcelize")
     alias(libs.plugins.ksp)
+}
+
+// 签名凭据存于根目录 local.properties（本地文件，已被 .gitignore 忽略），禁止硬编码进构建脚本
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.let { file ->
+        FileInputStream(file).use { load(it) }
+    }
 }
 
 android {
@@ -25,9 +35,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("release.keystore")
-            storePassword = "***REMOVED***"
-            keyAlias = "icanyunying"
-            keyPassword = "***REMOVED***"
+            storePassword = localProps.getProperty("RELEASE_STORE_PASSWORD")
+            keyAlias = localProps.getProperty("RELEASE_KEY_ALIAS")
+            keyPassword = localProps.getProperty("RELEASE_KEY_PASSWORD")
         }
     }
 
