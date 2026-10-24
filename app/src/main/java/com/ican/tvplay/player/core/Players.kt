@@ -1,7 +1,6 @@
 package com.ican.tvplay.player.core
 
 import android.content.Context
-import android.view.View
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -149,10 +148,10 @@ object Players {
     /** 字幕位置百分比（正数上移，0 为默认贴底） */
     private var subtitlePosition = 0f
 
+    /** 添加外挂字幕后，需要在 onTracksChanged 中强制选中该外挂字幕轨道 */
+    private var pendingSelectExternalSubtitle = false
+
     private var subtitleViewRef: SubtitleView? = null
-    private val subtitleLayoutListener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-        applySubtitlePosition()
-    }
 
     /** 播放前源类型探测任务：换源/切集时取消上一个，避免旧探测结果覆盖新播放 */
     private var probeJob: Job? = null
@@ -406,6 +405,38 @@ object Players {
             val codec = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO }
                 ?.let { g -> (0 until g.length).firstNotNullOfOrNull { i -> g.getTrackFormat(i).codecs } }
             Log.d(TAG, "onTracksChanged videoCodec=$codec")
+            // 字幕轨道调试日志
+            val textGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
+            textGroups.forEachIndexed { gi, g ->
+                for (i in 0 until g.length) {
+                    val fmt = g.getTrackFormat(i)
+                    Log.d(TAG, "  textTrack[$gi][$i] label=${fmt.label} mime=${fmt.sampleMimeType} lang=${fmt.language} flags=${fmt.selectionFlags} selected=${g.isSelected}")
+                }
+            }
+            // 添加外挂字幕后，强制选中 label 不为空的外挂字幕轨道（内嵌字幕 label 通常为 null）
+            // 注意：onTracksChanged 可能在轨道清空时先触发一次，此时找不到外挂字幕，不能重置标志
+            if (pendingSelectExternalSubtitle) {
+                val p = player
+                if (p != null) {
+                    val extGroupIndex = textGroups.indexOfFirst { g ->
+                        (0 until g.length).any { i -> g.getTrackFormat(i).label != null }
+                    }
+                    if (extGroupIndex >= 0) {
+                        val g = textGroups[extGroupIndex]
+                        val trackIndex = (0 until g.length).first { i -> g.getTrackFormat(i).label != null }
+                        val builder = p.trackSelectionParameters.buildUpon()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                            .setOverrideForType(
+                                TrackSelectionOverride(g.mediaTrackGroup, listOf(trackIndex))
+                            )
+                        p.trackSelectionParameters = builder.build()
+                        pendingSelectExternalSubtitle = false
+                        Log.d(TAG, "  force select external subtitle group=$extGroupIndex track=$trackIndex label=${g.getTrackFormat(trackIndex).label}")
+                    } else {
+                        Log.d(TAG, "  pendingSelectExternalSubtitle: no external subtitle track found yet, keep waiting")
+                    }
+                }
+            }
             _state.value = _state.value.copy(
                 audioTracks = collectOptions(tracks, C.TRACK_TYPE_AUDIO),
                 textTracks = collectOptions(tracks, C.TRACK_TYPE_TEXT),
@@ -438,7 +469,6 @@ object Players {
     /** 视图销毁时解绑（仅当是当前绑定的视图才清空，防止全屏/竖屏切换时误清新绑定） */
     fun unbindPlayerView(view: PlayerView) {
         if (playerView === view) {
-            subtitleViewRef?.removeOnLayoutChangeListener(subtitleLayoutListener)
             subtitleViewRef = null
             playerView = null
             view.player = null
@@ -501,24 +531,58 @@ object Players {
     }
 
     private fun applySubtitleScale() {
-        subtitleViewRef?.setFractionalTextSize(
+        val view = resolveSubtitleView()
+        if (com.ican.tvplay.BuildConfig.DEBUG) {
+            val cues = player?.currentCues?.cues?.size ?: -1
+            Log.d(TAG, "applySubtitleScale scale=$subtitleScale view=$view cues=$cues")
+        }
+        if (view == null) return
+        // media3 默认 applyEmbeddedFontSizes=true，SSA/ASS 等带内嵌样式字幕的 textSize
+        // 会覆盖 setFractionalTextSize 设置的 defaultTextSize。
+        // 非默认字号时禁用内嵌字体大小，让 defaultTextSize 对所有字幕格式生效。
+        view.setApplyEmbeddedFontSizes(subtitleScale == 1.0f)
+        view.setFractionalTextSize(
             SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * subtitleScale,
         )
+        view.invalidate()
     }
 
     private fun applySubtitlePosition() {
-        val view = subtitleViewRef ?: return
-        val height = view.height
-        if (height <= 0) return   // 尚未布局完成，等 OnLayoutChange 回调再应用
-        view.translationY = -(subtitlePosition / 100f) * height
+        val view = resolveSubtitleView()
+        if (com.ican.tvplay.BuildConfig.DEBUG) {
+            Log.d(TAG, "applySubtitlePosition position=$subtitlePosition view=$view")
+        }
+        if (view == null) return
+        // 用 media3 官方 bottomPaddingFraction 控制字幕垂直位置：
+        // 默认 0.08（距底部 8%），范围 0~1。
+        // position: -100(贴底) ~ 0(默认) ~ +100(顶部)
+        val defaultFraction = SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION
+        val fraction = if (subtitlePosition >= 0f) {
+            defaultFraction + (subtitlePosition / 100f) * (1.0f - defaultFraction)
+        } else {
+            defaultFraction + (subtitlePosition / 100f) * defaultFraction
+        }
+        view.setBottomPaddingFraction(fraction.coerceIn(0f, 1f))
+        view.invalidate()
     }
 
-    /** 绑定 PlayerView 内部的 SubtitleView，并在尺寸变化（竖屏/全屏切换）后重算位置 */
+    /** 获取当前绑定的 SubtitleView，若引用丢失则尝试从 PlayerView 重新取 */
+    private fun resolveSubtitleView(): SubtitleView? {
+        subtitleViewRef?.let { return it }
+        val pv = playerView ?: return null
+        val sv = pv.subtitleView
+        if (sv != null) {
+            subtitleViewRef = sv
+            applySubtitleScale()
+            applySubtitlePosition()
+        }
+        return sv
+    }
+
+    /** 绑定 PlayerView 内部的 SubtitleView，并立即应用字号/位置设置 */
     private fun attachSubtitleView(view: SubtitleView?) {
         if (subtitleViewRef !== view) {
-            subtitleViewRef?.removeOnLayoutChangeListener(subtitleLayoutListener)
             subtitleViewRef = view
-            view?.addOnLayoutChangeListener(subtitleLayoutListener)
         }
         applySubtitleScale()
         applySubtitlePosition()
@@ -700,8 +764,20 @@ object Players {
         val spec = currentSpec ?: return
         val p = player ?: return
         val pos = p.currentPosition
+        if (com.ican.tvplay.BuildConfig.DEBUG) {
+            Log.d(TAG, "addSubtitle url=${sub.url} pos=$pos mime=${sub.mimeType}")
+        }
         val newSpec = spec.copy(subs = spec.subs.filterNot { it.url == sub.url } + sub)
         currentSpec = newSpec
+        // MPV 内核：直接调用 player.addSubtitle()，不重建 MediaSource（仿 fongmi MpvPlayerEngine.addSubtitle）
+        if (p is androidx.media3.mpvplayer.MpvPlayer) {
+            val subConfig = MediaItemFactory.buildSingleSubConfig(sub)
+            val ok = p.addSubtitle(subConfig)
+            Log.d(TAG, "addSubtitle mpv addSubtitle=$ok")
+            return
+        }
+        // EXO 内核：ExoPlayer 无 addSubtitle，需重建 MediaSource
+        pendingSelectExternalSubtitle = true
         startInternal(p, newSpec, pos)
     }
 
@@ -784,6 +860,9 @@ object Players {
                 if (decode == Decode.SOFT) DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
                 else DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF,
             )
+        // MediaSourceFactory：统一处理 headers 和字幕偏移解析器
+        val mediaSourceFactory = DefaultMediaSourceFactory(ctx)
+            .setSubtitleParserFactory(SubtitleOffsetParserFactory { _state.value.subtitleOffsetMs })
         // 缓冲：默认时长 × 档位倍率（仿 fongmi buffer 设置）。
         // 用支持热切换的 TieredLoadControl 包装：切换档位不重建播放器，播放头追上旧缓冲边缘后换策略
         val loadControl = TieredLoadControl(tier)
@@ -797,6 +876,7 @@ object Players {
             .setTrackSelector(DefaultTrackSelector(ctx))
             .setLoadControl(loadControl)
             .setBandwidthMeter(meter)
+            .setMediaSourceFactory(mediaSourceFactory)
             .build()
             .apply {
                 // CONTENT_TYPE_MOVIE 让系统把 AC3/EAC3/DTS 等音频路由到正确的硬件路径
@@ -812,6 +892,14 @@ object Players {
                 addListener(listener)
                 setPlaybackSpeed(_state.value.speed)
             }
+    }
+
+    /** 仿 fongmi LangUtil.getPreferredTextLanguages：按系统语言生成首选字幕语言列表 */
+    private fun preferredTextLanguages(): Array<String> {
+        val locale = java.util.Locale.getDefault()
+        val tag = locale.toLanguageTag()
+        val language = locale.language
+        return if (tag == language) arrayOf(language) else arrayOf(tag, language)
     }
 
     private fun startInternal(p: Player, spec: PlaySpec, positionMs: Long) {
@@ -847,14 +935,15 @@ object Players {
                 .setAllowCrossProtocolRedirects(true)
             p.setMediaSource(
                 DefaultMediaSourceFactory(ds)
-                    // 外挂字幕解析阶段平移时间轴（media3 官方无播放器级偏移 API）
                     .setSubtitleParserFactory(SubtitleOffsetParserFactory { _state.value.subtitleOffsetMs })
                     .createMediaSource(item),
-                positionMs,
             )
         } else {
-            p.setMediaItem(item, positionMs)
+            // headers 为空时走 setMediaItem，使用 buildExoPlayer 中设置的 mediaSourceFactory
+            // （已包含 SubtitleParserFactory + experimentalParseSubtitlesDuringExtraction）
+            p.setMediaItem(item)
         }
+        if (positionMs > 0L) p.seekTo(positionMs)
         p.prepare()
         p.play()
     }

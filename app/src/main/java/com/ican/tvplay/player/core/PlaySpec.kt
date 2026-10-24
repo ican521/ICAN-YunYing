@@ -41,19 +41,30 @@ object MediaItemFactory {
         return MediaItem.Builder()
             .setUri(Uri.parse(spec.url))
             .setMimeType(spec.format)
-            .setSubtitleConfigurations(spec.subs.map(::buildSubConfig))
+            .setSubtitleConfigurations(spec.subs.mapIndexed { index, sub -> buildSubConfig(sub, index, spec.subs.size) })
             .build()
     }
 
-    private fun buildSubConfig(sub: SubItem): MediaItem.SubtitleConfiguration {
+    private fun buildSubConfig(sub: SubItem, index: Int, total: Int): MediaItem.SubtitleConfiguration {
         val uri = Uri.parse(sub.url)
         val mime = sub.mimeType ?: guessSubtitleMime(uri.path)
+        // 仿 fongmi：仅有一个外挂字幕时不设标志；多个时第一个用 DEFAULT（默认选中），其余 AUTOSELECT
+        val flag = when {
+            total <= 1 -> 0
+            index == 0 -> C.SELECTION_FLAG_DEFAULT
+            else -> C.SELECTION_FLAG_AUTOSELECT
+        }
         return MediaItem.SubtitleConfiguration.Builder(uri)
             .setLabel(sub.name)
             .setMimeType(mime)
             .setLanguage(sub.lang)
-            .setSelectionFlags(C.SELECTION_FLAG_AUTOSELECT)
+            .setSelectionFlags(flag)
             .build()
+    }
+
+    /** 构建单个外挂字幕 SubtitleConfiguration（用于 MPV player.addSubtitle 动态添加） */
+    fun buildSingleSubConfig(sub: SubItem): MediaItem.SubtitleConfiguration {
+        return buildSubConfig(sub, 0, 1)
     }
 
     /** 按扩展名猜字幕格式（仿 fongmi TrackUtil.getSubtitleMimeType） */

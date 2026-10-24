@@ -1,6 +1,7 @@
 package com.ican.tvplay.player
 
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Point
 import android.os.Build
@@ -79,6 +80,8 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import kotlin.math.hypot
@@ -150,6 +153,7 @@ import com.ican.tvplay.player.core.PlaybackService
 import com.ican.tvplay.player.core.PlaySpec
 import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.player.core.SubItem
+import com.ican.tvplay.player.core.MediaItemFactory
 import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.FadingScrim
@@ -229,16 +233,46 @@ fun PlayerScreen(
     val container = appContainer()
     val scope = rememberCoroutineScope()
 
-    // 添加字幕：直接调起系统文件选择器，选中后立即加载外挂字幕
-    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    // 添加字幕：直接调起原生文件管理器（AOSP DocumentsUI），fongmi 同款 Intent
+    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val data = result.data
+        val uri = data?.data
         if (uri != null) {
+            // 持久化读取权限：addSubtitle 会重新 prepare 播放器，若不持久化则无法再次读取该 Uri
+            val flags = data.flags
+            if (flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION != 0) {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            }
             val name = runCatching {
                 context.contentResolver
                     .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
                     ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
             }.getOrNull()?.takeIf { it.isNotBlank() } ?: "外挂字幕"
-            Players.addSubtitle(SubItem(name = name, url = uri.toString()))
+            // 按文件名扩展名猜 mime，避免 content:// Uri 的 path 无扩展名导致解析失败
+            val mime = MediaItemFactory.guessSubtitleMime(name)
+            Players.addSubtitle(SubItem(name = name, url = uri.toString(), mimeType = mime))
         }
+    }
+    val launchSubtitlePicker = {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .setType("*/*")
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .putExtra(Intent.EXTRA_MIME_TYPES, SUBTITLE_MIME_TYPES)
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false)
+            .putExtra("android.content.extra.SHOW_ADVANCED", true)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            .addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        // 直接指定原生 DocumentsUI 的 PickActivity，绕过 MIUI 等定制 ROM 的文件管理器拦截
+        val nativePkg = listOf("com.google.android.documentsui", "com.android.documentsui")
+            .firstOrNull { pkg ->
+                runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
+            }
+        if (nativePkg != null) {
+            intent.setClassName(nativePkg, "com.android.documentsui.picker.PickActivity")
+        }
+        subtitlePicker.launch(intent)
     }
 
     val playerState by Players.state.collectAsStateWithLifecycle()
@@ -1144,7 +1178,7 @@ fun PlayerScreen(
             },
             onSeekDragChange = { seekDragging = it },
             onOpenSubtitleSettings = { showSubtitleSettings = true },
-            onAddSubtitle = { subtitlePicker.launch(SUBTITLE_MIME_TYPES) },
+            onAddSubtitle = { launchSubtitlePicker() },
             subtitleSettingsOpen = showSubtitleSettings,
         )
         }
@@ -1245,7 +1279,7 @@ fun PlayerScreen(
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
             onSeekDragChange = { seekDragging = it },
             onOpenSubtitleSettings = { showSubtitleSettings = true },
-            onAddSubtitle = { subtitlePicker.launch(SUBTITLE_MIME_TYPES) },
+            onAddSubtitle = { launchSubtitlePicker() },
         )
         }
         }
@@ -3063,7 +3097,7 @@ private fun <T> OptionDialog(
         renderInRootScaffold = true,
         largeScreen = false,
         onDismissRequest = onDismiss,
-        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
+        outsideMargin = DpSize(16.dp, 0.dp),
     ) {
         Column(
             modifier = Modifier
@@ -3129,10 +3163,17 @@ private fun SubtitleDialog(
         renderInRootScaffold = true,
         largeScreen = false,
         onDismissRequest = onDismiss,
-        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
+        outsideMargin = DpSize(16.dp, 0.dp),
     ) {
+        val maxDialogHeight = with(LocalConfiguration.current) { (screenHeightDp * 0.65f).dp }
         // 行间距与 OptionDialog（倍速/缓冲等弹窗）统一为 6dp
-        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = maxDialogHeight)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             // 纯展示：当前正在生效的字幕（无字幕/已关闭时显示「无」）
             SubInfoRow(
                 label = "显示当前字幕",
@@ -3708,4 +3749,5 @@ private fun PlayerErrorScreen(
         }
     }
 }
+
 private const val HIDE_DELAY_MS = 5_000L

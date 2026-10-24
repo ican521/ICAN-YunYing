@@ -21,13 +21,23 @@ internal class SubtitleOffsetParserFactory(
 
     private val delegate = DefaultSubtitleParserFactory()
 
-    override fun supportsFormat(format: Format): Boolean = delegate.supportsFormat(format)
+    override fun supportsFormat(format: Format): Boolean {
+        val result = delegate.supportsFormat(format)
+        if (com.ican.tvplay.BuildConfig.DEBUG) {
+            android.util.Log.d("SubtitleOffset", "supportsFormat mime=${format.sampleMimeType} result=$result")
+        }
+        return result
+    }
 
     override fun getCueReplacementBehavior(format: Format): Int =
         delegate.getCueReplacementBehavior(format)
 
-    override fun create(format: Format): SubtitleParser =
-        OffsetSubtitleParser(delegate.create(format), offsetMsProvider)
+    override fun create(format: Format): SubtitleParser {
+        if (com.ican.tvplay.BuildConfig.DEBUG) {
+            android.util.Log.d("SubtitleOffset", "create mime=${format.sampleMimeType}")
+        }
+        return OffsetSubtitleParser(delegate.create(format), offsetMsProvider)
+    }
 }
 
 @OptIn(UnstableApi::class)
@@ -41,7 +51,12 @@ private class OffsetSubtitleParser(
         outputOptions: SubtitleParser.OutputOptions,
         output: Consumer<CuesWithTiming>,
     ) {
-        delegate.parse(data, outputOptions) { cues -> output.accept(shift(cues)) }
+        delegate.parse(data, outputOptions) { cues ->
+            if (com.ican.tvplay.BuildConfig.DEBUG) {
+                android.util.Log.d("SubtitleOffset", "parse cues=${cues.cues.size} startUs=${cues.startTimeUs} durUs=${cues.durationUs} dataLen=${data.size}")
+            }
+            output.accept(shift(cues))
+        }
     }
 
     override fun parse(
@@ -51,7 +66,12 @@ private class OffsetSubtitleParser(
         outputOptions: SubtitleParser.OutputOptions,
         output: Consumer<CuesWithTiming>,
     ) {
-        delegate.parse(data, offset, length, outputOptions) { cues -> output.accept(shift(cues)) }
+        delegate.parse(data, offset, length, outputOptions) { cues ->
+            if (com.ican.tvplay.BuildConfig.DEBUG) {
+                android.util.Log.d("SubtitleOffset", "parse(offset) cues=${cues.cues.size} startUs=${cues.startTimeUs} durUs=${cues.durationUs} dataLen=$length")
+            }
+            output.accept(shift(cues))
+        }
     }
 
     override fun parseToLegacySubtitle(data: ByteArray, offset: Int, length: Int): Subtitle =
