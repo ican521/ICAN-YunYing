@@ -76,7 +76,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -412,7 +412,7 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                     verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                 ) {
-                    gridItems(pageVideos.value, key = { it.id }) { video ->
+                    gridItems(pageVideos.value, key = { it.id }, contentType = { if (driveStyle.value) "drive" else "video" }) { video ->
                         if (driveStyle.value) {
                             DriveRowItem(video = video, onClick = { onItemClick(video) })
                         } else {
@@ -428,7 +428,7 @@ fun HomeScreen(
                     //   可滚距离 = (内容总高 + Spacer高 + cardGapV) - (可视区高 - 顶栏占位 - 底部占位)
                     //   令其 = searchRowMaxCollapsePx，反解 Spacer 高
                     if (driveStyle.value && pageVideos.value.isNotEmpty()) {
-                        item(key = "drive_bottom_spacer", span = { GridItemSpan(maxLineSpan) }) {
+                        item(key = "drive_bottom_spacer", contentType = "spacer", span = { GridItemSpan(maxLineSpan) }) {
                             val itemCount = pageVideos.value.size
                             val rowHeightPx = with(density) { 64.dp.toPx() }
                             val gapPx = with(density) { Spacing.cardGapV.toPx() }
@@ -570,7 +570,7 @@ fun SitePickerDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.heightIn(max = 380.dp),
                 ) {
-                    items(sites, key = { it.key }) { site ->
+                    items(sites, key = { it.key }, contentType = { "site" }) { site ->
                         val isCurrent = site.key == currentKey
                         val shape = RoundedCornerShape(Spacing.corner)
                         // toggleVersion 仅作重组触发key：开关切换后重读开关状态刷新图标着色
@@ -806,7 +806,7 @@ private fun UnderlineTabRow(
         val availableWidthPx = with(density) { availableWidth.toPx() }
         var lastSettledIndex by remember { mutableIntStateOf(-1) }
 
-        // 各 tab 文字的实际渲染宽度（选中加粗后由 onGloballyPositioned 重新记录）
+        // 各 tab 文字的实际渲染宽度（选中加粗后由 onSizeChanged 重新记录；只需宽度，不用 onGloballyPositioned 监听位置）
         val textWidths = remember { mutableStateMapOf<Int, Int>() }
         val fallbackIndicatorPx = with(density) { 20.dp.toPx() }
         val indicatorWidthPx = textWidths[selectedTabIndex]?.toFloat() ?: fallbackIndicatorPx
@@ -868,7 +868,7 @@ private fun UnderlineTabRow(
                 userScrollEnabled = hasScrollRange,
                 modifier = Modifier.fillMaxSize(),
             ) {
-                itemsIndexed(tabs) { index, tabText ->
+                itemsIndexed(tabs, contentType = { _, _ -> "tab" }) { index, tabText ->
                     val selected = selectedTabIndex == index
                     // 文字贴底对齐 + 底部预留 12dp = 指示器高3 + 指示器下距3 + 目标间距6：
                     // 保证「文字底缘→指示器顶缘」与「指示器底缘→下方内容」(3+3=6) 严格相等 6dp，
@@ -899,8 +899,8 @@ private fun UnderlineTabRow(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
                                 .padding(bottom = 12.dp)
-                                .onGloballyPositioned { coords ->
-                                    textWidths[index] = coords.size.width
+                                .onSizeChanged { size ->
+                                    textWidths[index] = size.width
                                 },
                         )
                     }

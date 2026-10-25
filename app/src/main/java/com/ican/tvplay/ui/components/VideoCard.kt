@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -21,8 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.SubcomposeAsyncImage
-import coil3.compose.SubcomposeAsyncImageContent
+import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
@@ -129,14 +132,22 @@ fun PosterImage(
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     val context = LocalContext.current
-    SubcomposeAsyncImage(
-        model = posterModel(context, cover),
-        contentDescription = title,
-        contentScale = contentScale,
-        modifier = modifier,
-        error = { PosterTextFallback(title) },
-        success = { SubcomposeAsyncImageContent() },
-    )
+    // 轻量 AsyncImage（替代 SubcomposeAsyncImage：去掉子组合的二次测量开销）；
+    // 加载失败叠标题文字兜底，与原 error 槽行为一致（remember key 到 cover：换封面后重置失败态）
+    var failed by remember(cover) { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        AsyncImage(
+            model = posterModel(context, cover),
+            contentDescription = title,
+            contentScale = contentScale,
+            modifier = Modifier.fillMaxSize(),
+            onSuccess = { failed = false },
+            onError = { failed = true },
+        )
+        if (failed) {
+            PosterTextFallback(title)
+        }
+    }
 }
 
 /** 无海报时的文字兜底：居中显示标题（最多 3 行，超出省略） */

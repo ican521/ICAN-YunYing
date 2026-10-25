@@ -178,8 +178,7 @@ fun MultiSourceSearchScreen(
                     }
                 }
                 // === 具体站源（固定宽度胶囊，仅取 | 前名称，不显示条数）===
-                itemsIndexed(sites, key = { _, entry -> entry.site.key }) { _, entry ->
-                    val idx = sites.indexOf(entry)
+                itemsIndexed(sites, key = { _, entry -> entry.site.key }, contentType = { _, _ -> "site" }) { idx, entry ->
                     SiteSourceChip(
                         name = siteShortName(entry.site.name, entry.site.key),
                         selected = idx == selectedIndex,
@@ -229,7 +228,7 @@ fun MultiSourceSearchScreen(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                         verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                     ) {
-                        items(displayVideos, key = { "${it.video.id}_${it.siteKey}" }) { dv ->
+                        items(displayVideos, key = { "${it.video.id}_${it.siteKey}" }, contentType = { "video" }) { dv ->
                             CrossSourceVideoCard(
                                 video = dv.video,
                                 siteName = dv.siteName,

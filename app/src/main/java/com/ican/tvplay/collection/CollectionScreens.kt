@@ -147,14 +147,14 @@ fun FavoritesScreen(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                     verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                 ) {
-                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                item(contentType = "updates_entry", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
                     UpdatesEntry(
                         todayCount = todayUpdates.size,
                         pendingCount = pendingUpdates.size,
                         onClick = onUpdatesClick,
                     )
                 }
-                items(favorites, key = { it.videoId }) { item ->
+                items(favorites, key = { it.videoId }, contentType = { "favorite" }) { item ->
                     FavoriteCard(
                         entity = item,
                         editMode = editMode,
@@ -472,7 +472,7 @@ fun HistoryScreen(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                     verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                 ) {
-                items(histories, key = { it.videoId }) { history ->
+                items(histories, key = { it.videoId }, contentType = { "history" }) { history ->
                     HistoryCard(
                         history = history,
                         editMode = editMode,

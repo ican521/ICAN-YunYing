@@ -100,9 +100,6 @@ object Players {
         val ready: Boolean = false,
         val playing: Boolean = false,
         val buffering: Boolean = false,
-        val positionMs: Long = 0L,
-        val durationMs: Long = 0L,
-        val bufferedMs: Long = 0L,
         val speed: Float = 1.0f,
         val decode: Decode = Decode.HARD,
         val kernel: Kernel = Kernel.EXO,
@@ -118,8 +115,19 @@ object Players {
         val networkSpeedBps: Long = 0L,
     )
 
+    /** 高频进度（播放中每 500ms 一跳）：与 PlayerState 拆开，
+     *  进度刷新只重组订阅本流的进度条/时间文本，不再牵动整个播放页 */
+    data class ProgressState(
+        val positionMs: Long = 0L,
+        val durationMs: Long = 0L,
+        val bufferedMs: Long = 0L,
+    )
+
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state.asStateFlow()
+
+    private val _progress = MutableStateFlow(ProgressState())
+    val progress: StateFlow<ProgressState> = _progress.asStateFlow()
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -374,7 +382,7 @@ object Players {
         override fun run() {
             val p = player ?: return
             if (p.duration != C.TIME_UNSET) {
-                _state.value = _state.value.copy(
+                _progress.value = ProgressState(
                     positionMs = p.currentPosition.coerceAtLeast(0L),
                     durationMs = p.duration.coerceAtLeast(0L),
                     bufferedMs = p.bufferedPosition.coerceAtLeast(0L),
@@ -676,11 +684,11 @@ object Players {
         onPlayerChanged?.invoke(null)
         _state.value = _state.value.copy(
             ready = false, playing = false, buffering = false,
-            positionMs = 0L, durationMs = 0L, bufferedMs = 0L,
             audioTracks = emptyList(), textTracks = emptyList(),
             subtitleOffsetMs = 0L, error = null,
             networkSpeedBps = 0L,
         )
+        _progress.value = ProgressState()
     }
 
     /** 后台：暂停并释放音频焦点（不销毁 player，页面回来还能恢复） */

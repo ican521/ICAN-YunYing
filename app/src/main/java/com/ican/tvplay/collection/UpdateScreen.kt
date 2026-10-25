@@ -160,7 +160,7 @@ fun UpdateScreen(
 
                     if (today.isNotEmpty()) {
                         item { SectionTitle("今日更新", today.size) }
-                        items(today, key = { it.favorite.videoId }) { item ->
+                        items(today, key = { it.favorite.videoId }, contentType = { "update" }) { item ->
                             UpdateRow(
                                 item = item,
                                 onClick = { play(item) },
@@ -171,7 +171,7 @@ fun UpdateScreen(
 
                     if (pending.isNotEmpty()) {
                         item { SectionTitle("待看更新", pending.size) }
-                        items(pending, key = { it.favorite.videoId }) { item ->
+                        items(pending, key = { it.favorite.videoId }, contentType = { "update" }) { item ->
                             UpdateRow(
                                 item = item,
                                 onClick = { play(item) },
@@ -222,7 +222,7 @@ fun UpdatePopupDialog(
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
-                items(items, key = { it.favorite.videoId }) { item ->
+                items(items, key = { it.favorite.videoId }, contentType = { "update" }) { item ->
                     PopupUpdateRow(item = item, onClick = { onPlay(item) })
                 }
             }

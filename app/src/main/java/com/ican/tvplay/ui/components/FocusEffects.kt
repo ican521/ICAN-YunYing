@@ -17,11 +17,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
@@ -120,7 +120,6 @@ fun Modifier.tvCardEffect(
     LaunchedEffect(freezeScale) {
         frozenAt = if (freezeScale) animatedScale else null
     }
-    val scale = frozenAt ?: animatedScale
 
     val accent = MaterialTheme.colorScheme.primary
     val isDark = LocalDarkTheme.current
@@ -135,7 +134,12 @@ fun Modifier.tvCardEffect(
     val showHoldOverlay = holdDownState && isDark
 
     return this
-        .scale(scale)
+        // 动画值在 graphicsLayer lambda 内（绘制阶段）读取：缩放动画期间不再每帧触发重组
+        .graphicsLayer {
+            val currentScale = frozenAt ?: animatedScale
+            scaleX = currentScale
+            scaleY = currentScale
+        }
         .then(
             if (glow) {
                 Modifier.blackElevationShadow(if (focused) 18.dp else 6.dp, shape)

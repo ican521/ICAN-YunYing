@@ -21,6 +21,7 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -28,6 +29,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -95,19 +97,25 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.State
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -118,8 +126,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -697,7 +707,6 @@ fun PlayerScreen(
         // 直接从 player 读当前位置，不依赖 state（release 会重置 state，导致最后一次保存读到 0）
         val pos = Players.currentPositionMs()
         val dur = Players.durationMs()
-        val st = Players.state.value.copy(positionMs = pos, durationMs = dur)
         // 同步片头/片尾标记到播放上下文（后台切集/通知栏用）
         Players.playbackContext?.takeIf { it.video.id == v.id }?.let {
             Players.playbackContext = it.copy(openingMs = openingMs, endingMs = endingMs)
@@ -723,8 +732,8 @@ fun PlayerScreen(
                         categoryName = v.categoryName,
                         episodeIndex = episodeIndex,
                         episodeTitle = epTitle,
-                        positionMs = st.positionMs,
-                        durationMs = st.durationMs,
+                        positionMs = pos,
+                        durationMs = dur,
                         updatedAt = System.currentTimeMillis(),
                         openingMs = openingMs,
                         endingMs = endingMs,
@@ -752,11 +761,11 @@ fun PlayerScreen(
 
     /** 短按片头：把当前进度标记为片头（fongmi: canSetOpening + setOpening(position)） */
     fun markOpening() {
-        val st = Players.state.value
-        val limit = opEdLimit(st.durationMs)
-        if (st.durationMs > 0 && st.positionMs > 0 && st.positionMs <= limit) {
-            openingMs = st.positionMs
-            toastMsg("已标记片头 ${formatMs(st.positionMs)}，此后自动跳过")
+        val prog = Players.progress.value
+        val limit = opEdLimit(prog.durationMs)
+        if (prog.durationMs > 0 && prog.positionMs > 0 && prog.positionMs <= limit) {
+            openingMs = prog.positionMs
+            toastMsg("已标记片头 ${formatMs(prog.positionMs)}，此后自动跳过")
             saveProgress()
         } else {
             toastMsg("片头标记需在开头 ${limit / 60_000} 分钟内")
@@ -765,10 +774,10 @@ fun PlayerScreen(
 
     /** 短按片尾：把当前进度距结尾的时长标记为片尾（fongmi: setEnding(duration - position)） */
     fun markEnding() {
-        val st = Players.state.value
-        val remain = st.durationMs - st.positionMs
-        val limit = opEdLimit(st.durationMs)
-        if (st.durationMs > 0 && st.positionMs > 0 && remain in 1..limit) {
+        val prog = Players.progress.value
+        val remain = prog.durationMs - prog.positionMs
+        val limit = opEdLimit(prog.durationMs)
+        if (prog.durationMs > 0 && prog.positionMs > 0 && remain in 1..limit) {
             endingMs = remain
             toastMsg("已标记片尾，播到此处自动下一集")
             saveProgress()
@@ -779,16 +788,19 @@ fun PlayerScreen(
 
     // 片尾自动切下一集（fongmi: onTimeChanged → nextEpisode）
     // 每集只触发一次：endingSkipped 随 episodeIndex 重置（remember key 为 episodeIndex）
+    // 订阅独立进度流：500ms 一跳的进度刷新只触发本效应，不再牵动整个播放页重组
     var endingSkipped by remember(episodeIndex) { mutableStateOf(false) }
-    LaunchedEffect(playerState.positionMs) {
-        val dur = playerState.durationMs
-        if (!endingSkipped && endingMs > 0 && dur > 0 &&
-            endingMs + playerState.positionMs >= dur
-        ) {
-            if (episodeIndex < lineEpisodes.size - 1) {
-                endingSkipped = true
-                toastMsg("已跳过片尾")
-                episodeIndex++
+    LaunchedEffect(episodeIndex) {
+        Players.progress.collect { prog ->
+            val dur = prog.durationMs
+            if (!endingSkipped && endingMs > 0 && dur > 0 &&
+                endingMs + prog.positionMs >= dur
+            ) {
+                if (episodeIndex < lineEpisodes.size - 1) {
+                    endingSkipped = true
+                    toastMsg("已跳过片尾")
+                    episodeIndex++
+                }
             }
         }
     }
@@ -1017,35 +1029,37 @@ fun PlayerScreen(
 
         // 横屏小窗↔全屏放大/缩回过渡：宽/高/顶部偏移连续插值，
         // PlayerView 全程不重建，只有画面在放大，不挂任何控制层
+        // 五个动画值保留为 State<Dp>（不委托）：使用方全部在布局/绘制阶段 lambda 内读取，
+        // 动画进行期间不触发逐帧重组
         val expandTransition = updateTransition(
             targetState = landscapeFullscreen,
             label = "landPlayerExpand",
         )
-        val animWidth by expandTransition.animateDp(
+        val animWidth = expandTransition.animateDp(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "animWidth",
         ) { expanded ->
             if (expanded) screenW else screenW * LAND_PLAYER_WIDTH_FRACTION
         }
-        val animHeight by expandTransition.animateDp(
+        val animHeight = expandTransition.animateDp(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "animHeight",
         ) { expanded ->
             if (expanded) screenH
             else screenW * LAND_PLAYER_WIDTH_FRACTION * (9f / 16f)
         }
-        val animTop by expandTransition.animateDp(
+        val animTop = expandTransition.animateDp(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "animTop",
         ) { expanded -> if (expanded) 0.dp else statusBarTop }
         // 横屏小窗左缘：对齐页面左基线（手机 16dp / 平板 24dp），放大到全屏时收回到 0
         val pageHorizontal = pageHorizontalPadding()
-        val animLeft by expandTransition.animateDp(
+        val animLeft = expandTransition.animateDp(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "animLeft",
         ) { expanded -> if (expanded) 0.dp else pageHorizontal }
         // 小窗圆角半径（方案 B 遮罩用）：小窗态 16dp，放大到全屏同步归零 → 缺口尺寸为 0 自动消失
-        val animCorner by expandTransition.animateDp(
+        val animCorner = expandTransition.animateDp(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "animCorner",
         ) { expanded -> if (expanded) 0.dp else Spacing.corner }
@@ -1102,21 +1116,34 @@ fun PlayerScreen(
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
                 // 深色：小窗（非全屏）四周加圆角描边；全屏时圆角归零且不挂描边修饰符
                 isLandscape -> {
-                    val cornerShape = RoundedCornerShape(animCorner)
                     val isDark = com.ican.tvplay.ui.theme.LocalDarkTheme.current
-                    // 深色 + 圆角尚存（非全屏）时才挂描边修饰符；全屏稳态圆角归零，直接不挂 ——
-                    // 若继续挂 0dp 宽的 border，Android Paint 会按「发丝线」画出 1px，
-                    // 导致平板深色全屏时四周残留一圈描边
-                    val borderModifier = if (isDark && animCorner > 1.dp) {
-                        Modifier.border(width = 1.dp, color = Color.White.copy(alpha = 0.15f), shape = cornerShape)
-                    } else Modifier
                     Modifier
-                        .offset(x = animLeft, y = animTop)
-                        .width(animWidth)
-                        .height(animHeight)
-                        .clip(cornerShape)
+                        // 动画值全部在布局/绘制阶段的 lambda 内读取：放大/缩回动画期间本分支不触发逐帧重组
+                        .offset { IntOffset(animLeft.value.roundToPx(), animTop.value.roundToPx()) }
+                        .animatedSize(animWidth, animHeight)
+                        .graphicsLayer {
+                            shape = RoundedCornerShape(animCorner.value)
+                            clip = true
+                        }
                         .background(Color.Black)
-                        .then(borderModifier)
+                        .drawWithContent {
+                            drawContent()
+                            // 深色 + 圆角尚存（非全屏）时才画描边；全屏稳态圆角归零不画 ——
+                            // 若继续画 0dp 宽的描边，Android Paint 会按「发丝线」画出 1px，
+                            // 导致平板深色全屏时四周残留一圈描边（原 border 修饰符的等价绘制）
+                            val corner = animCorner.value
+                            if (isDark && corner > 1.dp) {
+                                val strokePx = 1.dp.toPx()
+                                val half = strokePx / 2
+                                drawRoundRect(
+                                    color = Color.White.copy(alpha = 0.15f),
+                                    topLeft = Offset(half, half),
+                                    size = Size(size.width - strokePx, size.height - strokePx),
+                                    cornerRadius = CornerRadius((corner.toPx() - half).coerceAtLeast(0f)),
+                                    style = Stroke(width = strokePx),
+                                )
+                            }
+                        }
                 }
                 else ->
                     Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f).background(Color.Black)
@@ -1458,16 +1485,16 @@ private fun LandscapePlayLayout(
     controlsVisible: Boolean,
     locked: Boolean,
     // 动画中的播放器边界（小窗静止值 = 38% 宽 16:9 + 状态栏顶部偏移 + 左缘对齐页面左基线）
-    playerTop: Dp,
-    playerLeft: Dp,
-    playerWidth: Dp,
-    playerHeight: Dp,
+    playerTop: State<Dp>,
+    playerLeft: State<Dp>,
+    playerWidth: State<Dp>,
+    playerHeight: State<Dp>,
     smallPlayerWidth: Dp,
     screenWidth: Dp,
     screenHeight: Dp,
     pageHorizontal: Dp,
     /** 小窗圆角半径（遮罩方案，随放大动画归零） */
-    playerCorner: Dp,
+    playerCorner: State<Dp>,
     onToggleControls: () -> Unit,
     onTogglePlay: () -> Unit,
     onPrev: () -> Unit,
@@ -1491,12 +1518,15 @@ private fun LandscapePlayLayout(
         // 播放器覆盖层：与底层常驻 PlayerView 同位同尺寸（尺寸由根 AndroidView 动画值驱动）
         PreviewPlayerArea(
             modifier = Modifier
-                .offset(x = playerLeft, y = playerTop)
-                .width(playerWidth)
-                .height(playerHeight)
+                .offset { IntOffset(playerLeft.value.roundToPx(), playerTop.value.roundToPx()) }
+                .animatedSize(playerWidth, playerHeight)
                 // 控制层随小窗一起裁成圆角：否则底部渐变条（半透明黑压浅色底 = 浅灰）
                 // 的方角会露在圆角缺口里，形成左右下角的浅灰色直角块
-                .clip(RoundedCornerShape(playerCorner)),
+                // （graphicsLayer clip 与 clip 修饰符视觉等效，圆角动画值改到绘制阶段读取）
+                .graphicsLayer {
+                    shape = RoundedCornerShape(playerCorner.value)
+                    clip = true
+                },
             playerState = playerState,
             showLoading = false,
             controlsVisible = controlsVisible,
@@ -1513,8 +1543,13 @@ private fun LandscapePlayLayout(
         // 右侧信息列：锚在视频右缘，宽度固定（小窗时的剩余宽度），随放大向右滑出屏幕
         Column(
             modifier = Modifier
-                .offset(x = playerLeft + playerWidth, y = playerTop)
-                .width(screenWidth - smallPlayerWidth - playerLeft)
+                .offset { IntOffset((playerLeft.value + playerWidth.value).roundToPx(), playerTop.value.roundToPx()) }
+                // 宽度 = 视频右侧剩余宽度（动画值在布局阶段读取，等价 width()）
+                .layout { measurable, constraints ->
+                    val w = (screenWidth - smallPlayerWidth - playerLeft.value).roundToPx()
+                    val placeable = measurable.measure(constraints.copy(minWidth = w, maxWidth = w))
+                    layout(w, placeable.height) { placeable.place(0, 0) }
+                }
                 // 浅色模式下全屏缩回小窗时，根 Box 残留黑底会透出到信息列，
                 // 此处显式覆盖主题背景，确保缩回后恢复浅色
                 .background(MaterialTheme.colorScheme.background)
@@ -1533,9 +1568,14 @@ private fun LandscapePlayLayout(
         // 下方区块：锚在视频下缘，高度为视频下方的剩余空间（放大时随视频增高收缩到 0）
         Column(
             modifier = Modifier
-                .offset(y = playerTop + playerHeight)
+                .offset { IntOffset(0, (playerTop.value + playerHeight.value).roundToPx()) }
                 .fillMaxWidth()
-                .height(screenHeight - playerTop - playerHeight)
+                // 高度 = 视频下方剩余空间（动画值在布局阶段读取，等价 height()）
+                .layout { measurable, constraints ->
+                    val h = (screenHeight - playerTop.value - playerHeight.value).roundToPx()
+                    val placeable = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
+                    layout(placeable.width, h) { placeable.place(0, 0) }
+                }
                 // 浅色模式下全屏缩回小窗时，根 Box 残留黑底会透出到下方区块，
                 // 此处显式覆盖主题背景，确保缩回后恢复浅色
                 .background(MaterialTheme.colorScheme.background)
@@ -1563,6 +1603,15 @@ private fun LandscapePlayLayout(
     }
 }
 
+/** 布局阶段读取动画 Dp 状态并设为精确宽高（视觉等价 width()/height()，动画期间不触发逐帧重组） */
+private fun Modifier.animatedSize(width: State<Dp>, height: State<Dp>): Modifier =
+    layout { measurable, _ ->
+        val w = width.value.roundToPx()
+        val h = height.value.roundToPx()
+        val placeable = measurable.measure(Constraints.fixed(w, h))
+        layout(w, h) { placeable.place(0, 0) }
+    }
+
 /**
  * 小窗圆角遮罩（方案 B）：视频由 SurfaceView 渲染、画面由系统独立合成，Compose 无法裁剪它，
  * 因此在视频上方用「与页面底色同色的 4 个圆角缺口」把四个直角盖掉，视觉上等效 [Spacing.corner] 圆角。
@@ -1572,19 +1621,23 @@ private fun LandscapePlayLayout(
  */
 @Composable
 private fun PlayerCornerMask(
-    left: Dp,
-    top: Dp,
-    width: Dp,
-    height: Dp,
-    corner: Dp,
+    left: State<Dp>,
+    top: State<Dp>,
+    width: State<Dp>,
+    height: State<Dp>,
+    corner: State<Dp>,
 ) {
-    if (corner <= 0.dp) return
+    if (corner.value <= 0.dp) return
     val color = MaterialTheme.colorScheme.background
-    Box(modifier = Modifier.offset(x = left, y = top).size(width, height)) {
-        CornerNotch(color, corner, Alignment.TopStart)
-        CornerNotch(color, corner, Alignment.TopEnd)
-        CornerNotch(color, corner, Alignment.BottomStart)
-        CornerNotch(color, corner, Alignment.BottomEnd)
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(left.value.roundToPx(), top.value.roundToPx()) }
+            .animatedSize(width, height),
+    ) {
+        CornerNotch(color, corner.value, Alignment.TopStart)
+        CornerNotch(color, corner.value, Alignment.TopEnd)
+        CornerNotch(color, corner.value, Alignment.BottomStart)
+        CornerNotch(color, corner.value, Alignment.BottomEnd)
     }
 }
 
@@ -1764,15 +1817,7 @@ private fun PreviewPlayerArea(
                         .fillMaxWidth()
                         .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
                 ) {
-                    Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
-                    LineSlider(
-                        progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
-                        buffered = if (playerState.durationMs > 0) playerState.bufferedMs.toFloat() / playerState.durationMs else 0f,
-                        onSeek = { Players.seekTo((it * Players.durationMs()).toLong()) },
-                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                        onDragFractionChange = { onSeekDragChange(it != null) },
-                    )
-                    Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
+                    PlayerProgressRow(onDragFractionChange = { onSeekDragChange(it != null) })
                 }
             }
         }
@@ -1946,7 +1991,7 @@ private fun LineSection(
         )
         Spacer(modifier = Modifier.height(Spacing.titleContentGap))
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(v.playSources) { source ->
+        items(v.playSources, key = { it.flag }, contentType = { "line" }) { source ->
             val selected = source.flag == lineFlag
             val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
             Box(
@@ -2088,7 +2133,7 @@ private fun EpisodeSection(
             state = listState,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            itemsIndexed(displayEps) { dispIdx, ep ->
+            itemsIndexed(displayEps, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { dispIdx, ep ->
                 val idx = if (reversedEp) lineEpisodes.size - 1 - dispIdx else dispIdx
                 EpisodeChip(
                     title = ep.title,
@@ -2228,7 +2273,7 @@ private fun EpisodeGridDialog(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.titleContentGap),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    itemsIndexed(pageTitles) { idx, title ->
+                    itemsIndexed(pageTitles, key = { _, title -> title }, contentType = { _, _ -> "page_tab" }) { idx, title ->
                         val isSelected = pagerState.currentPage == idx
                         Box(
                             modifier = Modifier
@@ -2284,7 +2329,7 @@ private fun EpisodeGridDialog(
                         .padding(horizontal = Spacing.titleContentGap)
                         .height(pageHeight),
                 ) {
-                    itemsIndexed(pageEpisodes) { dispIdx, ep ->
+                    itemsIndexed(pageEpisodes, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { dispIdx, ep ->
                         // 倒序时本页内部反转：dispIdx 0 对应页内最后一集
                         val realIdx = if (reversed) {
                             start + rawPage.size - 1 - dispIdx
@@ -2451,8 +2496,7 @@ private fun FullscreenPlayLayout(
                         if (event == null) {
                             // 长按阈值到点（期间无新事件）：位移仍在 slop 内 → 2 倍速快进
                             if (hypot(lastX - downX, lastY - downY) <= viewConfiguration.touchSlop) {
-                                val st = Players.state.value
-                                if (st.playing && st.durationMs > 0) {
+                                if (Players.state.value.playing && Players.progress.value.durationMs > 0) {
                                     isLong = true
                                     Players.setSpeed(2f)
                                     speedUpHint = true
@@ -2481,10 +2525,10 @@ private fun FullscreenPlayLayout(
                         }
                         // 横向拖动快进/快退（fongmi onScroll：time = deltaX * 50ms，实时预览不真 seek）
                         if (axis == 1) {
-                            val st = Players.state.value
-                            if (st.durationMs > 0) {
+                            val prog = Players.progress.value
+                            if (prog.durationMs > 0) {
                                 val delta = ((change.position.x - downX) * 50).toLong()
-                                seekTarget = (st.positionMs + delta).coerceIn(0L, st.durationMs)
+                                seekTarget = (prog.positionMs + delta).coerceIn(0L, prog.durationMs)
                                 seekPreview = seekTarget
                             }
                         }
@@ -2522,42 +2566,10 @@ private fun FullscreenPlayLayout(
             },
     ) {
         // fongmi 手势反馈浮层：顶部居中显示快进/快退目标时间（无胶囊底，纯文字+图标）
-        if (seekPreview != null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 24.dp),
-            ) {
-                Icon(
-                    imageVector = if ((seekPreview ?: 0L) >= playerState.positionMs) AppIcons.Forward else AppIcons.Rewind,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                // 宽度由透明占位文字锁定，数字逐帧变化时位置不跳动
-                StableTimeText(
-                    text = formatMs(seekPreview ?: 0L),
-                    durationMs = playerState.durationMs,
-                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
-                    color = Color.White,
-                )
-            }
-        }
         // 拖动底部进度条：顶部居中实时显示「跳转至 MM:SS」，跟随手指位置更新（无胶囊底）
-        val sliderFraction = sliderSeekFraction
-        if (sliderFraction != null && playerState.durationMs > 0) {
-            StableTimeText(
-                text = "跳转至${formatMs((sliderFraction * playerState.durationMs).toLong())}",
-                durationMs = playerState.durationMs,
-                prefix = "跳转至",
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 24.dp),
-            )
+        // 内部订阅独立进度流：拖动期间的进度刷新只重组本浮层
+        if (seekPreview != null || sliderSeekFraction != null) {
+            SeekFeedbackOverlay(seekPreview = seekPreview, sliderFraction = sliderSeekFraction)
         }
         if (speedUpHint) {
             Text(
@@ -2645,18 +2657,10 @@ private fun FullscreenPlayLayout(
                                 }
                             },
                     ) {
-                        Text(text = formatMs(playerState.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
-                        LineSlider(
-                            progress = if (playerState.durationMs > 0) playerState.positionMs.toFloat() / playerState.durationMs else 0f,
-                            buffered = if (playerState.durationMs > 0) playerState.bufferedMs.toFloat() / playerState.durationMs else 0f,
-                            onSeek = { Players.seekTo((it * Players.durationMs()).toLong()) },
-                            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                            onDragFractionChange = {
-                                sliderSeekFraction = it
-                                onSeekDragChange(it != null)
-                            },
-                        )
-                        Text(text = formatMs(playerState.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
+                        PlayerProgressRow(onDragFractionChange = {
+                            sliderSeekFraction = it
+                            onSeekDragChange(it != null)
+                        })
                     }
                     // 动作栏（fongmi: 左组功能 + 右侧字幕/音轨/片头/片尾，白色 14sp 文字）
                     Row(
@@ -2965,7 +2969,7 @@ private fun EpisodeSideSheet(
             Column(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .offset(x = sheetSlideX)
+                    .offset { IntOffset(sheetSlideX.roundToPx(), 0) }
                     .fillMaxHeight()
                     .width(panelWidth)
                     .background(
@@ -2997,7 +3001,7 @@ private fun EpisodeSideSheet(
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    itemsIndexed(episodes) { idx, ep ->
+                    itemsIndexed(episodes, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { idx, ep ->
                         val selected = idx == currentIndex
                         val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
                         Box(
@@ -3237,7 +3241,7 @@ private fun SubtitleSettingSideSheet(
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .offset(x = sheetSlideX)
+                .offset { IntOffset(sheetSlideX.roundToPx(), 0) }
                 .fillMaxHeight()
                 .width(panelWidth)
                 .background(
@@ -3537,6 +3541,63 @@ private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color?
 }
 
 // ========== 工具方法 ==========
+
+/** 进度条行（时间 + 进度条 + 时长）：内部订阅独立进度流，
+ *  播放中 500ms 一跳的进度刷新只重组本行，不再牵动整个控制层 */
+@Composable
+private fun RowScope.PlayerProgressRow(onDragFractionChange: (Float?) -> Unit) {
+    val progress by Players.progress.collectAsStateWithLifecycle()
+    Text(text = formatMs(progress.positionMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
+    LineSlider(
+        progress = if (progress.durationMs > 0) progress.positionMs.toFloat() / progress.durationMs else 0f,
+        buffered = if (progress.durationMs > 0) progress.bufferedMs.toFloat() / progress.durationMs else 0f,
+        onSeek = { Players.seekTo((it * Players.durationMs()).toLong()) },
+        modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+        onDragFractionChange = onDragFractionChange,
+    )
+    Text(text = formatMs(progress.durationMs), style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp, fontFeatureSettings = "tnum"), color = Color.White)
+}
+
+/** 手势 seek 反馈浮层：快进/快退目标时间 + 拖动进度条「跳转至」提示（fongmi 同款，无胶囊底） */
+@Composable
+private fun BoxScope.SeekFeedbackOverlay(seekPreview: Long?, sliderFraction: Float?) {
+    val progress by Players.progress.collectAsStateWithLifecycle()
+    if (seekPreview != null) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 24.dp),
+        ) {
+            Icon(
+                imageVector = if (seekPreview >= progress.positionMs) AppIcons.Forward else AppIcons.Rewind,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            // 宽度由透明占位文字锁定，数字逐帧变化时位置不跳动
+            StableTimeText(
+                text = formatMs(seekPreview),
+                durationMs = progress.durationMs,
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
+                color = Color.White,
+            )
+        }
+    }
+    if (sliderFraction != null && progress.durationMs > 0) {
+        StableTimeText(
+            text = "跳转至${formatMs((sliderFraction * progress.durationMs).toLong())}",
+            durationMs = progress.durationMs,
+            prefix = "跳转至",
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
+            color = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 24.dp),
+        )
+    }
+}
 
 /**
  * 宽度稳定的时间文字：部分 OEM 定制字体会忽略 tnum，数字宽度随时间逐帧变化会让布局跳动。
