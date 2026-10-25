@@ -25,6 +25,9 @@ object LocalProxyServer {
     private const val START_PORT = 9978
     private const val END_PORT = 9999
 
+    /** 代理请求最大并发线程数：正常播放（m3u8 播放列表+分片+字幕）同时只占几个，留足余量 */
+    private const val MAX_PROXY_THREADS = 12
+
     private var server: ProxyServer? = null
     @Volatile
     private var spiderManager: SpiderManager? = null
@@ -95,6 +98,10 @@ object LocalProxyServer {
         for (port in START_PORT..END_PORT) {
             try {
                 val s = ProxyServer(port)
+                // 线程池限流：NanoHTTPD 默认每个请求裸开线程，遇到拉死源不退出的 jar 代理
+                // 会线程无限堆积（栈+缓冲吃光堆内存导致 OOM 闪退）。固定上限后请求排队，
+                // 并发数可控，坏线路反复请求也撑不爆内存
+                s.setAsyncRunner(BoundedAsyncRunner(MAX_PROXY_THREADS))
                 s.start(500)
                 com.github.catvod.Proxy.set(port)
                 boundPort = port
@@ -117,6 +124,40 @@ object LocalProxyServer {
         boundPort = -1
         spiderManager = null
         appContext = null
+    }
+
+    /**
+     * 有界线程池（替换 NanoHTTPD 默认的每请求裸开线程 DefaultAsyncRunner）：
+     * 并发请求超过 [maxThreads] 时在队列里等待，线程数永远不超限。
+     */
+    private class BoundedAsyncRunner(maxThreads: Int) : NanoHTTPD.AsyncRunner {
+
+        private val pool = java.util.concurrent.ThreadPoolExecutor(
+            maxThreads, maxThreads,
+            60L, java.util.concurrent.TimeUnit.SECONDS,
+            java.util.concurrent.LinkedBlockingQueue(),
+        ) { r -> Thread(r, "NanoHttpd Request Processor").apply { isDaemon = true } }
+
+        private val running = java.util.concurrent.CopyOnWriteArrayList<NanoHTTPD.ClientHandler>()
+
+        override fun closeAll() {
+            running.forEach { runCatching { it.close() } }
+            pool.shutdownNow()
+        }
+
+        override fun closed(clientHandler: NanoHTTPD.ClientHandler) {
+            running.remove(clientHandler)
+        }
+
+        override fun exec(clientHandler: NanoHTTPD.ClientHandler) {
+            running.add(clientHandler)
+            try {
+                pool.execute(clientHandler)
+            } catch (t: Throwable) {
+                running.remove(clientHandler)
+                runCatching { clientHandler.close() }
+            }
+        }
     }
 
     private class ProxyServer(port: Int) : NanoHTTPD(port) {

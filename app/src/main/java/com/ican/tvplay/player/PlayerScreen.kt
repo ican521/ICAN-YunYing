@@ -650,6 +650,11 @@ fun PlayerScreen(
     LaunchedEffect(playerState.error) {
         if (playerState.error == null || fallbackInProgress) return@LaunchedEffect
         val v = video ?: return@LaunchedEffect
+        // 无论是否自动兜底，先把出错线路记入会话失败集合：
+        // 手动反复点同一条放不了的线路会并行堆起大量代理拉流线程耗尽内存，
+        // 记入后该线路在本次会话内不再重复发起（requestLineChange 拦截）
+        val curFlag = playLine?.flag ?: v.playFrom
+        failedFlags.value = failedFlags.value + curFlag
         // 当前站点（跨站源缓存优先，兜底首页当前站）
         val cached = Players.cachedVideo?.takeIf { it.video.id == v.id }
         val curSite = cached?.site ?: container.videoRepository.currentSite.value?.site
@@ -659,13 +664,11 @@ fun PlayerScreen(
         }
 
         // 1) 换下一条线路（同站源内）
-        val curFlag = playLine?.flag ?: v.playFrom
         val flags = v.playSources.map { it.flag }
         if (flags.size > 1) {
             val nextFlag = flags.dropWhile { it != curFlag }.drop(1)
                 .firstOrNull { it !in failedFlags.value }
             if (nextFlag != null) {
-                failedFlags.value = failedFlags.value + curFlag
                 toastMsg("播放失败，自动切换线路：$nextFlag")
                 lineFlag = nextFlag
                 return@LaunchedEffect
@@ -746,6 +749,18 @@ fun PlayerScreen(
                 )
             }.onFailure {
                 android.util.Log.e("PlayerScreen", "history upsert failed: ${v.id} ep=$episodeIndex", it)
+            }
+        }
+    }
+
+    /** 手动切线统一入口：已失败的线路本次会话内不再重试，仅 Toast 提示（防反复点死线路堆积代理线程） */
+    val requestLineChange: (String) -> Unit = { flag ->
+        if (flag != lineFlag) {
+            if (flag in failedFlags.value) {
+                toastMsg("该线路播放失败，请换其他线路")
+            } else {
+                lineFlag = flag
+                saveProgress()
             }
         }
     }
@@ -1255,12 +1270,7 @@ fun PlayerScreen(
                     landZoomToken++
                 },
                 onBack = { handleBack() },
-                onLineChange = { flag ->
-                    if (flag != lineFlag) {
-                        lineFlag = flag
-                        saveProgress()
-                    }
-                },
+                onLineChange = requestLineChange,
                 onEpisodeSelect = { idx ->
                     if (idx != episodeIndex) episodeIndex = idx
                 },
@@ -1298,12 +1308,7 @@ fun PlayerScreen(
             onLockToggle = { locked = true; controlsVisible = false },
             onUnlock = { locked = false; controlsVisible = true },
             onBack = { handleBack() },
-            onLineChange = { flag ->
-                if (flag != lineFlag) {
-                    lineFlag = flag
-                    saveProgress()
-                }
-            },
+            onLineChange = requestLineChange,
             onEpisodeSelect = { idx ->
                 if (idx != episodeIndex) episodeIndex = idx
             },
