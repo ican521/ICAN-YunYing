@@ -638,9 +638,14 @@ fun PlayerScreen(
     }
 
     // ---- 播放失败自动切换（fongmi VodFallbackPolicy：先换线路，再换站源） ----
-    // 已失败的线路/站点：本次播放会话内不再重试，避免循环
-    val failedFlags = remember(videoId) { mutableStateOf(setOf<String>()) }
-    val failedSiteKeys = remember(videoId) { mutableStateOf(setOf<String>()) }
+    // 已失败的线路/站点：本次播放会话内不再重试，避免循环。
+    // 作用域必须是整个 PlayerScreen 实例（remember 无 key）：若按 videoId 记忆，
+    // 自动换站源后 video 一变集合就被重置，会在两个坏站之间无限乒乓（每轮都调 jar 解析，
+    // 网盘 jar 每次拉取几百 KB JSON，高频循环几十秒即可耗尽堆内存 OOM 闪退）。
+    // 换站成功时 failedFlags 会手动清空（同各站线路名常同名，新站给一次全新机会）；
+    // failedSiteKeys 永不清空，保证兜底链必然终止。
+    val failedFlags = remember { mutableStateOf(setOf<String>()) }
+    val failedSiteKeys = remember { mutableStateOf(setOf<String>()) }
     var fallbackInProgress by remember { mutableStateOf(false) }
 
     fun toastMsg(msg: String) {
@@ -649,6 +654,13 @@ fun PlayerScreen(
 
     LaunchedEffect(playerState.error) {
         if (playerState.error == null || fallbackInProgress) return@LaunchedEffect
+        // 当前已在正常播放：错误必来自「已被替换的旧源」的迟到事件（如死代理地址秒判失败后
+        // 其 mpv EndFile 错误晚到），直接丢弃——否则会把正在播放的好源切走，
+        // 并触发换线/换站连锁循环
+        if (playerState.playing) {
+            Players.clearError()
+            return@LaunchedEffect
+        }
         val v = video ?: return@LaunchedEffect
         // 无论是否自动兜底，先把出错线路记入会话失败集合：
         // 手动反复点同一条放不了的线路会并行堆起大量代理拉流线程耗尽内存，

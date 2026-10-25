@@ -652,6 +652,15 @@ object Players {
         _state.value = _state.value.copy(error = message)
     }
 
+    /**
+     * 清除错误状态（不清播放）：用于丢弃「已被替换的旧源」迟到的错误事件。
+     * 旧源（如秒判失败的死代理地址）的错误到达时新源往往已在正常播放，
+     * 若不丢弃会把正在播放的好源切走，并引发换线/换站循环。
+     */
+    fun clearError() {
+        if (_state.value.error != null) _state.value = _state.value.copy(error = null)
+    }
+
     /** 退出播放页但继续后台播放（保活开关开启）：解绑视图，播放器保持，转交前台服务 */
     fun detachForBackground() {
         playerView?.let { it.player = null }
