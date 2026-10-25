@@ -37,8 +37,11 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.ican.tvplay.data.FavoriteUpdateItem
 import com.ican.tvplay.ui.collection.FavoritesScreen
 import com.ican.tvplay.ui.collection.HistoryScreen
+import com.ican.tvplay.ui.collection.UpdatePopupDialog
+import com.ican.tvplay.ui.collection.UpdateScreen
 import com.ican.tvplay.ui.components.FloatingBottomBar
 import com.ican.tvplay.ui.components.FloatingBottomBarItem
 import com.ican.tvplay.ui.components.LocalEnableBlur
@@ -76,6 +79,12 @@ import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 @Composable
 fun AppRoot() {
     val appViewModel = appViewModel { AppViewModel(this) }
+    val updatesViewModel = appViewModel { UpdatesViewModel(this) }
+    // 启动自动弹出的「今日更新」面板（当天有更新且今天还没弹过时展示一次）
+    var updatePopupItems by remember {
+        androidx.compose.runtime.mutableStateOf<List<FavoriteUpdateItem>>(emptyList())
+    }
+    var showUpdatePopup by remember { androidx.compose.runtime.mutableStateOf(false) }
     val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by appViewModel.themeColor.collectAsStateWithLifecycle()
     val enableBlur by appViewModel.enableBlur.collectAsStateWithLifecycle()
@@ -140,6 +149,16 @@ fun AppRoot() {
                 if (req != null) {
                     navigator.push(Route.Player(req.videoId, req.episodeIndex, req.flag))
                 }
+            }
+        }
+
+        // 启动追番检测：按频率节流检查收藏剧集；当天有更新且今天未弹过时自动弹面板
+        LaunchedEffect(Unit) {
+            val todayItems = updatesViewModel.startupTodayUpdates()
+            if (todayItems.isNotEmpty()) {
+                updatePopupItems = todayItems
+                showUpdatePopup = true
+                updatesViewModel.markPopupShown()
             }
         }
 
@@ -221,6 +240,7 @@ fun AppRoot() {
                                         pushCardRouteThrottled(Route.Player(videoId, episodeIndex, flag, preInit))
                                     }
                                 },
+                                onUpdatesClick = { pushCardRouteThrottled(Route.Updates) },
                                 onBack = { mainPagerState.animateToPage(0) },
                             )
 
@@ -259,12 +279,25 @@ fun AppRoot() {
                         onBack = { navigator.pop() },
                     )
                 }
+                entry<Route.Updates>(swipeDismiss = NavSwipeDirection.None) {
+                    UpdateScreen(
+                        onPlay = { videoId, episodeIndex, flag, preInit ->
+                            if (guardPlay()) {
+                                pushCardRouteThrottled(
+                                    Route.Player(videoId, episodeIndex, flag, preInit, forceStart = true),
+                                )
+                            }
+                        },
+                        onBack = { navigator.pop() },
+                    )
+                }
                 entry<Route.Player>(swipeDismiss = NavSwipeDirection.None) { key ->
                     PlayerScreen(
                         videoId = key.videoId,
                         startEpisode = key.episodeIndex,
                         startFlag = key.flag,
                         preInitialized = key.preInit,
+                        forceStart = key.forceStart,
                         onBack = { navigator.pop() },
                     )
                 }
@@ -331,6 +364,37 @@ fun AppRoot() {
                             pushCardRouteThrottled(Route.Player(videoId = videoId, episodeIndex = 0))
                         } else {
                             Toast.makeText(context, "暂不支持此链接格式", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+            )
+
+            // 启动「今日更新」面板：点击条目直接进播放页并选中第一条未看集
+            UpdatePopupDialog(
+                show = showUpdatePopup,
+                items = updatePopupItems,
+                onDismiss = { showUpdatePopup = false },
+                onPlay = { item ->
+                    showUpdatePopup = false
+                    urlParseScope.launch {
+                        val prepared = updatesViewModel.preparePlay(item)
+                        if (prepared == null) {
+                            Toast.makeText(context, "视频加载失败，站源可能已失效", Toast.LENGTH_SHORT).show()
+                        } else if (guardPlay()) {
+                            Players.cacheVideo(
+                                prepared.video,
+                                prepared.siteKey,
+                                prepared.site,
+                                prepared.jarSpec,
+                            )
+                            pushCardRouteThrottled(
+                                Route.Player(
+                                    prepared.video.id,
+                                    item.firstUnwatchedIndex,
+                                    prepared.flag,
+                                    forceStart = true,
+                                ),
+                            )
                         }
                     }
                 },

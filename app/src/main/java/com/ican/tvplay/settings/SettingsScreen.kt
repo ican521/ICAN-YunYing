@@ -98,6 +98,9 @@ fun SettingsScreen(
     val topBarBlur by viewModel.topBarBlurEnabled.collectAsStateWithLifecycle()
     val enablePredictiveBack by viewModel.enablePredictiveBack.collectAsStateWithLifecycle()
     val backgroundPlay by viewModel.playerBackgroundPlay.collectAsStateWithLifecycle()
+    val favoriteUpdateCheckEnabled by viewModel.favoriteUpdateCheckEnabled.collectAsStateWithLifecycle()
+    val favoriteUpdateIntervalHours by viewModel.favoriteUpdateIntervalHours.collectAsStateWithLifecycle()
+    val favoriteUpdateStartupPopup by viewModel.favoriteUpdateStartupPopup.collectAsStateWithLifecycle()
     val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     val configUrl by viewModel.configUrl.collectAsStateWithLifecycle()
     val siteName by viewModel.siteName.collectAsStateWithLifecycle()
@@ -343,6 +346,42 @@ fun SettingsScreen(
                 title = "收藏同步",
                 summary = "局域网设备间同步收藏（双向/上传/下载）",
                 onClick = { showSyncDialog = true },
+            )
+        }
+        }
+
+        item {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            SwitchPreference(
+                title = "追番更新提醒",
+                summary = "启动时检测收藏剧集的最新集数，有更新时在收藏页提示",
+                checked = favoriteUpdateCheckEnabled,
+                onCheckedChange = { viewModel.setFavoriteUpdateCheckEnabled(it) },
+            )
+            OverlayDropdownPreference(
+                title = "检测频率",
+                summary = "控制启动时多久检测一次",
+                items = listOf("每次启动", "6 小时", "24 小时"),
+                selectedIndex = when (favoriteUpdateIntervalHours) {
+                    0 -> 0
+                    24 -> 2
+                    else -> 1
+                },
+                onSelectedIndexChange = { index ->
+                    viewModel.setFavoriteUpdateIntervalHours(
+                        when (index) {
+                            0 -> 0
+                            2 -> 24
+                            else -> 6
+                        },
+                    )
+                },
+            )
+            SwitchPreference(
+                title = "启动自动弹窗",
+                summary = "当天有更新时，打开 APP 自动弹出一次更新面板",
+                checked = favoriteUpdateStartupPopup,
+                onCheckedChange = { viewModel.setFavoriteUpdateStartupPopup(it) },
             )
         }
         }

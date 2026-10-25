@@ -80,10 +80,14 @@ import kotlinx.coroutines.launch
 @Composable
 fun FavoritesScreen(
     onPlay: (videoId: String, episodeIndex: Int, flag: String, preInitialized: Boolean) -> Unit,
+    onUpdatesClick: () -> Unit = {},
     onBack: () -> Unit = {},
 ) {
     val viewModel = appViewModel { CollectionViewModel(this) }
+    val updatesViewModel = appViewModel { com.ican.tvplay.ui.UpdatesViewModel(this) }
     val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+    val todayUpdates by updatesViewModel.todayUpdates.collectAsStateWithLifecycle()
+    val pendingUpdates by updatesViewModel.pendingUpdates.collectAsStateWithLifecycle()
     val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -143,6 +147,13 @@ fun FavoritesScreen(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                     verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                 ) {
+                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                    UpdatesEntry(
+                        todayCount = todayUpdates.size,
+                        pendingCount = pendingUpdates.size,
+                        onClick = onUpdatesClick,
+                    )
+                }
                 items(favorites, key = { it.videoId }) { item ->
                     FavoriteCard(
                         entity = item,
@@ -211,6 +222,73 @@ fun FavoritesScreen(
     )
 }
 
+
+/**
+ * 收藏页顶部的「追番更新」入口：今日更新 + 待看更新数量汇总，
+ * 点击进入追番更新页。没有任何更新时也保留入口（说明文字改为引导语）。
+ */
+@Composable
+private fun UpdatesEntry(
+    todayCount: Int,
+    pendingCount: Int,
+    onClick: () -> Unit,
+) {
+    val total = todayCount + pendingCount
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .tvCardEffect(
+                onClick = onClick,
+                shape = RoundedCornerShape(Spacing.corner),
+                focusedScale = 1.02f,
+                glow = false,
+                pressColor = LightOnSurface,
+            ),
+        insideMargin = PaddingValues(0.dp),
+        colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "追番更新",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Text(
+                    text = when {
+                        total == 0 -> "收藏的剧集有更新时会在这里提醒"
+                        todayCount > 0 -> "今日更新 $todayCount 部 · 待看 $total 部"
+                        else -> "有 $total 部已更新未看"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (total > 0) {
+                Box(
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = "$total",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+            }
+        }
+    }
+}
 
 /** 收藏卡片：与首页 [VideoCard] 同款 miuix Card 容器 + SinkFeedback 按压形变；
  *  左上角站源胶囊，编辑模式下隐藏并在右上角显示删除叉号；底部渐变 + 标题。 */

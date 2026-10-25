@@ -227,6 +227,8 @@ fun PlayerScreen(
     startEpisode: Int,
     startFlag: String = "",
     preInitialized: Boolean = false,
+    /** 追番更新入口：强制从 [startEpisode] 开播，不被历史记录覆盖 */
+    forceStart: Boolean = false,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -386,7 +388,7 @@ fun PlayerScreen(
                 ?: Players.BufferTier.LOW,
         )
     }
-    // 字幕字号/位置（持久化，仿 fongmi SubtitleSetting）：修改后实时作用到当前 PlayerView
+    // 字幕字号/位置（持久化，仿 fongmi SubtitleSetting）：修改后实时作用到当前 Player
     LaunchedEffect(savedSubtitleScale) { Players.setSubtitleScale(savedSubtitleScale) }
     LaunchedEffect(savedSubtitlePosition) { Players.setSubtitlePosition(savedSubtitlePosition) }
 
@@ -547,13 +549,17 @@ fun PlayerScreen(
             val eps = v.playSources
                 .let { s -> s.firstOrNull { it.flag == lineFlag } ?: s.firstOrNull() }
                 ?.episodes ?: v.episodes
-            if (history != null && (eps.isEmpty() || history.episodeIndex in eps.indices)) {
+            if (!forceStart && history != null && (eps.isEmpty() || history.episodeIndex in eps.indices)) {
                 episodeIndex = history.episodeIndex.coerceIn(0, (eps.size - 1).coerceAtLeast(0))
                 val nearEnd = history.durationMs > 0 &&
                     history.durationMs - history.positionMs < RESUME_THRESHOLD_MS
                 val resume = if (nearEnd) 0L else history.positionMs
                 // fongmi: startPositionMs = max(opening, 续播位置)，每次开播自动跳过片头
                 pendingPosition = maxOf(resume, history.openingMs)
+            }
+            // 追番入口：直接选中传入的未看集（不从该集中间续播，pendingPosition 保持 0 从头播放）
+            if (forceStart && eps.isNotEmpty()) {
+                episodeIndex = startEpisode.coerceIn(0, eps.size - 1)
             }
             // 片头/片尾标记（按剧存储，fongmi History.opening/ending 同款）
             openingMs = history?.openingMs ?: 0L
@@ -1889,15 +1895,23 @@ private fun FavoriteButton(v: Video) {
                                     favSiteKey,
                                 )
                             }
+                            // 追更基线：以收藏时的总集数为已看基线，避免「刚收藏就提示更新」
+                            val episodeCount = v.playSources.maxOfOrNull { it.episodes.size }
+                                ?: v.episodes.size
+                            val now = System.currentTimeMillis()
                             container.favoriteDao.upsert(
                                 FavoriteEntity(
                                     videoId = v.id,
                                     title = v.title,
                                     cover = v.cover,
                                     categoryName = v.categoryName,
-                                    addedAt = System.currentTimeMillis(),
+                                    addedAt = now,
                                     sourceKey = favSiteKey,
                                     sourceName = favSiteName,
+                                    episodeCount = episodeCount,
+                                    ackEpisodeCount = episodeCount,
+                                    lastUpdatedAt = 0L,
+                                    lastCheckedAt = now,
                                 ),
                             )
                         } else {
@@ -3174,11 +3188,6 @@ private fun SubtitleDialog(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            // 纯展示：当前正在生效的字幕（无字幕/已关闭时显示「无」）
-            SubInfoRow(
-                label = "显示当前字幕",
-                value = if (textDisabled) "无" else tracks.firstOrNull { it.selected }?.name ?: "无",
-            )
             tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected, selectedBorderColor) { onSelect(t) } }
             SubRow("添加字幕", false, selectedBorderColor) { onAddSubtitle() }
             SubRow("字幕设置", false, selectedBorderColor) { onSettings() }

@@ -25,6 +25,14 @@ data class FavoriteEntity(
     val sourceKey: String = "",
     /** 站源显示名（仅取 | 前名称），收藏卡片右上角标签用 */
     val sourceName: String = "",
+    /** 追更：最近一次检测到的总集数（0 = 尚未检测） */
+    val episodeCount: Int = 0,
+    /** 追更：已确认看过 / 已忽略的集数基线（前 N 集视为已看） */
+    val ackEpisodeCount: Int = 0,
+    /** 追更：最近一次集数增加的时间（0 = 从未增加） */
+    val lastUpdatedAt: Long = 0,
+    /** 追更：最近一次成功检测时间（0 = 从未检测） */
+    val lastCheckedAt: Long = 0,
 )
 
 /** 播放历史（含播放进度） */
@@ -92,6 +100,31 @@ interface FavoriteDao {
     @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE videoId = :videoId)")
     suspend fun isFavorite(videoId: String): Boolean
 
+    /** 追更检测：一次性取全部收藏快照 */
+    @Query("SELECT * FROM favorites")
+    suspend fun getAll(): List<FavoriteEntity>
+
+    /** 追更检测：写回集数/已看基线/更新时间 */
+    @Query(
+        "UPDATE favorites SET episodeCount = :episodeCount, ackEpisodeCount = :ackEpisodeCount, " +
+            "lastUpdatedAt = :lastUpdatedAt, lastCheckedAt = :lastCheckedAt WHERE videoId = :videoId",
+    )
+    suspend fun updateTracking(
+        videoId: String,
+        episodeCount: Int,
+        ackEpisodeCount: Int,
+        lastUpdatedAt: Long,
+        lastCheckedAt: Long,
+    )
+
+    /** 标记单部已读：把已看基线推到当前总集数 */
+    @Query("UPDATE favorites SET ackEpisodeCount = episodeCount WHERE videoId = :videoId")
+    suspend fun acknowledge(videoId: String)
+
+    /** 全部标记已读 */
+    @Query("UPDATE favorites SET ackEpisodeCount = episodeCount")
+    suspend fun acknowledgeAll()
+
     @Upsert
     suspend fun upsert(favorite: FavoriteEntity)
 
@@ -123,7 +156,7 @@ interface HistoryDao {
 
 @Database(
     entities = [FavoriteEntity::class, HistoryEntity::class, DeviceEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -178,13 +211,26 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v6→v7：favorites 表增加追更字段（集数/已看基线/更新时间/检测时间，旧数据从 0 开始建基线） */
+        private val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE favorites ADD COLUMN episodeCount INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE favorites ADD COLUMN ackEpisodeCount INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE favorites ADD COLUMN lastUpdatedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE favorites ADD COLUMN lastCheckedAt INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 "tvplay.db",
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
+                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+                )
                 .fallbackToDestructiveMigration()
                 .build()
 

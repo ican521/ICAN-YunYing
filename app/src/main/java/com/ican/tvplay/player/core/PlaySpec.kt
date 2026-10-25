@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 /** 外挂字幕（仿 fongmi bean/Sub 精简版） */
 data class SubItem(
@@ -37,24 +39,33 @@ object MediaItemFactory {
         return headers + ("User-Agent" to DEFAULT_UA)
     }
 
-    fun from(spec: PlaySpec): MediaItem {
+    fun from(spec: PlaySpec): MediaItem = from(spec, mpv = false)
+
+    /** MPV 的 sub-add 对 file:/// 兼容性差：字幕统一给 libass 可读的本机绝对路径 */
+    fun fromMpv(spec: PlaySpec): MediaItem = from(spec, mpv = true)
+
+    private fun from(spec: PlaySpec, mpv: Boolean): MediaItem {
         return MediaItem.Builder()
             .setUri(Uri.parse(spec.url))
-            .setMimeType(spec.format)
-            .setSubtitleConfigurations(spec.subs.mapIndexed { index, sub -> buildSubConfig(sub, index, spec.subs.size) })
+            // MPV 不要强制 m3u8：MpvNetworkOptions 会据此设置 demuxer-lavf-format=hls，
+            // 该选项残留会把后续 sub-add 的外挂 ASS 也强制按 HLS 打开（mpv.log: Found 'hls' forced）。
+            .setMimeType(if (mpv) null else spec.format)
+            .setSubtitleConfigurations(spec.subs.mapIndexed { index, sub -> buildSubConfig(sub, index, spec.subs.size, mpv) })
             .build()
     }
 
-    private fun buildSubConfig(sub: SubItem, index: Int, total: Int): MediaItem.SubtitleConfiguration {
-        val uri = Uri.parse(sub.url)
+    private fun buildSubConfig(sub: SubItem, index: Int, total: Int, mpv: Boolean): MediaItem.SubtitleConfiguration {
+        val uri = subtitleUri(sub.url, mpv)
         val mime = sub.mimeType ?: guessSubtitleMime(uri.path)
-        // 仿 fongmi：仅有一个外挂字幕时不设标志；多个时第一个用 DEFAULT（默认选中），其余 AUTOSELECT
+        // 仿 fongmi Sub.getFlag()：raw flag=0 也要回 DEFAULT；MPV sub-add 需要 default 才会真正选中显示，
+        // 否则只会 cached/auto 挂上去但不显示。
         val flag = when {
-            total <= 1 -> 0
             index == 0 -> C.SELECTION_FLAG_DEFAULT
             else -> C.SELECTION_FLAG_AUTOSELECT
         }
         return MediaItem.SubtitleConfiguration.Builder(uri)
+            // fongmi 同款稳定 id：保证外挂字幕轨在重建/切内核后可被同一个 override 选中
+            .setId("external:" + UUID.nameUUIDFromBytes(sub.url.toByteArray(StandardCharsets.UTF_8)))
             .setLabel(sub.name)
             .setMimeType(mime)
             .setLanguage(sub.lang)
@@ -64,7 +75,20 @@ object MediaItemFactory {
 
     /** 构建单个外挂字幕 SubtitleConfiguration（用于 MPV player.addSubtitle 动态添加） */
     fun buildSingleSubConfig(sub: SubItem): MediaItem.SubtitleConfiguration {
-        return buildSubConfig(sub, 0, 1)
+        return buildSubConfig(sub, 0, 1, mpv = false)
+    }
+
+    /** MPV 动态添加字幕同样用本机绝对路径，避免 file:/// 被 libass/mpv 拒绝 */
+    fun buildMpvSubConfig(sub: SubItem): MediaItem.SubtitleConfiguration {
+        return buildSubConfig(sub, 0, 1, mpv = true)
+    }
+
+    private fun subtitleUri(url: String, mpv: Boolean): Uri {
+        val uri = Uri.parse(url)
+        if (!mpv) return uri
+        if (!uri.scheme.equals("file", ignoreCase = true)) return uri
+        val path = uri.path
+        return if (path.isNullOrBlank()) uri else Uri.parse(path)
     }
 
     /** 按扩展名猜字幕格式（仿 fongmi TrackUtil.getSubtitleMimeType） */

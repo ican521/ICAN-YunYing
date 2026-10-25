@@ -33,4 +33,9 @@ class AppContainer(context: Context) {
     val spiderManager: com.ican.tvplay.data.remote.SpiderManager by lazy {
         com.ican.tvplay.data.remote.SpiderManager(context.applicationContext)
     }
+
+    /** 收藏追更检测：启动/手动刷新时比较收藏剧集的总集数 */
+    val favoriteUpdateChecker: FavoriteUpdateChecker by lazy {
+        FavoriteUpdateChecker(favoriteDao, settingsRepository, spiderManager)
+    }
 }

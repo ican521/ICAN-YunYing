@@ -265,6 +265,53 @@ class SettingsRepository(context: Context) {
         _syncMode.value = mode
     }
 
+    // ---- 追番更新提醒 ----
+
+    /** 启动时自动检测收藏剧集是否更新（默认开启） */
+    private val _favoriteUpdateCheckEnabled =
+        MutableStateFlow(prefs.getBoolean(KEY_FAVORITE_UPDATE_CHECK, true))
+    val favoriteUpdateCheckEnabled: StateFlow<Boolean> = _favoriteUpdateCheckEnabled.asStateFlow()
+
+    fun setFavoriteUpdateCheckEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_FAVORITE_UPDATE_CHECK, enabled).apply()
+        _favoriteUpdateCheckEnabled.value = enabled
+    }
+
+    /** 检测频率（小时；0 = 每次启动都检测），默认 6 小时 */
+    private val _favoriteUpdateIntervalHours =
+        MutableStateFlow(prefs.getInt(KEY_FAVORITE_UPDATE_INTERVAL, 6))
+    val favoriteUpdateIntervalHours: StateFlow<Int> = _favoriteUpdateIntervalHours.asStateFlow()
+
+    fun setFavoriteUpdateIntervalHours(hours: Int) {
+        prefs.edit().putInt(KEY_FAVORITE_UPDATE_INTERVAL, hours).apply()
+        _favoriteUpdateIntervalHours.value = hours
+    }
+
+    /** 当天有更新时启动自动弹出面板（默认开启） */
+    private val _favoriteUpdateStartupPopup =
+        MutableStateFlow(prefs.getBoolean(KEY_FAVORITE_UPDATE_POPUP, true))
+    val favoriteUpdateStartupPopup: StateFlow<Boolean> = _favoriteUpdateStartupPopup.asStateFlow()
+
+    fun setFavoriteUpdateStartupPopup(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_FAVORITE_UPDATE_POPUP, enabled).apply()
+        _favoriteUpdateStartupPopup.value = enabled
+    }
+
+    /** 最近一次弹窗日期（yyyy-MM-dd），用于「每天只弹一次」；普通读写即可 */
+    fun favoriteUpdatePopupDate(): String =
+        prefs.getString(KEY_FAVORITE_UPDATE_POPUP_DATE, null).orEmpty()
+
+    fun setFavoriteUpdatePopupDate(date: String) {
+        prefs.edit().putString(KEY_FAVORITE_UPDATE_POPUP_DATE, date).apply()
+    }
+
+    /** 最近一次自动检测时间（毫秒），用于频率节流 */
+    fun favoriteUpdateLastCheckAt(): Long = prefs.getLong(KEY_FAVORITE_UPDATE_LAST_CHECK, 0L)
+
+    fun setFavoriteUpdateLastCheckAt(at: Long) {
+        prefs.edit().putLong(KEY_FAVORITE_UPDATE_LAST_CHECK, at).apply()
+    }
+
     // ---- 搜索历史 ----
 
     private val _searchHistory = MutableStateFlow(
@@ -336,6 +383,9 @@ class SettingsRepository(context: Context) {
         _subtitlePosition.value = prefs.getFloat(KEY_PLAYER_SUBTITLE_POSITION, 0f)
             .coerceIn(SUBTITLE_MIN_POSITION, SUBTITLE_MAX_POSITION)
         _syncMode.value = prefs.getInt(KEY_SYNC_MODE, 0)
+        _favoriteUpdateCheckEnabled.value = prefs.getBoolean(KEY_FAVORITE_UPDATE_CHECK, true)
+        _favoriteUpdateIntervalHours.value = prefs.getInt(KEY_FAVORITE_UPDATE_INTERVAL, 6)
+        _favoriteUpdateStartupPopup.value = prefs.getBoolean(KEY_FAVORITE_UPDATE_POPUP, true)
         _searchHistory.value = runCatching {
             prefs.getStringSet(KEY_SEARCH_HISTORY, emptySet()).orEmpty().toList()
         }.getOrDefault(emptyList())
@@ -363,6 +413,11 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_SUBTITLE_SCALE = "player_subtitle_scale"
         const val KEY_PLAYER_SUBTITLE_POSITION = "player_subtitle_position"
         const val KEY_SYNC_MODE = "sync_mode"
+        const val KEY_FAVORITE_UPDATE_CHECK = "favorite_update_check"
+        const val KEY_FAVORITE_UPDATE_INTERVAL = "favorite_update_interval"
+        const val KEY_FAVORITE_UPDATE_POPUP = "favorite_update_popup"
+        const val KEY_FAVORITE_UPDATE_POPUP_DATE = "favorite_update_popup_date"
+        const val KEY_FAVORITE_UPDATE_LAST_CHECK = "favorite_update_last_check"
         const val KEY_SEARCH_HISTORY = "search_history"
         const val KEY_HOT = "hot"
         const val MAX_SEARCH_HISTORY = 10

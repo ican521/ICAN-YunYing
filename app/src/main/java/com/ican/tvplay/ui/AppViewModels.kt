@@ -298,6 +298,124 @@ class CollectionViewModel(container: AppContainer) : ViewModel() {
     }
 }
 
+/** 追番更新：收藏剧集的集数变化检测结果 + 启动弹窗 */
+class UpdatesViewModel(container: AppContainer) : ViewModel() {
+    private val favoriteDao = container.favoriteDao
+    private val historyDao = container.historyDao
+    private val checker = container.favoriteUpdateChecker
+    private val settings = container.settingsRepository
+    private val apiClient = com.ican.tvplay.data.remote.VodApiClient()
+
+    /** 手动「重新检查」进行中 */
+    private val _checking = MutableStateFlow(false)
+    val checking: StateFlow<Boolean> = _checking.asStateFlow()
+
+    /** 全部有更新待看的收藏（今日更新 + 以前已更新未看） */
+    val allUpdates: StateFlow<List<com.ican.tvplay.data.FavoriteUpdateItem>> =
+        combine(favoriteDao.observeAll(), historyDao.observeAll()) { favorites, histories ->
+            com.ican.tvplay.data.FavoriteUpdates.compute(favorites, histories)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 今日更新（lastUpdatedAt 落在今天且仍有未看集） */
+    val todayUpdates: StateFlow<List<com.ican.tvplay.data.FavoriteUpdateItem>> = allUpdates
+        .map { list -> list.filter { it.updatedToday } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 以前更新过但仍未看的 */
+    val pendingUpdates: StateFlow<List<com.ican.tvplay.data.FavoriteUpdateItem>> = allUpdates
+        .map { list -> list.filterNot { it.updatedToday } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 点击更新条目跳播放页所需：元数据空壳 + 站源（完整选集由播放页异步补拉） */
+    data class PreparedUpdatePlay(
+        val video: Video,
+        val siteKey: String,
+        val site: TvBoxSite?,
+        val jarSpec: String,
+        val flag: String,
+    )
+
+    suspend fun preparePlay(item: com.ican.tvplay.data.FavoriteUpdateItem): PreparedUpdatePlay? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val configUrl = settings.configUrl.value
+            if (configUrl.isBlank()) return@withContext null
+            val config = apiClient.loadConfig(configUrl) ?: return@withContext null
+            val favorite = item.favorite
+            val site = config.sites.firstOrNull { it.key == favorite.sourceKey }
+                ?: config.sites.firstOrNull { it.key == settings.siteKey.value }
+                ?: return@withContext null
+            val jarSpec = if (site.isSpider()) site.jar.ifBlank { config.spider } else ""
+            val video = Video(
+                id = favorite.videoId,
+                title = favorite.title,
+                cover = favorite.cover,
+                categoryId = "",
+                categoryName = favorite.categoryName,
+                year = 0,
+                rating = "",
+                region = "",
+                description = "",
+                tags = emptyList(),
+                episodes = emptyList(),
+                playFrom = "",
+                playSources = emptyList(),
+                sourceName = favorite.sourceName,
+            )
+            PreparedUpdatePlay(
+                video = video,
+                siteKey = site.key,
+                site = site,
+                jarSpec = jarSpec,
+                flag = item.history?.lineFlag.orEmpty(),
+            )
+        }
+
+    /** 手动重新检查（忽略频率节流） */
+    fun manualCheck() {
+        if (_checking.value) return
+        viewModelScope.launch {
+            _checking.value = true
+            runCatching { checker.check(force = true) }
+            _checking.value = false
+        }
+    }
+
+    /** 标记单部已读：已看基线推到当前总集数 */
+    fun markRead(videoId: String) {
+        viewModelScope.launch { favoriteDao.acknowledge(videoId) }
+    }
+
+    /** 全部标记已读 */
+    fun markAllRead() {
+        viewModelScope.launch { favoriteDao.acknowledgeAll() }
+    }
+
+    /**
+     * 启动检测：按频率节流执行一次。
+     * 只有「今天有更新且今天还没弹过」才返回非空列表（面板内容含今日更新 + 以前更新未看）；
+     * 空列表 = 不弹面板。
+     */
+    suspend fun startupTodayUpdates(): List<com.ican.tvplay.data.FavoriteUpdateItem> {
+        runCatching { checker.check(force = false) }
+        if (!settings.favoriteUpdateStartupPopup.value) return emptyList()
+        val today = com.ican.tvplay.data.FavoriteUpdates.todayKey()
+        if (settings.favoriteUpdatePopupDate() == today) return emptyList()
+        val favorites = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            favoriteDao.getAll()
+        }
+        val histories = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            historyDao.observeAll().first()
+        }
+        val all = com.ican.tvplay.data.FavoriteUpdates.compute(favorites, histories)
+        return if (all.any { it.updatedToday }) all else emptyList()
+    }
+
+    /** 记录今天已弹过面板（每天只弹一次） */
+    fun markPopupShown() {
+        settings.setFavoriteUpdatePopupDate(com.ican.tvplay.data.FavoriteUpdates.todayKey())
+    }
+}
+
 /** 设置 */
 class SettingsViewModel(container: AppContainer) : ViewModel() {
     private val settings = container.settingsRepository
@@ -318,6 +436,9 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val homeLayoutSize: StateFlow<com.ican.tvplay.data.HomeLayoutSize> = settings.homeLayoutSize
     val playerBackgroundPlay: StateFlow<Int> = settings.playerBackgroundPlay
     val configUrl: StateFlow<String> = settings.configUrl
+    val favoriteUpdateCheckEnabled: StateFlow<Boolean> = settings.favoriteUpdateCheckEnabled
+    val favoriteUpdateIntervalHours: StateFlow<Int> = settings.favoriteUpdateIntervalHours
+    val favoriteUpdateStartupPopup: StateFlow<Boolean> = settings.favoriteUpdateStartupPopup
 
     /** 当前站源名；未加载成功时为「未配置」 */
     val siteName: StateFlow<String> = videoRepository.currentSite
@@ -338,6 +459,11 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setHomeLayoutSize(size: com.ican.tvplay.data.HomeLayoutSize) =
         settings.setHomeLayoutSize(size)
     fun setPlayerBackgroundPlay(mode: Int) = settings.setPlayerBackgroundPlay(mode)
+    fun setFavoriteUpdateCheckEnabled(enabled: Boolean) =
+        settings.setFavoriteUpdateCheckEnabled(enabled)
+    fun setFavoriteUpdateIntervalHours(hours: Int) = settings.setFavoriteUpdateIntervalHours(hours)
+    fun setFavoriteUpdateStartupPopup(enabled: Boolean) =
+        settings.setFavoriteUpdateStartupPopup(enabled)
 
     /** 保存配置 URL 后立即重新拉取站点与分类，并后台预热首页各分类首屏（fongmi 式） */
     fun setConfigUrl(url: String) {

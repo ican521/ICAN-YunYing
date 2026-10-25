@@ -13,6 +13,7 @@ import androidx.media3.common.ParserException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -151,6 +152,10 @@ object Players {
     /** 添加外挂字幕后，需要在 onTracksChanged 中强制选中该外挂字幕轨道 */
     private var pendingSelectExternalSubtitle = false
 
+    /** MPV addSubtitle 的 native 结果不可靠：用来延迟校验文本轨是否真正出现 */
+    private var mpvSubtitleVerifyToken = 0
+
+    // ---- 对外状态 ----
     private var subtitleViewRef: SubtitleView? = null
 
     /** 播放前源类型探测任务：换源/切集时取消上一个，避免旧探测结果覆盖新播放 */
@@ -426,6 +431,8 @@ object Players {
                         val trackIndex = (0 until g.length).first { i -> g.getTrackFormat(i).label != null }
                         val builder = p.trackSelectionParameters.buildUpon()
                             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                            // 清掉内封 CEA/默认字幕轨 override，避免外挂轨已选中但渲染仍落到内封轨
+                            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
                             .setOverrideForType(
                                 TrackSelectionOverride(g.mediaTrackGroup, listOf(trackIndex))
                             )
@@ -518,16 +525,18 @@ object Players {
         }
     }
 
-    /** 字幕字号（0.5x - 4.0x）：实时应用到已绑定的 SubtitleView */
+    /** 字幕字号（0.5x - 4.0x）：实时应用到已绑定的 SubtitleView / MPV 字幕选项 */
     fun setSubtitleScale(scale: Float) {
         subtitleScale = scale.coerceIn(SUBTITLE_MIN_SCALE, SUBTITLE_MAX_SCALE)
         applySubtitleScale()
+        applyMpvSubtitleOptions()
     }
 
-    /** 字幕位置（-100% - +100%，正数上移）：media3 官方无 bottomPosition API，用视图位移实现 */
+    /** 字幕位置（-100% - +100%，正数上移）：EXO 用 SubtitleView，MPV 用 sub-pos */
     fun setSubtitlePosition(position: Float) {
         subtitlePosition = position.coerceIn(SUBTITLE_MIN_POSITION, SUBTITLE_MAX_POSITION)
         applySubtitlePosition()
+        applyMpvSubtitleOptions()
     }
 
     private fun applySubtitleScale() {
@@ -566,6 +575,26 @@ object Players {
         view.invalidate()
     }
 
+    /**
+     * MPV 字幕样式：MPV 由 libmpv 直接渲染字幕，不走 media3 SubtitleView。
+     * 当前 mpvplayer AAR 的 MpvSubtitleOptions 只暴露 sub-pos/sub-scale：
+     * sub-pos 100=底部默认，0=顶部；我们的 position 正数上移，所以映射为 100-position。
+     */
+    private fun buildMpvSubtitleOptions(): androidx.media3.mpvplayer.MpvSubtitleOptions {
+        val mpvPos = (100f - subtitlePosition).coerceIn(0f, 100f)
+        // 固定使用字幕原始样式（ASS 内嵌字体/样式），只暴露 sub-pos/sub-scale 调整。
+        return androidx.media3.mpvplayer.MpvSubtitleOptions.Builder()
+            .setPosition(mpvPos.toDouble())
+            .setScale(subtitleScale.toDouble())
+            .build()
+    }
+
+    private fun applyMpvSubtitleOptions() {
+        val p = player as? MpvPlayer ?: return
+        runCatching { p.setSubtitleOptions(buildMpvSubtitleOptions()) }
+            .onFailure { Log.e(TAG, "applyMpvSubtitleOptions failed", it) }
+    }
+
     /** 获取当前绑定的 SubtitleView，若引用丢失则尝试从 PlayerView 重新取 */
     private fun resolveSubtitleView(): SubtitleView? {
         subtitleViewRef?.let { return it }
@@ -579,11 +608,14 @@ object Players {
         return sv
     }
 
-    /** 绑定 PlayerView 内部的 SubtitleView，并立即应用字号/位置设置 */
+    /** 绑定 PlayerView 内部的 SubtitleView，并立即应用字号/位置设置（样式固定用字幕原始样式） */
     private fun attachSubtitleView(view: SubtitleView?) {
         if (subtitleViewRef !== view) {
             subtitleViewRef = view
         }
+        // EXO 不追 ASS 原生字体/特效：固定回系统字幕样式，再应用我们的字号/位置。
+        view?.setApplyEmbeddedStyles(false)
+        view?.setUserDefaultStyle()
         applySubtitleScale()
         applySubtitlePosition()
     }
@@ -749,8 +781,12 @@ object Players {
         if (option != null) {
             val tracks = p.currentTracks
             val group = tracks.groups.getOrNull(option.groupIndex) ?: return
+            if (trackType == C.TRACK_TYPE_TEXT) {
+                // 手动选择外挂/内封字幕前清掉旧文本轨 override，避免多文本轨同时被选中
+                builder.clearOverridesOfType(trackType)
+            }
             builder.setOverrideForType(
-                TrackSelectionOverride(group.mediaTrackGroup, option.trackIndex),
+                TrackSelectionOverride(group.mediaTrackGroup, listOf(option.trackIndex)),
             )
         } else {
             builder.clearOverridesOfType(trackType)
@@ -759,26 +795,87 @@ object Players {
         listener.onTracksChanged(p.currentTracks)
     }
 
-    /** 动态添加外挂字幕：重建 MediaItem 并保持当前播放位置 */
+    /** 动态添加外挂字幕：content:// 先落成缓存文件；MPV 直接 addSubtitle，EXO 重建 MediaItem 保持当前播放位置 */
     fun addSubtitle(sub: SubItem) {
         val spec = currentSpec ?: return
         val p = player ?: return
         val pos = p.currentPosition
+        val resolved = resolveExternalSubtitle(sub)
         if (com.ican.tvplay.BuildConfig.DEBUG) {
-            Log.d(TAG, "addSubtitle url=${sub.url} pos=$pos mime=${sub.mimeType}")
+            Log.d(TAG, "addSubtitle url=${sub.url} resolved=${resolved.url} pos=$pos mime=${resolved.mimeType} kernel=${_state.value.kernel}")
         }
-        val newSpec = spec.copy(subs = spec.subs.filterNot { it.url == sub.url } + sub)
+        val newSpec = spec.copy(subs = spec.subs.filterNot { it.url == sub.url || it.url == resolved.url } + resolved)
         currentSpec = newSpec
-        // MPV 内核：直接调用 player.addSubtitle()，不重建 MediaSource（仿 fongmi MpvPlayerEngine.addSubtitle）
-        if (p is androidx.media3.mpvplayer.MpvPlayer) {
-            val subConfig = MediaItemFactory.buildSingleSubConfig(sub)
-            val ok = p.addSubtitle(subConfig)
-            Log.d(TAG, "addSubtitle mpv addSubtitle=$ok")
-            return
-        }
-        // EXO 内核：ExoPlayer 无 addSubtitle，需重建 MediaSource
+        // 选择/导入字幕后确保文本轨道未被禁用（否则 override 选中也不会出字幕）
+        p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            .build()
+        _state.value = _state.value.copy(textDisabled = false)
         pendingSelectExternalSubtitle = true
+
+        // fongmi MpvPlayerEngine.addSubtitle：MPV 播放中直接挂载外挂字幕，不重建视频源。
+        // 只有 direct add 失败（idle/ended/native 拒绝）时才回退到重建 MediaItem。
+        if (p is MpvPlayer && p.currentMediaItem != null &&
+            p.playbackState != Player.STATE_IDLE && p.playbackState != Player.STATE_ENDED
+        ) {
+            val added = runCatching { p.addSubtitle(MediaItemFactory.buildMpvSubConfig(resolved)) }
+                .onFailure { Log.e(TAG, "mpv direct addSubtitle failed ${resolved.url}", it) }
+                .getOrDefault(false)
+            if (added) {
+                Log.d(TAG, "mpv direct addSubtitle ok ${resolved.url}")
+                applyMpvSubtitleOptions()
+                // mpvplayer 的 addSubtitle 在 active file 分支会吞掉 native false 仍返回 true；
+                // 延迟校验文本轨真的出现，否则回退重建（已用 file:// 缓存，位置由 startInternal 恢复）。
+                val verifyToken = ++mpvSubtitleVerifyToken
+                handler.postDelayed({
+                    if (verifyToken != mpvSubtitleVerifyToken) return@postDelayed
+                    val cur = player as? MpvPlayer ?: return@postDelayed
+                    val hasExternalTrack = cur.currentTracks.groups.any { g ->
+                        g.type == C.TRACK_TYPE_TEXT &&
+                            (0 until g.length).any { i -> g.getTrackFormat(i).label == resolved.name }
+                    }
+                    if (!hasExternalTrack) {
+                        Log.w(TAG, "mpv direct addSubtitle no text track, fallback rebuild ${resolved.url}")
+                        startInternal(cur, currentSpec ?: newSpec, cur.currentPosition)
+                    }
+                }, 800L)
+                return
+            }
+            Log.w(TAG, "mpv direct addSubtitle rejected, fallback to rebuild ${resolved.url}")
+        }
         startInternal(p, newSpec, pos)
+    }
+
+    /**
+     * SAF content:// 字幕对 EXO/MPV 都不稳定：EXO 可能被默认 UA 的 HttpDataSource 当成 http 打开，
+     * MPV native 也读不了 content 协议。导入时复制到 app cache，后续切内核/重载都用 file://，无需重新导入。
+     */
+    private fun resolveExternalSubtitle(sub: SubItem): SubItem {
+        val uri = android.net.Uri.parse(sub.url)
+        if (uri.scheme != "content") return sub
+        val ctx = appContext ?: return sub
+        return runCatching {
+            val bytes = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching sub
+            val lowerName = sub.name.lowercase()
+            val ext = when {
+                sub.mimeType == MimeTypes.TEXT_SSA || lowerName.endsWith(".ass") || lowerName.endsWith(".ssa") -> ".ass"
+                sub.mimeType == MimeTypes.TEXT_VTT || lowerName.endsWith(".vtt") -> ".vtt"
+                sub.mimeType == MimeTypes.APPLICATION_TTML || lowerName.endsWith(".ttml") || lowerName.endsWith(".xml") -> ".ttml"
+                else -> ".srt"
+            }
+            val dir = java.io.File(ctx.cacheDir, "subtitles").apply { mkdirs() }
+            // 文件名别带前导 '-'（hashCode 可能为负），避免 mpv/libass 对路径参数解析边界情况
+            val file = java.io.File(dir, "${Integer.toHexString(sub.url.hashCode())}$ext")
+            file.writeBytes(bytes)
+            sub.copy(
+                url = android.net.Uri.fromFile(file).toString(),
+                mimeType = sub.mimeType ?: MediaItemFactory.guessSubtitleMime(file.name),
+            )
+        }.onSuccess {
+            Log.d(TAG, "resolveExternalSubtitle ${sub.url} -> ${it.url}")
+        }.onFailure {
+            Log.e(TAG, "resolveExternalSubtitle failed ${sub.url}", it)
+        }.getOrDefault(sub)
     }
 
     // ---- 内部实现 ----
@@ -814,6 +911,7 @@ object Players {
                     MpvPlayer.Builder(ctx).setDecode(mpvDecode).setConfig(config).build().apply {
                         addListener(listener)
                         setPlaybackSpeed(_state.value.speed)
+                        setSubtitleOptions(buildMpvSubtitleOptions())
                         playWhenReady = true
                     }
                 } catch (t: Throwable) {
@@ -838,9 +936,10 @@ object Players {
         // fongmi MpvUtil.buildConfig 同款：指定 CA 证书包，mpv(curl) 拉流 TLS 校验必需，
         // 否则报 "TLS certificate verification failed" 所有 https 分片打不开
         val caFile = java.io.File(ctx.filesDir, "cacert.pem")
-        return androidx.media3.mpvplayer.MpvPlayerConfig.Builder()
+        val builder = androidx.media3.mpvplayer.MpvPlayerConfig.Builder()
             .addConfigDirectory(mpvDir)
             .addTlsCaFileFromAsset(ctx, "cacert.pem", caFile)
+            .addAndroidSubtitleOptions(ctx, buildMpvSubtitleOptions())
             .addAndroidDefaults(
                 androidx.media3.mpvplayer.MpvAndroidOptions.Builder()
                     .setShaderCacheDirectory(mpvCacheDir)
@@ -849,7 +948,7 @@ object Players {
                     .setGpuNextEnabled(false)
                     .build(),
             )
-            .build()
+        return builder.build()
     }
 
     /** 仿 fongmi ExoUtil.buildPlayer/buildLoadControl/buildRenderersFactory 的官方 media3 等价实现 */
@@ -888,6 +987,59 @@ object Players {
                     true,
                 )
                 setHandleAudioBecomingNoisy(true)
+                if (com.ican.tvplay.BuildConfig.DEBUG) {
+                    // 字幕链路诊断：确认外挂字幕是否真正发起加载/读取成功/产生 cues
+                    addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+                        private fun isTextLike(mime: String?): Boolean {
+                            return mime == "application/x-media3-cues" ||
+                                mime?.startsWith("text/") == true ||
+                                mime == MimeTypes.APPLICATION_SUBRIP ||
+                                mime == MimeTypes.APPLICATION_TTML
+                        }
+
+                        override fun onLoadStarted(
+                            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                            loadEventInfo: androidx.media3.exoplayer.source.LoadEventInfo,
+                            mediaLoadData: androidx.media3.exoplayer.source.MediaLoadData,
+                        ) {
+                            val mime = mediaLoadData.trackFormat?.sampleMimeType
+                            if (isTextLike(mime)) {
+                                Log.d(TAG, "exoLoad start uri=${loadEventInfo.dataSpec.uri} mime=$mime")
+                            }
+                        }
+
+                        override fun onLoadCompleted(
+                            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                            loadEventInfo: androidx.media3.exoplayer.source.LoadEventInfo,
+                            mediaLoadData: androidx.media3.exoplayer.source.MediaLoadData,
+                        ) {
+                            val mime = mediaLoadData.trackFormat?.sampleMimeType
+                            if (isTextLike(mime)) {
+                                Log.d(TAG, "exoLoad done uri=${loadEventInfo.dataSpec.uri} bytes=${loadEventInfo.bytesLoaded} mime=$mime")
+                            }
+                        }
+
+                        override fun onLoadError(
+                            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                            loadEventInfo: androidx.media3.exoplayer.source.LoadEventInfo,
+                            mediaLoadData: androidx.media3.exoplayer.source.MediaLoadData,
+                            error: java.io.IOException,
+                            wasCanceled: Boolean,
+                        ) {
+                            val mime = mediaLoadData.trackFormat?.sampleMimeType
+                            if (isTextLike(mime) || loadEventInfo.dataSpec.uri.scheme == "content") {
+                                Log.e(TAG, "exoLoad error uri=${loadEventInfo.dataSpec.uri} mime=$mime canceled=$wasCanceled", error)
+                            }
+                        }
+
+                        override fun onCues(
+                            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                            cueGroup: androidx.media3.common.text.CueGroup,
+                        ) {
+                            Log.d(TAG, "exoCues size=${cueGroup.cues.size} first=${cueGroup.cues.firstOrNull()?.text}")
+                        }
+                    })
+                }
                 playWhenReady = true
                 addListener(listener)
                 setPlaybackSpeed(_state.value.speed)
@@ -916,7 +1068,8 @@ object Players {
         val extras = android.os.Bundle().apply {
             spec.headers.forEach { (k, v) -> putString(k, v) }
         }
-        val item = MediaItemFactory.from(spec).buildUpon()
+        val baseItem = if (p is MpvPlayer) MediaItemFactory.fromMpv(spec) else MediaItemFactory.from(spec)
+        val item = baseItem.buildUpon()
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(metaTitle)
@@ -928,22 +1081,35 @@ object Players {
             )
             .build()
         val headers = MediaItemFactory.checkUa(spec.headers)
-        if (p is ExoPlayer && headers.isNotEmpty()) {
-            // EXO 内核：headers 走 OkHttp DataSource 注入
-            val ds = DefaultHttpDataSource.Factory()
-                .setDefaultRequestProperties(headers)
-                .setAllowCrossProtocolRedirects(true)
-            p.setMediaSource(
-                DefaultMediaSourceFactory(ds)
-                    .setSubtitleParserFactory(SubtitleOffsetParserFactory { _state.value.subtitleOffsetMs })
-                    .createMediaSource(item),
-            )
+        var seekAfterSet = positionMs > 0L
+        if (p is ExoPlayer) {
+            val ctx = appContext
+            if (ctx != null) {
+                // EXO：http(s) 走 DefaultHttpDataSource 注入 UA/headers；content/file 由 DefaultDataSource 分发，
+                // 避免外挂字幕 content:// 被 HttpDataSource 当成 http 打开（unknown protocol: content）。
+                val httpDs = DefaultHttpDataSource.Factory()
+                    .setDefaultRequestProperties(headers)
+                    .setAllowCrossProtocolRedirects(true)
+                val ds = DefaultDataSource.Factory(ctx, httpDs)
+                p.setMediaSource(
+                    DefaultMediaSourceFactory(ds)
+                        .setSubtitleParserFactory(SubtitleOffsetParserFactory { _state.value.subtitleOffsetMs })
+                        .createMediaSource(item),
+                )
+            } else {
+                p.setMediaItem(item)
+            }
         } else {
-            // headers 为空时走 setMediaItem，使用 buildExoPlayer 中设置的 mediaSourceFactory
-            // （已包含 SubtitleParserFactory + experimentalParseSubtitlesDuringExtraction）
-            p.setMediaItem(item)
+            // MPV：seekTo(prepare 前) 不生效，必须用 setMediaItem(item, startPositionMs) 带起始进度，
+            // 否则 EXO→MPV 切内核会从头播放。
+            if (positionMs > 0L) {
+                p.setMediaItem(item, positionMs)
+                seekAfterSet = false
+            } else {
+                p.setMediaItem(item)
+            }
         }
-        if (positionMs > 0L) p.seekTo(positionMs)
+        if (seekAfterSet) p.seekTo(positionMs)
         p.prepare()
         p.play()
     }
@@ -955,6 +1121,7 @@ object Players {
         val pos = old.currentPosition
         val wasPlaying = old.playWhenReady
         val spec = currentSpec
+        mpvSubtitleVerifyToken++   // 取消上一次 MPV 动态挂字幕的延迟校验
         handler.removeCallbacks(ticker)
         bandwidthMeter?.removeEventListener(bandwidthListener)
         bandwidthMeter = null
@@ -971,6 +1138,8 @@ object Players {
         playerView?.let { it.player = p }
         if (spec != null) {
             retryCount = 0    // 重建后重置错误计数
+            // 已导入外挂字幕时切内核/解码：重建后自动选中同一条外挂字幕，无需重新导入
+            if (spec.subs.isNotEmpty()) pendingSelectExternalSubtitle = true
             try {
                 startInternal(p, spec, pos)
             } catch (t: Throwable) {
@@ -1095,6 +1264,12 @@ object Players {
             for (ti in 0 until group.length) {
                 if (!group.isTrackSupported(ti)) continue
                 val format = group.getTrackFormat(ti)
+                if (trackType == C.TRACK_TYPE_TEXT) {
+                    // 隐藏 EXO 里常见的无标识字幕轨（如内嵌 CEA-608：label/language 都为空，UI 只显示 Unknown）
+                    val noIdentity = format.label == null &&
+                        (format.language == null || format.language == "und")
+                    if (noIdentity) continue
+                }
                 out += TrackOption(
                     groupIndex = gi,
                     trackIndex = ti,

@@ -33,6 +33,11 @@ sealed interface Route : NavKey, Parcelable {
     @Serializable
     data object History : Route
 
+    /** 追番更新页：收藏页入口进入，分「今日更新 / 待看更新」两组 */
+    @Parcelize
+    @Serializable
+    data object Updates : Route
+
     @Parcelize
     @Serializable
     data class Player(
@@ -40,5 +45,7 @@ sealed interface Route : NavKey, Parcelable {
         val episodeIndex: Int,
         val flag: String = "",
         val preInit: Boolean = false,
+        /** 强制从指定集开播（追番更新入口）：不再被历史记录覆盖到上次观看集 */
+        val forceStart: Boolean = false,
     ) : Route
 }
