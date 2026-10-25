@@ -2589,12 +2589,13 @@ private fun FullscreenPlayLayout(
             Box(modifier = Modifier.fillMaxSize()) {
                 // 顶栏（fongmi: 56dp 行高 + 左右 4dp padding，返回 48dp / 标题 16sp 占中间 / 右侧投屏 48dp）
                 // 无黑色渐变遮罩：纯白图标直接叠在画面上
+                // 全屏不加 statusBarsPadding：上滑回多任务时系统会短暂亮出状态栏，
+                // 实时 inset 会让顶栏跟着下移（fongmi 控制层锚定屏幕顶缘，不响应 inset）
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
-                        .statusBarsPadding()
                         .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 24.dp),
                 ) {
                     PlainTopBtn(AppIcons.Back, "返回") { onExitFullscreen() }
