@@ -108,6 +108,8 @@ object Players {
         val audioTracks: List<TrackOption> = emptyList(),
         val textTracks: List<TrackOption> = emptyList(),
         val textDisabled: Boolean = false,
+        /** 正在切换线路/选集：解析新源期间保持加载态（真实播放器的 buffering 会在这期间被 state=IDLE 冲掉） */
+        val switching: Boolean = false,
         /** 外挂字幕时间偏移（ms，仿 fongmi 播放内状态，新开播重置） */
         val subtitleOffsetMs: Long = 0L,
         val error: String? = null,
@@ -491,6 +493,26 @@ object Players {
         }
     }
 
+    /**
+     * 切换线路/选集：立即停掉当前画面并进入加载态。
+     *
+     * 对齐 fongmi：详情页点线路 → seamless() → selectEpisode() → playEpisode() → host.stopPlaybackForRefresh()，
+     * 即「先停当前播放，再解析新源」。本项目原来是解析完才换源，网盘类 jar 解析要秒级，
+     * 期间旧画面继续播且无任何提示，看起来就像"点了没反应"。
+     */
+    fun beginSwitch() {
+        probeJob?.cancel()
+        offsetApplyJob?.cancel()
+        startToken++          // 让在途的旧起播回调失效
+        player?.stop()
+        _state.value = _state.value.copy(
+            switching = true,
+            buffering = true,
+            playing = false,
+            error = null,
+        )
+    }
+
     /** 开始播放（或换源/换线路） */
     fun start(context: Context, spec: PlaySpec, startPositionMs: Long = 0L) {
         appContext = context.applicationContext
@@ -500,7 +522,7 @@ object Players {
         currentSpec = spec
         retryCount = 0  // 新源重置错误计数
         // 新源开播清除旧错误，并重置播放内的字幕偏移（偏移只对当前这一集有效，仿 fongmi）
-        _state.value = _state.value.copy(error = null, subtitleOffsetMs = 0L)
+        _state.value = _state.value.copy(error = null, subtitleOffsetMs = 0L, switching = false)
         val inferred = spec.format ?: ContentTypeProbe.fromUrl(spec.url)
         val needProbe = inferred == null && _state.value.kernel == Kernel.EXO &&
             (spec.url.startsWith("http://") || spec.url.startsWith("https://"))
@@ -649,7 +671,7 @@ object Players {
     /** 播放页解析阶段（spider playerContent / jx 二次解析）致命错误上报：转错误页提示而不是崩溃 */
     fun notifyError(message: String) {
         Log.e(TAG, "notifyError: $message")
-        _state.value = _state.value.copy(error = message)
+        _state.value = _state.value.copy(error = message, switching = false)
     }
 
     /**
@@ -692,7 +714,7 @@ object Players {
         autoNextFired = false
         onPlayerChanged?.invoke(null)
         _state.value = _state.value.copy(
-            ready = false, playing = false, buffering = false,
+            ready = false, playing = false, buffering = false, switching = false,
             audioTracks = emptyList(), textTracks = emptyList(),
             subtitleOffsetMs = 0L, error = null,
             networkSpeedBps = 0L,

@@ -791,6 +791,9 @@ fun PlayerScreen(
             // 仅防连点误触（400ms），不再限制重试次数：用户点线路就是明确的「切过去试一下」意图
             if (now - lastLineChangeAt >= 400L) {
                 lastLineChangeAt = now
+                // 立即停掉当前画面进入加载态（对齐 fongmi 详情页切线路：先 stopPlaybackForRefresh 再解析），
+                // 否则解析新线路（网盘类 jar 秒级）期间旧画面继续播，看起来像"点了没反应"
+                Players.beginSwitch()
                 lineFlag = flag
                 saveProgress()
             }
@@ -1781,7 +1784,7 @@ private fun PreviewPlayerArea(
         // 加载转圈（fongmi: view_progress；进页面即显示，STATE_READY 后随 buffering 显隐）
         // 放在控制层下面：缓冲时转圈在按钮后方，按钮仍然可点击（与 fongmi 同款 z-order）
         // 转圈固定在屏幕中心，不随网速文字出现而位移
-        if (showLoading || playerState.buffering) {
+        if (showLoading || playerState.buffering || playerState.switching) {
             CircularProgressIndicator(
                 color = Color.White,
                 modifier = Modifier
@@ -2791,7 +2794,7 @@ private fun FullscreenPlayLayout(
         }
 
         // 缓冲转圈（fongmi 全屏 view_progress 同款：中心固定位置，不随网速文字位移）
-        if (playerState.buffering) {
+        if (playerState.buffering || playerState.switching) {
             CircularProgressIndicator(
                 color = Color.White,
                 modifier = Modifier
