@@ -302,13 +302,14 @@ class SpiderManager(private val appContext: Context) {
         if (!site.isSpider()) return@withContext com.ican.tvplay.data.PlaySource(fixedPlayUrl)
         val spider = getSpider(site, jarSpec)
             ?: return@withContext com.ican.tvplay.data.PlaySource(fixedPlayUrl)
+        Log.d(TAG, "playerContent in site=${site.key} flag=$flag id=${fixedPlayUrl.take(160)}")
         val jsonStr = playerContent(spider, flag.ifBlank { site.key }, fixedPlayUrl)
         // 排查内存：网盘类 jar 的 playerContent 会拉整份文件清单，单次响应可能极大，
         // 记录响应体积与当前堆占用，便于定位 OOM 是「单次解析太大」还是「多次解析累积」
         runCatching {
             val rt = Runtime.getRuntime()
             val usedMb = (rt.totalMemory() - rt.freeMemory()) / 1024 / 1024
-            Log.d(TAG, "playerContent size=${jsonStr.length} heapUsed=${usedMb}MB site=${site.key}")
+            Log.d(TAG, "playerContent size=${jsonStr.length} heapUsed=${usedMb}MB site=${site.key} body=${jsonStr.take(200)}")
         }
         if (jsonStr.isBlank()) return@withContext com.ican.tvplay.data.PlaySource(playUrl)
         runCatching {
@@ -316,16 +317,10 @@ class SpiderManager(private val appContext: Context) {
             val obj = json.parseToJsonElement(jsonStr).jsonObject
             val rawUrl = obj["url"]?.jsonPrimitive?.content ?: playUrl
             val headers = mutableMapOf<String, String>()
-            obj["header"]?.let { el ->
-                runCatching {
-                    el.jsonObject.entries.forEach { (k, v) ->
-                        headers[k] = v.jsonPrimitive.content
-                    }
-                }
-            }
+            obj["header"]?.let { el -> parseHeaderElement(el, headers) }
             val parse = obj["parse"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             val jx = obj["jx"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-            Log.d(TAG, "resolvePlayUrl rawUrl=$rawUrl parse=$parse jx=$jx")
+            Log.d(TAG, "resolvePlayUrl rawUrl=$rawUrl parse=$parse jx=$jx headers=${headers.keys}")
             val fixedUrl = fixProxyUrl(rawUrl)
             if (fixedUrl != rawUrl) Log.d(TAG, "resolvePlayUrl proxy fixed: $fixedUrl")
             val finalUrl = if (com.ican.tvplay.data.remote.JxParser.needsParse(fixedUrl, parse, jx)) {
@@ -335,14 +330,46 @@ class SpiderManager(private val appContext: Context) {
             }
             com.ican.tvplay.data.PlaySource(url = percentEncodeUrl(finalUrl.ifBlank { playUrl }), headers = headers)
         }.getOrNull()?.let { source ->
+            // 网盘分享描述（形如 {"pg":"1","sToken":...}）不是可播放地址：
+            // jar 返回它说明「没解析出真实直链」，把它交给播放器只会得到一个必然失败的加载。
+            // 直接判失败，交给上层的换线路兜底逻辑处理。
+            if (source.url.isBlank() || source.url.startsWith("{")) {
+                Log.w(TAG, "resolvePlayUrl invalid url: ${source.url.take(120)}")
+                throw java.io.IOException("invalid play url")
+            }
             // jar 内置代理预检：部分 jar 返回指向其内置服务器的本机 URL（如 127.0.0.1:6677），但该服务器
-            // 未必真的起来了（实测此 jar 全程未监听）。提前抛错走线路兜底换下一条，与 fongmi 表现一致
+            // 未必真的起来了。提前抛错走线路兜底换下一条，与 fongmi 表现一致
             if (!awaitLocalProxyAlive(source.url)) {
                 Log.w(TAG, "resolvePlayUrl local proxy dead: ${source.url.take(80)}")
                 throw java.io.IOException("local proxy not alive")
             }
             source
         } ?: com.ican.tvplay.data.PlaySource(playUrl)
+    }
+
+    /**
+     * 解析 jar 返回的 header 字段。三种形态都要吃下：
+     * 1. JSON 对象：{"User-Agent":"..."}
+     * 2. JSON 字符串（网盘类 jar 最常见）："{\"cookie\":\"__puus=...\",\"Referer\":\"https://pan.quark.cn/\"}"
+     *    —— 夸克等网盘直链必须带这里的 cookie/UA/Referer 才能过 CDN 鉴权，漏解析就等于裸请求（412）。
+     * 3. 纯文本多行："k: v" 或 "k=v"
+     */
+    private fun parseHeaderElement(el: kotlinx.serialization.json.JsonElement, out: MutableMap<String, String>) {
+        if (el is kotlinx.serialization.json.JsonObject) {
+            el.entries.forEach { (k, v) -> out[k] = v.jsonPrimitive.content }
+            return
+        }
+        val text = runCatching { el.jsonPrimitive.content }.getOrNull()?.trim().orEmpty()
+        if (text.isEmpty()) return
+        val inner = runCatching { Json.parseToJsonElement(text) }.getOrNull()
+        if (inner is kotlinx.serialization.json.JsonObject) {
+            inner.entries.forEach { (k, v) -> out[k] = v.jsonPrimitive.content }
+            return
+        }
+        text.split('\n', '\r').map { it.trim() }.filter { it.isNotEmpty() }.forEach { line ->
+            val i = line.indexOfFirst { it == ':' || it == '=' }
+            if (i > 0) out[line.substring(0, i).trim()] = line.substring(i + 1).trim()
+        }
     }
 
     /**
@@ -387,7 +414,6 @@ class SpiderManager(private val appContext: Context) {
         }
         return false
     }
-
     /** fongmi Source.fetch：处理特殊协议（video:// 去前缀，其他协议暂时直接返回） */
     private fun fixSpecialProtocol(url: String): String {
         return when {
