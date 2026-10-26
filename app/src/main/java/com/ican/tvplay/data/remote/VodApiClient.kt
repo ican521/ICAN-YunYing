@@ -33,6 +33,8 @@ private const val TAG = "VodApi"
 data class TvBoxConfig(
     val spider: String = "",
     val sites: List<TvBoxSite> = emptyList(),
+    /** 配置声明的 VIP 解析平台列表（fongmi VodConfig.getFlags），必须原样传给 jar 的 playerContent */
+    val flags: List<String> = emptyList(),
 )
 
 @Serializable
@@ -169,6 +171,10 @@ class VodApiClient(
             val decoded = Decoder.decode(body)
             Log.d(TAG, "decoded bytes=${decoded.length}, head=${decoded.take(200)}")
             val config = json.decodeFromString<TvBoxConfig>(decoded)
+            // 配置的 flags 必须交给 jar（playerContent 第三个参数）：网盘类 jar 依此决定自己解析
+            // 还是把分享描述（share_id/surl/fs_id JSON）丢回给壳；壳不声明支持时夸克线路永远拿不到直链
+            com.ican.tvplay.data.remote.SpiderManager.setVipFlags(config.flags)
+            Log.d(TAG, "config flags=${config.flags.size} ${config.flags}".take(320))
             Log.d(TAG, "sites count=${config.sites.size}, spider=${config.spider.take(80)}")
             config.sites.forEachIndexed { i, s ->
                 Log.d(TAG, "site[$i] key=${s.key} name=${s.name} type=${s.type} api=${s.api.take(60)}")

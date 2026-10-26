@@ -64,6 +64,14 @@ class SpiderManager(private val appContext: Context) {
         /** key = md5(jarUrl)|siteKey → 已初始化的 Spider 实例（反射持有） */
         private val spiders = ConcurrentHashMap<String, Any>()
 
+        /** 配置声明的 VIP 解析平台（fongmi VodConfig.getFlags()），playerContent 第三个参数用 */
+        @Volatile
+        private var vipFlags: List<String> = emptyList()
+
+        fun setVipFlags(flags: List<String>) {
+            vipFlags = flags.toList()
+        }
+
         private var jarDirRef: File? = null
         private var dexOutDirRef: File? = null
 
@@ -211,7 +219,7 @@ class SpiderManager(private val appContext: Context) {
                         String::class.java,
                         String::class.java,
                         List::class.java,
-                    ).invoke(spider, flag, id, emptyList<String>()) as? String ?: ""
+                    ).invoke(spider, flag, id, vipFlags) as? String ?: ""
                 }
             }.onFailure { Log.e(TAG, "playerContent fail flag=$flag id=$id", it) }.getOrDefault("")
         }
