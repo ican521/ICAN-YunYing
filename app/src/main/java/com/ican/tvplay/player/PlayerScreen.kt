@@ -591,11 +591,6 @@ fun PlayerScreen(
     // 解析并播放（video 变化也触发：自动换站源后整片替换重解析）
     LaunchedEffect(initialized, video, episodeIndex, lineFlag) {
         if (!initialized) return@LaunchedEffect
-        // 双保险：已被判失败的线路绝不真正发起解析（拦截层若漏掉也不会拉爆内存）
-        if (lineFlag.isNotBlank() && lineFlag in failedFlags.value) {
-            android.widget.Toast.makeText(context, "该线路播放失败，请换其他线路", android.widget.Toast.LENGTH_SHORT).show()
-            return@LaunchedEffect
-        }
         if (resumeFromBackground) {
             // 后台续播接管：播放器已在播，无需重新解析
             resumeFromBackground = false
@@ -774,21 +769,31 @@ fun PlayerScreen(
         }
     }
 
-    /** 手动切线统一入口：已失败的线路本次会话内不再重试，仅 Toast 提示（防反复点死线路堆积代理线程） */
-    // 切线路防抖：坏线路的 jar 解析要联网盘拉数据（每次几百 KB），
-    // 快速连点会并行堆起多个解析协程，几十秒内即可耗尽堆内存闪退
+    /**
+     * 手动切线统一入口。
+     * 不能把失败线路永久拉黑：线路一旦判失败就永久不可用，会导致「同一个线路名在其他集/其他片全部播不了」，
+     * 而用户手动点它本就是明确的「再试一次」意图。改为「限次重试 + 防抖」：
+     * - 同一线路最多手动尝试 [MAX_MANUAL_ATTEMPTS] 次，超过后只提示不解析；
+     * - 距上次切线不足 1.5 秒的连点直接忽略。
+     * 这样既不会像以前那样无限重试把 jar 解析堆到内存爆掉，也保留了换线路自救的机会。
+     */
     var lastLineChangeAt by remember { mutableLongStateOf(0L) }
+    val lineAttempts = remember { mutableMapOf<String, Int>() }
     val requestLineChange: (String) -> Unit = { flag ->
         if (flag != lineFlag) {
             val now = android.os.SystemClock.elapsedRealtime()
             if (now - lastLineChangeAt < 1500L) {
                 // 防抖窗口内直接忽略，不提示也不解析
-            } else if (flag in failedFlags.value) {
-                toastMsg("该线路播放失败，请换其他线路")
             } else {
-                lastLineChangeAt = now
-                lineFlag = flag
-                saveProgress()
+                val used = lineAttempts[flag] ?: 0
+                if (used >= MAX_MANUAL_ATTEMPTS) {
+                    toastMsg("该线路多次播放失败，请换其他线路")
+                } else {
+                    lineAttempts[flag] = used + 1
+                    lastLineChangeAt = now
+                    lineFlag = flag
+                    saveProgress()
+                }
             }
         }
     }
@@ -3855,3 +3860,6 @@ private fun PlayerErrorScreen(
 }
 
 private const val HIDE_DELAY_MS = 5_000L
+
+/** 用户手动点击同一条线路的最大尝试次数（超过后不再解析，避免坏线路把 jar 解析堆到内存爆掉） */
+private const val MAX_MANUAL_ATTEMPTS = 3
