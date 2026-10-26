@@ -578,9 +578,24 @@ fun PlayerScreen(
         initialized = true
     }
 
+    // ---- 播放失败自动切换（fongmi VodFallbackPolicy：先换线路，再换站源） ----
+    // 已失败的线路/站点：本次播放会话内不再重试，避免循环。
+    // 作用域必须是整个 PlayerScreen 实例（remember 无 key）：若按 videoId 记忆，
+    // 自动换站源后 video 一变集合就被重置，会在两个坏站之间无限乒乓（每轮都调 jar 解析，
+    // 网盘 jar 每次拉取几百 KB JSON，高频循环几十秒即可耗尽堆内存 OOM 闪退）。
+    // 该名单在换站时也不清空，否则旧站坏线路会重新可点，同样形成死循环。
+    val failedFlags = remember { mutableStateOf(setOf<String>()) }
+    val failedSiteKeys = remember { mutableStateOf(setOf<String>()) }
+    var fallbackInProgress by remember { mutableStateOf(false) }
+
     // 解析并播放（video 变化也触发：自动换站源后整片替换重解析）
     LaunchedEffect(initialized, video, episodeIndex, lineFlag) {
         if (!initialized) return@LaunchedEffect
+        // 双保险：已被判失败的线路绝不真正发起解析（拦截层若漏掉也不会拉爆内存）
+        if (lineFlag.isNotBlank() && lineFlag in failedFlags.value) {
+            android.widget.Toast.makeText(context, "该线路播放失败，请换其他线路", android.widget.Toast.LENGTH_SHORT).show()
+            return@LaunchedEffect
+        }
         if (resumeFromBackground) {
             // 后台续播接管：播放器已在播，无需重新解析
             resumeFromBackground = false
@@ -637,16 +652,7 @@ fun PlayerScreen(
         }
     }
 
-    // ---- 播放失败自动切换（fongmi VodFallbackPolicy：先换线路，再换站源） ----
-    // 已失败的线路/站点：本次播放会话内不再重试，避免循环。
-    // 作用域必须是整个 PlayerScreen 实例（remember 无 key）：若按 videoId 记忆，
-    // 自动换站源后 video 一变集合就被重置，会在两个坏站之间无限乒乓（每轮都调 jar 解析，
-    // 网盘 jar 每次拉取几百 KB JSON，高频循环几十秒即可耗尽堆内存 OOM 闪退）。
-    // 换站成功时 failedFlags 会手动清空（同各站线路名常同名，新站给一次全新机会）；
-    // failedSiteKeys 永不清空，保证兜底链必然终止。
-    val failedFlags = remember { mutableStateOf(setOf<String>()) }
-    val failedSiteKeys = remember { mutableStateOf(setOf<String>()) }
-    var fallbackInProgress by remember { mutableStateOf(false) }
+    // ---- 播放失败自动切换（fongmi VodFallbackPolicy：先换线路，再换站源）----
 
     fun toastMsg(msg: String) {
         android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
@@ -697,7 +703,10 @@ fun PlayerScreen(
             )
             if (candidate != null) {
                 failedSiteKeys.value = failedSiteKeys.value + curKey
-                failedFlags.value = emptySet()
+                // 注意：这里不能清空 failedFlags。清空会让旧站的坏线路重新可点，
+                // 用户手点回去 → jar 重新解析 → 失败 → 又自动换站 → 名单再清空，
+                // 形成死循环并在几十秒内刷爆堆内存闪退。
+                // 代价仅是「新站同名线路被误拦一条」，远小于 OOM 风险。
                 val newVideo = candidate.video
                 toastMsg("播放失败，自动切换站源：${siteShortName(candidate.site.name, candidate.site.key)}")
                 // 缓存新站点信息：解析 LaunchedEffect 据此走新站的 playerContent 延迟解析
@@ -766,11 +775,18 @@ fun PlayerScreen(
     }
 
     /** 手动切线统一入口：已失败的线路本次会话内不再重试，仅 Toast 提示（防反复点死线路堆积代理线程） */
+    // 切线路防抖：坏线路的 jar 解析要联网盘拉数据（每次几百 KB），
+    // 快速连点会并行堆起多个解析协程，几十秒内即可耗尽堆内存闪退
+    var lastLineChangeAt by remember { mutableLongStateOf(0L) }
     val requestLineChange: (String) -> Unit = { flag ->
         if (flag != lineFlag) {
-            if (flag in failedFlags.value) {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastLineChangeAt < 1500L) {
+                // 防抖窗口内直接忽略，不提示也不解析
+            } else if (flag in failedFlags.value) {
                 toastMsg("该线路播放失败，请换其他线路")
             } else {
+                lastLineChangeAt = now
                 lineFlag = flag
                 saveProgress()
             }
