@@ -9,6 +9,9 @@ import java.util.concurrent.TimeUnit
 
 private const val TAG = "JxParser"
 
+/** 解析页 HTML 的读取上限：超过这个体积就不可能是网页，直接放弃 */
+private const val MAX_HTML_BYTES = 2L * 1024 * 1024
+
 /**
  * 解析 Fongmi/TVBox playerContent 返回的 parse=1 / jx=1 模式播放地址。
  * 即 spider 返回的 url 不是真实 m3u8/mp4，而是一个「解析页」URL（如 https://jx.xxx.com/?url=xxx），
@@ -24,18 +27,6 @@ object JxParser {
         .followRedirects(true)
         .followSslRedirects(true)
         .build()
-
-    /** 常见真实流地址特征 */
-    private val REAL_STREAM_HINTS = listOf(
-        ".m3u8",
-        ".m4v",
-        ".mp4",
-        ".flv",
-        ".mpd",   // DASH
-        ".ts",
-        "video",
-        ".php?",
-    )
 
     /** 从 HTML 中提取真实视频地址的正则（按优先级排序） */
     private val STREAM_PATTERNS = listOf(
@@ -70,9 +61,10 @@ object JxParser {
      * - 或 url 不含任何真实流特征（.m3u8/.mp4/.flv/.mpd）→ 可能是解析页
      */
     fun needsParse(url: String, parseFlag: Int?, jxFlag: Int?): Boolean {
-        if (parseFlag == 1 || parseFlag == 2 || jxFlag == 1) return true
-        val lower = url.lowercase()
-        return REAL_STREAM_HINTS.none { lower.contains(it) } && url.startsWith("http")
+        // 只信 jar 的显式声明。曾经按「URL 不含 .m3u8/.mp4 就当解析页」猜测，
+        // 但夸克等网盘的直链本来就没有这些后缀，会被误判成解析页 → 把整集视频当 HTML
+        // 读进 String（一直转圈、Java 堆冲到数百 MB、最终 OOM 闪退）。
+        return parseFlag == 1 || parseFlag == 2 || jxFlag == 1
     }
 
     /**
@@ -108,7 +100,30 @@ object JxParser {
                     Log.e(TAG, "jx GET failed HTTP ${resp.code}")
                     return@runCatching parseUrl
                 }
-                val html = resp.body?.string().orEmpty()
+                // 双保险：即使被显式标成解析页，只要响应是媒体流/超大二进制，就绝不能读进内存
+                val contentType = resp.header("Content-Type").orEmpty().lowercase()
+                val declaredLength = resp.body?.contentLength() ?: -1L
+                val looksLikeMedia = contentType.startsWith("video/") ||
+                    contentType.startsWith("audio/") ||
+                    contentType.contains("octet-stream") ||
+                    contentType.contains("mpegurl") ||
+                    declaredLength > MAX_HTML_BYTES
+                if (looksLikeMedia) {
+                    Log.w(TAG, "jx skip media response type=$contentType len=$declaredLength")
+                    return@runCatching parseUrl
+                }
+                // 最多只读 MAX_HTML_BYTES：解析页是 HTML，读不完就说明不是解析页
+                val src = resp.body?.source()
+                val html = if (src == null) {
+                    ""
+                } else {
+                    val buf = okio.Buffer()
+                    while (buf.size < MAX_HTML_BYTES) {
+                        val want = (MAX_HTML_BYTES - buf.size).coerceAtMost(16 * 1024)
+                        if (src.read(buf, want) == -1L) break
+                    }
+                    buf.readUtf8()
+                }
                 if (html.isEmpty()) {
                     Log.w(TAG, "jx empty body")
                     return@runCatching parseUrl

@@ -782,28 +782,17 @@ fun PlayerScreen(
     /**
      * 手动切线统一入口。
      * 不能把失败线路永久拉黑：线路一旦判失败就永久不可用，会导致「同一个线路名在其他集/其他片全部播不了」，
-     * 而用户手动点它本就是明确的「再试一次」意图。改为「限次重试 + 防抖」：
-     * - 同一线路最多手动尝试 [MAX_MANUAL_ATTEMPTS] 次，超过后只提示不解析；
-     * - 距上次切线不足 1.5 秒的连点直接忽略。
-     * 这样既不会像以前那样无限重试把 jar 解析堆到内存爆掉，也保留了换线路自救的机会。
+     * 而用户手动点它本就是明确的「再试一次」意图。因此这里只做 400ms 防连点误触，不限制重试次数。
      */
     var lastLineChangeAt by remember { mutableLongStateOf(0L) }
-    val lineAttempts = remember { mutableMapOf<String, Int>() }
     val requestLineChange: (String) -> Unit = { flag ->
         if (flag != lineFlag) {
             val now = android.os.SystemClock.elapsedRealtime()
-            if (now - lastLineChangeAt < 1500L) {
-                // 防抖窗口内直接忽略，不提示也不解析
-            } else {
-                val used = lineAttempts[flag] ?: 0
-                if (used >= MAX_MANUAL_ATTEMPTS) {
-                    toastMsg("该线路多次播放失败，请换其他线路")
-                } else {
-                    lineAttempts[flag] = used + 1
-                    lastLineChangeAt = now
-                    lineFlag = flag
-                    saveProgress()
-                }
+            // 仅防连点误触（400ms），不再限制重试次数：用户点线路就是明确的「切过去试一下」意图
+            if (now - lastLineChangeAt >= 400L) {
+                lastLineChangeAt = now
+                lineFlag = flag
+                saveProgress()
             }
         }
     }
@@ -3870,9 +3859,6 @@ private fun PlayerErrorScreen(
 }
 
 private const val HIDE_DELAY_MS = 5_000L
-
-/** 用户手动点击同一条线路的最大尝试次数（超过后不再解析，避免坏线路把 jar 解析堆到内存爆掉） */
-private const val MAX_MANUAL_ATTEMPTS = 3
 
 /** 单次播放会话内自动兜底（换线路/换站源）的总次数上限，防止沿站源链无限解析 */
 private const val MAX_AUTO_FALLBACK = 2
