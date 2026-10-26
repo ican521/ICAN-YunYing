@@ -3875,4 +3875,4 @@ private const val HIDE_DELAY_MS = 5_000L
 private const val MAX_MANUAL_ATTEMPTS = 3
 
 /** 单次播放会话内自动兜底（换线路/换站源）的总次数上限，防止沿站源链无限解析 */
-private const val MAX_AUTO_FALLBACK = 6
+private const val MAX_AUTO_FALLBACK = 2

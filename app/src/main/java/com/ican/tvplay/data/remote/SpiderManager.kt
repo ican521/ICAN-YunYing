@@ -295,6 +295,13 @@ class SpiderManager(private val appContext: Context) {
         val spider = getSpider(site, jarSpec)
             ?: return@withContext com.ican.tvplay.data.PlaySource(fixedPlayUrl)
         val jsonStr = playerContent(spider, flag.ifBlank { site.key }, fixedPlayUrl)
+        // 排查内存：网盘类 jar 的 playerContent 会拉整份文件清单，单次响应可能极大，
+        // 记录响应体积与当前堆占用，便于定位 OOM 是「单次解析太大」还是「多次解析累积」
+        runCatching {
+            val rt = Runtime.getRuntime()
+            val usedMb = (rt.totalMemory() - rt.freeMemory()) / 1024 / 1024
+            Log.d(TAG, "playerContent size=${jsonStr.length} heapUsed=${usedMb}MB site=${site.key}")
+        }
         if (jsonStr.isBlank()) return@withContext com.ican.tvplay.data.PlaySource(playUrl)
         runCatching {
             val json = Json { ignoreUnknownKeys = true }
