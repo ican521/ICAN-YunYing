@@ -45,6 +45,9 @@ class SpiderManager(private val appContext: Context) {
     private fun lockOf(spider: Any): Mutex = spiderLocks.computeIfAbsent(spider) { Mutex() }
 
     companion object {
+        /** 百分号编码用的大写十六进制表 */
+        private val HEX = "0123456789ABCDEF".toCharArray()
+
         // 全局缓存：SpiderManager 可能随 ViewModel 重建，jar/classloader/spider 实例
         // 必须跨实例常驻（fongmi 同款做法），否则每次进搜索页全部站点重新加载 init，极慢
         private val locks = ConcurrentHashMap<String, Any>()
@@ -315,8 +318,59 @@ class SpiderManager(private val appContext: Context) {
             } else {
                 fixedUrl
             }
-            com.ican.tvplay.data.PlaySource(url = finalUrl.ifBlank { playUrl }, headers = headers)
-        }.getOrNull() ?: com.ican.tvplay.data.PlaySource(playUrl)
+            com.ican.tvplay.data.PlaySource(url = percentEncodeUrl(finalUrl.ifBlank { playUrl }), headers = headers)
+        }.getOrNull()?.let { source ->
+            // jar 内置代理预检：部分 jar 返回指向其内置服务器的本机 URL（如 127.0.0.1:6677），但该服务器
+            // 未必真的起来了（实测此 jar 全程未监听）。提前抛错走线路兜底换下一条，与 fongmi 表现一致
+            if (!awaitLocalProxyAlive(source.url)) {
+                Log.w(TAG, "resolvePlayUrl local proxy dead: ${source.url.take(80)}")
+                throw java.io.IOException("local proxy not alive")
+            }
+            source
+        } ?: com.ican.tvplay.data.PlaySource(playUrl)
+    }
+
+    /**
+     * mpv 走 libcurl，「URL 里带空格或中文」会被直接判为格式非法并瞬间失败
+     * （日志表现为 Opening 与 Failed to open 同一毫秒），而网盘类 jar 返回的路径常带中文片名与空格。
+     * 只对非 ASCII 和空格做百分号编码，其余 ASCII 原样保留（已编码的 %xx 不受影响）。
+     */
+    private fun percentEncodeUrl(url: String): String {
+        if (url.none { it == ' ' || it.code > 127 }) return url
+        val sb = StringBuilder(url.length + 32)
+        for (ch in url) {
+            if (ch.code in 33..126) {
+                sb.append(ch)
+            } else {
+                ch.toString().toByteArray(Charsets.UTF_8).forEach { b ->
+                    sb.append('%').append(HEX[(b.toInt() shr 4) and 0x0F]).append(HEX[b.toInt() and 0x0F])
+                }
+            }
+        }
+        return sb.toString()
+    }
+
+    /**
+     * 本机代理 URL 活性预检：非本机地址直接放行；本机地址做 TCP 连接测试，
+     * 连不上时按「服务器可能慢启动」重试 3 次（每次间隔 400ms），全部失败判死。
+     */
+    private suspend fun awaitLocalProxyAlive(url: String): Boolean {
+        val uri = runCatching { android.net.Uri.parse(url) }.getOrNull() ?: return true
+        val host = uri.host ?: return true
+        if (host != "127.0.0.1" && host != "localhost") return true
+        val port = uri.port
+        if (port <= 0) return true
+        repeat(3) { attempt ->
+            val ok = runCatching {
+                java.net.Socket().use { s ->
+                    s.connect(java.net.InetSocketAddress(host, port), 800)
+                }
+                true
+            }.getOrDefault(false)
+            if (ok) return true
+            if (attempt < 2) kotlinx.coroutines.delay(400)
+        }
+        return false
     }
 
     /** fongmi Source.fetch：处理特殊协议（video:// 去前缀，其他协议暂时直接返回） */

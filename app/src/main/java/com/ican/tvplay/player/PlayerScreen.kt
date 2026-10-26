@@ -587,6 +587,8 @@ fun PlayerScreen(
     val failedFlags = remember { mutableStateOf(setOf<String>()) }
     val failedSiteKeys = remember { mutableStateOf(setOf<String>()) }
     var fallbackInProgress by remember { mutableStateOf(false) }
+    // 本会话已自动兜底次数（换线路 + 换站源合计），用于给解析开销封顶
+    var autoFallbackCount by remember { mutableIntStateOf(0) }
 
     // 解析并播放（video 变化也触发：自动换站源后整片替换重解析）
     LaunchedEffect(initialized, video, episodeIndex, lineFlag) {
@@ -663,6 +665,12 @@ fun PlayerScreen(
             return@LaunchedEffect
         }
         val v = video ?: return@LaunchedEffect
+        // 自动兜底次数上限：每次兜底都要让 jar 重新解析（网盘类要拉整份文件清单，单次数十 MB），
+        // 不限次数会沿站源链一路解析下去，几十秒就能把 256MB 堆耗尽闪退
+        if (autoFallbackCount >= MAX_AUTO_FALLBACK) {
+            toastMsg("所有线路均播放失败，请手动选择其他线路")
+            return@LaunchedEffect
+        }
         // 无论是否自动兜底，先把出错线路记入会话失败集合：
         // 手动反复点同一条放不了的线路会并行堆起大量代理拉流线程耗尽内存，
         // 记入后该线路在本次会话内不再重复发起（requestLineChange 拦截）
@@ -683,6 +691,7 @@ fun PlayerScreen(
                 .firstOrNull { it !in failedFlags.value }
             if (nextFlag != null) {
                 toastMsg("播放失败，自动切换线路：$nextFlag")
+                autoFallbackCount++
                 lineFlag = nextFlag
                 return@LaunchedEffect
             }
@@ -698,6 +707,7 @@ fun PlayerScreen(
             )
             if (candidate != null) {
                 failedSiteKeys.value = failedSiteKeys.value + curKey
+                autoFallbackCount++
                 // 注意：这里不能清空 failedFlags。清空会让旧站的坏线路重新可点，
                 // 用户手点回去 → jar 重新解析 → 失败 → 又自动换站 → 名单再清空，
                 // 形成死循环并在几十秒内刷爆堆内存闪退。
@@ -3863,3 +3873,6 @@ private const val HIDE_DELAY_MS = 5_000L
 
 /** 用户手动点击同一条线路的最大尝试次数（超过后不再解析，避免坏线路把 jar 解析堆到内存爆掉） */
 private const val MAX_MANUAL_ATTEMPTS = 3
+
+/** 单次播放会话内自动兜底（换线路/换站源）的总次数上限，防止沿站源链无限解析 */
+private const val MAX_AUTO_FALLBACK = 6
