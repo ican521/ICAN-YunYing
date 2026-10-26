@@ -118,13 +118,34 @@ class MainActivity : ComponentActivity() {
         return shortSideDp < 600
     }
 
-    /** 退出全屏/离开播放页后恢复屏幕方向：小屏手机锁竖屏，平板恢复系统自由方向。
+    /** 用户是否开着自动旋转（即没锁方向）。只读系统设置，无需任何权限。 */
+    private fun isAutoRotate(): Boolean = runCatching {
+        android.provider.Settings.System.getInt(
+            contentResolver,
+            android.provider.Settings.System.ACCELEROMETER_ROTATION,
+            1,
+        ) == 1
+    }.getOrDefault(true)
+
+    /** 平板恢复方向：用户开着自动旋转才跟随系统；锁着方向时按当前实际方向恢复。
+     *  绝不能再返回 SCREEN_ORIENTATION_UNSPECIFIED —— MIUI/HyperOS 把「无偏好」当成
+     *  「放开旋转」，会把用户锁好的方向一并解锁（可用设置里的方向锁定按钮复现）。
+     *  fongmi 同款：VideoActivity.isAutoRotate() + PlaybackOrientation.getExitFullscreenOrientation。 */
+    private fun tabletRestoreOrientation(): Int = if (isAutoRotate()) {
+        ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+    } else if (resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+        ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
+    } else {
+        ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
+    }
+
+    /** 退出全屏/离开播放页后恢复屏幕方向：小屏手机锁竖屏，平板按用户旋转锁状态恢复。
      *  由播放页调用，判定同样按物理屏（播放页所在窗口可能已被信箱化） */
     fun restoreDefaultOrientation() {
         requestedOrientation = if (isSmallScreenDevice()) {
             ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         } else {
-            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            tabletRestoreOrientation()
         }
     }
 
@@ -314,7 +335,7 @@ class MainActivity : ComponentActivity() {
             requestedOrientation = if (isSmallScreenDevice()) {
                 ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             } else {
-                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                tabletRestoreOrientation()
             }
             // 同步恢复状态栏：全屏播放时隐藏的状态栏若不在此处恢复，系统会记住「隐藏」，
             // 重开回前台首帧按无状态栏渲染，播放页退出的恢复调用约 370ms 后才生效，
