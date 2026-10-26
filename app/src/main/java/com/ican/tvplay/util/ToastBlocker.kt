@@ -49,11 +49,16 @@ object ToastBlocker {
 
             val iface = Class.forName("android.app.INotificationManager")
             val proxy = Proxy.newProxyInstance(iface.classLoader, arrayOf(iface)) { _, method, args ->
-                if (isToastEnqueue(method.name) && shouldBlock(args)) {
+                val result = if (isToastEnqueue(method.name) && shouldBlock(args)) {
                     null // 命中屏蔽文案：不入队，Toast 不显示
                 } else {
                     invokeOriginal(method, args)
                 }
+                // 关键：动态代理返回 null 给基本类型返回值会在调用方（Toast.show）抛
+                // NullPointerException: Expected to unbox a 'boolean' primitive type but was returned null。
+                // jar 在解析/弹幕异常时会弹 Toast，主线程随即崩溃（表现为「刚打开视频就闪退」），
+                // 因此任何基本类型返回值都必须补默认值，绝不能透传 null。
+                if (result == null && method.returnType.isPrimitive) primitiveDefault(method.returnType) else result
             }
             field.set(null, proxy)
             installed = true
@@ -84,6 +89,19 @@ object ToastBlocker {
         if (target == null) null else method.invoke(target, *(args ?: emptyArray<Any?>()))
     } catch (_: Throwable) {
         null
+    }
+
+    /** 基本类型返回值的安全默认值（boolean 的 enqueue*Toast 返回 true 表示已受理） */
+    private fun primitiveDefault(type: Class<*>): Any? = when (type) {
+        java.lang.Boolean.TYPE -> true
+        java.lang.Character.TYPE -> '\u0000'
+        java.lang.Byte.TYPE -> 0.toByte()
+        java.lang.Short.TYPE -> 0.toShort()
+        java.lang.Integer.TYPE -> 0
+        java.lang.Long.TYPE -> 0L
+        java.lang.Float.TYPE -> 0f
+        java.lang.Double.TYPE -> 0.0
+        else -> null
     }
 
     /** 原始服务：优先取 install 时抓到的；为空则经 ServiceManager 现取一次并缓存 */
