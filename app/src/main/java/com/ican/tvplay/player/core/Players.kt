@@ -1410,14 +1410,24 @@ private class TieredLoadControl(initialTier: Players.BufferTier) : LoadControl {
         /** 距缓冲边缘 ≤1s 即视为已追上（避免临界点抖动） */
         const val ACTIVATE_THRESHOLD_US = 1_000_000L
 
+        /** EXO 单个播放器允许占用的缓冲字节上限（4K 高码率时按时长算会算出数百 MB） */
+        const val TARGET_BUFFER_BYTES = 64 * 1024 * 1024
+
+        /**
+         * 缓冲档位只放大「最大缓冲时长」，最小缓冲固定 10s。
+         * default 的 min/max 都是 50s：4K 原盘（40Mbps 左右）意味着开播前要先缓存约 250MB，
+         * 手机堆根本放不下，表现就是「一直转圈、网速在跑、然后 OOM 闪退」。
+         */
         fun buildDelegate(tier: Players.BufferTier): DefaultLoadControl =
             DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
-                    DefaultLoadControl.DEFAULT_MIN_BUFFER_MS * tier.multiplier,
-                    DefaultLoadControl.DEFAULT_MAX_BUFFER_MS * tier.multiplier,
+                    10_000,
+                    (30_000L * tier.multiplier).coerceAtMost(60_000L).toInt(),
                     DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
                     DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
                 )
+                // 高码率片源再叠加字节上限，避免单纯按「时长」算出几百 MB 的缓冲预算
+                .setTargetBufferBytes(TARGET_BUFFER_BYTES)
                 .build()
     }
 }
