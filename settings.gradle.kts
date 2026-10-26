@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ICAN-YunYing"
 include(":app")
+include(":baselineprofile")

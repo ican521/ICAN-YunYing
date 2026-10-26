@@ -1,0 +1,114 @@
+# Baseline Profile for ICAN 云影
+# Generated 2026-10-26 from ART current profile (root shell manual dump)
+# Format: H = Hot (AOT compile hot path), S = Startup (AOT compile startup path)
+
+# ====== App startup critical path ======
+S Lcom/ican/tvplay/MainActivity;
+S Lcom/ican/tvplay/TvPlayApplication;
+S Lcom/ican/tvplay/ui/AppRoot;
+S Lcom/ican/tvplay/ui/home/HomeScreenKt;
+S Lcom/ican/tvplay/ui/nav/Route$Main;
+
+# ====== Theme & Compose foundation (always loaded on startup) ======
+H Lcom/ican/tvplay/ui/theme/ThemeKt;
+H Lcom/ican/tvplay/ui/theme/ColorKt;
+H Lcom/ican/tvplay/ui/theme/SpacingKt;
+H Lcom/ican/tvplay/ui/components/MiuixBarsKt;
+H Lcom/ican/tvplay/ui/components/MainPagerState;
+H Lcom/ican/tvplay/ui/components/MainPagerState$Companion;
+
+# ====== Home screen grid & cards ======
+H Lcom/ican/tvplay/ui/home/HomeScreenKt$UnderlineTabRow_AGcomas$lambda$0$13$2$0$$inlined$itemsIndexed$default$2;
+H Lcom/ican/tvplay/ui/home/HomeScreenKt$HomeScreen$lambda$21$0$0$0$11$0$0$$inlined$items$default$3;
+H Lcom/ican/tvplay/ui/components/VideoCardKt;
+H Lcom/ican/tvplay/ui/components/VideoCardKt$VideoCard$lambda$3$0;
+H Lcom/ican/tvplay/ui/components/FocusEffectsKt;
+H Lcom/ican/tvplay/ui/components/EmptyStateKt;
+H Lcom/ican/tvplay/ui/components/ScreenPaddingsKt;
+
+# ====== Data layer (settings, repository, network) ======
+H Lcom/ican/tvplay/data/AppContainer;
+H Lcom/ican/tvplay/data/SettingsRepository;
+H Lcom/ican/tvplay/data/SettingsRepository$Companion;
+H Lcom/ican/tvplay/data/VideoRepository;
+H Lcom/ican/tvplay/data/remote/VodApiClient;
+H Lcom/ican/tvplay/data/remote/SpiderManager;
+H Lcom/ican/tvplay/data/remote/SourceCache;
+H Lcom/ican/tvplay/data/model/ModelsKt;
+
+# ====== Image loading (Coil) ======
+H Lcom/ican/tvplay/util/PosterImagesKt;
+H Lcom/ican/tvplay/util/ToastBlocker;
+
+# ====== miuix Compose (UI foundation) ======
+H Ltop/yukonga/miuix/kmp/utils/MiuixIndication$MiuixIndicationInstance;
+H Ltop/yukonga/miuix/kmp/utils/MiuixIndication$MiuixIndicationInstance$onAttach$1;
+H Ltop/yukonga/miuix/kmp/utils/AbstractPressableNode$clickPointerInput$2;
+H Ltop/yukonga/miuix/kmp/utils/PressableNode;
+H Ltop/yukonga/miuix/kmp/blur/DrawBackdropNode;
+H Ltop/yukonga/miuix/kmp/utils/MiuixPopupUtils$Companion$DialogEntry$2$1;
+
+# ====== Compose Foundation (Lazy Grid, scrolling, gestures) ======
+H Landroidx/compose/foundation/lazy/layout/LazyLayoutSemanticsModifierNode;
+H Landroidx/compose/foundation/lazy/layout/DisplayingDisappearingItemsNode;
+H Landroidx/compose/foundation/ClickableNode;
+H Landroidx/compose/foundation/FocusableNode;
+H Landroidx/compose/foundation/BackgroundNode;
+H Landroidx/compose/foundation/gestures/ForEachGestureKt$awaitEachGesture$2;
+H Landroidx/compose/foundation/gestures/ForEachGestureKt$awaitAllPointersUp$3;
+H Landroidx/compose/foundation/gestures/TapGestureDetectorKt$awaitFirstDown$2;
+H Landroidx/compose/foundation/gestures/TapGestureDetectorKt$detectTapGestures$2;
+H Landroidx/compose/foundation/layout/BoxMeasurePolicy;
+H Landroidx/compose/foundation/layout/SizeNode;
+H Landroidx/compose/foundation/layout/FillNode;
+H Landroidx/compose/foundation/layout/PaddingValuesModifier;
+
+# ====== Compose Runtime (recomposition, snapshots, composition) ======
+H Landroidx/compose/runtime/BroadcastFrameClock;
+H Landroidx/compose/runtime/collection/MutableVector$MutableVectorList;
+H Landroidx/compose/runtime/collection/ScatterSetWrapper;
+H Landroidx/compose/runtime/ParcelableSnapshotMutableState;
+H Landroidx/compose/runtime/Recomposer$runRecomposeAndApplyChanges$2;
+H Landroidx/compose/runtime/SnapshotStateKt__SnapshotFlowKt$snapshotFlowImpl$1;
+
+# ====== Compose UI (layout, drawing, node) ======
+H Landroidx/compose/ui/draw/CacheDrawModifierNodeImpl;
+H Landroidx/compose/ui/draw/DrawWithContentModifier;
+H Landroidx/compose/ui/graphics/RenderEffect;
+H Landroidx/compose/ui/layout/Placeable;
+H Landroidx/compose/ui/node/UiApplier;
+H Landroidx/compose/ui/node/InnerNodeCoordinator;
+H Landroidx/compose/ui/node/LayoutModifierNodeCoordinator;
+H Landroidx/compose/ui/node/TailModifierNode;
+H Landroidx/compose/ui/platform/AndroidUiDispatcher;
+H Landroidx/compose/ui/platform/GlobalSnapshotManager$ensureStarted$1;
+H Landroidx/compose/ui/platform/MotionDurationScaleImpl;
+
+# ====== Coroutines (async loading) ======
+H Lkotlinx/coroutines/flow/StateFlowImpl;
+H Lkotlinx/coroutines/channels/BufferedChannel;
+H Lkotlinx/coroutines/channels/BufferedChannel$BufferedChannelIterator;
+H Lkotlinx/coroutines/internal/DispatchedContinuation;
+H Lkotlinx/coroutines/JobSupport$AwaitContinuation;
+
+# ====== Compose Animation (enter/exit, transitions) ======
+H Landroidx/compose/animation/core/Transition$animateTo$1$1$1;
+H Landroidx/compose/animation/core/SuspendAnimationKt$animate$4;
+H Landroidx/compose/animation/core/AnimateAsStateKt$animateValueAsState$3$1;
+H Landroidx/compose/animation/AnimatedEnterExitMeasurePolicy;
+H Landroidx/compose/animation/EnterExitTransitionModifierNode;
+
+# ====== Lifecycle Compose (collectAsStateWithLifecycle) ======
+H Landroidx/lifecycle/compose/FlowExtKt$collectAsStateWithLifecycle$1$1$1$1;
+
+# ====== Coil Compose (image loading) ======
+H Lcoil3/compose/internal/ContentPainterNode;
+
+# ====== Compose Text nodes (card labels, titles) ======
+H Landroidx/compose/foundation/text/modifiers/TextStringSimpleNode;
+H Landroidx/compose/foundation/text/modifiers/TextAnnotatedStringNode;
+H Landroidx/compose/foundation/text/layout/TextLayoutKt$TextLayout$1;
+
+# ====== Compose Selection/Focus ======
+H Landroidx/compose/foundation/selection/SimpleLayoutKt$SimpleLayout$1;
+H Landroidx/compose/foundation/FocusableNode$emitWithFallback$1;

@@ -9,6 +9,8 @@ plugins {
     // AGP 9 内置 Kotlin 已在 classpath 提供 parcelize，无版本直接应用（KernelSU Route 需要 @Parcelize）
     id("org.jetbrains.kotlin.plugin.parcelize")
     alias(libs.plugins.ksp)
+    // 消费 :baselineprofile 模块生成的 profile，release 构建时自动合并进 APK
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 // 签名凭据存于根目录 local.properties（本地文件，已被 .gitignore 忽略），禁止硬编码进构建脚本
@@ -140,4 +142,10 @@ dependencies {
 
     // NanoHTTPD：本地代理服务器（spider jar 返回 127.0.0.1/proxy 地址时由本服务中转拉流，fongmi 同款）
     implementation(libs.nanohttpd)
+
+    // Baseline Profile 运行时：应用启动时把 profile 安装到 ART，加速冷启动
+    implementation(libs.androidx.profileinstaller)
+
+    // 关联 baselineprofile 模块：让 :app:generateBaselineProfile 找到生成用例
+    baselineProfile(project(":baselineprofile"))
 }
