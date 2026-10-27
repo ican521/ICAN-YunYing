@@ -29,6 +29,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -976,6 +977,9 @@ fun PlayerScreen(
     }
 
     fun handleBack() {
+        // 锁定状态下屏蔽返回（对齐 fongmi isLock() 拦截语义），
+        // 系统侧滑/返回键不退出全屏、不退出页面，解锁后恢复
+        if (locked) return
         if (fullscreen) {
             if (landscapeFullscreen) {
                 // 平板横屏直进的全屏：立即卸载全屏覆盖层，PlayerView 执行缩回动画，
@@ -2030,7 +2034,14 @@ private fun LineSection(
             color = MaterialTheme.colorScheme.onBackground,
         )
         Spacer(modifier = Modifier.height(Spacing.titleContentGap))
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    // 通栏横滑：负 padding 撑出信息流水平边距让视口到屏幕边缘，contentPadding 保证
+    // 静止时首尾 chips 仍对齐全局基准线（fongmi RecyclerView clipToPadding=false 同款效果）
+    val bleed = pageHorizontalPadding()
+    LazyRow(
+        modifier = Modifier.padding(horizontal = -bleed),
+        contentPadding = PaddingValues(horizontal = bleed),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         items(v.playSources, key = { it.flag }, contentType = { "line" }) { source ->
             val selected = source.flag == lineFlag
             val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
@@ -2103,7 +2114,7 @@ private fun EpisodeSection(
             )
             Spacer(modifier = Modifier.weight(1f))
             Text(
-                text = "更多",
+                text = "展开",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable(
@@ -2168,9 +2179,13 @@ private fun EpisodeSection(
                 }
             }
         }
-        // 默认横向滚动（fongmi: adapter_episode_hori）
+        // 默认横向滚动（fongmi: adapter_episode_hori）；通栏横滑同 LineSection：视口到屏幕边缘，
+        // contentPadding 保证静止时首尾 chip 仍对齐全局基准线
+        val bleed = pageHorizontalPadding()
         LazyRow(
             state = listState,
+            modifier = Modifier.padding(horizontal = -bleed),
+            contentPadding = PaddingValues(horizontal = bleed),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             itemsIndexed(displayEps, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { dispIdx, ep ->

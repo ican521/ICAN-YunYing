@@ -188,6 +188,13 @@ class MainActivity : ComponentActivity() {
                 .setAspectRatio(videoAspectRational())
                 .setActions(buildPipActions())
                 .setSourceRectHint(Rect().apply { window.decorView.getGlobalVisibleRect(this) })
+            // Android 15+：显式指定双击展开的目标比例（与视频一致），
+            // 让系统展开时按视频比例直接放大，减少先按默认比例 reshape（圆角先变小）
+            // 再放大的中间态。低版本无此 API；展开动画序列（圆角插值/旋转/放大）
+            // 本身由 SystemUI 渲染，App 侧无公开 API 自定义
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                runCatching { builder.setExpandedAspectRatio(videoAspectRational()) }
+            }
             enterPictureInPictureMode(builder.build())
         } catch (_: Exception) {
         }
