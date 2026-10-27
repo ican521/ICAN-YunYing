@@ -2372,8 +2372,9 @@ private fun EpisodeGridDialog(
                 state = pagerState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    // 弹窗底部与末行选集的间距 = 全局弹窗内容边距（与左右一致）
-                    .padding(bottom = Spacing.dialogContentMargin),
+                    // 弹窗底部与末行选集的视觉间距对齐左右（dialogContentMargin=16dp）：
+                    // 网格页高内含 4dp 防裁余量（透明不可见），故此处补偿 4dp，视觉底部间距 = 16dp
+                    .padding(bottom = Spacing.dialogContentMargin - 4.dp),
                 // 页与页之间留出间隙（视觉上与 6dp 的 chip 间距区分开），滑动时能看到页与页不粘连
                 pageSpacing = Spacing.titleContentGap,
             ) { page ->
