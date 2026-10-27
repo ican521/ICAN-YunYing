@@ -72,6 +72,7 @@ import com.ican.tvplay.ui.theme.PosterActionScrim
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
 import com.ican.tvplay.ui.theme.PosterBottomScrim
 import com.ican.tvplay.ui.theme.Spacing
+import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -239,7 +240,7 @@ private fun UpdatesEntry(
             .fillMaxWidth()
             .tvCardEffect(
                 onClick = onClick,
-                shape = RoundedCornerShape(Spacing.corner),
+                shape = SquircleShape(Spacing.corner),
                 focusedScale = 1.02f,
                 glow = false,
                 pressColor = LightOnSurface,
@@ -310,7 +311,7 @@ private fun FavoriteCard(
             )
             .tvCardEffect(
                     onClick = onClick,
-                    shape = RoundedCornerShape(Spacing.corner),
+                    shape = SquircleShape(Spacing.corner),
                     focusedScale = 1.05f,
                     glow = false,
                     onLongClick = onLongClick,
@@ -567,7 +568,7 @@ private fun HistoryCard(
             )
             .tvCardEffect(
                     onClick = onClick,
-                    shape = RoundedCornerShape(Spacing.corner),
+                    shape = SquircleShape(Spacing.corner),
                     focusedScale = 1.05f,
                     glow = false,
                     onLongClick = onLongClick,

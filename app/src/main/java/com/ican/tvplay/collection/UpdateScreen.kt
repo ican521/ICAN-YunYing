@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -53,6 +52,7 @@ import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
+import com.ican.tvplay.ui.theme.SquircleShape
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -269,7 +269,7 @@ private fun UpdateRow(
             .fillMaxWidth()
             .tvCardEffect(
                 onClick = onClick,
-                shape = RoundedCornerShape(Spacing.corner),
+                shape = SquircleShape(Spacing.corner),
                 focusedScale = 1.02f,
                 glow = false,
             ),
@@ -283,7 +283,7 @@ private fun UpdateRow(
             Box(
                 modifier = Modifier
                     .size(width = 56.dp, height = 76.dp)
-                    .clip(RoundedCornerShape(10.dp)),
+                    .clip(SquircleShape(10.dp)),
             ) {
                 PosterImage(
                     title = item.favorite.title,
@@ -333,7 +333,7 @@ private fun PopupUpdateRow(item: FavoriteUpdateItem, onClick: () -> Unit) {
             .fillMaxWidth()
             .tvCardEffect(
                 onClick = onClick,
-                shape = RoundedCornerShape(Spacing.corner),
+                shape = SquircleShape(Spacing.corner),
                 focusedScale = 1.02f,
                 glow = false,
             )

@@ -71,6 +71,7 @@ import com.ican.tvplay.ui.theme.PosterBadgeScrim
 import com.ican.tvplay.ui.theme.PosterBottomScrim
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
+import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 
@@ -397,7 +398,7 @@ private fun CrossSourceVideoCard(
             )
             .tvCardEffect(
                 onClick = onClick,
-                shape = RoundedCornerShape(Spacing.corner),
+                shape = SquircleShape(Spacing.corner),
                 focusedScale = 1.05f,
                 glow = false,
                 // 按压蒙层固定浅色模式同款浅黑：深色模式与浅色表现一致
@@ -454,7 +455,7 @@ private fun CrossSourceVideoCard(
                             modifier = Modifier
                                 .background(
                                     PosterBadgeScrim,
-                                    RoundedCornerShape(Spacing.corner),
+                                    SquircleShape(Spacing.corner),
                                 )
                                 .padding(horizontal = 6.dp, vertical = 2.dp),
                         ) {

@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -81,6 +80,7 @@ import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
+import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.tv.material3.Icon
@@ -569,7 +569,7 @@ private fun FavoriteSyncDialog(
                         .clickable { viewModel.cycleSyncMode() }
                         .background(
                             MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha),
-                            RoundedCornerShape(Spacing.corner),
+                            SquircleShape(Spacing.corner),
                         )
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
@@ -657,7 +657,7 @@ private fun FavoriteSyncDialog(
                                                 if (ok) onDismiss()
                                             }
                                         },
-                                        shape = RoundedCornerShape(Spacing.corner),
+                                        shape = SquircleShape(Spacing.corner),
                                         focusedScale = 1.03f,
                                         glow = false,
                                         onLongClick = {
@@ -677,7 +677,7 @@ private fun FavoriteSyncDialog(
                                     )
                                     .background(
                                         MaterialTheme.colorScheme.surfaceVariant,
-                                        RoundedCornerShape(Spacing.corner),
+                                        SquircleShape(Spacing.corner),
                                     )
                                     .padding(horizontal = 12.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,

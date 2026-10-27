@@ -31,6 +31,7 @@ import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
 import com.ican.tvplay.ui.theme.PosterBottomScrim
 import com.ican.tvplay.ui.theme.Spacing
+import com.ican.tvplay.ui.theme.SquircleShape
 import com.ican.tvplay.util.posterModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -57,8 +58,8 @@ fun VideoCard(
     modifier: Modifier = Modifier,
     width: Dp = 148.dp,
 ) {
-    // 固定 32dp squircle 连续曲率角（与 miuix 弹窗默认下限同值，预览效果）
-    val corner = 32.dp
+    // 全局统一 16dp 连续曲率角（SquircleShape，与 miuix Card/弹窗同曲线风格，全 API 生效）
+    val corner = Spacing.corner
     Card(
         modifier = modifier
             .width(width)
@@ -68,14 +69,12 @@ fun VideoCard(
                 delay = null,
             )
             // 按压蒙层固定浅色模式同款浅黑(#15161D)：深色模式不再出现浅白按压块，两套模式完全一致
-            // squircleRadius：裁剪改用 miuix squircleClip 连续曲率角，与 Card 自带 squircleSurface 轮廓一致
-            // （此前 clip(RoundedCornerShape) 会把 Card 的 squircle 底二次裁成普通圆角）
+            // shape 用 SquircleShape 连续曲率角，与 Card 自带 squircleSurface 轮廓一致
             .tvCardEffect(
                 onClick = onClick,
-                shape = RoundedCornerShape(corner),
+                shape = SquircleShape(corner),
                 glow = false,
                 pressColor = LightOnSurface,
-                squircleRadius = corner,
             ),
         cornerRadius = corner,
         insideMargin = PaddingValues(0.dp),

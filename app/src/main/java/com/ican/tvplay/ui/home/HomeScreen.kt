@@ -47,7 +47,6 @@ import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pagerGestureOverride
 import top.yukonga.miuix.kmp.utils.pressable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -109,6 +108,7 @@ import com.ican.tvplay.ui.components.tvCardEffect
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
+import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -572,7 +572,7 @@ fun SitePickerDialog(
                 ) {
                     items(sites, key = { it.key }, contentType = { "site" }) { site ->
                         val isCurrent = site.key == currentKey
-                        val shape = RoundedCornerShape(Spacing.corner)
+                        val shape = SquircleShape(Spacing.corner)
                         // toggleVersion 仅作重组触发key：开关切换后重读开关状态刷新图标着色
                         val searchOn = remember(site.key, toggleVersion) { isSearchable(site) }
                         val changeOn = remember(site.key, toggleVersion) { isChangeable(site) }
@@ -938,7 +938,7 @@ private fun DriveRowItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .tvCardEffect(onClick = onClick, shape = RoundedCornerShape(Spacing.corner), glow = false),
+            .tvCardEffect(onClick = onClick, shape = SquircleShape(Spacing.corner), glow = false),
         insideMargin = PaddingValues(0.dp),
         colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(
             color = MaterialTheme.colorScheme.surfaceVariant,

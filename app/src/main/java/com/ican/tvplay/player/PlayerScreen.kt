@@ -181,6 +181,7 @@ import com.ican.tvplay.ui.theme.EpisodeSelectedFillAlpha
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
+import com.ican.tvplay.ui.theme.SquircleShape
 import com.ican.tvplay.ui.theme.optionBorderColor
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.delay
@@ -1176,7 +1177,7 @@ fun PlayerScreen(
                         .offset { IntOffset(animLeft.value.roundToPx(), animTop.value.roundToPx()) }
                         .animatedSize(animWidth, animHeight)
                         .graphicsLayer {
-                            shape = RoundedCornerShape(animCorner.value)
+                            shape = SquircleShape(animCorner.value)
                             clip = true
                         }
                         .background(Color.Black)
@@ -1583,7 +1584,7 @@ private fun LandscapePlayLayout(
                 // 的方角会露在圆角缺口里，形成左右下角的浅灰色直角块
                 // （graphicsLayer clip 与 clip 修饰符视觉等效，圆角动画值改到绘制阶段读取）
                 .graphicsLayer {
-                    shape = RoundedCornerShape(playerCorner.value)
+                    shape = SquircleShape(playerCorner.value)
                     clip = true
                 },
             playerState = playerState,
@@ -2057,7 +2058,7 @@ private fun LineSection(
     ) {
         items(v.playSources, key = { it.flag }, contentType = { "line" }) { source ->
             val selected = source.flag == lineFlag
-            val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
+            val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -2647,7 +2648,7 @@ private fun FullscreenPlayLayout(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 24.dp)
-                    .clip(RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner))
+                    .clip(SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner))
                     .background(Color(0x4D000000))
                     .padding(horizontal = 16.dp, vertical = 6.dp),
             )
@@ -2940,7 +2941,7 @@ private fun EpisodeChip(
     modifier: Modifier = Modifier,
     showBorder: Boolean = false,
 ) {
-    val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
+    val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
     // 描边：仅"更多"弹窗（showBorder=true）且仅深色模式；浅色模式选中/未选中一律不描边。
     // 深色选中描边对齐全屏选集弹窗（BrandBlueDeep），未选中沿用 optionBorderColor
     val borderModifier = if (showBorder && LocalDarkTheme.current) {
@@ -3043,7 +3044,7 @@ private fun EpisodeSideSheet(
                     .width(panelWidth)
                     .background(
                         DarkSurfaceElevated,
-                        RoundedCornerShape(topStart = com.ican.tvplay.ui.theme.Spacing.corner, bottomStart = com.ican.tvplay.ui.theme.Spacing.corner),
+                        SquircleShape(topStart = com.ican.tvplay.ui.theme.Spacing.corner, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = com.ican.tvplay.ui.theme.Spacing.corner),
                     )
                     // 面板本体消费点击，避免点面板空白处误触发外层收起
                     .clickable(
@@ -3077,7 +3078,7 @@ private fun EpisodeSideSheet(
                 ) {
                     itemsIndexed(episodes, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { idx, ep ->
                         val selected = idx == currentIndex
-                        val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
+                        val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
@@ -3223,7 +3224,7 @@ private fun <T> OptionDialog(
             ) {
                 options.forEach { opt ->
                     val selected = opt == current
-                    val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
+                    val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
                     val borderColor = when {
                         !isDark -> null
                         selected && selectedBorderColor != null -> selectedBorderColor
@@ -3361,7 +3362,7 @@ private fun SubtitleSettingSideSheet(
                 .width(panelWidth)
                 .background(
                     DarkSurfaceElevated,
-                    RoundedCornerShape(topStart = Spacing.corner, bottomStart = Spacing.corner),
+                    SquircleShape(topStart = Spacing.corner, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = Spacing.corner),
                 )
                 .then(if (statusBarInset) Modifier.statusBarsPadding() else Modifier)
                 .clickable(
@@ -3518,7 +3519,7 @@ private fun OffsetAdjustRow(offsetMs: Long, modifier: Modifier = Modifier) {
             // 读取最新状态而非组合时快照：输入框先提交时也能基于新值步进
             Players.setSubtitleOffset(Players.state.value.subtitleOffsetMs - SUBTITLE_OFFSET_STEP_MS)
         }
-        val inputShape = RoundedCornerShape(Spacing.corner)
+        val inputShape = SquircleShape(Spacing.corner)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -3582,7 +3583,7 @@ private fun snapSubtitlePosition(raw: Float): Float {
 
 @Composable
 private fun OffsetStepButton(text: String, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(Spacing.corner)
+    val shape = SquircleShape(Spacing.corner)
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -3600,7 +3601,7 @@ private fun OffsetStepButton(text: String, onClick: () -> Unit) {
 
 @Composable
 private fun SubInfoRow(label: String, value: String) {
-    val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
+    val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
     val isDark = LocalDarkTheme.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -3627,7 +3628,7 @@ private fun SubInfoRow(label: String, value: String) {
 
 @Composable
 private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color? = null, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(com.ican.tvplay.ui.theme.Spacing.corner)
+    val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
     val isDark = LocalDarkTheme.current
     val borderColor = when {
         !isDark -> null

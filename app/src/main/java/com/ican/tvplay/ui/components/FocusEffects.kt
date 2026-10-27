@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import top.yukonga.miuix.kmp.interfaces.HoldDownInteraction
-import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.utils.MiuixIndication
 
 /**
@@ -76,9 +75,6 @@ fun Modifier.tvCardEffect(
     /** 按压蒙层颜色覆盖：null 时取主题 onSurface（浅色深灰、深色浅白，随主题适配）。
      *  视频卡片等海报类组件固定传浅黑色，保证深色模式按压特效与浅色模式完全一致 */
     pressColor: Color? = null,
-    /** 非 null 时改用 miuix squircleClip(该半径) 连续曲率角裁剪（API 33+ shader，低版本自动回退
-     *  clip(shape) 圆弧），与 miuix Card squircleSurface 轮廓逐像素一致；为 null 时用普通 [shape] 圆弧裁剪 */
-    squircleRadius: Dp? = null,
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
@@ -151,9 +147,7 @@ fun Modifier.tvCardEffect(
                 Modifier
             },
         )
-        .then(
-            if (squircleRadius != null) Modifier.squircleClip(squircleRadius) else Modifier.clip(shape),
-        )
+        .clip(shape)
         .combinedClickable(
             interactionSource = interactionSource,
             indication = if (pressEffect) pressIndication else null,
