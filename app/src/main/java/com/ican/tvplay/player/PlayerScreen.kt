@@ -2019,6 +2019,27 @@ private fun FavoriteButton(v: Video) {
     }
 }
 
+/** 通栏横滑视口扩展：向左右各扩展 [bleed] 并整体左移放置（效果等价 fongmi RecyclerView
+ *  clipToPadding=false）。新版 Compose 的 Modifier.padding 禁止负值（抛
+ *  IllegalArgumentException），故用 layout modifier 扩展测量宽度实现 */
+private fun Modifier.horizontalBleed(bleed: Dp): Modifier = layout { measurable, constraints ->
+    val extra = bleed.roundToPx()
+    val newMaxWidth = if (constraints.maxWidth == Constraints.Infinity) {
+        Constraints.Infinity
+    } else {
+        constraints.maxWidth + extra * 2
+    }
+    val placeable = measurable.measure(
+        constraints.copy(
+            minWidth = constraints.minWidth.coerceAtMost(newMaxWidth),
+            maxWidth = newMaxWidth,
+        ),
+    )
+    layout(placeable.width, placeable.height) {
+        placeable.placeRelative(-extra, 0)
+    }
+}
+
 /** 线路区块（fongmi: detail_flag）：横向滚动 chips */
 @Composable
 private fun LineSection(
@@ -2034,11 +2055,11 @@ private fun LineSection(
             color = MaterialTheme.colorScheme.onBackground,
         )
         Spacer(modifier = Modifier.height(Spacing.titleContentGap))
-    // 通栏横滑：负 padding 撑出信息流水平边距让视口到屏幕边缘，contentPadding 保证
+    // 通栏横滑：horizontalBleed 把视口扩展到屏幕边缘，contentPadding 保证
     // 静止时首尾 chips 仍对齐全局基准线（fongmi RecyclerView clipToPadding=false 同款效果）
     val bleed = pageHorizontalPadding()
     LazyRow(
-        modifier = Modifier.padding(horizontal = -bleed),
+        modifier = Modifier.horizontalBleed(bleed),
         contentPadding = PaddingValues(horizontal = bleed),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -2184,7 +2205,7 @@ private fun EpisodeSection(
         val bleed = pageHorizontalPadding()
         LazyRow(
             state = listState,
-            modifier = Modifier.padding(horizontal = -bleed),
+            modifier = Modifier.horizontalBleed(bleed),
             contentPadding = PaddingValues(horizontal = bleed),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
