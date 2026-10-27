@@ -3,7 +3,9 @@ package com.ican.tvplay.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.utils.getRoundedCorner
 
 /**
  * 全局 UI 间距/圆角规范（所有 Compose 页面强制遵守，禁止硬编码魔法数字）。
@@ -57,6 +59,14 @@ object Spacing {
 
     /** 全局统一圆角（卡片/按钮/输入框/弹窗）；圆形按钮与胶囊用 CircleShape，不适用此值 */
     val corner = 16.dp
+
+    /**
+     * miuix 弹窗同款动态圆角：跟随设备屏幕物理圆角，公式与 miuix OverlayDialog 完全一致
+     * （getRoundedCorner() − 弹窗外边距 [dialogContentMargin]，钳制 32~48dp），换设备自动适配。
+     * 视频卡片等需要与底部弹窗圆角保持一致的组件统一引用本值。
+     */
+    val dialogDeviceCorner: Dp
+        @Composable get() = (getRoundedCorner() - dialogContentMargin).coerceIn(32.dp, 48.dp)
 
     /** 圆形按钮统一尺寸 */
     val circleButton = 48.dp

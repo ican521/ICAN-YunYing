@@ -57,6 +57,8 @@ fun VideoCard(
     modifier: Modifier = Modifier,
     width: Dp = 148.dp,
 ) {
+    // miuix 弹窗同款动态圆角：跟随设备屏幕物理圆角（公式与 OverlayDialog 一致），换设备自动适配
+    val corner = Spacing.dialogDeviceCorner
     Card(
         modifier = modifier
             .width(width)
@@ -70,11 +72,12 @@ fun VideoCard(
             // （此前 clip(RoundedCornerShape) 会把 Card 的 squircle 底二次裁成普通圆角）
             .tvCardEffect(
                 onClick = onClick,
-                shape = RoundedCornerShape(Spacing.corner),
+                shape = RoundedCornerShape(corner),
                 glow = false,
                 pressColor = LightOnSurface,
-                squircleRadius = Spacing.corner,
+                squircleRadius = corner,
             ),
+        cornerRadius = corner,
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
     ) {
