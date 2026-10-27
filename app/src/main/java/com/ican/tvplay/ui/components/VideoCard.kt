@@ -57,8 +57,8 @@ fun VideoCard(
     modifier: Modifier = Modifier,
     width: Dp = 148.dp,
 ) {
-    // miuix 弹窗同款动态圆角：跟随设备屏幕物理圆角（公式与 OverlayDialog 一致），换设备自动适配
-    val corner = Spacing.dialogDeviceCorner
+    // 固定 32dp squircle 连续曲率角（与 miuix 弹窗默认下限同值，预览效果）
+    val corner = 32.dp
     Card(
         modifier = modifier
             .width(width)
