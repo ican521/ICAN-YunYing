@@ -2306,12 +2306,12 @@ private fun EpisodeGridDialog(
         largeScreen = false,
         onDismissRequest = onDismiss,
         // 占满当前状态下允许的最大宽度（去掉库默认 maxWidth 上限），
-        // 左右外边距对齐播放页内容边距（pageHorizontalPadding）
+        // 左右外边距 = 全局弹窗内容边距（固定 16dp，不分设备）
         maxWidth = Dp.Infinity,
-        // 三边统一 16dp：左右 = 播放页内容区边距；底部 = max(16dp, 系统导航栏高度)，跨设备自适应
-        outsideMargin = DpSize(pageHorizontalPadding(), dialogBottomMargin()),
+        // 三边统一 16dp：左右 = 全局弹窗内容边距；底部 = max(16dp, 系统导航栏高度)，跨设备自适应
+        outsideMargin = DpSize(Spacing.dialogContentMargin, dialogBottomMargin()),
         // 弹窗内部边距全部归零、由内容区自控：选集网格左右不再内缩，
-        // 滑动切页时网格内容直接绘制到弹窗最左/最右边缘；Tab 单独保留 12dp 内缩
+        // 滑动切页时网格内容直接绘制到弹窗最左/最右边缘；Tab 单独保留 dialogContentMargin 内缩
         insideMargin = DpSize(0.dp, 0.dp),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -2331,13 +2331,13 @@ private fun EpisodeGridDialog(
                 // 补偿后标题墨迹↔Tab 墨迹 ≈ 14.8dp，与「弹窗顶↔标题」14.5dp、「Tab↔网格」14.5dp 三段等距
                 Spacer(modifier = Modifier.height(3.dp))
                 // 自绘分页 Tab（LazyRow）：
-                // 几何对齐——内容左右内缩 12dp（与选集网格 LazyVerticalGrid 的 horizontal padding 同源），
-                // 每个 Tab 盒内左右再内缩 16dp，故静止时首个 Tab 文字墨迹起点 = 12 + 16 = 28dp，
-                // 恰好落在第一个选集按钮左缘(12dp) + 圆角半径(Spacing.corner=16dp) 的圆角/直线相切点上；
-                // 12dp 内容内边距随滚动滑走，故滚动时 Tab 仍可贴到弹窗最左/最右边缘。
+                // 几何对齐——内容左右内缩 dialogContentMargin（与选集网格 LazyVerticalGrid 的 horizontal padding 同源），
+                // 每个 Tab 盒内左右再内缩 16dp，故静止时首个 Tab 文字墨迹起点 = 16 + 16 = 32dp，
+                // 恰好落在第一个选集按钮左缘(16dp) + 圆角半径(Spacing.corner=16dp) 的圆角/直线相切点上；
+                // 16dp 内容内边距随滚动滑走，故滚动时 Tab 仍可贴到弹窗最左/最右边缘。
                 LazyRow(
                     state = tabListState,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.titleContentGap),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.dialogContentMargin),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     itemsIndexed(pageTitles, key = { _, title -> title }, contentType = { _, _ -> "page_tab" }) { idx, title ->
@@ -2372,8 +2372,8 @@ private fun EpisodeGridDialog(
                 state = pagerState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    // 弹窗底部与末行选集的间距，与三段等距体系同值
-                    .padding(bottom = Spacing.titleContentGap),
+                    // 弹窗底部与末行选集的间距 = 全局弹窗内容边距（与左右一致）
+                    .padding(bottom = Spacing.dialogContentMargin),
                 // 页与页之间留出间隙（视觉上与 6dp 的 chip 间距区分开），滑动时能看到页与页不粘连
                 pageSpacing = Spacing.titleContentGap,
             ) { page ->
@@ -2385,7 +2385,7 @@ private fun EpisodeGridDialog(
                 // 行距换算像素非整数（2.75x 密度下 16.5px），LazyGrid 逐项像素取整会在末行底边
                 // 裁掉 1~2px 圆角；视口略高于内容即可完整渲染末行（网格背景透明，余量不可见）
                 val pageHeight = 40.dp * rowsPerPage + 6.dp * (rowsPerPage - 1) + 4.dp
-                // 左右 12dp 内缩放在「每一页内部」并随页滑动：静止时网格有正常边距；
+                // 左右 dialogContentMargin 内缩放在「每一页内部」并随页滑动：静止时网格有正常边距；
                 // 滑动切页时 pager 视口为弹窗全宽，内容可以一直绘制到弹窗最左/最右边缘
                 LazyVerticalGrid(
                     columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(spanCount),
@@ -2393,7 +2393,7 @@ private fun EpisodeGridDialog(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = Spacing.titleContentGap)
+                        .padding(horizontal = Spacing.dialogContentMargin)
                         .height(pageHeight),
                 ) {
                     itemsIndexed(pageEpisodes, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { dispIdx, ep ->
@@ -3177,22 +3177,42 @@ private fun <T> OptionDialog(
     // 与设置页「站源设置」同款：miuix OverlayDialog 底部呼出（滑入滑出 + 遮罩由库处理）
     OverlayDialog(
         show = show,
-        title = title,
-        titleColor = MiuixTheme.colorScheme.onBackground,
+        // 标题自绘（与选集「更多」弹窗同款）：库默认 insideMargin=24dp 会在列表底部压出一条背景色
+        // 遮挡带且标题间距不可控；传 null + insideMargin 归零后全部边距由内容区自控
+        title = null,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         renderInRootScaffold = true,
         largeScreen = false,
         onDismissRequest = onDismiss,
-        outsideMargin = DpSize(16.dp, 0.dp),
+        outsideMargin = DpSize(Spacing.dialogContentMargin, 0.dp),
+        insideMargin = DpSize(0.dp, 0.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = maxDialogHeight),
         ) {
+            // 标题距弹窗顶 = 标题距下方选项 = titleContentGap（与选集「更多」弹窗标题同款间距）
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.titleContentGap),
+            )
+            Spacer(modifier = Modifier.height(Spacing.titleContentGap))
             Column(
                 modifier = Modifier
-                    .verticalScroll(rememberScrollState()),
+                    .weight(1f, fill = false)
+                    // 左右边距 = 全局弹窗内容边距（scroll 之前，滑动时选项不进入两侧边距区）
+                    .padding(horizontal = Spacing.dialogContentMargin)
+                    .verticalScroll(rememberScrollState())
+                    // 底部边距随内容滚动（scroll 之后）：长列表可一直滑到弹窗最底缘，
+                    // 静止时末项与弹窗底部的间距 = 全局弹窗内容边距（与左右一致）
+                    .padding(bottom = Spacing.dialogContentMargin),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 options.forEach { opt ->
@@ -3241,28 +3261,49 @@ private fun SubtitleDialog(
     selectedBorderColor: Color? = null,
 ) {
     // 与设置页「站源设置」同款：miuix OverlayDialog 底部呼出
+    // 标题自绘 + insideMargin 归零（同 OptionDialog）：消除库默认 24dp 内边距造成的底部背景遮挡条
     OverlayDialog(
         show = show,
-        title = "字幕",
-        titleColor = MiuixTheme.colorScheme.onBackground,
+        title = null,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         renderInRootScaffold = true,
         largeScreen = false,
         onDismissRequest = onDismiss,
-        outsideMargin = DpSize(16.dp, 0.dp),
+        outsideMargin = DpSize(Spacing.dialogContentMargin, 0.dp),
+        insideMargin = DpSize(0.dp, 0.dp),
     ) {
         val maxDialogHeight = with(LocalConfiguration.current) { (screenHeightDp * 0.65f).dp }
-        // 行间距与 OptionDialog（倍速/缓冲等弹窗）统一为 6dp
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = maxDialogHeight)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .heightIn(max = maxDialogHeight),
         ) {
-            tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected, selectedBorderColor) { onSelect(t) } }
-            SubRow("添加字幕", false, selectedBorderColor) { onAddSubtitle() }
-            SubRow("字幕设置", false, selectedBorderColor) { onSettings() }
+            // 标题距弹窗顶 = 标题距下方选项 = titleContentGap（与选集「更多」弹窗标题同款间距）
+            Text(
+                text = "字幕",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.titleContentGap),
+            )
+            Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+            // 行间距与 OptionDialog（倍速/缓冲等弹窗）统一为 6dp；
+            // 左右/底部边距 = 全局弹窗内容边距，底部边距在 scroll 之后随内容滚动（长列表可滑到弹窗最底缘）
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .padding(horizontal = Spacing.dialogContentMargin)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = Spacing.dialogContentMargin),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected, selectedBorderColor) { onSelect(t) } }
+                SubRow("添加字幕", false, selectedBorderColor) { onAddSubtitle() }
+                SubRow("字幕设置", false, selectedBorderColor) { onSettings() }
+            }
         }
     }
 }

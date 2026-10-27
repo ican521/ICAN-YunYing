@@ -39,8 +39,15 @@ object Spacing {
      */
     val searchBarBottomMargin = 10.dp
 
-    /** 板块内部标题与下方内容的间距 */
+    /** 板块内部标题与下方内容的间距（也是底部弹窗大标题距弹窗顶/距下方内容的间距） */
     val titleContentGap = 12.dp
+
+    /**
+     * 底部弹窗内容边距：选项方块距弹窗左右两侧 = 距弹窗底部 = 本值（固定 16dp，不分手机/平板）。
+     * 全屏播放页底部功能弹窗（OptionDialog/SubtitleDialog）与选集「更多」弹窗（EpisodeGridDialog）
+     * 统一引用本常量，禁止各自硬编码。
+     */
+    val dialogContentMargin = 16.dp
 
     /** 网格卡片横向间距 */
     val cardGapH = 12.dp
