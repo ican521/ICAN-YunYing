@@ -3044,7 +3044,7 @@ private fun EpisodeSideSheet(
                     .width(panelWidth)
                     .background(
                         DarkSurfaceElevated,
-                        SquircleShape(topStart = com.ican.tvplay.ui.theme.Spacing.corner, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = com.ican.tvplay.ui.theme.Spacing.corner),
+                        SquircleShape(topStart = com.ican.tvplay.ui.theme.Spacing.sideSheetCorner, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = com.ican.tvplay.ui.theme.Spacing.sideSheetCorner),
                     )
                     // 面板本体消费点击，避免点面板空白处误触发外层收起
                     .clickable(
@@ -3362,7 +3362,7 @@ private fun SubtitleSettingSideSheet(
                 .width(panelWidth)
                 .background(
                     DarkSurfaceElevated,
-                    SquircleShape(topStart = Spacing.corner, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = Spacing.corner),
+                    SquircleShape(topStart = Spacing.sideSheetCorner, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = Spacing.sideSheetCorner),
                 )
                 .then(if (statusBarInset) Modifier.statusBarsPadding() else Modifier)
                 .clickable(

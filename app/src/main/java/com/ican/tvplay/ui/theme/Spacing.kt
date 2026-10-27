@@ -60,6 +60,9 @@ object Spacing {
     /** 全局统一圆角（卡片/按钮/输入框/弹窗）；圆形按钮与胶囊用 CircleShape，不适用此值 */
     val corner = 16.dp
 
+    /** 右侧滑出面板（选集/字幕设置侧边栏）外围圆角：只圆左两角，与 miuix 底部弹窗本体 32dp 同值 */
+    val sideSheetCorner = 32.dp
+
     /**
      * miuix 弹窗同款动态圆角：跟随设备屏幕物理圆角，公式与 miuix OverlayDialog 完全一致
      * （getRoundedCorner() − 弹窗外边距 [dialogContentMargin]，钳制 32~48dp），换设备自动适配。
