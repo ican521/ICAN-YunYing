@@ -5,8 +5,10 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Point
 import android.os.Build
+import android.media.AudioManager
 import android.os.SystemClock
 import android.provider.OpenableColumns
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -47,6 +49,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -1388,6 +1391,10 @@ fun PlayerScreen(
 
 // ========== 竖屏布局 ==========
 
+/** 竖屏顶部预览小窗高度的封顶比例（相对状态栏下方可用高度）：视频为竖屏（宽高比<1）时高度封顶并横向收缩居中，
+ *  避免 9:16 等竖屏片源把整屏占满、压掉详情信息流（fongmi 竖屏详情小窗也限制在可用区域内的同款思路） */
+private const val VERTICAL_PREVIEW_MAX_HEIGHT_FRACTION = 0.6f
+
 @Composable
 private fun PortraitPlayLayout(
     current: Video?,
@@ -1429,23 +1436,41 @@ private fun PortraitPlayLayout(
     ) {
 
     // === 视频播放区占位（PlayerView 常驻于根 Box 最底层，此处仅放控制层/加载/错误覆盖层） ===
-    PreviewPlayerArea(
+    // 竖屏预览小窗跟随视频比例（fongmi onVideoSizeChanged → PlayerView.aspectRatio 同款）：
+    // 宽占满、高 = 宽 / 视频宽高比；视频为竖屏（宽高比<1）时高度封顶并横向收缩居中，避免把详情信息流顶飞。
+    // 平板横屏走 LandscapePlayLayout（固定 38% 宽 16:9），不进入此布局，天然不随视频比例调整。
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .aspectRatio(16f / 9f),
-        playerState = playerState,
-        showLoading = false,
-        controlsVisible = controlsVisible,
-        locked = locked,
-        onToggleControls = onToggleControls,
-        onBack = onBack,
-        onTogglePlay = onTogglePlay,
-        onPrev = onPrev,
-        onNext = onNext,
-        onEnterFullscreen = onEnterFullscreen,
-        onSeekDragChange = onSeekDragChange,
-    )
+            .statusBarsPadding(),
+    ) {
+        val ratio = playerState.videoAspectRatio.takeIf { it > 0f } ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
+        // 可用宽高（px，statusBarsPadding 之后）；高度封顶比例防止竖屏视频占满整屏
+        val availW = constraints.maxWidth
+        val availH = constraints.maxHeight
+        val maxH = (availH * VERTICAL_PREVIEW_MAX_HEIGHT_FRACTION).roundToInt()
+        val h = (availW / ratio).roundToInt().coerceAtMost(maxH)
+        val w = (h * ratio).roundToInt().coerceAtMost(availW)
+        with(LocalDensity.current) {
+            PreviewPlayerArea(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .width(w.toDp())
+                    .height(h.toDp()),
+                playerState = playerState,
+                showLoading = false,
+                controlsVisible = controlsVisible,
+                locked = locked,
+                onToggleControls = onToggleControls,
+                onBack = onBack,
+                onTogglePlay = onTogglePlay,
+                onPrev = onPrev,
+                onNext = onNext,
+                onEnterFullscreen = onEnterFullscreen,
+                onSeekDragChange = onSeekDragChange,
+            )
+        }
+    }
 
     // === 可滚动详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===
     // 详情加载期间整屏遮罩转圈统一显示（见根 Box），此处不再分区域转圈
@@ -2486,6 +2511,18 @@ private fun FullscreenPlayLayout(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    // 亮度滑动作用于本 Activity 窗口；离开全屏布局时恢复「跟随系统」，避免把用户系统亮度改掉（fongmi 退出恢复）
+    DisposableEffect(Unit) {
+        onDispose {
+            (context as? Activity)?.window?.let { w ->
+                val lp = w.attributes
+                if (lp.screenBrightness >= 0f) {
+                    lp.screenBrightness = -1f
+                    w.attributes = lp
+                }
+            }
+        }
+    }
     // 锁定状态下的解锁按钮显隐（单击唤出，2.5s 自动隐藏）
     var unlockHint by remember { mutableStateOf(false) }
     LaunchedEffect(unlockHint) {
@@ -2508,17 +2545,27 @@ private fun FullscreenPlayLayout(
     var speedUpHint by remember { mutableStateOf(false) }
     // 拖动底部进度条时的实时目标比例：顶部居中显示「跳转至 MM:SS」，松手消失
     var sliderSeekFraction by remember { mutableStateOf<Float?>(null) }
+    // 全屏左右侧上下滑调亮度/音量（fongmi PlayerGestureView 同款：左 1/4 亮度、右 1/4 音量），滑动中显示反馈浮层
+    var adjustType by remember { mutableStateOf<AdjustType?>(null) }
+    var adjustPercent by remember { mutableIntStateOf(0) }
+    // 手势作用区域实际像素尺寸（onSizeChanged 捕获，全屏 fillMaxSize = 整屏），供亮度/音量分区与换算
+    var gestureW by remember { mutableIntStateOf(0) }
+    var gestureH by remember { mutableIntStateOf(0) }
+    // 音量走系统媒体音量，亮度作用于本 Activity 窗口
+    val audioManager = remember { context.getSystemService(AudioManager::class.java) }
     LaunchedEffect(locked) {
         if (locked) {
             seekPreview = null
             speedUpHint = false
             sliderSeekFraction = null
+            adjustType = null
         }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .onSizeChanged { gestureW = it.width; gestureH = it.height }
             // 背景由根 Box 提供（此处若带背景会盖住常驻 PlayerView）
             // 选集侧边弹窗打开期间（showEpisodes）抑制全部手势：弹窗改为组件内覆盖层后，
             // 事件不再被子窗口拦截，需防止遮罩上的长按/拖动误触发快进/seek
@@ -2532,6 +2579,10 @@ private fun FullscreenPlayLayout(
                     val downTime = down.uptimeMillis
                     val downX = down.position.x
                     val downY = down.position.y
+                    // 亮度/音量滑动的基准值（按下瞬间捕获一次）：亮度取当前窗口值（跟随系统时换算系统亮度），音量取当前媒体音量
+                    val baseBrightness = currentWindowBrightness(context as? Activity)
+                    val baseVolume = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
+                    val maxVolume = audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 1
                     var axis = 0 // 0 未定 | 1 横向seek | 2 纵向/放弃
                     var isLong = false
                     var seekTarget: Long? = null
@@ -2601,6 +2652,31 @@ private fun FullscreenPlayLayout(
                                 seekPreview = seekTarget
                             }
                         }
+                        // 纵向滑动：左侧调亮度、右侧调音量（fongmi 左 1/4 亮度、右 1/4 音量）；
+                        // 锁定时上方 locked 已 continue 屏蔽此分支，天然满足「锁定不响应亮度/音量」
+                        if (axis == 2) {
+                            val dy = change.position.y - downY // 上滑为负
+                            val delta = -dy / gestureH.coerceAtLeast(1) // 上滑增：0~1 变化量
+                            when {
+                                gestureW > 0 && downX < gestureW / 4f -> {
+                                    val newB = (baseBrightness + delta).coerceIn(0.05f, 1f)
+                                    (context as? Activity)?.window?.let { w ->
+                                        val lp = w.attributes
+                                        lp.screenBrightness = newB
+                                        w.attributes = lp
+                                    }
+                                    adjustType = AdjustType.BRIGHTNESS
+                                    adjustPercent = (newB * 100).roundToInt()
+                                }
+                                gestureW > 0 && downX > gestureW * 3f / 4f -> {
+                                    val newV = (baseVolume + delta * maxVolume).roundToInt().coerceIn(0, maxVolume)
+                                    audioManager?.setStreamVolume(AudioManager.STREAM_MUSIC, newV, 0)
+                                    adjustType = AdjustType.VOLUME
+                                    adjustPercent = if (maxVolume > 0) (newV * 100 / maxVolume) else 0
+                                }
+                                // 中间区域纵向滑动：忽略（中间留给横向 seek）
+                            }
+                        }
                     }
 
                     // 抬起（fongmi onTouchEvent ACTION_UP）
@@ -2612,6 +2688,9 @@ private fun FullscreenPlayLayout(
                         // fongmi onSeekEnd：真正 seek 到预览位置
                         Players.seekTo(seekTarget)
                         seekPreview = null
+                    } else if (axis == 2) {
+                        // 亮度/音量滑动结束：隐藏反馈浮层
+                        adjustType = null
                     } else if (axis == 0 && !gestureBlocked && !sideSheetOpen) {
                         // 未移动未长按（且未点在控件上）：单击/双击判定（fongmi GestureDetector）
                         val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
@@ -2639,6 +2718,14 @@ private fun FullscreenPlayLayout(
         // 内部订阅独立进度流：拖动期间的进度刷新只重组本浮层
         if (seekPreview != null || sliderSeekFraction != null) {
             SeekFeedbackOverlay(seekPreview = seekPreview, sliderFraction = sliderSeekFraction)
+        }
+        // 亮度/音量滑动反馈浮层（fongmi PlayerGestureView 同款：屏幕中央半透明圆角，图标 + 百分比 + 进度条）
+        adjustType?.let { type ->
+            GestureAdjustOverlay(
+                type = type,
+                percent = adjustPercent,
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
         if (speedUpHint) {
             Text(
@@ -2903,6 +2990,59 @@ private fun FullscreenPlayLayout(
             onDismiss = { showText = false },
             selectedBorderColor = BrandBlueDeep,
         )
+    }
+}
+
+/** 全屏手势调节类型：左 1/4 亮度、右 1/4 音量（fongmi PlayerGestureView 同款） */
+private enum class AdjustType { BRIGHTNESS, VOLUME }
+
+/** 读取 Activity 窗口当前亮度（0.0~1.0）：窗口 screenBrightness 为 -1（跟随系统）时换算系统亮度值 */
+private fun currentWindowBrightness(activity: Activity?): Float {
+    val window = activity?.window ?: return 0.5f
+    val attrs = window.attributes
+    if (attrs.screenBrightness >= 0f) return attrs.screenBrightness
+    val sys = runCatching {
+        Settings.System.getInt(activity.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 128)
+    }.getOrDefault(128)
+    return (sys / 255f).coerceIn(0f, 1f)
+}
+
+/** 亮度/音量滑动反馈浮层：屏幕中央半透明圆角，图标 + 百分比 + 细进度条（fongmi PlayerGestureView 同款） */
+@Composable
+private fun GestureAdjustOverlay(type: AdjustType, percent: Int, modifier: Modifier = Modifier) {
+    val label = if (type == AdjustType.BRIGHTNESS) "亮度" else "音量"
+    val icon = if (type == AdjustType.BRIGHTNESS) AppIcons.BrightnessHigh else AppIcons.VolumeUp
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .clip(SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner))
+            .background(Color(0x66000000))
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+    ) {
+        Icon(icon, label, tint = Color.White, modifier = Modifier.size(36.dp))
+        Text(
+            text = "$label $percent%",
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
+            color = Color.White,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        // 细进度条（固定宽 120dp 高 4dp，圆角）：白底半透明轨道 + 白色前景
+        Box(
+            modifier = Modifier
+                .padding(top = 10.dp)
+                .width(120.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(Color(0x33FFFFFF)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(percent.coerceIn(0, 100) / 100f)
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(Color.White),
+            )
+        }
     }
 }
 

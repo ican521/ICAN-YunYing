@@ -13,6 +13,7 @@ import androidx.media3.common.ParserException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
+import androidx.media3.common.VideoSize
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
@@ -70,6 +71,9 @@ object Players {
 
     private const val TAG = "Players"
 
+    /** 视频宽高比默认值（16:9）：解码到视频尺寸前，竖屏详情页顶部预览小窗用此比例（fongmi PlayerView 默认一致） */
+    const val DEFAULT_VIDEO_ASPECT_RATIO = 16f / 9f
+
     /** 解码内核 */
     enum class Decode(val label: String) { HARD("硬解"), SOFT("软解") }
 
@@ -115,6 +119,8 @@ object Players {
         val error: String? = null,
         /** 实时网络速度（bps），缓冲时显示在转圈下方 */
         val networkSpeedBps: Long = 0L,
+        /** 视频宽高比（宽/高，fongmi onVideoSizeChanged 同款）：竖屏顶部预览小窗高度随视频比例调整，默认 16:9 */
+        val videoAspectRatio: Float = DEFAULT_VIDEO_ASPECT_RATIO,
     )
 
     /** 高频进度（播放中每 500ms 一跳）：与 PlayerState 拆开，
@@ -406,6 +412,16 @@ object Players {
     private val listener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _state.value = _state.value.copy(playing = isPlaying)
+        }
+
+        override fun onVideoSizeChanged(videoSize: VideoSize) {
+            // 竖屏详情页顶部预览小窗跟随视频比例（fongmi onVideoSizeChanged → view.aspectRatio）
+            val ratio = if (videoSize.width > 0 && videoSize.height > 0) {
+                videoSize.width.toFloat() / videoSize.height
+            } else 0f
+            if (ratio > 0f) {
+                _state.value = _state.value.copy(videoAspectRatio = ratio)
+            }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
