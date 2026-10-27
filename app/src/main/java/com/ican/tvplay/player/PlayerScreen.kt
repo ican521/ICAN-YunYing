@@ -1452,26 +1452,41 @@ private fun PortraitPlayLayout(
         modifier = Modifier
             .weight(1f)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = pageHorizontalPadding(), vertical = Spacing.titleContentGap),
+            // 水平边距下放到各 Section 内部（首页顶部分类 Tab 同款结构性通栏）：
+            // 线路/选集横向列表需天然占满全宽，靠自身 contentPadding 对齐基准线并支持贴边横滑
+            .padding(vertical = Spacing.titleContentGap),
         verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
     ) {
         val v = current ?: return@Column
 
         // 标题+收藏 / 更新备注 / 站源 / 年份·地区·类型（标题↔信息行的次间距在组件内部）
-        VideoMetaSection(v = v, lineFlag = lineFlag)
+        VideoMetaSection(
+            v = v,
+            lineFlag = lineFlag,
+            modifier = Modifier.padding(horizontal = pageHorizontalPadding()),
+        )
 
         // 线路（标题↔chips 的次间距在组件内部）
-        LineSection(v = v, lineFlag = lineFlag, onLineChange = onLineChange)
+        LineSection(
+            v = v,
+            lineFlag = lineFlag,
+            onLineChange = onLineChange,
+            horizontalPadding = pageHorizontalPadding(),
+        )
 
-        // 选集（倒序/更多，横滑↔网格；标题↔按钮的次间距在组件内部）
+        // 选集（倒序/展开，横滑↔网格；标题↔按钮的次间距在组件内部）
         EpisodeSection(
             lineEpisodes = lineEpisodes,
             episodeIndex = episodeIndex,
             onEpisodeSelect = onEpisodeSelect,
+            horizontalPadding = pageHorizontalPadding(),
         )
 
         // 简介（标题↔正文的次间距在组件内部）
-        DescriptionSection(v = v)
+        DescriptionSection(
+            v = v,
+            modifier = Modifier.padding(horizontal = pageHorizontalPadding()),
+        )
 
         Spacer(modifier = Modifier.height(60.dp))
     }
@@ -1624,22 +1639,20 @@ private fun LandscapePlayLayout(
                 // 此处显式覆盖主题背景，确保缩回后恢复浅色
                 .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
-                .padding(
-                    start = pageHorizontal,
-                    end = pageHorizontal,
-                    top = com.ican.tvplay.ui.theme.Spacing.titleContentGap,
-                ),
+                // 水平边距下放到各 Section 内部（同竖屏信息流的结构性通栏），此处只保留顶部间距
+                .padding(top = com.ican.tvplay.ui.theme.Spacing.titleContentGap),
             // 板块主间距与竖屏信息流统一为 sectionSpacing
             verticalArrangement = Arrangement.spacedBy(com.ican.tvplay.ui.theme.Spacing.sectionSpacing),
         ) {
             if (current != null) {
-                LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange)
+                LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange, horizontalPadding = pageHorizontal)
                 EpisodeSection(
                     lineEpisodes = lineEpisodes,
                     episodeIndex = episodeIndex,
                     onEpisodeSelect = onEpisodeSelect,
+                    horizontalPadding = pageHorizontal,
                 )
-                DescriptionSection(v = current)
+                DescriptionSection(v = current, modifier = Modifier.padding(horizontal = pageHorizontal))
 
                 Spacer(modifier = Modifier.height(60.dp))
             }
@@ -2019,33 +2032,13 @@ private fun FavoriteButton(v: Video) {
     }
 }
 
-/** 通栏横滑视口扩展：向左右各扩展 [bleed] 并整体左移放置（效果等价 fongmi RecyclerView
- *  clipToPadding=false）。新版 Compose 的 Modifier.padding 禁止负值（抛
- *  IllegalArgumentException），故用 layout modifier 扩展测量宽度实现 */
-private fun Modifier.horizontalBleed(bleed: Dp): Modifier = layout { measurable, constraints ->
-    val extra = bleed.roundToPx()
-    val newMaxWidth = if (constraints.maxWidth == Constraints.Infinity) {
-        Constraints.Infinity
-    } else {
-        constraints.maxWidth + extra * 2
-    }
-    val placeable = measurable.measure(
-        constraints.copy(
-            minWidth = constraints.minWidth.coerceAtMost(newMaxWidth),
-            maxWidth = newMaxWidth,
-        ),
-    )
-    layout(placeable.width, placeable.height) {
-        placeable.placeRelative(-extra, 0)
-    }
-}
-
 /** 线路区块（fongmi: detail_flag）：横向滚动 chips */
 @Composable
 private fun LineSection(
     v: Video,
     lineFlag: String,
     onLineChange: (String) -> Unit,
+    horizontalPadding: Dp,
 ) {
     Column {
         Text(
@@ -2053,14 +2046,13 @@ private fun LineSection(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(horizontal = horizontalPadding),
         )
         Spacer(modifier = Modifier.height(Spacing.titleContentGap))
-    // 通栏横滑：horizontalBleed 把视口扩展到屏幕边缘，contentPadding 保证
-    // 静止时首尾 chips 仍对齐全局基准线（fongmi RecyclerView clipToPadding=false 同款效果）
-    val bleed = pageHorizontalPadding()
+    // 通栏横滑（首页顶部分类 Tab 同款）：列表天然占满全宽，contentPadding 保证
+    // 静止时首尾 chips 对齐全局基准线，滑动时条目可完整滑到屏幕最边缘
     LazyRow(
-        modifier = Modifier.horizontalBleed(bleed),
-        contentPadding = PaddingValues(horizontal = bleed),
+        contentPadding = PaddingValues(horizontal = horizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(v.playSources, key = { it.flag }, contentType = { "line" }) { source ->
@@ -2101,19 +2093,20 @@ private fun LineSection(
     }
 }
 
-/** 选集区块（fongmi: detail_episode）：标题+倒序/正序+更多；默认横向滚动，点更多弹出分页网格弹窗 */
+/** 选集区块（fongmi: detail_episode）：标题+倒序/正序+展开；默认横向滚动，点展开弹出分页网格弹窗 */
 @Composable
 private fun EpisodeSection(
     lineEpisodes: List<Episode>,
     episodeIndex: Int,
     onEpisodeSelect: (Int) -> Unit,
+    horizontalPadding: Dp,
 ) {
     var showEpisodeGrid by remember { mutableStateOf(false) }
     var reversedEp by remember { mutableStateOf(false) }
 
     Column {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = horizontalPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -2200,13 +2193,11 @@ private fun EpisodeSection(
                 }
             }
         }
-        // 默认横向滚动（fongmi: adapter_episode_hori）；通栏横滑同 LineSection：视口到屏幕边缘，
-        // contentPadding 保证静止时首尾 chip 仍对齐全局基准线
-        val bleed = pageHorizontalPadding()
+        // 默认横向滚动（fongmi: adapter_episode_hori）；通栏横滑同 LineSection：列表天然占满
+        // 全宽，contentPadding 保证静止时首尾 chip 对齐全局基准线，滑动可贴到屏幕最边缘
         LazyRow(
             state = listState,
-            modifier = Modifier.horizontalBleed(bleed),
-            contentPadding = PaddingValues(horizontal = bleed),
+            contentPadding = PaddingValues(horizontal = horizontalPadding),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             itemsIndexed(displayEps, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { dispIdx, ep ->
@@ -2438,8 +2429,8 @@ private fun Activity?.restoreDefaultOrientation() {
 
 /** 简介区块：直接全部显示，不折叠、不可点击 */
 @Composable
-private fun DescriptionSection(v: Video) {
-    Column {
+private fun DescriptionSection(v: Video, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
         Text(
             text = "简介",
             style = MaterialTheme.typography.titleMedium,
