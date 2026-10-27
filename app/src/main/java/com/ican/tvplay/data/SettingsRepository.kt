@@ -219,6 +219,16 @@ class SettingsRepository(context: Context) {
         _playerBuffer.value = tier
     }
 
+    /** 全屏播放亮度（0.0~1.0，-1 表示跟随系统；仿 fongmi PlayerSetting 亮度持久化） */
+    private val _playerBrightness = MutableStateFlow(prefs.getFloat(KEY_PLAYER_BRIGHTNESS, -1f))
+    val playerBrightness: StateFlow<Float> = _playerBrightness.asStateFlow()
+
+    fun setPlayerBrightness(brightness: Float) {
+        val value = brightness.coerceIn(-1f, 1f)
+        prefs.edit().putFloat(KEY_PLAYER_BRIGHTNESS, value).apply()
+        _playerBrightness.value = value
+    }
+
     /** 后台播放（fongmi 同款三态）：关闭 / 开启（后台续播+通知栏） / 画中画 */
     private val _playerBackgroundPlay = MutableStateFlow(
         prefs.getInt(KEY_PLAYER_BACKGROUND, BACKGROUND_OFF),
@@ -377,6 +387,7 @@ class SettingsRepository(context: Context) {
         _playerScale.value = prefs.getString(KEY_PLAYER_SCALE, null).orEmpty()
         _playerEngine.value = prefs.getString(KEY_PLAYER_ENGINE, null).orEmpty()
         _playerBuffer.value = prefs.getInt(KEY_PLAYER_BUFFER, 1)
+        _playerBrightness.value = prefs.getFloat(KEY_PLAYER_BRIGHTNESS, -1f)
         _playerBackgroundPlay.value = prefs.getInt(KEY_PLAYER_BACKGROUND, BACKGROUND_OFF)
         _subtitleScale.value = prefs.getFloat(KEY_PLAYER_SUBTITLE_SCALE, 1.0f)
             .coerceIn(SUBTITLE_MIN_SCALE, SUBTITLE_MAX_SCALE)
@@ -409,6 +420,7 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_SCALE = "player_scale"
         const val KEY_PLAYER_ENGINE = "player_engine"
         const val KEY_PLAYER_BUFFER = "player_buffer"
+        const val KEY_PLAYER_BRIGHTNESS = "player_brightness"
         const val KEY_PLAYER_BACKGROUND = "player_background"
         const val KEY_PLAYER_SUBTITLE_SCALE = "player_subtitle_scale"
         const val KEY_PLAYER_SUBTITLE_POSITION = "player_subtitle_position"

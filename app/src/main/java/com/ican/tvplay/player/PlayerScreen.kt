@@ -152,6 +152,7 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import com.ican.tvplay.data.BACKGROUND_OFF
+import com.ican.tvplay.data.SettingsRepository
 import com.ican.tvplay.data.BACKGROUND_ON
 import com.ican.tvplay.data.SUBTITLE_MAX_POSITION
 import com.ican.tvplay.data.SUBTITLE_MAX_SCALE
@@ -1084,6 +1085,13 @@ fun PlayerScreen(
         val statusBarTop = remember(density) {
             with(density) { statusBarInsets.getTop(this).toDp() }
         }
+        // 竖屏详情页小窗动态比例（fongmi PlayerView.aspectRatio 同款）：PlayerView 与 PortraitPlayLayout 覆盖层共用，
+        // 宽占满、高=宽/视频宽高比；视频为竖屏（宽高比<1）时高度封顶并横向收缩居中。
+        // PlayerView 必须与覆盖层同比例——否则宽银幕源会在固定 16:9 容器里留上下黑边、控制层与画面错位
+        val videoRatio = playerState.videoAspectRatio.takeIf { it > 0f } ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
+        val portraitPreviewMaxH = (screenH - statusBarTop) * VERTICAL_PREVIEW_MAX_HEIGHT_FRACTION
+        val portraitPreviewH = (screenW / videoRatio).coerceAtMost(portraitPreviewMaxH)
+        val portraitPreviewW = (portraitPreviewH * videoRatio).coerceAtMost(screenW)
 
         // 横屏小窗↔全屏放大/缩回过渡：宽/高/顶部偏移连续插值，
         // PlayerView 全程不重建，只有画面在放大，不挂任何控制层
@@ -1204,7 +1212,15 @@ fun PlayerScreen(
                         }
                 }
                 else ->
-                    Modifier.fillMaxWidth().statusBarsPadding().aspectRatio(16f / 9f).background(Color.Black)
+                    Modifier
+                        // 竖屏小窗跟随视频比例（fongmi PlayerView.aspectRatio 同款）：顶部对齐，横向收缩时居中，
+                        // 与 PortraitPlayLayout 覆盖层像素对齐（否则宽银幕源 16:9 留黑边 + 控制层错位）
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .offset { IntOffset(((screenW - portraitPreviewW) / 2f).roundToPx(), 0) }
+                        .width(portraitPreviewW)
+                        .height(portraitPreviewH)
+                        .background(Color.Black)
             },
         )
         // 诊断日志：仅 debug 构建保留（release 自动剔除）
@@ -1238,6 +1254,7 @@ fun PlayerScreen(
             playerState = playerState,
             controlsVisible = controlsVisible,
             locked = locked,
+            settings = settings,
             onToggleControls = { controlsVisible = !controlsVisible },
             onControlInteract = { controlsTick++ },
             onTogglePlay = { Players.playPause() },
@@ -2483,6 +2500,7 @@ private fun FullscreenPlayLayout(
     playerState: Players.PlayerState,
     controlsVisible: Boolean,
     locked: Boolean,
+    settings: SettingsRepository,
     onToggleControls: () -> Unit,
     onControlInteract: () -> Unit,
     onTogglePlay: () -> Unit,
@@ -2511,10 +2529,23 @@ private fun FullscreenPlayLayout(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // 亮度滑动作用于本 Activity 窗口；离开全屏布局时恢复「跟随系统」，避免把用户系统亮度改掉（fongmi 退出恢复）
+    // 亮度持久化（仿 fongmi PlayerSetting）：进全屏应用上次保存的亮度，离开时保存当前值并恢复「跟随系统」
+    LaunchedEffect(Unit) {
+        val saved = settings.playerBrightness.value
+        if (saved >= 0f) {
+            (context as? Activity)?.window?.let { w ->
+                val lp = w.attributes
+                lp.screenBrightness = saved
+                w.attributes = lp
+            }
+        }
+    }
     DisposableEffect(Unit) {
         onDispose {
-            (context as? Activity)?.window?.let { w ->
+            val window = (context as? Activity)?.window
+            // 保存当前亮度（跟随系统时为 -1），退出后恢复跟随系统，避免把系统亮度改掉
+            settings.setPlayerBrightness(window?.attributes?.screenBrightness ?: -1f)
+            window?.let { w ->
                 val lp = w.attributes
                 if (lp.screenBrightness >= 0f) {
                     lp.screenBrightness = -1f
