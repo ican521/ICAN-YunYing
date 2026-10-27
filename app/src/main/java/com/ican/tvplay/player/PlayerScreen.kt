@@ -1092,6 +1092,9 @@ fun PlayerScreen(
         val portraitPreviewMaxH = (screenH - statusBarTop) * VERTICAL_PREVIEW_MAX_HEIGHT_FRACTION
         val portraitPreviewH = (screenW / videoRatio).coerceAtMost(portraitPreviewMaxH)
         val portraitPreviewW = (portraitPreviewH * videoRatio).coerceAtMost(screenW)
+        // 视频比例就绪时小窗高宽平滑过渡（否则从默认 16:9 跳到实际比例会瞬间跳变）
+        val animatedPreviewH by animateDpAsState(portraitPreviewH, tween(250), label = "portraitPreviewH")
+        val animatedPreviewW by animateDpAsState(portraitPreviewW, tween(250), label = "portraitPreviewW")
 
         // 横屏小窗↔全屏放大/缩回过渡：宽/高/顶部偏移连续插值，
         // PlayerView 全程不重建，只有画面在放大，不挂任何控制层
@@ -1217,9 +1220,9 @@ fun PlayerScreen(
                         // 与 PortraitPlayLayout 覆盖层像素对齐（否则宽银幕源 16:9 留黑边 + 控制层错位）
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .offset { IntOffset(((screenW - portraitPreviewW) / 2f).roundToPx(), 0) }
-                        .width(portraitPreviewW)
-                        .height(portraitPreviewH)
+                        .offset { IntOffset(((screenW - animatedPreviewW) / 2f).roundToPx(), 0) }
+                        .width(animatedPreviewW)
+                        .height(animatedPreviewH)
                         .background(Color.Black)
             },
         )
@@ -1466,14 +1469,17 @@ private fun PortraitPlayLayout(
         val availW = constraints.maxWidth
         val availH = constraints.maxHeight
         val maxH = (availH * VERTICAL_PREVIEW_MAX_HEIGHT_FRACTION).roundToInt()
-        val h = (availW / ratio).roundToInt().coerceAtMost(maxH)
-        val w = (h * ratio).roundToInt().coerceAtMost(availW)
+        val targetH = (availW / ratio).roundToInt().coerceAtMost(maxH)
+        val targetW = (targetH * ratio).roundToInt().coerceAtMost(availW)
         with(LocalDensity.current) {
+            // 视频比例就绪时平滑过渡（与底层 PlayerView 动画同步，避免高度瞬间跳变）
+            val h by animateDpAsState(targetH.toDp(), tween(250), label = "portraitPreviewH")
+            val w by animateDpAsState(targetW.toDp(), tween(250), label = "portraitPreviewW")
             PreviewPlayerArea(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .width(w.toDp())
-                    .height(h.toDp()),
+                    .width(w)
+                    .height(h),
                 playerState = playerState,
                 showLoading = false,
                 controlsVisible = controlsVisible,
@@ -2070,7 +2076,8 @@ private fun FavoriteButton(v: Video) {
             imageVector = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
             contentDescription = if (isFav) "取消收藏" else "收藏",
             tint = if (isFav) BrandPink else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp),
+            // 26dp：心形图形约 20dp 视觉高，与标题（24sp）字面齐平；空心/实心共用同一尺寸
+            modifier = Modifier.size(26.dp),
         )
     }
 }
@@ -2688,24 +2695,27 @@ private fun FullscreenPlayLayout(
                         if (axis == 2) {
                             val dy = change.position.y - downY // 上滑为负
                             val delta = -dy / gestureH.coerceAtLeast(1) // 上滑增：0~1 变化量
-                            when {
-                                gestureW > 0 && downX < gestureW / 4f -> {
-                                    val newB = (baseBrightness + delta).coerceIn(0.05f, 1f)
-                                    (context as? Activity)?.window?.let { w ->
-                                        val lp = w.attributes
-                                        lp.screenBrightness = newB
-                                        w.attributes = lp
+                            // 顶部区域（约 15% 屏高）让位给系统下拉状态栏，避免下滑呼出状态栏时误触亮度/音量
+                            if (downY >= gestureH * GESTURE_TOP_EXCLUDE_FRACTION) {
+                                when {
+                                    gestureW > 0 && downX < gestureW / 4f -> {
+                                        val newB = (baseBrightness + delta).coerceIn(0.05f, 1f)
+                                        (context as? Activity)?.window?.let { w ->
+                                            val lp = w.attributes
+                                            lp.screenBrightness = newB
+                                            w.attributes = lp
+                                        }
+                                        adjustType = AdjustType.BRIGHTNESS
+                                        adjustPercent = (newB * 100).roundToInt()
                                     }
-                                    adjustType = AdjustType.BRIGHTNESS
-                                    adjustPercent = (newB * 100).roundToInt()
+                                    gestureW > 0 && downX > gestureW * 3f / 4f -> {
+                                        val newV = (baseVolume + delta * maxVolume).roundToInt().coerceIn(0, maxVolume)
+                                        audioManager?.setStreamVolume(AudioManager.STREAM_MUSIC, newV, 0)
+                                        adjustType = AdjustType.VOLUME
+                                        adjustPercent = if (maxVolume > 0) (newV * 100 / maxVolume) else 0
+                                    }
+                                    // 中间区域纵向滑动：忽略（中间留给横向 seek）
                                 }
-                                gestureW > 0 && downX > gestureW * 3f / 4f -> {
-                                    val newV = (baseVolume + delta * maxVolume).roundToInt().coerceIn(0, maxVolume)
-                                    audioManager?.setStreamVolume(AudioManager.STREAM_MUSIC, newV, 0)
-                                    adjustType = AdjustType.VOLUME
-                                    adjustPercent = if (maxVolume > 0) (newV * 100 / maxVolume) else 0
-                                }
-                                // 中间区域纵向滑动：忽略（中间留给横向 seek）
                             }
                         }
                     }
@@ -2750,26 +2760,34 @@ private fun FullscreenPlayLayout(
         if (seekPreview != null || sliderSeekFraction != null) {
             SeekFeedbackOverlay(seekPreview = seekPreview, sliderFraction = sliderSeekFraction)
         }
-        // 亮度/音量滑动反馈浮层（fongmi PlayerGestureView 同款：屏幕中央半透明圆角，图标 + 百分比 + 进度条）
+        // 亮度/音量滑动反馈浮层：顶部居中（与 2 倍速提示同位置），图标 + 细进度条
         adjustType?.let { type ->
             GestureAdjustOverlay(
                 type = type,
                 percent = adjustPercent,
-                modifier = Modifier.align(Alignment.Center),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 24.dp),
             )
         }
         if (speedUpHint) {
-            Text(
-                text = "2.0倍速快进中",
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
-                color = Color.White,
+            // 与亮度/音量浮层同尺寸胶囊：36dp 高，文字垂直居中
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 24.dp)
-                    .clip(SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner))
+                    .height(36.dp)
+                    .clip(CircleShape)
                     .background(Color(0x4D000000))
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-            )
+                    .padding(horizontal = 14.dp),
+            ) {
+                Text(
+                    text = "2.0倍速快进中",
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
+                    color = Color.White,
+                )
+            }
         }
 
         if (controlsVisible && !locked) {
@@ -3027,6 +3045,9 @@ private fun FullscreenPlayLayout(
 /** 全屏手势调节类型：左 1/4 亮度、右 1/4 音量（fongmi PlayerGestureView 同款） */
 private enum class AdjustType { BRIGHTNESS, VOLUME }
 
+/** 全屏顶部预留高度（屏幕高比例）：顶部区域纵向滑动让位给系统下拉状态栏，避免下滑呼出状态栏时误触亮度/音量 */
+private const val GESTURE_TOP_EXCLUDE_FRACTION = 0.15f
+
 /** 读取 Activity 窗口当前亮度（0.0~1.0）：窗口 screenBrightness 为 -1（跟随系统）时换算系统亮度值 */
 private fun currentWindowBrightness(activity: Activity?): Float {
     val window = activity?.window ?: return 0.5f
@@ -3038,33 +3059,33 @@ private fun currentWindowBrightness(activity: Activity?): Float {
     return (sys / 255f).coerceIn(0f, 1f)
 }
 
-/** 亮度/音量滑动反馈浮层：屏幕中央半透明圆角，图标 + 百分比 + 细进度条（fongmi PlayerGestureView 同款） */
+/**
+ * 亮度/音量滑动反馈浮层：顶部居中（与 2 倍速提示同位置），只保留系统图标 + 细进度条
+ * 尺寸对齐灵动岛比例：胶囊高 36dp（图标 20dp + 上下各 8dp），
+ * 左 8dp 让图标圆心与左端帽圆心同心，条距图标 8dp（条左端与端帽圆相切），
+ * 右 16dp 让条端小圆（r=2dp）与右端帽圆（r=18dp）圆心同心
+ */
 @Composable
 private fun GestureAdjustOverlay(type: AdjustType, percent: Int, modifier: Modifier = Modifier) {
     val label = if (type == AdjustType.BRIGHTNESS) "亮度" else "音量"
-    val icon = if (type == AdjustType.BRIGHTNESS) AppIcons.BrightnessHigh else AppIcons.VolumeUp
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    val icon = if (type == AdjustType.BRIGHTNESS) AppIcons.MiuBrightness else AppIcons.MiuVolume
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
-            .clip(SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner))
-            .background(Color(0x66000000))
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .clip(CircleShape)
+            .background(Color(0x4D000000))
+            .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
     ) {
-        Icon(icon, label, tint = Color.White, modifier = Modifier.size(36.dp))
-        Text(
-            text = "$label $percent%",
-            style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp),
-            color = Color.White,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        // 细进度条（固定宽 120dp 高 4dp，圆角）：白底半透明轨道 + 白色前景
+        // 图标用澎湃OS 原始配色（橙色太阳 / 蓝色喇叭），不跟随 tint
+        Icon(icon, label, tint = Color.Unspecified, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        // 细进度条（100dp × 4dp，全圆角）：白底半透明轨道 + 白色前景
         Box(
             modifier = Modifier
-                .padding(top = 10.dp)
-                .width(120.dp)
+                .width(100.dp)
                 .height(4.dp)
                 .clip(RoundedCornerShape(percent = 50))
-                .background(Color(0x33FFFFFF)),
+                .background(Color(0x40FFFFFF)),
         ) {
             Box(
                 modifier = Modifier

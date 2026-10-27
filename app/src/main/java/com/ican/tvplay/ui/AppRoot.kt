@@ -80,6 +80,7 @@ import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 fun AppRoot() {
     val appViewModel = appViewModel { AppViewModel(this) }
     val updatesViewModel = appViewModel { UpdatesViewModel(this) }
+
     // 启动自动弹出的「今日更新」面板（当天有更新且今天还没弹过时展示一次）
     var updatePopupItems by remember {
         androidx.compose.runtime.mutableStateOf<List<FavoriteUpdateItem>>(emptyList())

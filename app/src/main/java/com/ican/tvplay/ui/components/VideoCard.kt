@@ -131,8 +131,7 @@ fun VideoCard(
 /**
  * 海报统一渲染入口（首页 / 搜索 / 收藏 / 历史共用）。
  *
- * 封面缺失或加载失败（如糯米站源）时，不再只留一块灰色底，
- * 而是在海报位置直接显示标题文字——对齐 fongmi 的失败兜底，但用文字代替首字色块。
+ * 封面缺失或加载失败（如糯米站源）时，海报位置统一显示「[空]」占位，不再显示视频标题。
  */
 @Composable
 fun PosterImage(
@@ -155,23 +154,21 @@ fun PosterImage(
             onError = { failed = true },
         )
         if (failed) {
-            PosterTextFallback(title)
+            PosterTextFallback()
         }
     }
 }
 
-/** 无海报时的文字兜底：居中显示标题（最多 3 行，超出省略） */
+/** 无海报时的兜底：不显示视频标题，统一显示「[空]」占位 */
 @Composable
-private fun PosterTextFallback(title: String) {
+private fun PosterTextFallback() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
-            text = title,
+            text = "[空]",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 12.dp),
+            maxLines = 1,
         )
     }
 }

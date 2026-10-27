@@ -3,6 +3,8 @@ package com.ican.tvplay.ui.components
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
@@ -279,17 +281,48 @@ object AppIcons {
         "M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z",
     )
 
-    // 音量图标（全屏右侧上下滑调音量反馈，Material 标准 volume_up）
-    val VolumeUp: ImageVector = vector(
-        "volume_up",
-        "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" +
-            "M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z",
-    )
+    // 澎湃OS 亮度图标（橙色实心圆 + 8 道短光芒，手写路径复刻系统控制中心样式）
+    // 坐标已按 1.13 倍预缩放（围绕视口中心），让光芒末端撑满 20dp 图标外接圆
+    val MiuBrightness: ImageVector = ImageVector.Builder(
+        name = "miu_brightness",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).addPath(
+        pathData = addPathNodes("M12 8.04a3.96 3.96 0 1 0 0 7.92 3.96 3.96 0 1 0 0-7.92z"),
+        fill = SolidColor(Color(0xFFFF9F06)),
+    ).addPath(
+        pathData = addPathNodes(
+            "M12 3.64V1.38M12 20.36V22.62M3.64 12H1.38M20.36 12H22.62" +
+                "M6.09 6.09L4.49 4.49M17.91 17.91l1.6 1.6" +
+                "M6.09 17.91l-1.6 1.6M17.91 6.09l1.6-1.6",
+        ),
+        stroke = SolidColor(Color(0xFFFF9F06)),
+        strokeLineWidth = 2.37f,
+        strokeLineCap = StrokeCap.Round,
+        strokeLineJoin = StrokeJoin.Round,
+    ).build()
 
-    // 亮度图标（全屏左侧上下滑调亮度反馈，Material 标准 brightness_high）
-    val BrightnessHigh: ImageVector = vector(
-        "brightness_high",
-        "M20 8.69V4h-4.69L12 0.69 8.69 4H4v4.69L0.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69z" +
-            "M12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm0-10c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z",
-    )
+    // 澎湃OS 音量图标（蓝色喇叭 + 两道圆弧声波，手写路径复刻系统控制中心样式）
+    // 坐标已按 1.18 倍预缩放（围绕视口中心），让喇叭与声波撑满 20dp 图标外接圆
+    val MiuVolume: ImageVector = ImageVector.Builder(
+        name = "miu_volume",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).addPath(
+        pathData = addPathNodes(
+            "M6.81 8.46H3.03C2.12 8.46 1.38 9.2 1.38 10.11v3.78c0 .909.743 1.652 1.652 1.652" +
+                "h3.78l4.77 4.28c.743.661 1.888.142 1.888-.838V5.01" +
+                "c0-.979-1.145-1.499-1.888-.838L6.81 8.46z",
+        ),
+        fill = SolidColor(Color(0xFF3582FF)),
+    ).addPath(
+        pathData = addPathNodes("M16.25 8.7a4.25 4.25 0 0 1 0 6.6M19.55 5.63a8.73 8.73 0 0 1 0 12.74"),
+        stroke = SolidColor(Color(0xFF3582FF)),
+        strokeLineWidth = 2.36f,
+        strokeLineCap = StrokeCap.Round,
+    ).build()
 }

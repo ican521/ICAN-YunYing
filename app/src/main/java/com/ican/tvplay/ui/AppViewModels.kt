@@ -34,6 +34,16 @@ class AppViewModel(container: AppContainer) : ViewModel() {
     private val settings = container.settingsRepository
     private val videoRepository = container.videoRepository
 
+    init {
+        // 热搜榜只在冷启动时静默刷新并回写缓存；搜索页与回前台都不再刷新
+        viewModelScope.launch {
+            val body = com.ican.tvplay.data.remote.HotWordSource.fetch() ?: return@launch
+            if (com.ican.tvplay.data.remote.HotWordSource.parse(body).isNotEmpty()) {
+                settings.setHotWordsJson(body)
+            }
+        }
+    }
+
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
     val themeColor: StateFlow<Int> = settings.themeColor
     val enableBlur: StateFlow<Boolean> = settings.enableBlur
@@ -132,20 +142,12 @@ class SearchViewModel(container: AppContainer) : ViewModel() {
     val history: StateFlow<List<String>> = settings.searchHistory
 
     /**
-     * 热门推荐词（空查询时显示）：本地缓存优先立即展示（fongmi Setting.getHot 同款），
-     * 网络榜单由 [refreshHotWords] 在进入搜索页时后台刷新并回写缓存；
+     * 热门推荐词（空查询时显示）：本地缓存优先立即展示（fongmi Setting.getHot 同款）；
+     * 网络榜单由应用启动时的 [AppViewModel] 静默刷新并回写缓存，搜索页进入时不再发请求。
      * 无缓存时用固定兜底词，避免首屏空白。
      */
     val hotWords: Flow<List<String>> = settings.hotWordsJson.map { cached ->
         com.ican.tvplay.data.remote.HotWordSource.parse(cached).ifEmpty { DEFAULT_HOT_WORDS }
-    }
-
-    /** 拉取最新热搜榜（360 影视热搜榜，取前 12 条）并回写缓存；失败静默保留现有词表 */
-    suspend fun refreshHotWords() {
-        val body = com.ican.tvplay.data.remote.HotWordSource.fetch() ?: return
-        if (com.ican.tvplay.data.remote.HotWordSource.parse(body).isNotEmpty()) {
-            settings.setHotWordsJson(body)
-        }
     }
 
     fun onQueryChange(value: String) {
