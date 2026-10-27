@@ -3049,9 +3049,11 @@ private fun EpisodeSideSheet(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                     ) {}
-                    .padding(horizontal = 10.dp, vertical = 16.dp),
+                    // 左右边距 = 全局弹窗内容边距；顶部间距 = titleContentGap（与底部弹窗标题同款）
+                    .padding(horizontal = Spacing.dialogContentMargin)
+                    .padding(top = Spacing.titleContentGap),
             ) {
-                // 标题（深色配色，居中）
+                // 标题（深色配色，居中）：距面板顶 = 距下方列表 = titleContentGap
                 Text(
                     text = "选集",
                     style = MaterialTheme.typography.titleMedium,
@@ -3060,7 +3062,7 @@ private fun EpisodeSideSheet(
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp),
+                        .padding(bottom = Spacing.titleContentGap),
                 )
                 val listState = rememberLazyListState(
                     initialFirstVisibleItemIndex = currentIndex.coerceIn(0, episodes.lastIndex),
@@ -3068,6 +3070,9 @@ private fun EpisodeSideSheet(
                 LazyColumn(
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(6.dp),
+                    // 底部边距随内容滚动：列表可一直滑到面板最底缘，静止时末项距底 = 全局弹窗内容边距（与左右一致）
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = Spacing.dialogContentMargin),
+                    modifier = Modifier.weight(1f),
                 ) {
                     itemsIndexed(episodes, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { idx, ep ->
                         val selected = idx == currentIndex
@@ -3362,8 +3367,12 @@ private fun SubtitleSettingSideSheet(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                 ) {}
-                .padding(horizontal = 16.dp, vertical = 16.dp)
-                .verticalScroll(rememberScrollState()),
+                // 左右边距 = 全局弹窗内容边距；顶部间距 = titleContentGap；
+                // 底部边距移到 verticalScroll 之后随内容滚动：列表可滑到面板最底缘，不再被固定内边距遮挡
+                .padding(horizontal = Spacing.dialogContentMargin)
+                .padding(top = Spacing.titleContentGap)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = Spacing.dialogContentMargin),
         ) {
             // 侧栏固定深色底，miuix 滑杆强制使用深色色板，避免浅色主题下滑杆轨道看不清
             MiuixTheme(colors = darkColorScheme()) {
