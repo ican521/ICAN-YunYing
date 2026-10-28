@@ -146,11 +146,6 @@ private fun mirrorGridToCollapse(gs: LazyGridState, collapsePx: Float) {
     val delta = collapsePx.roundToInt() - gs.firstVisibleItemScrollOffset
     if (delta == 0) return
     gs.dispatchRawDelta(delta.toFloat())
-    android.util.Log.d(
-        "TVHomeMirror",
-        "target=${collapsePx.roundToInt()} delta=$delta" +
-            " after=(${gs.firstVisibleItemIndex},${gs.firstVisibleItemScrollOffset})"
-    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -270,13 +265,12 @@ fun HomeScreen(
 
     // 「网格顶部滚动量 = 折叠量」不变量：所有已组合的页（含 beyondViewport 预渲染的邻页）
     // 只要停在顶部区（firstVisibleItemIndex == 0）就必须严格等于当前折叠量，且双向维持。
-    // 该不变量由三个钩子维持：
-    //   ① 非当前页在「组合 / 数据装载完成 / settle 变化」后立即对齐 → 预渲染邻页滑入前已就位；
-    //   ② 横向拖动 / 翻页期间逐帧把离屏页对齐到当前折叠量 → 覆盖「先纵向滚动改折叠量、紧接着横向切页」；
-    //   ③ 页面 settle 后重置到对齐位置 → 目标页回到顶部，离屏页重置不会产生可见跳动。
-    // 不再使用「currentPage 变化时立刻把离屏页 scrollToItem(0)」：
-    // 那会把预渲染邻页拉回滚动 0（顶部空出折叠量像素），越过中点后新旧页角色互换，
-    // 表现为「右侧页上移、左侧页下移、空白左右横跳」。
+    // 该不变量由两个钩子维持：
+    //   ① 非当前页在「组合 / 数据装载完成」后立即对齐 → 预渲染邻页滑入前已就位；
+    //   ② 横向拖动 / 翻页期间逐帧把「本次起页以外」的页对齐到当前折叠量 → 真正切过去时目标页
+    //      在进入可视区前就已就位；起页全程不参与，故「拖向另一页但没切过去、又滑回」不会丢进度。
+    // 不再使用「settle 后重置当前页」：pager 越半回弹的取消拖动也会触发 settle，
+    // 会把用户留在本页的滚动进度清掉。
 
     // 折叠纯跟手、松手无吸附：手指停在哪，搜索行就停在哪（对齐 fongmi）
 
@@ -291,15 +285,17 @@ fun HomeScreen(
                 if (moving == wasMoving) return@collect
                 wasMoving = moving
                 if (!moving) return@collect
+                // 记录本次拖动/翻页的起页：整个过程中它都不参与对齐，
+                // 这样「向另一页拖动但没切过去、又滑回本页」时，本页的滚动进度原样保留
+                val origin = pagerState.currentPage
                 while (!pagerState.isIdle()) {
-                    val settled = pagerState.settledPage
                     val collapse = searchRowCollapsePx
                     gridLock.withLock {
                         for ((p, gs) in gridStates) {
-                            if (p == settled) continue
+                            if (p == origin) continue
                             // 不限于「停在顶部区」的页：离屏邻页（哪怕已深度滚动）也在拖动开始时
-                            // 立刻回到「折叠态顶部」。这样往回拖、还没松手时目标页就已经重置好
-                            // （此时它还没进入可视区，不会看到跳变），松手后也就不会再有可见的跳一下。
+                            // 立刻回到「折叠态顶部」。这样真正切过去时目标页在进入可视区前就已就位，
+                            // 松手后不会再有可见的跳一下。
                             alignGridToCollapse(gs, collapse)
                         }
                     }
@@ -413,17 +409,6 @@ fun HomeScreen(
             LaunchedEffect(pageVideos.value) {
                 if (pageVideos.value.isEmpty()) return@LaunchedEffect
                 gridLock.withLock { alignGridToCollapse(gridState, searchRowCollapsePx) }
-            }
-            // 钩子③（当前页）：仅在 pager 真正停稳（松手且已回落到位）时对齐到「折叠态顶部」。
-            // 拖动 / 越半回弹期间不重置（currentPage 在越半时就会翻转，若按它触发会在还没松手时
-            // 就把网格拉回去，与钩子②逐帧同步互相打断，导致该页网格与折叠量脱钩、折叠/下拉失灵）
-            LaunchedEffect(page) {
-                snapshotFlow { pagerState.isIdle() to pagerState.currentPage }
-                    .collect { (idle, current) ->
-                        if (idle && current == page) {
-                            gridLock.withLock { alignGridToCollapse(gridState, searchRowCollapsePx) }
-                        }
-                    }
             }
             BoxWithConstraints(
                 modifier = Modifier
