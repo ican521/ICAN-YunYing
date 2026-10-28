@@ -1104,18 +1104,23 @@ fun PlayerScreen(
             targetState = landscapeFullscreen,
             label = "landPlayerExpand",
         )
+        // 横屏小窗固定 16:9（硬性要求：不跟随视频比例）。但宽/高像素必须「同源取整」：
+        // 若宽度与高度各自独立 roundToPx()，盒子的真实像素比例会偏离 16:9 约 1px，
+        // 填充/裁剪模式下 ExoPlayer 的 SurfaceView（按容器宽度 f2i 截断高度）底部会露出一条细黑线。
+        // 因此高度按「宽度像素 × 9/16」取整后再还原为 Dp，保证 heightPx = round(widthPx × 9/16)。
+        val smallLandW = screenW * LAND_PLAYER_WIDTH_FRACTION
+        val smallLandH = with(density) { (smallLandW.toPx() * (9f / 16f)).roundToInt().toDp() }
         val animWidth = expandTransition.animateDp(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "animWidth",
         ) { expanded ->
-            if (expanded) screenW else screenW * LAND_PLAYER_WIDTH_FRACTION
+            if (expanded) screenW else smallLandW
         }
         val animHeight = expandTransition.animateDp(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "animHeight",
         ) { expanded ->
-            if (expanded) screenH
-            else screenW * LAND_PLAYER_WIDTH_FRACTION * (9f / 16f)
+            if (expanded) screenH else smallLandH
         }
         val animTop = expandTransition.animateDp(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
