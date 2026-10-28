@@ -30,3 +30,7 @@ Thumbs.db
 /icon_*.*
 apk_check_tmp/
 .kotlin/
+
+# 本地工具生成：IDE 技能目录 / 反编译临时产物
+/.trae/
+/top/
