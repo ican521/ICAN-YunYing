@@ -224,6 +224,11 @@ fun HomeScreen(
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 if (suppress) return Offset.Zero
+                // 横向切页/翻页（pager 正在移动）期间冻结折叠量：
+                // miuix 跨轴手势层把横向拖动转发为纵向滚动增量给本连接，但此时网格并未真正滚动
+                // （pointer 已被 pager 消费），若照常累加会让折叠量与各页网格 offset 脱钩，
+                // 多次「左滑越半→右滑回」后折叠/下拉以及切页时卡片顶对齐 tab 的功能失灵
+                if (pagerState.isScrollInProgress || pagerState.currentPageOffsetFraction != 0f) return Offset.Zero
                 val max = searchRowMaxCollapsePx
                 if (max <= 0f) return Offset.Zero
                 // miuix pager 跨轴手势层转发过来的滚动增量方向与标准相反，统一取反：
