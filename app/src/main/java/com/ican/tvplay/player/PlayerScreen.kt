@@ -1760,10 +1760,14 @@ private fun PlayerCornerMask(
 private fun BoxScope.CornerNotch(color: Color, r: Dp, alignment: Alignment) {
     val mirrorX = alignment == Alignment.TopEnd || alignment == Alignment.BottomEnd
     val mirrorY = alignment == Alignment.BottomStart || alignment == Alignment.BottomEnd
+    // 覆盖余量：视频由 SurfaceView 系统独立合成、Compose 无法裁剪，圆角遮罩在 1px 级会有
+    // 对齐/取整偏差，露出视频直角的一丝黑色。把缺口整体加大 1dp，保证必然盖住直角——
+    // 多出的区域落在四周页面底色上，不可见；可见圆角只增大 1dp，几乎无感。
+    val cover = r + 1.dp
     Box(
         modifier = Modifier
             .align(alignment)
-            .size(r)
+            .size(cover)
             .drawWithCache {
                 val s = size.minDimension
                 // 基准路径：圆心在方块右下角（即左上角缺口）——左边 → 四分之一弧 → 回原点的直角区
