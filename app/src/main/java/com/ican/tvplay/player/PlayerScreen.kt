@@ -105,16 +105,11 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -1132,11 +1127,6 @@ fun PlayerScreen(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "animLeft",
         ) { expanded -> if (expanded) 0.dp else pageHorizontal }
-        // 小窗圆角半径（方案 B 遮罩用）：小窗态 16dp，放大到全屏同步归零 → 缺口尺寸为 0 自动消失
-        val animCorner = expandTransition.animateDp(
-            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
-            label = "animCorner",
-        ) { expanded -> if (expanded) 0.dp else Spacing.corner }
 
         // 动画收敛后处理：放大结束挂全屏布局（纯净画面起手）；
         // 缩回期间横版布局全程渲染，信息列/下方区块锚定视频边缘跟随滑入滑出（fongmi ChangeBounds）
@@ -1188,37 +1178,15 @@ fun PlayerScreen(
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
-                // 深色：小窗（非全屏）四周加圆角描边；全屏时圆角归零且不挂描边修饰符
-                isLandscape -> {
-                    val isDark = com.ican.tvplay.ui.theme.LocalDarkTheme.current
+                // 视频面保持方角 + 纯黑底（fongmi activity_detail_land 的 400dp×225dp 纯黑 FrameLayout 同款）：
+                // SurfaceView 无法被 Compose 裁剪，只能靠遮罩盖角；而 FIT 模式信箱黑(#000)与页面底色有色差，
+                // 遮罩无论多精确都会在四角露出"黑边"。方角 + 黑底后信箱黑与底色同色，黑边彻底不存在
+                isLandscape ->
                     Modifier
                         // 动画值全部在布局/绘制阶段的 lambda 内读取：放大/缩回动画期间本分支不触发逐帧重组
                         .offset { IntOffset(animLeft.value.roundToPx(), animTop.value.roundToPx()) }
                         .animatedSize(animWidth, animHeight)
-                        .graphicsLayer {
-                            shape = SquircleShape(animCorner.value)
-                            clip = true
-                        }
                         .background(Color.Black)
-                        .drawWithContent {
-                            drawContent()
-                            // 深色 + 圆角尚存（非全屏）时才画描边；全屏稳态圆角归零不画 ——
-                            // 若继续画 0dp 宽的描边，Android Paint 会按「发丝线」画出 1px，
-                            // 导致平板深色全屏时四周残留一圈描边（原 border 修饰符的等价绘制）
-                            val corner = animCorner.value
-                            if (isDark && corner > 1.dp) {
-                                val strokePx = 1.dp.toPx()
-                                val half = strokePx / 2
-                                drawRoundRect(
-                                    color = Color.White.copy(alpha = 0.15f),
-                                    topLeft = Offset(half, half),
-                                    size = Size(size.width - strokePx, size.height - strokePx),
-                                    cornerRadius = CornerRadius((corner.toPx() - half).coerceAtLeast(0f)),
-                                    style = Stroke(width = strokePx),
-                                )
-                            }
-                        }
-                }
                 else ->
                     Modifier
                         // 竖屏小窗跟随视频比例（fongmi PlayerView.aspectRatio 同款）：顶部对齐，横向收缩时居中，
@@ -1321,7 +1289,6 @@ fun PlayerScreen(
                 screenWidth = screenW,
                 screenHeight = screenH,
                 pageHorizontal = pageHorizontal,
-                playerCorner = animCorner,
                 onToggleControls = { controlsVisible = !controlsVisible },
                 onTogglePlay = { Players.playPause() },
                 onPrev = { if (episodeIndex > 0) episodeIndex-- },
@@ -1606,8 +1573,6 @@ private fun LandscapePlayLayout(
     screenWidth: Dp,
     screenHeight: Dp,
     pageHorizontal: Dp,
-    /** 小窗圆角半径（遮罩方案，随放大动画归零） */
-    playerCorner: State<Dp>,
     onToggleControls: () -> Unit,
     onTogglePlay: () -> Unit,
     onPrev: () -> Unit,
@@ -1619,27 +1584,13 @@ private fun LandscapePlayLayout(
     onSeekDragChange: (Boolean) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // 小窗圆角遮罩：先画（层级低于控制层），只覆盖视频四角，不拦截触摸
-        PlayerCornerMask(
-            left = playerLeft,
-            top = playerTop,
-            width = playerWidth,
-            height = playerHeight,
-            corner = playerCorner,
-        )
-
         // 播放器覆盖层：与底层常驻 PlayerView 同位同尺寸（尺寸由根 AndroidView 动画值驱动）
+        // 不再裁圆角：视频面是方角（fongmi 同款），控制层若单独裁圆角，
+        // 底部渐变条的方角反而会露在圆角缺口里形成浅灰色直角块
         PreviewPlayerArea(
             modifier = Modifier
                 .offset { IntOffset(playerLeft.value.roundToPx(), playerTop.value.roundToPx()) }
-                .animatedSize(playerWidth, playerHeight)
-                // 控制层随小窗一起裁成圆角：否则底部渐变条（半透明黑压浅色底 = 浅灰）
-                // 的方角会露在圆角缺口里，形成左右下角的浅灰色直角块
-                // （graphicsLayer clip 与 clip 修饰符视觉等效，圆角动画值改到绘制阶段读取）
-                .graphicsLayer {
-                    shape = SquircleShape(playerCorner.value)
-                    clip = true
-                },
+                .animatedSize(playerWidth, playerHeight),
             playerState = playerState,
             showLoading = false,
             controlsVisible = controlsVisible,
@@ -1722,77 +1673,6 @@ private fun Modifier.animatedSize(width: State<Dp>, height: State<Dp>): Modifier
         val placeable = measurable.measure(Constraints.fixed(w, h))
         layout(w, h) { placeable.place(0, 0) }
     }
-
-/**
- * 小窗圆角遮罩（方案 B）：视频由 SurfaceView 渲染、画面由系统独立合成，Compose 无法裁剪它，
- * 因此在视频上方用「与页面底色同色的 4 个圆角缺口」把四个直角盖掉，视觉上等效 [Spacing.corner] 圆角。
- *
- * - 只覆盖四角那一小块，不带任何 pointerInput，不拦截小窗控制层的触摸
- * - [corner] 随放大动画归零（缺口尺寸为 0）→ 全屏时自动消失，无需额外显隐逻辑
- */
-@Composable
-private fun PlayerCornerMask(
-    left: State<Dp>,
-    top: State<Dp>,
-    width: State<Dp>,
-    height: State<Dp>,
-    corner: State<Dp>,
-) {
-    if (corner.value <= 0.dp) return
-    val color = MaterialTheme.colorScheme.background
-    Box(
-        modifier = Modifier
-            .offset { IntOffset(left.value.roundToPx(), top.value.roundToPx()) }
-            .animatedSize(width, height),
-    ) {
-        CornerNotch(color, corner.value, Alignment.TopStart)
-        CornerNotch(color, corner.value, Alignment.TopEnd)
-        CornerNotch(color, corner.value, Alignment.BottomStart)
-        CornerNotch(color, corner.value, Alignment.BottomEnd)
-    }
-}
-
-/**
- * 单个 r×r 圆角缺口：填充「方形 − 四分之一圆」，
- * 圆心取方块中靠近视频中心的那一角（由 [alignment] 决定朝向）。
- */
-@Composable
-private fun BoxScope.CornerNotch(color: Color, r: Dp, alignment: Alignment) {
-    val mirrorX = alignment == Alignment.TopEnd || alignment == Alignment.BottomEnd
-    val mirrorY = alignment == Alignment.BottomStart || alignment == Alignment.BottomEnd
-    // 覆盖余量：视频由 SurfaceView 系统独立合成、Compose 无法裁剪，圆角遮罩在 1px 级会有
-    // 对齐/取整偏差，露出视频直角的一丝黑色。把缺口整体加大 1dp，保证必然盖住直角——
-    // 多出的区域落在四周页面底色上，不可见；可见圆角只增大 1dp，几乎无感。
-    val cover = r + 1.dp
-    Box(
-        modifier = Modifier
-            .align(alignment)
-            .size(cover)
-            .drawWithCache {
-                val s = size.minDimension
-                // 基准路径：圆心在方块右下角（即左上角缺口）——左边 → 四分之一弧 → 回原点的直角区
-                val base = Path().apply {
-                    moveTo(0f, 0f)
-                    lineTo(0f, s)
-                    arcTo(Rect(Offset(s, s), s), 180f, 90f, false)
-                    close()
-                }
-                onDrawBehind {
-                    withTransform(
-                        {
-                            scale(
-                                scaleX = if (mirrorX) -1f else 1f,
-                                scaleY = if (mirrorY) -1f else 1f,
-                                pivot = center,
-                            )
-                        },
-                    ) {
-                        drawPath(base, color)
-                    }
-                }
-            },
-    )
-}
 
 // ========== 非全屏播放器区与信息区块（竖屏 / 横屏共用） ==========
 

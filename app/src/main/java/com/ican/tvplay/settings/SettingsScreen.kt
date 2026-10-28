@@ -409,7 +409,7 @@ fun SettingsScreen(
         item {
         Card(modifier = Modifier.fillMaxWidth()) {
             InfoRow("应用名称", "ICAN云影")
-            InfoRow("版本", "0.1.0")
+            InfoRow("版本", "1.0.0")
         }
         }
         }

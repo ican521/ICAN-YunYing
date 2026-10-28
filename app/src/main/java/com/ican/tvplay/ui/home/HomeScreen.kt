@@ -35,10 +35,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import top.yukonga.miuix.kmp.utils.PagerGestureNestedScrollConnection
 import top.yukonga.miuix.kmp.utils.PagerInterceptionMode
@@ -68,11 +68,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -115,29 +111,46 @@ import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** 顶部分类 Tab 行高度（与 [UnderlineTabRow] 默认高度一致，用于确定性计算顶区展开总高） */
 private val TabRowHeight = 42.dp
 
+/** pager 是否已停稳：不在滚动，且偏移已归位。拖动中 / 松手回弹中都为 false */
+private fun PagerState.isIdle(): Boolean =
+    !isScrollInProgress && abs(currentPageOffsetFraction) < 0.01f
+
 /**
- * 把网格重置到「折叠态顶部」：滚动 0 + 折叠量偏移，即 glued 不变量要求的
- * 「折叠量 = 网格滚动量」位置。用于离屏页与刚 settle 的目标页。
+ * 把网格对齐到「折叠态顶部」：item 0 的偏移 = 折叠量。
+ * 用单次 scrollToItem(index, offset) 完成，不经过「先归 0 再滚回」的中间态，
+ * 避免折叠量在中间帧被读成 0，导致搜索行闪一下。
  */
-private suspend fun resetGridToCollapseTop(gs: LazyGridState, collapsePx: Float) {
-    gs.scrollToItem(0)
-    if (collapsePx > 0f) gs.scrollBy(collapsePx)
+private suspend fun alignGridToCollapse(gs: LazyGridState, collapsePx: Float) {
+    val target = collapsePx.roundToInt()
+    if (gs.firstVisibleItemIndex == 0 && gs.firstVisibleItemScrollOffset == target) return
+    try {
+        gs.scrollToItem(0, target)
+    } catch (t: Throwable) {
+        return
+    }
 }
 
 /**
- * 只修正「停在顶部区」（firstVisibleItemIndex == 0）的网格：把滚动量对齐到折叠量。
- * 已对齐时直接返回，不产生任何滚动与布局开销（用于切页过程中逐帧同步离屏邻页）。
+ * 同步版镜像：把停在顶部区的网格滚到折叠量。
+ * 不用挂起的 scrollToItem —— 它会被更高优先级的滚动（用户拖动/惯性）打断并抛
+ * CancellationException 而静默失败；dispatchRawDelta 立即生效、不会被打断。
  */
-private suspend fun syncGridToCollapse(gs: LazyGridState, collapsePx: Float) {
+private fun mirrorGridToCollapse(gs: LazyGridState, collapsePx: Float) {
     if (gs.firstVisibleItemIndex != 0) return
-    val cur = gs.firstVisibleItemScrollOffset.toFloat()
-    if (cur == collapsePx) return
-    gs.scrollBy(collapsePx - cur)
+    val delta = collapsePx.roundToInt() - gs.firstVisibleItemScrollOffset
+    if (delta == 0) return
+    gs.dispatchRawDelta(delta.toFloat())
+    android.util.Log.d(
+        "TVHomeMirror",
+        "target=${collapsePx.roundToInt()} delta=$delta" +
+            " after=(${gs.firstVisibleItemIndex},${gs.firstVisibleItemScrollOffset})"
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -198,10 +211,12 @@ fun HomeScreen(
     // 上滑列表滚多少收多少、下滑滚多少展多少，卡片始终贴着搜索行底缘，栏无任何自主运动；
     // 列表已在顶部时下拉过界量也用于展开；只改顶区高度、不碰网格布局，无反馈回路
     // 最大收起量 = HomeTopBar 固定 48dp + 搜索行顶部间距（不含状态栏：状态栏由固定 Spacer 占位
-    // 不折叠，否则收起后 Tab 行顶到屏幕最顶端与状态栏重叠），直接计算（不做实测回写，杜绝测量振荡）
+    // 不折叠，否则收起后 Tab 行顶到屏幕最顶端与状态栏重叠），直接计算（不做实测回写，杜绝测量振荡）。
+    // 量化成整像素：折叠量同时驱动「顶栏 Layout 的 shift（roundToInt）」和「网格 contentPadding 对齐」，
+    // 若保留小数（如 170.5，Layout 取 171 而网格取 170）新页卡片顶部会比 Tab 行底缘低 1px，露出 1px 缝隙
     val searchRowMaxCollapsePx = with(density) {
         (48.dp + Spacing.pageTop).toPx()
-    }
+    }.roundToInt().toFloat()
     // 顶区「展开状态」总高度 → 每页网格固定顶部 contentPadding。
     // 确定性计算，不做实测回写：实测值会受「顶栏毛玻璃」开关引起的重排影响出现瞬时偏差，
     // 从而抖动网格 padding 并导致搜索行折叠短时卡住 / 内容错位
@@ -209,35 +224,46 @@ fun HomeScreen(
     val topBarHeightPx = with(density) {
         statusBarTopDp.toPx() + searchRowMaxCollapsePx +
             (Spacing.categoryTabVertical * 2 + TabRowHeight).toPx()
-    }
+    }.roundToInt().toFloat()
     var searchRowCollapsePx by remember { mutableFloatStateOf(0f) }
     // 各页网格状态表：切页时用于把目标页滚动位置对齐折叠量
     val gridStates = remember { mutableStateMapOf<Int, LazyGridState>() }
-    // 网格写串行锁：三个钩子（数据装载 / 横向逐帧同步 / currentPage 重置）对同一页网格的
-    // scrollToItem / scrollBy 全部串行化，杜绝互相打断滚动中间态，导致某页「网格 offset 与折叠量脱钩」、
-    // 进而在多次左右滑动后该页折叠/下拉功能失灵
+    // 网格写串行锁：三个钩子（数据装载 / 横向逐帧同步 / settle 对齐）对同一页网格的
+    // scrollToItem 串行化，杜绝互相打断滚动中间态，导致某页「网格 offset 与折叠量脱钩」
     val gridLock = remember { Mutex() }
-    val collapseConnection = remember {
-        object : NestedScrollConnection {
-            /** 切页对齐期间的程序性滚动抑制标记，防止回写折叠量 */
-            var suppress: Boolean = false
 
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (suppress) return Offset.Zero
-                // 横向切页/翻页（pager 正在移动）期间冻结折叠量：
-                // miuix 跨轴手势层把横向拖动转发为纵向滚动增量给本连接，但此时网格并未真正滚动
-                // （pointer 已被 pager 消费），若照常累加会让折叠量与各页网格 offset 脱钩，
-                // 多次「左滑越半→右滑回」后折叠/下拉以及切页时卡片顶对齐 tab 的功能失灵
-                if (pagerState.isScrollInProgress || pagerState.currentPageOffsetFraction != 0f) return Offset.Zero
-                val max = searchRowMaxCollapsePx
-                if (max <= 0f) return Offset.Zero
-                // miuix pager 跨轴手势层转发过来的滚动增量方向与标准相反，统一取反：
-                // 取反后 dy>0 = 上滑收起、dy<0 = 下拉/顶部过界展开
-                val dy = -(if (consumed.y != 0f) consumed.y else available.y)
-                if (dy != 0f) {
-                    searchRowCollapsePx = (searchRowCollapsePx + dy).coerceIn(0f, max)
-                }
-                return Offset.Zero
+    // 折叠量唯一真源 = 当前页网格的真实滚动位置（直接读位置，绝不做增量累加）。
+    // 不再监听 onPostScroll：miuix 跨轴手势层在横向切页时会把纵向滚动增量转发进嵌套滚动链
+    // （此时网格并没有真的滚动），按增量累加会让折叠量与网格 offset 一点点拉开，
+    // 多次「左滑过中点 → 右滑回上一页」后折叠与「卡片顶部贴 Tab」彻底失灵；
+    // 直接读网格位置则天然免疫这类转发增量，且不存在收不满 / 展不回 / 两段式收拢。
+    // 横向拖动/翻页期间冻结读取：此时读到的可能是尚未对齐的邻页 offset，冻结由钩子②负责对齐。
+    LaunchedEffect(Unit) {
+        snapshotFlow {
+            val idle = pagerState.isIdle()
+            val grid = gridStates[pagerState.currentPage]
+            when {
+                !idle || grid == null -> null
+                // 该页网格完全滚不动（空页 / 数据未加载 / 内容不足一屏）时不采样：
+                // 否则会把折叠量采成 0，切到这类页时搜索栏瞬间弹开、切回来又收起（卡顿式来回跳）
+                !grid.canScrollForward && !grid.canScrollBackward &&
+                    grid.firstVisibleItemIndex == 0 && grid.firstVisibleItemScrollOffset == 0 -> null
+                grid.firstVisibleItemIndex > 0 -> searchRowMaxCollapsePx
+                else -> grid.firstVisibleItemScrollOffset.toFloat()
+            }
+        }.collect { v ->
+            if (v == null) return@collect
+            // 量化到整像素：与顶栏 Layout 的 shift、网格 offset 用同一个整数，避免 1px 缝隙
+            val c = v.coerceIn(0f, searchRowMaxCollapsePx).roundToInt().toFloat()
+            if (c == searchRowCollapsePx) return@collect
+            searchRowCollapsePx = c
+            // 镜像：折叠量是全局唯一的一份，但每页各有一份滚动位置。
+            // 采样一变，立刻把所有非当前页（停在顶部区的）滚到同一折叠量，
+            // 否则「在第1页滑回顶部 → 折叠量0，而第0页仍停在170」，切页时顶部栏来回跳、卡片不贴 Tab。
+            // 直接写在这里而不是另开 LaunchedEffect：这条链路必定执行，不会被其它钩子的互斥锁挡住。
+            val current = pagerState.currentPage
+            gridStates.forEach { (p, gs) ->
+                if (p != current) mirrorGridToCollapse(gs, c)
             }
         }
     }
@@ -260,25 +286,22 @@ fun HomeScreen(
     // 对齐函数在「已对齐」时直接返回，故静止/已对齐状态下不产生任何额外滚动与布局开销
     LaunchedEffect(Unit) {
         var wasMoving = false
-        snapshotFlow { pagerState.isScrollInProgress || pagerState.currentPageOffsetFraction != 0f }
+        snapshotFlow { !pagerState.isIdle() }
             .collect { moving ->
                 if (moving == wasMoving) return@collect
                 wasMoving = moving
                 if (!moving) return@collect
-                while (pagerState.isScrollInProgress || pagerState.currentPageOffsetFraction != 0f) {
+                while (!pagerState.isIdle()) {
                     val settled = pagerState.settledPage
                     val collapse = searchRowCollapsePx
-                    collapseConnection.suppress = true
-                    try {
-                        // 串行锁：本帧对离屏页的同步与钩子①/③对当前页的写入互斥，避免滚动中间态被打断
-                        gridLock.withLock {
-                            for ((p, gs) in gridStates) {
-                                if (p == settled) continue
-                                syncGridToCollapse(gs, collapse)
-                            }
+                    gridLock.withLock {
+                        for ((p, gs) in gridStates) {
+                            if (p == settled) continue
+                            // 不限于「停在顶部区」的页：离屏邻页（哪怕已深度滚动）也在拖动开始时
+                            // 立刻回到「折叠态顶部」。这样往回拖、还没松手时目标页就已经重置好
+                            // （此时它还没进入可视区，不会看到跳变），松手后也就不会再有可见的跳一下。
+                            alignGridToCollapse(gs, collapse)
                         }
-                    } finally {
-                        collapseConnection.suppress = false
                     }
                     withFrameNanos { }
                 }
@@ -295,10 +318,9 @@ fun HomeScreen(
         // 禁用分类 Tab 栏 + 内容 Pager 的边界 overscroll 回弹效果
         CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
 
-        // 内容层：录制给顶区毛玻璃（模糊关闭时原样渲染）；挂搜索行折叠的滚动连接
+        // 内容层：录制给顶区毛玻璃（模糊关闭时原样渲染）
         Box(
-            modifier = (if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
-                .nestedScroll(collapseConnection),
+            modifier = (if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
         ) {
 
         // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；
@@ -381,36 +403,27 @@ fun HomeScreen(
             // 注册到页表：切页/同步时按页取用；页面销毁时一并移除，避免残留 stale state 被同步逻辑空转
             DisposableEffect(page) {
                 gridStates[page] = gridState
+                // 新组合的页立即镜像到当前折叠量：initialCollapse 只在创建时快照一次，
+                // 若此后折叠量已变（或创建时快照值已过期），该页会停在错的滚动位置（卡片不贴 Tab）
+                if (page != pagerState.currentPage) mirrorGridToCollapse(gridState, searchRowCollapsePx)
                 onDispose { gridStates.remove(page) }
             }
             // 钩子①：数据装载完成后立即把网格对齐到折叠量（不管是否当前页）
             // 快速滑动切页时，新页数据刚加载就同步，避免 grid 从 0 位置布局出现空白
             LaunchedEffect(pageVideos.value) {
                 if (pageVideos.value.isEmpty()) return@LaunchedEffect
-                collapseConnection.suppress = true
-                try {
-                    gridLock.withLock {
-                        resetGridToCollapseTop(gridState, searchRowCollapsePx)
-                    }
-                } finally {
-                    collapseConnection.suppress = false
-                }
+                gridLock.withLock { alignGridToCollapse(gridState, searchRowCollapsePx) }
             }
-            // 钩子③（当前页）：仅在 pager 已停稳（非横向拖动中）时重置到「顶部」——
-            // 折叠态顶部 = 对齐折叠量处。拖动（含越半翻页）期间不重置，交给钩子②逐帧同步；
-            // 否则「左滑越半→右滑回」的连续振荡会在拖动显示的页面上反复 scrollToItem(0)+scrollBy，
-            // 与钩子②互相打断，导致该页网格与折叠量脱钩、折叠/下拉失灵
-            LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
-                if (pagerState.currentPage != page) return@LaunchedEffect
-                if (pagerState.isScrollInProgress) return@LaunchedEffect
-                collapseConnection.suppress = true
-                try {
-                    gridLock.withLock {
-                        resetGridToCollapseTop(gridState, searchRowCollapsePx)
+            // 钩子③（当前页）：仅在 pager 真正停稳（松手且已回落到位）时对齐到「折叠态顶部」。
+            // 拖动 / 越半回弹期间不重置（currentPage 在越半时就会翻转，若按它触发会在还没松手时
+            // 就把网格拉回去，与钩子②逐帧同步互相打断，导致该页网格与折叠量脱钩、折叠/下拉失灵）
+            LaunchedEffect(page) {
+                snapshotFlow { pagerState.isIdle() to pagerState.currentPage }
+                    .collect { (idle, current) ->
+                        if (idle && current == page) {
+                            gridLock.withLock { alignGridToCollapse(gridState, searchRowCollapsePx) }
+                        }
                     }
-                } finally {
-                    collapseConnection.suppress = false
-                }
             }
             BoxWithConstraints(
                 modifier = Modifier
@@ -784,7 +797,7 @@ private fun HomeTopBar(
 @Composable
 private fun CategoryChips(
     categories: List<VideoCategory>,
-    pagerState: androidx.compose.foundation.pager.PagerState,
+    pagerState: PagerState,
     tappedIndex: Int?,
     onSelect: (Int) -> Unit,
 ) {
