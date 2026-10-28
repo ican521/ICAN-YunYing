@@ -113,6 +113,8 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.roundToInt
 
 /** 顶部分类 Tab 行高度（与 [UnderlineTabRow] 默认高度一致，用于确定性计算顶区展开总高） */
@@ -211,6 +213,10 @@ fun HomeScreen(
     var searchRowCollapsePx by remember { mutableFloatStateOf(0f) }
     // 各页网格状态表：切页时用于把目标页滚动位置对齐折叠量
     val gridStates = remember { mutableStateMapOf<Int, LazyGridState>() }
+    // 网格写串行锁：三个钩子（数据装载 / 横向逐帧同步 / currentPage 重置）对同一页网格的
+    // scrollToItem / scrollBy 全部串行化，杜绝互相打断滚动中间态，导致某页「网格 offset 与折叠量脱钩」、
+    // 进而在多次左右滑动后该页折叠/下拉功能失灵
+    val gridLock = remember { Mutex() }
     val collapseConnection = remember {
         object : NestedScrollConnection {
             /** 切页对齐期间的程序性滚动抑制标记，防止回写折叠量 */
@@ -259,9 +265,12 @@ fun HomeScreen(
                     val collapse = searchRowCollapsePx
                     collapseConnection.suppress = true
                     try {
-                        for ((p, gs) in gridStates) {
-                            if (p == settled) continue
-                            syncGridToCollapse(gs, collapse)
+                        // 串行锁：本帧对离屏页的同步与钩子①/③对当前页的写入互斥，避免滚动中间态被打断
+                        gridLock.withLock {
+                            for ((p, gs) in gridStates) {
+                                if (p == settled) continue
+                                syncGridToCollapse(gs, collapse)
+                            }
                         }
                     } finally {
                         collapseConnection.suppress = false
@@ -375,18 +384,25 @@ fun HomeScreen(
                 if (pageVideos.value.isEmpty()) return@LaunchedEffect
                 collapseConnection.suppress = true
                 try {
-                    resetGridToCollapseTop(gridState, searchRowCollapsePx)
+                    gridLock.withLock {
+                        resetGridToCollapseTop(gridState, searchRowCollapsePx)
+                    }
                 } finally {
                     collapseConnection.suppress = false
                 }
             }
-            // 钩子③（当前页）：currentPage 变化时立即重置到「顶部」——折叠态顶部 = 对齐折叠量处
-            // 快速滑动切页时不等 settle，直接重置，避免保留之前的滚动进度
-            LaunchedEffect(pagerState.currentPage) {
+            // 钩子③（当前页）：仅在 pager 已停稳（非横向拖动中）时重置到「顶部」——
+            // 折叠态顶部 = 对齐折叠量处。拖动（含越半翻页）期间不重置，交给钩子②逐帧同步；
+            // 否则「左滑越半→右滑回」的连续振荡会在拖动显示的页面上反复 scrollToItem(0)+scrollBy，
+            // 与钩子②互相打断，导致该页网格与折叠量脱钩、折叠/下拉失灵
+            LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
                 if (pagerState.currentPage != page) return@LaunchedEffect
+                if (pagerState.isScrollInProgress) return@LaunchedEffect
                 collapseConnection.suppress = true
                 try {
-                    resetGridToCollapseTop(gridState, searchRowCollapsePx)
+                    gridLock.withLock {
+                        resetGridToCollapseTop(gridState, searchRowCollapsePx)
+                    }
                 } finally {
                     collapseConnection.suppress = false
                 }
