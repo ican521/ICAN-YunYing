@@ -2473,10 +2473,12 @@ private fun EpisodeGridDialog(
     }
 }
 
-/** 站源接口返回的简介常带 <p>/<br> 等 HTML 标签残留：显示前剥离，只留正文 */
-private val htmlTagRegex = Regex("<[^>]*>|〈[^〉]*〉")
-
-private fun cleanDescription(raw: String): String = raw.replace(htmlTagRegex, "").trim()
+/** 站源接口返回的简介常带 HTML：既有 <p>/<br> 等标签残留，也有 &nbsp;/&amp; 等实体。
+ *  显示前用 Html.fromHtml 一次性剥标签 + 反转义实体（&nbsp;→不可断空格、&amp;→&、&lt;/&gt; 等），
+ *  避免简介里出现 &nbsp; 这类乱码。 */
+private fun cleanDescription(raw: String): String =
+    if (raw.isBlank()) ""
+    else android.text.Html.fromHtml(raw, android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim()
 
 /** 退出全屏/离开播放页后恢复屏幕方向：小屏手机锁回竖屏（禁用自动横向），平板恢复系统自由方向 */
 private fun Activity?.restoreDefaultOrientation() {
