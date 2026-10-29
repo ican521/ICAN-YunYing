@@ -70,7 +70,7 @@ import com.ican.tvplay.ui.components.videoGridColumns
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterActionScrim
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
-import com.ican.tvplay.ui.theme.PosterBottomScrim
+import com.ican.tvplay.ui.theme.PosterTitleScrim
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.Icon
@@ -377,19 +377,14 @@ private fun FavoriteCard(
                 }
             }
 
-            // 底部渐变 + 标题
+            // 底部纯色底 + 标题（40% 黑不渐变；顶边比标题再高出一截，高度 = 标题底部到卡片底部的距离）
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, PosterBottomScrim),
-                        ),
-                    )
-                    // 渐变只在标题这一段（透明分界线正好落在标题顶部）；
+                    .background(PosterTitleScrim)
                     // 底部留 6dp：文字行盒下方还有约 4dp 余量，6+4 才和左侧 10dp 视觉一致
-                    .padding(start = 10.dp, end = 10.dp, bottom = 6.dp),
+                    .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 10.dp),
             ) {
                 Text(
                     text = entity.title,
@@ -663,14 +658,9 @@ private fun HistoryCard(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, PosterBottomScrim),
-                            ),
-                        )
-                        // 渐变只在标题 + 进度条这一段（透明分界线正好落在标题顶部）；
-                        // 底部留 6dp，和左侧 10dp 视觉一致
-                        .padding(start = 10.dp, end = 10.dp, bottom = 6.dp),
+                        .background(PosterTitleScrim)
+                        // 纯色底铺在「标题 + 进度条」这一段，顶边比标题再高出一截
+                        .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(

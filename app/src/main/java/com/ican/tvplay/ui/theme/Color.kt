@@ -42,6 +42,7 @@ const val EpisodeSelectedFillAlpha = 0.25f
 // 海报卡片叠加层（首页/收藏/历史/搜索结果共用），保证各页海报视觉一致
 val PosterBadgeScrim = Color(0x66000000)   // 左上角站源/评分角标底
 val PosterBottomScrim = Color(0xE6000000)  // 底部标题渐变终点色
+val PosterTitleScrim = Color(0x66000000)   // 底部标题纯色底（40% 黑，不渐变）
 val PosterActionScrim = Color(0x88000000)  // 编辑模式右上角删除圆钮底
 
 // 主题色板选中勾的背衬（半透明黑，保证勾在任意色点上都可见）

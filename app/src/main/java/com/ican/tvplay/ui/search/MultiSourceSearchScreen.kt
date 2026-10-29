@@ -68,7 +68,7 @@ import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
-import com.ican.tvplay.ui.theme.PosterBottomScrim
+import com.ican.tvplay.ui.theme.PosterTitleScrim
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
@@ -466,14 +466,9 @@ private fun CrossSourceVideoCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, PosterBottomScrim),
-                            ),
-                        )
-                        // 渐变只在标题这一段（透明分界线正好落在标题顶部）；
-                        // 底部留 6dp，和左侧 10dp 视觉一致
-                        .padding(start = 10.dp, end = 10.dp, bottom = 6.dp),
+                        .background(PosterTitleScrim)
+                        // 纯色底铺在标题这一段（40% 黑不渐变），顶边比标题再高出一截
+                        .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 10.dp),
                 ) {
                     Text(
                         text = video.title,

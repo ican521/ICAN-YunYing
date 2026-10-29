@@ -29,7 +29,7 @@ import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
-import com.ican.tvplay.ui.theme.PosterBottomScrim
+import com.ican.tvplay.ui.theme.PosterTitleScrim
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import com.ican.tvplay.util.posterModel
@@ -91,19 +91,14 @@ fun VideoCard(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 底部渐变 + 标题（与收藏/历史/搜索结果卡片统一：渐变随标题内容收缩，不再固定 72dp）
+            // 底部纯色底 + 标题（40% 黑不渐变；顶边比标题再高出一截，高度 = 标题底部到卡片底部的距离）
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, PosterBottomScrim),
-                        ),
-                    )
-                    // 渐变只在标题这一段（透明分界线正好落在标题顶部）；
+                    .background(PosterTitleScrim)
                     // 底部留 6dp：文字行盒本身在字形下方还有约 4dp 余量，6+4 才和左侧 10dp 视觉一致
-                    .padding(start = 10.dp, end = 10.dp, bottom = 6.dp),
+                    .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 10.dp),
             ) {
                 Text(
                     text = video.title,
