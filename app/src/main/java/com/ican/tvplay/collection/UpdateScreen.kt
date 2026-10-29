@@ -41,8 +41,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.ican.tvplay.data.FavoriteUpdateItem
-import com.ican.tvplay.data.local.FavoriteEntity
-import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.ui.UpdatesViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
@@ -159,42 +157,6 @@ fun UpdateScreen(
                                 onClick = { viewModel.markAllRead() },
                             )
                         }
-                    }
-
-                    // 【临时预览】假数据：确认海报右侧 4 行排版（标题 / 更新至 x 集 / 看到的集标题 / 站源）后删除
-                    item { SectionTitle("今日更新（预览）", 1) }
-                    item(key = "debug_update_preview") {
-                        UpdateRow(
-                            item = FavoriteUpdateItem(
-                                favorite = FavoriteEntity(
-                                    videoId = "debug_preview",
-                                    title = "斗破苍穹年番",
-                                    cover = "",
-                                    categoryName = "动漫",
-                                    addedAt = 0L,
-                                    sourceName = "木木资源",
-                                    episodeCount = 173,
-                                ),
-                                history = HistoryEntity(
-                                    videoId = "debug_preview",
-                                    title = "斗破苍穹年番",
-                                    cover = "",
-                                    categoryName = "动漫",
-                                    episodeIndex = 172,
-                                    episodeTitle = "第172集 风尊者现身",
-                                    positionMs = 0L,
-                                    durationMs = 0L,
-                                    updatedAt = 0L,
-                                ),
-                                totalEpisodes = 173,
-                                watchedEpisodes = 172,
-                                firstUnwatchedIndex = 172,
-                                unwatchedCount = 1,
-                                updatedToday = true,
-                            ),
-                            onClick = {},
-                            onMarkRead = {},
-                        )
                     }
 
                     if (today.isNotEmpty()) {
