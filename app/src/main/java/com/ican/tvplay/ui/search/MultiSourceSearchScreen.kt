@@ -466,8 +466,12 @@ private fun CrossSourceVideoCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(PosterTitleScrim)
-                        // 纯色底铺在标题这一段（40% 黑不渐变），顶边与底边留白一致
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, PosterTitleScrim),
+                            ),
+                        )
+                        // 高度不变（上下各 6dp），纯黑 80% → 全透明渐变
                         .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 6.dp),
                 ) {
                     Text(

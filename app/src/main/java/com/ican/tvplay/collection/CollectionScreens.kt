@@ -377,12 +377,16 @@ private fun FavoriteCard(
                 }
             }
 
-            // 底部纯色底 + 标题（40% 黑不渐变；顶边比标题再高出一截，高度 = 标题底部到卡片底部的距离）
+            // 底部渐变 + 标题（高度不变：标题上下各 6dp；渐变从底部 80% 黑到顶部全透明）
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .background(PosterTitleScrim)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, PosterTitleScrim),
+                        ),
+                    )
                     // 底部留 6dp：文字行盒下方还有约 4dp 余量，6+4 才和左侧 10dp 视觉一致
                     .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 6.dp),
             ) {
@@ -658,8 +662,12 @@ private fun HistoryCard(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(PosterTitleScrim)
-                        // 纯色底铺在「标题 + 进度条」这一段，顶边与底边留白一致
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, PosterTitleScrim),
+                            ),
+                        )
+                        // 高度不变（上下各 6dp），纯黑 80% → 全透明渐变
                         .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
