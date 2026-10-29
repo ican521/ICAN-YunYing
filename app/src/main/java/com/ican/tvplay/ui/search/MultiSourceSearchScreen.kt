@@ -471,8 +471,9 @@ private fun CrossSourceVideoCard(
                                 listOf(Color.Transparent, PosterBottomScrim),
                             ),
                         )
-                        // 渐变只在标题这一段（透明分界线正好落在标题顶部）
-                        .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+                        // 渐变只在标题这一段（透明分界线正好落在标题顶部）；
+                        // 底部留 6dp，和左侧 10dp 视觉一致
+                        .padding(start = 10.dp, end = 10.dp, bottom = 6.dp),
                 ) {
                     Text(
                         text = video.title,

@@ -101,8 +101,9 @@ fun VideoCard(
                             listOf(Color.Transparent, PosterBottomScrim),
                         ),
                     )
-                    // 渐变只在标题这一段（透明分界线正好落在标题顶部），不再向标题上方多铺 10dp
-                    .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+                    // 渐变只在标题这一段（透明分界线正好落在标题顶部）；
+                    // 底部留 6dp：文字行盒本身在字形下方还有约 4dp 余量，6+4 才和左侧 10dp 视觉一致
+                    .padding(start = 10.dp, end = 10.dp, bottom = 6.dp),
             ) {
                 Text(
                     text = video.title,

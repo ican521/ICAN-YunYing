@@ -340,16 +340,27 @@ fun PlayerScreen(
     // 缩放会话令牌：每次进入/退出全屏自增，作为收敛监听 LaunchedEffect 的 key，
     // 避免协程体内把 landZooming 置 false 导致自身被取消、渐显逻辑丢失
     var landZoomToken by remember { mutableIntStateOf(0) }
+    // 旋转进全屏前的黑场遮罩：等它真正画到屏幕上再请求系统旋转，
+    // 避免系统旋转动画的起始帧还是浅色竖屏预览页（视频上下两端出现白→黑渐变）
+    var rotationScrim by remember { mutableStateOf(false) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
             // 旋转进入/退出全屏后都保持纯净画面，工具栏由用户单击唤出
             pendingFullscreen == true && isLandscape -> {
                 fullscreen = true; pendingFullscreen = null; controlsVisible = false
+                rotationScrim = false
             }
             pendingFullscreen == false && !isLandscape -> {
                 fullscreen = false; pendingFullscreen = null; controlsVisible = false
             }
+        }
+    }
+    // 兜底：旋转若始终没发生，1.2 秒后撤掉黑场，避免页面一直纯黑
+    LaunchedEffect(rotationScrim) {
+        if (rotationScrim) {
+            delay(1200)
+            if (rotationScrim && !isLandscape) rotationScrim = false
         }
     }
 
@@ -967,6 +978,7 @@ fun PlayerScreen(
             fun cancelPendingFullscreen() {
                 if (pendingFullscreen != null) {
                     pendingFullscreen = null
+                    rotationScrim = false
                     activity?.restoreDefaultOrientation()
                     activity?.window?.let { w ->
                         WindowCompat.getInsetsController(w, w.decorView)
@@ -1392,21 +1404,28 @@ fun PlayerScreen(
                 } else {
                     // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
                     landscapeFullscreen = false
-                    // 旋转动画期间系统按窗口底色渲染窗口截图：若等 LaunchedEffect(videoPresent) 才切黑，
-                    // 视频上下两端会先露出浅色主题底色再渐变成黑色（平板横屏无旋转，所以没有这个现象）。
-                    // 这里在请求旋转前同步把窗口/根底色切黑，保证旋转全程都是黑底。
+                    // 黑场遮罩：不改布局（避免视频突然铺满竖屏的割裂感），只用纯黑盖住预览页。
+                    // 系统旋转动画的起始帧取自请求瞬间的画面，若这里还是浅色预览页（信息面板/系统栏），
+                    // 旋转过程中视频上下两端就会看到浅色渐变到黑色；先把黑场画出来再请求旋转即可。
+                    rotationScrim = true
+                    Players.setVideoPresent(true)
                     activityWindow?.setBackgroundDrawable(
                         android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
                     )
-                    Players.setVideoPresent(true)
-                    // 先切到「黑底 + 视频铺满」的挂起态，等两帧画面真正画出来后再请求旋转。
-                    // 系统旋转动画的起始帧取自请求瞬间的窗口画面：若立刻请求，起始帧还是浅色竖屏
-                    // 预览页（信息面板/状态栏），旋转过程中视频上下两端就会出现浅色渐变到黑色；
-                    // 平板同样会旋转，只是预览页构图不同、浅色区域少，所以白色带不明显。
-                    pendingFullscreen = true
+                    // 系统栏同步隐藏 + 切深色图标，避免旋转时顶部/底部露出浅色系统栏
+                    activityWindow?.let { w ->
+                        val controller = WindowCompat.getInsetsController(w, w.decorView)
+                        controller.isAppearanceLightStatusBars = false
+                        controller.isAppearanceLightNavigationBars = false
+                        controller.systemBarsBehavior =
+                            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        controller.hide(WindowInsetsCompat.Type.systemBars())
+                    }
                     scope.launch {
+                        // 等两帧，确保纯黑帧已经真正画到屏幕上，再发起旋转
                         withFrameNanos { }
                         withFrameNanos { }
+                        pendingFullscreen = true
                         (context as? Activity)?.requestedOrientation =
                             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     }
@@ -1446,6 +1465,15 @@ fun PlayerScreen(
             SubtitleSettingSideSheet(
                 statusBarInset = !(fullscreen || landscapeFullscreen || isLandscape),
                 onDismiss = { showSubtitleSettings = false },
+            )
+        }
+
+        // 旋转进全屏前的纯黑遮罩（盖住预览页与系统栏区域，保证系统旋转动画起始帧为黑）
+        if (rotationScrim) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
             )
         }
     }
