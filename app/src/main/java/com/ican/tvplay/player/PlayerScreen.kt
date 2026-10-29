@@ -185,7 +185,6 @@ import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import com.ican.tvplay.ui.theme.optionBorderColor
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -340,27 +339,16 @@ fun PlayerScreen(
     // 缩放会话令牌：每次进入/退出全屏自增，作为收敛监听 LaunchedEffect 的 key，
     // 避免协程体内把 landZooming 置 false 导致自身被取消、渐显逻辑丢失
     var landZoomToken by remember { mutableIntStateOf(0) }
-    // 旋转进全屏前的黑场遮罩：等它真正画到屏幕上再请求系统旋转，
-    // 避免系统旋转动画的起始帧还是浅色竖屏预览页（视频上下两端出现白→黑渐变）
-    var rotationScrim by remember { mutableStateOf(false) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
             // 旋转进入/退出全屏后都保持纯净画面，工具栏由用户单击唤出
             pendingFullscreen == true && isLandscape -> {
                 fullscreen = true; pendingFullscreen = null; controlsVisible = false
-                rotationScrim = false
             }
             pendingFullscreen == false && !isLandscape -> {
                 fullscreen = false; pendingFullscreen = null; controlsVisible = false
             }
-        }
-    }
-    // 兜底：旋转若始终没发生，1.2 秒后撤掉黑场，避免页面一直纯黑
-    LaunchedEffect(rotationScrim) {
-        if (rotationScrim) {
-            delay(1200)
-            if (rotationScrim && !isLandscape) rotationScrim = false
         }
     }
 
@@ -973,22 +961,7 @@ fun PlayerScreen(
         val activity = context as? android.app.Activity
         val lifecycle = (activity as? androidx.lifecycle.LifecycleOwner)?.lifecycle
         val lifecycleObserver = object : DefaultLifecycleObserver {
-            // 旋转挂起期间切后台：系统不会在不可见时继续旋转，挂起态会一直卡住
-            //（视频固定铺满、系统栏不恢复、返回手势失效），这里直接取消挂起并恢复系统栏
-            fun cancelPendingFullscreen() {
-                if (pendingFullscreen != null) {
-                    pendingFullscreen = null
-                    rotationScrim = false
-                    activity?.restoreDefaultOrientation()
-                    activity?.window?.let { w ->
-                        WindowCompat.getInsetsController(w, w.decorView)
-                            .show(WindowInsetsCompat.Type.systemBars())
-                    }
-                }
-            }
-
             override fun onPause(owner: LifecycleOwner) {
-                cancelPendingFullscreen()
                 // 只有「全屏 + 已在 PiP」才保持播放；预览小窗（非全屏）回桌面一律暂停，
                 // 即使后台播放设为「画中画」也不例外（画中画仅全屏时触发，非全屏不回退会留在后台继续播）
                 val pipPlaying = activity?.isInPictureInPictureMode == true && Players.isFullscreen
@@ -1047,19 +1020,8 @@ fun PlayerScreen(
                 landZoomToken++
             } else {
                 // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
-                val activity = context as? Activity
-                activity?.restoreDefaultOrientation()
-                // 平板（自动旋转开着且设备本来就是横屏）：恢复默认方向后不会触发旋转，
-                // 若还等 isLandscape 变化，pendingFullscreen 会永远停在 false ——
-                // 视频固定铺满、系统栏不恢复、覆盖层落回竖屏布局，表现就是画面异常且返回手势失效。
-                // 这种情况直接退出全屏，不走旋转等待。
-                if (isLandscape && activity is com.ican.tvplay.MainActivity && !activity.isSmallScreenDevice()) {
-                    fullscreen = false
-                    pendingFullscreen = null
-                    controlsVisible = false
-                } else {
-                    pendingFullscreen = false
-                }
+                (context as? Activity).restoreDefaultOrientation()
+                pendingFullscreen = false
             }
             return
         }
@@ -1404,15 +1366,11 @@ fun PlayerScreen(
                 } else {
                     // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
                     landscapeFullscreen = false
-                    // 黑场遮罩：不改布局（避免视频突然铺满竖屏的割裂感），只用纯黑盖住预览页。
-                    // 系统旋转动画的起始帧取自请求瞬间的画面，若这里还是浅色预览页（信息面板/系统栏），
-                    // 旋转过程中视频上下两端就会看到浅色渐变到黑色；先把黑场画出来再请求旋转即可。
-                    rotationScrim = true
+                    // 请求旋转前同步把窗口底色和根底色切黑（系统栏同步隐藏并切浅色图标）
                     Players.setVideoPresent(true)
                     activityWindow?.setBackgroundDrawable(
                         android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
                     )
-                    // 系统栏同步隐藏 + 切深色图标，避免旋转时顶部/底部露出浅色系统栏
                     activityWindow?.let { w ->
                         val controller = WindowCompat.getInsetsController(w, w.decorView)
                         controller.isAppearanceLightStatusBars = false
@@ -1421,13 +1379,9 @@ fun PlayerScreen(
                             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                         controller.hide(WindowInsetsCompat.Type.systemBars())
                     }
-                    scope.launch {
-                        // 等一帧，确保纯黑帧已经画到屏幕上，再发起旋转（等待越短越不容易看到黑场）
-                        withFrameNanos { }
-                        pendingFullscreen = true
-                        (context as? Activity)?.requestedOrientation =
-                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                    }
+                    (context as? Activity)?.requestedOrientation =
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    pendingFullscreen = true
                 }
             },
             onLockToggle = { locked = true; controlsVisible = false },
@@ -1464,15 +1418,6 @@ fun PlayerScreen(
             SubtitleSettingSideSheet(
                 statusBarInset = !(fullscreen || landscapeFullscreen || isLandscape),
                 onDismiss = { showSubtitleSettings = false },
-            )
-        }
-
-        // 旋转进全屏前的纯黑遮罩（盖住预览页与系统栏区域，保证系统旋转动画起始帧为黑）
-        if (rotationScrim) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black),
             )
         }
     }

@@ -3,6 +3,8 @@ package com.ican.tvplay.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -504,7 +506,19 @@ fun HomeScreen(
                         .clipToBounds(),
                     content = {
                         // 0：搜索行（含顶部间距；左右边距走页面基准，分类 Tab 保持通栏）
-                        Column(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                // 折叠状态下在搜索行上向下滑动 → 把拖动转给当前页网格回滚，
+                                // 搜索行跟着展开（折叠量唯一真源是网格滚动位置，不直接改折叠量）
+                                .pointerInput(Unit) {
+                                    detectVerticalDragGestures { change, dragAmount ->
+                                        change.consume()
+                                        gridStates[pagerState.currentPage]
+                                            ?.dispatchRawDelta(-dragAmount)
+                                    }
+                                },
+                        ) {
                             Spacer(Modifier.height(Spacing.pageTop))
                             Box(
                                 modifier = Modifier
