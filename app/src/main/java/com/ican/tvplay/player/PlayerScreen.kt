@@ -143,6 +143,8 @@ import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
+import top.yukonga.miuix.kmp.nav.core.LocalNavTransitionScope
+import top.yukonga.miuix.kmp.nav.transition.NavRole
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
@@ -801,6 +803,19 @@ fun PlayerScreen(
         }
     }
 
+    /**
+     * 选集统一切换入口：与切线路同款「先停当前再解析」。
+     * 点选集立即停掉当前画面进入加载态，避免解析新集（网盘类 jar 秒级）期间旧画面继续播，
+     * 看起来像「点了延迟一会才开始加载」。
+     */
+    val requestEpisodeChange: (Int) -> Unit = { idx ->
+        if (idx != episodeIndex) {
+            Players.beginSwitch()
+            saveProgress()
+            episodeIndex = idx
+        }
+    }
+
     // ========== 片头/片尾标记（fongmi: onOpening/onEnding 同款规则） ==========
 
     /** 标记允许的时限：视频 <15 分钟→3 分钟；<30 分钟→6 分钟；否则→10 分钟 */
@@ -816,10 +831,7 @@ fun PlayerScreen(
         val limit = opEdLimit(prog.durationMs)
         if (prog.durationMs > 0 && prog.positionMs > 0 && prog.positionMs <= limit) {
             openingMs = prog.positionMs
-            toastMsg("已标记片头 ${formatMs(prog.positionMs)}，此后自动跳过")
             saveProgress()
-        } else {
-            toastMsg("片头标记需在开头 ${limit / 60_000} 分钟内")
         }
     }
 
@@ -830,10 +842,7 @@ fun PlayerScreen(
         val limit = opEdLimit(prog.durationMs)
         if (prog.durationMs > 0 && prog.positionMs > 0 && remain in 1..limit) {
             endingMs = remain
-            toastMsg("已标记片尾，播到此处自动下一集")
             saveProgress()
-        } else {
-            toastMsg("片尾标记需在结尾 ${limit / 60_000} 分钟内")
         }
     }
 
@@ -888,8 +897,10 @@ fun PlayerScreen(
         }
     }
 
-    // 全屏/放大动画期间自动收起状态栏，缩回小窗收敛后恢复（旋转请求在挂起触发处先行发出）
-    val immersive = fullscreen || landscapeFullscreen || landZooming
+    // 全屏/放大动画期间自动收起状态栏，缩回小窗收敛后恢复（旋转请求在挂起触发处先行发出）；
+    // 进入全屏后的旋转等待期（pendingFullscreen）也要收起系统栏，否则旋转动画中顶部/底部
+    // 会露出浅色状态栏/导航栏，看着像视频头尾由白色渐变成黑色
+    val immersive = fullscreen || landscapeFullscreen || landZooming || pendingFullscreen != null
     LaunchedEffect(immersive) {
         Players.isFullscreen = immersive
         val activity = context as? Activity ?: return@LaunchedEffect
@@ -924,6 +935,24 @@ fun PlayerScreen(
         // X 关闭画中画小窗：Activity 后台触发退出播放页（不销毁 App，回到首页）
         Players.uiExitNavigator = { onBack() }
         onDispose { Players.uiExitNavigator = null }
+    }
+
+    // 返回转场（含系统手势预测返回）一开始就暂停：转场期间视频若继续按片源帧率（约 25fps）出帧，
+    // 会把整页转场观感拉低到 25fps；先让画面静止，转场即可按屏幕刷新率满帧播放。
+    // 用导航转场作用域判断「本页正在退场」，返回键/边缘手势/页面返回按钮三种返回方式都能覆盖。
+    val navTransitionScope = LocalNavTransitionScope.current
+    var pausedForExit by remember { mutableStateOf(false) }
+    LaunchedEffect(navTransitionScope) {
+        snapshotFlow { navTransitionScope.role }.collect { role ->
+            if (role == NavRole.Outgoing && backgroundMode != BACKGROUND_ON) {
+                pausedForExit = true
+                Players.onPause()
+            } else if (pausedForExit) {
+                // 预测返回手势中途取消时本页仍是 Top，恢复播放，避免取消返回后画面停在暂停态
+                pausedForExit = false
+                Players.onResume()
+            }
+        }
     }
 
     // Surface 生命周期
@@ -998,6 +1027,10 @@ fun PlayerScreen(
         }
         // 放大/缩回动画进行中忽略返回，避免动画中途退出页面
         if (landZooming) return
+        // 退出播放页前先暂停：返回转场期间若视频继续出帧，转场观感会被片源帧率（约 25fps）拉低，
+        // 看起来像动画不是满帧；先让画面静止，转场按屏幕刷新率播放。
+        // 后台续播模式不暂停，否则退出后会打断「后台播放」。
+        if (backgroundMode != BACKGROUND_ON) Players.onPause()
         // release / 后台续播转交由 onDispose 统一处理（popBackStack 后触发）
         onBack()
     }
@@ -1243,7 +1276,7 @@ fun PlayerScreen(
             onSpeedChange = { settings.setPlayerSpeed(it) },
             playbackSpeed = settings.playerSpeed.collectAsStateWithLifecycle().value,
             onScaleChange = { settings.setPlayerScale(it.name) },
-            onEpisodeSelect = { idx -> if (idx != episodeIndex) episodeIndex = idx },
+            onEpisodeSelect = requestEpisodeChange,
             onEngineChange = { settings.setPlayerEngine(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
             openingMs = openingMs,
@@ -1306,9 +1339,7 @@ fun PlayerScreen(
                 },
                 onBack = { handleBack() },
                 onLineChange = requestLineChange,
-                onEpisodeSelect = { idx ->
-                    if (idx != episodeIndex) episodeIndex = idx
-                },
+                onEpisodeSelect = requestEpisodeChange,
                 onSeekDragChange = { seekDragging = it },
             )
         } else {
@@ -1335,6 +1366,13 @@ fun PlayerScreen(
                 } else {
                     // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
                     landscapeFullscreen = false
+                    // 旋转动画期间系统按窗口底色渲染窗口截图：若等 LaunchedEffect(videoPresent) 才切黑，
+                    // 视频上下两端会先露出浅色主题底色再渐变成黑色（平板横屏无旋转，所以没有这个现象）。
+                    // 这里在请求旋转前同步把窗口/根底色切黑，保证旋转全程都是黑底。
+                    activityWindow?.setBackgroundDrawable(
+                        android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
+                    )
+                    Players.setVideoPresent(true)
                     (context as? Activity)?.requestedOrientation =
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     pendingFullscreen = true
@@ -1344,9 +1382,7 @@ fun PlayerScreen(
             onUnlock = { locked = false; controlsVisible = true },
             onBack = { handleBack() },
             onLineChange = requestLineChange,
-            onEpisodeSelect = { idx ->
-                if (idx != episodeIndex) episodeIndex = idx
-            },
+            onEpisodeSelect = requestEpisodeChange,
             onSpeedChange = { settings.setPlayerSpeed(it) },
             onScaleChange = { settings.setPlayerScale(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },

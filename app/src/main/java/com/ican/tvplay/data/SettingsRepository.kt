@@ -287,9 +287,20 @@ class SettingsRepository(context: Context) {
         _favoriteUpdateCheckEnabled.value = enabled
     }
 
-    /** 检测频率（小时；0 = 每次启动都检测），默认 6 小时 */
-    private val _favoriteUpdateIntervalHours =
-        MutableStateFlow(prefs.getInt(KEY_FAVORITE_UPDATE_INTERVAL, 6))
+    /** 检测频率（小时；0 = 每次启动都检测），默认「每次启动」 */
+    private val _favoriteUpdateIntervalHours = MutableStateFlow(
+        run {
+            // 旧版本默认 6 小时，已安装设备里存的是 6：一次性迁移为新的默认值 0（每次启动），
+            // 用户之后仍可手动改回 6/24 小时
+            if (!prefs.getBoolean(KEY_FAVORITE_UPDATE_INTERVAL_MIGRATED, false)) {
+                if (prefs.getInt(KEY_FAVORITE_UPDATE_INTERVAL, 0) == 6) {
+                    prefs.edit().putInt(KEY_FAVORITE_UPDATE_INTERVAL, 0).apply()
+                }
+                prefs.edit().putBoolean(KEY_FAVORITE_UPDATE_INTERVAL_MIGRATED, true).apply()
+            }
+            prefs.getInt(KEY_FAVORITE_UPDATE_INTERVAL, 0)
+        },
+    )
     val favoriteUpdateIntervalHours: StateFlow<Int> = _favoriteUpdateIntervalHours.asStateFlow()
 
     fun setFavoriteUpdateIntervalHours(hours: Int) {
@@ -395,7 +406,7 @@ class SettingsRepository(context: Context) {
             .coerceIn(SUBTITLE_MIN_POSITION, SUBTITLE_MAX_POSITION)
         _syncMode.value = prefs.getInt(KEY_SYNC_MODE, 0)
         _favoriteUpdateCheckEnabled.value = prefs.getBoolean(KEY_FAVORITE_UPDATE_CHECK, true)
-        _favoriteUpdateIntervalHours.value = prefs.getInt(KEY_FAVORITE_UPDATE_INTERVAL, 6)
+        _favoriteUpdateIntervalHours.value = prefs.getInt(KEY_FAVORITE_UPDATE_INTERVAL, 0)
         _favoriteUpdateStartupPopup.value = prefs.getBoolean(KEY_FAVORITE_UPDATE_POPUP, true)
         _searchHistory.value = runCatching {
             prefs.getStringSet(KEY_SEARCH_HISTORY, emptySet()).orEmpty().toList()
@@ -427,6 +438,7 @@ class SettingsRepository(context: Context) {
         const val KEY_SYNC_MODE = "sync_mode"
         const val KEY_FAVORITE_UPDATE_CHECK = "favorite_update_check"
         const val KEY_FAVORITE_UPDATE_INTERVAL = "favorite_update_interval"
+        const val KEY_FAVORITE_UPDATE_INTERVAL_MIGRATED = "favorite_update_interval_migrated"
         const val KEY_FAVORITE_UPDATE_POPUP = "favorite_update_popup"
         const val KEY_FAVORITE_UPDATE_POPUP_DATE = "favorite_update_popup_date"
         const val KEY_FAVORITE_UPDATE_LAST_CHECK = "favorite_update_last_check"

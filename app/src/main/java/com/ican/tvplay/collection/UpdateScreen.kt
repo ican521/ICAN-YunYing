@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -292,7 +293,14 @@ private fun UpdateRow(
                 )
             }
             Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            // 海报右侧 4 行：标题贴海报顶部、站源贴海报底部，中间两行分别是「更新至 x 集」
+            // 和「当前看到那一集的视频标题」，整列高度与海报一致
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(76.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
                 Text(
                     text = item.favorite.title,
                     style = MaterialTheme.typography.titleSmall,
@@ -302,7 +310,16 @@ private fun UpdateRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "更新至第 ${item.totalEpisodes} 集 · 待看 ${item.unwatchedCount} 集",
+                    text = "更新至${item.totalEpisodes}集",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    // 直接显示当前看到那一集的视频标题（取自历史记录），没有历史时退回集数
+                    text = item.history?.episodeTitle?.takeIf { it.isNotBlank() }
+                        ?: if (item.watchedEpisodes > 0) "看到第 ${item.watchedEpisodes} 集" else "未开始观看",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

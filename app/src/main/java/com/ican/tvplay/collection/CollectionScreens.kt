@@ -634,23 +634,17 @@ private fun HistoryCard(
                 }
             }
 
-            // 底部渐变 + 集数胶囊（标题上方） + 标题 + 播放进度条
+            // 底部渐变只铺在「标题 + 播放进度条」这一块，不再向上盖住集数小标签
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, PosterBottomScrim),
-                        ),
-                    )
-                    .padding(horizontal = 10.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                    .fillMaxWidth(),
             ) {
-                // 集数小标签：直接显示集标题
+                // 集数小标签：直接显示集标题（自带胶囊底，位于渐变层之上）
                 if (history.episodeTitle.isNotBlank()) {
                     Box(
                         modifier = Modifier
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                             .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
@@ -664,27 +658,39 @@ private fun HistoryCard(
                         )
                     }
                 }
-                Text(
-                    text = history.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                // 播放进度细条
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(4.dp)
-                        .background(Color(0x44FFFFFF), CircleShape),
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, PosterBottomScrim),
+                            ),
+                        )
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
+                    Text(
+                        text = history.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    // 播放进度细条
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(progress)
+                            .fillMaxWidth()
                             .height(4.dp)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape),
-                    )
+                            .background(Color(0x44FFFFFF), CircleShape),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progress)
+                                .height(4.dp)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape),
+                        )
+                    }
                 }
             }
         }
