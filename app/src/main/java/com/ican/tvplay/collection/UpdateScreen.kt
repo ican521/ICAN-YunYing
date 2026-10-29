@@ -365,7 +365,8 @@ private fun UpdateRow(
                 )
                 Text(
                     text = item.favorite.sourceName.ifBlank { "来源" },
-                    style = MaterialTheme.typography.labelSmall,
+                    // 与上面两行统一字号（bodySmall 12sp）
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
