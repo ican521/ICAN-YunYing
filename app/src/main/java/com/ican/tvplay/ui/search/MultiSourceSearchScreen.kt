@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
@@ -446,7 +447,9 @@ private fun CrossSourceVideoCard(
                 if (tags.isNotEmpty()) {
                     Box(
                         modifier = Modifier
-                            // 底部不留间距：胶囊底边正好压在渐变 0% 透明分界线上（标题上方 6dp）
+                            // 往下压 4dp：抵消字体行盒上方富余，让「标签→标题」的视觉间距
+                            // 和「标题→卡片底边」保持一致（标签底边会略微压进渐变 0% 透明区）
+                            .offset(y = 4.dp)
                             .padding(start = 10.dp, end = 10.dp, top = 4.dp)
                             .background(
                                 PosterBadgeScrim,
