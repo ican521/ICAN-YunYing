@@ -1422,8 +1422,7 @@ fun PlayerScreen(
                         controller.hide(WindowInsetsCompat.Type.systemBars())
                     }
                     scope.launch {
-                        // 等两帧，确保纯黑帧已经真正画到屏幕上，再发起旋转
-                        withFrameNanos { }
+                        // 等一帧，确保纯黑帧已经画到屏幕上，再发起旋转（等待越短越不容易看到黑场）
                         withFrameNanos { }
                         pendingFullscreen = true
                         (context as? Activity)?.requestedOrientation =
