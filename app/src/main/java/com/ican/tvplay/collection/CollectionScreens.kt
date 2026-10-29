@@ -646,7 +646,8 @@ private fun HistoryCard(
                     Box(
                         modifier = Modifier
                             // 底部不留间距：胶囊底边正好压在渐变 0% 透明分界线上（标题上方 6dp）
-                            .padding(start = 10.dp, end = 10.dp, top = 4.dp)
+                            // 左边距 8dp：与左上角站源胶囊的 8dp 对齐
+                            .padding(start = 8.dp, end = 8.dp, top = 4.dp)
                             .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {

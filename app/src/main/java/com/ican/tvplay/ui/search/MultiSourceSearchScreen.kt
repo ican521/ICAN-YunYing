@@ -450,7 +450,8 @@ private fun CrossSourceVideoCard(
                             // 往下压 1dp：让「标签→标题」视觉间距（约 8–9dp）
                             // 接近「标题→卡片底边」的约 10dp
                             .offset(y = 1.dp)
-                            .padding(start = 10.dp, end = 10.dp, top = 4.dp)
+                            // 左边距 8dp：与左上角站源胶囊的 8dp 对齐
+                            .padding(start = 8.dp, end = 8.dp, top = 4.dp)
                             .background(
                                 PosterBadgeScrim,
                                 SquircleShape(Spacing.corner),
