@@ -4,6 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -229,38 +233,28 @@ fun HomeScreen(
     // scrollToItem 串行化，杜绝互相打断滚动中间态，导致某页「网格 offset 与折叠量脱钩」
     val gridLock = remember { Mutex() }
 
-    // 折叠量唯一真源 = 当前页网格的真实滚动位置（直接读位置，绝不做增量累加）。
-    // 不再监听 onPostScroll：miuix 跨轴手势层在横向切页时会把纵向滚动增量转发进嵌套滚动链
-    // （此时网格并没有真的滚动），按增量累加会让折叠量与网格 offset 一点点拉开，
-    // 多次「左滑过中点 → 右滑回上一页」后折叠与「卡片顶部贴 Tab」彻底失灵；
-    // 直接读网格位置则天然免疫这类转发增量，且不存在收不满 / 展不回 / 两段式收拢。
-    // 横向拖动/翻页期间冻结读取：此时读到的可能是尚未对齐的邻页 offset，冻结由钩子②负责对齐。
-    LaunchedEffect(Unit) {
-        snapshotFlow {
-            val idle = pagerState.isIdle()
-            val grid = gridStates[pagerState.currentPage]
-            when {
-                !idle || grid == null -> null
-                // 该页网格完全滚不动（空页 / 数据未加载 / 内容不足一屏）时不采样：
-                // 否则会把折叠量采成 0，切到这类页时搜索栏瞬间弹开、切回来又收起（卡顿式来回跳）
-                !grid.canScrollForward && !grid.canScrollBackward &&
-                    grid.firstVisibleItemIndex == 0 && grid.firstVisibleItemScrollOffset == 0 -> null
-                grid.firstVisibleItemIndex > 0 -> searchRowMaxCollapsePx
-                else -> grid.firstVisibleItemScrollOffset.toFloat()
-            }
-        }.collect { v ->
-            if (v == null) return@collect
-            // 量化到整像素：与顶栏 Layout 的 shift、网格 offset 用同一个整数，避免 1px 缝隙
-            val c = v.coerceIn(0f, searchRowMaxCollapsePx).roundToInt().toFloat()
-            if (c == searchRowCollapsePx) return@collect
-            searchRowCollapsePx = c
-            // 镜像：折叠量是全局唯一的一份，但每页各有一份滚动位置。
-            // 采样一变，立刻把所有非当前页（停在顶部区的）滚到同一折叠量，
-            // 否则「在第1页滑回顶部 → 折叠量0，而第0页仍停在170」，切页时顶部栏来回跳、卡片不贴 Tab。
-            // 直接写在这里而不是另开 LaunchedEffect：这条链路必定执行，不会被其它钩子的互斥锁挡住。
-            val current = pagerState.currentPage
-            gridStates.forEach { (p, gs) ->
-                if (p != current) mirrorGridToCollapse(gs, c)
+    // 折叠量改为「滚动增量驱动」：不管列表滚到多深，向下拖动都立即展开搜索行、向上拖动立即收起
+    //（旧做法把折叠量绑在网格位置 index==0 的 offset 上，必须先滚回最顶部才可能展开）。
+    // 用网格真实消费的增量 consumed.y（而不是 available.y）：miuix 跨轴手势层在横向切页时
+    // 转发的纵向增量并没有被网格消费，consumed.y == 0，天然不会污染折叠量。
+    // collapseRaw 保留小数累积，避免每帧取整把 <1px 的增量吃掉导致收不满 / 展不回。
+    var collapseRaw by remember { mutableFloatStateOf(0f) }
+    // 统一入口：按「展开像素」增减折叠量（正数=展开），并回写成整像素
+    //（顶栏 shift 与网格 offset 必须用同一个整数，否则新页卡片顶部会露出 1px 缝隙）
+    fun applyCollapseExpand(expandPx: Float) {
+        collapseRaw = (collapseRaw - expandPx).coerceIn(0f, searchRowMaxCollapsePx)
+        val c = collapseRaw.roundToInt().toFloat()
+        if (c != searchRowCollapsePx) searchRowCollapsePx = c
+    }
+    val gridScrollSync = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                if (consumed.y != 0f) applyCollapseExpand(consumed.y)
+                return Offset.Zero
             }
         }
     }
@@ -428,7 +422,10 @@ fun HomeScreen(
                 LazyVerticalGrid(
                     state = gridState,
                     columns = gridCells,
-                    modifier = Modifier.fillMaxSize(),
+                    // 折叠量跟随网格真实滚动增量（任意位置双向同步，见 gridScrollSync）
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .nestedScroll(gridScrollSync),
                     contentPadding = pageContentPadding,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                     verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
@@ -514,8 +511,11 @@ fun HomeScreen(
                                 .pointerInput(Unit) {
                                     detectVerticalDragGestures { change, dragAmount ->
                                         change.consume()
-                                        gridStates[pagerState.currentPage]
-                                            ?.dispatchRawDelta(-dragAmount)
+                                        // dispatchRawDelta 不走嵌套滚动链，所以这里手动同步折叠量：
+                                        // 网格消费多少就把折叠量同步展开/收起多少，保持卡片贴着搜索行底缘
+                                        val consumed = gridStates[pagerState.currentPage]
+                                            ?.dispatchRawDelta(-dragAmount) ?: 0f
+                                        if (consumed != 0f) applyCollapseExpand(-consumed)
                                     }
                                 },
                         ) {
