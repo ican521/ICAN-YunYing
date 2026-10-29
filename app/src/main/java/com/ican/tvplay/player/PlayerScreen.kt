@@ -185,6 +185,7 @@ import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import com.ican.tvplay.ui.theme.optionBorderColor
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -1398,9 +1399,17 @@ fun PlayerScreen(
                         android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
                     )
                     Players.setVideoPresent(true)
-                    (context as? Activity)?.requestedOrientation =
-                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    // 先切到「黑底 + 视频铺满」的挂起态，等两帧画面真正画出来后再请求旋转。
+                    // 系统旋转动画的起始帧取自请求瞬间的窗口画面：若立刻请求，起始帧还是浅色竖屏
+                    // 预览页（信息面板/状态栏），旋转过程中视频上下两端就会出现浅色渐变到黑色；
+                    // 平板同样会旋转，只是预览页构图不同、浅色区域少，所以白色带不明显。
                     pendingFullscreen = true
+                    scope.launch {
+                        withFrameNanos { }
+                        withFrameNanos { }
+                        (context as? Activity)?.requestedOrientation =
+                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    }
                 }
             },
             onLockToggle = { locked = true; controlsVisible = false },

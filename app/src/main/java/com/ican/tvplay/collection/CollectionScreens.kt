@@ -387,7 +387,8 @@ private fun FavoriteCard(
                             listOf(Color.Transparent, PosterBottomScrim),
                         ),
                     )
-                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                    // 渐变只在标题这一段（透明分界线正好落在标题顶部）
+                    .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
             ) {
                 Text(
                     text = entity.title,
@@ -666,7 +667,8 @@ private fun HistoryCard(
                                 listOf(Color.Transparent, PosterBottomScrim),
                             ),
                         )
-                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                        // 渐变只在标题 + 进度条这一段（透明分界线正好落在标题顶部）
+                        .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
