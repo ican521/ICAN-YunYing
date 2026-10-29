@@ -384,7 +384,7 @@ private fun FavoriteCard(
                     .fillMaxWidth()
                     .background(PosterTitleScrim)
                     // 底部留 6dp：文字行盒下方还有约 4dp 余量，6+4 才和左侧 10dp 视觉一致
-                    .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 10.dp),
+                    .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 6.dp),
             ) {
                 Text(
                     text = entity.title,
@@ -659,8 +659,8 @@ private fun HistoryCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(PosterTitleScrim)
-                        // 纯色底铺在「标题 + 进度条」这一段，顶边比标题再高出一截
-                        .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 10.dp),
+                        // 纯色底铺在「标题 + 进度条」这一段，顶边与底边留白一致
+                        .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(

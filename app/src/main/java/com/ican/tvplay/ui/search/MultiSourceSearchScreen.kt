@@ -467,8 +467,8 @@ private fun CrossSourceVideoCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(PosterTitleScrim)
-                        // 纯色底铺在标题这一段（40% 黑不渐变），顶边比标题再高出一截
-                        .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 10.dp),
+                        // 纯色底铺在标题这一段（40% 黑不渐变），顶边与底边留白一致
+                        .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 6.dp),
                 ) {
                     Text(
                         text = video.title,

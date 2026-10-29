@@ -98,7 +98,7 @@ fun VideoCard(
                     .align(Alignment.BottomCenter)
                     .background(PosterTitleScrim)
                     // 底部留 6dp：文字行盒本身在字形下方还有约 4dp 余量，6+4 才和左侧 10dp 视觉一致
-                    .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 10.dp),
+                    .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 6.dp),
             ) {
                 Text(
                     text = video.title,
