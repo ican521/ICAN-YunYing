@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /** 是否小屏设备（手机）：按物理屏幕短边 dp 判断，不受小窗/信箱化窗口尺寸影响 */
-    private fun isSmallScreenDevice(): Boolean {
+    fun isSmallScreenDevice(): Boolean {
         val bounds: Rect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             windowManager.maximumWindowMetrics.bounds
         } else {

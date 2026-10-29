@@ -961,7 +961,21 @@ fun PlayerScreen(
         val activity = context as? android.app.Activity
         val lifecycle = (activity as? androidx.lifecycle.LifecycleOwner)?.lifecycle
         val lifecycleObserver = object : DefaultLifecycleObserver {
+            // 旋转挂起期间切后台：系统不会在不可见时继续旋转，挂起态会一直卡住
+            //（视频固定铺满、系统栏不恢复、返回手势失效），这里直接取消挂起并恢复系统栏
+            fun cancelPendingFullscreen() {
+                if (pendingFullscreen != null) {
+                    pendingFullscreen = null
+                    activity?.restoreDefaultOrientation()
+                    activity?.window?.let { w ->
+                        WindowCompat.getInsetsController(w, w.decorView)
+                            .show(WindowInsetsCompat.Type.systemBars())
+                    }
+                }
+            }
+
             override fun onPause(owner: LifecycleOwner) {
+                cancelPendingFullscreen()
                 // 只有「全屏 + 已在 PiP」才保持播放；预览小窗（非全屏）回桌面一律暂停，
                 // 即使后台播放设为「画中画」也不例外（画中画仅全屏时触发，非全屏不回退会留在后台继续播）
                 val pipPlaying = activity?.isInPictureInPictureMode == true && Players.isFullscreen
@@ -1020,8 +1034,19 @@ fun PlayerScreen(
                 landZoomToken++
             } else {
                 // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
-                (context as? Activity).restoreDefaultOrientation()
-                pendingFullscreen = false
+                val activity = context as? Activity
+                activity?.restoreDefaultOrientation()
+                // 平板（自动旋转开着且设备本来就是横屏）：恢复默认方向后不会触发旋转，
+                // 若还等 isLandscape 变化，pendingFullscreen 会永远停在 false ——
+                // 视频固定铺满、系统栏不恢复、覆盖层落回竖屏布局，表现就是画面异常且返回手势失效。
+                // 这种情况直接退出全屏，不走旋转等待。
+                if (isLandscape && activity is com.ican.tvplay.MainActivity && !activity.isSmallScreenDevice()) {
+                    fullscreen = false
+                    pendingFullscreen = null
+                    controlsVisible = false
+                } else {
+                    pendingFullscreen = false
+                }
             }
             return
         }

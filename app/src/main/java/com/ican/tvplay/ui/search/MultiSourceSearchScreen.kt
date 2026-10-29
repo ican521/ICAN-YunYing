@@ -436,39 +436,43 @@ private fun CrossSourceVideoCard(
                 )
             }
 
-            // 底部渐变 + 标签 + 标题
-            Box(
+            // 底部渐变只铺在标题这一块，标签胶囊移到渐变层之上，不被渐变阴影盖住
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, PosterBottomScrim),
-                        ),
-                    )
-                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                    .fillMaxWidth(),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // 标签行（全部标签文字合并进同一个胶囊，省空间）
-                    if (tags.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    PosterBadgeScrim,
-                                    SquircleShape(Spacing.corner),
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                        ) {
-                            Text(
-                                text = tags.take(3).joinToString(" "),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                // 标签行（全部标签文字合并进同一个胶囊，省空间）
+                if (tags.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            .background(
+                                PosterBadgeScrim,
+                                SquircleShape(Spacing.corner),
                             )
-                        }
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            text = tags.take(3).joinToString(" "),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, PosterBottomScrim),
+                            ),
+                        )
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                ) {
                     Text(
                         text = video.title,
                         style = MaterialTheme.typography.titleSmall,
