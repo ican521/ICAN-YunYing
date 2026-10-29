@@ -446,7 +446,8 @@ private fun CrossSourceVideoCard(
                 if (tags.isNotEmpty()) {
                     Box(
                         modifier = Modifier
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            // 底部不留间距：胶囊底边正好压在渐变 0% 透明分界线上（标题上方 6dp）
+                            .padding(start = 10.dp, end = 10.dp, top = 4.dp)
                             .background(
                                 PosterBadgeScrim,
                                 SquircleShape(Spacing.corner),
