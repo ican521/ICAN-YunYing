@@ -1,4 +1,4 @@
-package com.ican.tvplay.ui.collection
+﻿package com.ican.tvplay.ui.collection
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -36,7 +36,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -55,6 +54,7 @@ import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -101,7 +101,7 @@ fun UpdateScreen(
                     prepared.site,
                     prepared.jarSpec,
                 )
-                onPlay(prepared.video.id, item.firstUnwatchedIndex, prepared.flag, false)
+                onPlay(prepared.video.id, item.resumeIndex, prepared.flag, false)
             }
         }
     }
@@ -210,6 +210,7 @@ fun UpdatePopupDialog(
     items: List<FavoriteUpdateItem>,
     onDismiss: () -> Unit,
     onPlay: (FavoriteUpdateItem) -> Unit,
+    onOpenAll: () -> Unit,
 ) {
     OverlayDialog(
         show = show,
@@ -222,16 +223,31 @@ fun UpdatePopupDialog(
         onDismissRequest = onDismiss,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 items(items, key = { it.favorite.videoId }, contentType = { "update" }) { item ->
                     PopupUpdateRow(item = item, onClick = { onPlay(item) })
                 }
             }
+            // 按钮行按全局弹窗规范：两侧等距 16dp（由 OverlayDialog 提供）+ 左右平分、取消在左
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.titleContentGap),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                TextButton(text = "知道了", onClick = onDismiss)
+                TextButton(
+                    text = "稍后",
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(20.dp))
+                TextButton(
+                    text = "查看全部",
+                    onClick = onOpenAll,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
             }
         }
     }
@@ -310,16 +326,15 @@ private fun UpdateRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "更新至${item.totalEpisodes}集",
+                    text = "已更至 第${item.totalEpisodes}集",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    // 直接显示当前看到那一集的视频标题（取自历史记录），没有历史时退回集数
-                    text = item.history?.episodeTitle?.takeIf { it.isNotBlank() }
-                        ?: if (item.watchedEpisodes > 0) "看到第 ${item.watchedEpisodes} 集" else "未开始观看",
+                    // 「已看到」+ 当前看到那一集的视频标题（取自历史记录），没有历史时退回集数
+                    text = "已看到 ${item.seenEpisodeTitle()}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -343,7 +358,10 @@ private fun UpdateRow(
     }
 }
 
-/** 弹窗内的紧凑条目 */
+/**
+ * 弹窗内的紧凑条目（两行式）：
+ * 第一行「标题 + 右侧已更至 第 x 集」，第二行「已看到 + 已看那一集的视频标题」。
+ */
 @Composable
 private fun PopupUpdateRow(item: FavoriteUpdateItem, onClick: () -> Unit) {
     Row(
@@ -358,20 +376,50 @@ private fun PopupUpdateRow(item: FavoriteUpdateItem, onClick: () -> Unit) {
             .padding(vertical = 8.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = item.favorite.title,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = "第 ${item.totalEpisodes} 集 · 待看 ${item.unwatchedCount}",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 12.sp,
-        )
+        Box(
+            modifier = Modifier
+                .size(width = 44.dp, height = 60.dp)
+                .clip(SquircleShape(8.dp)),
+        ) {
+            PosterImage(
+                title = item.favorite.title,
+                cover = item.favorite.cover,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        // 文字块与海报同高（60dp），三行均分：标题 / 已更至 / 已看到
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .height(60.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = item.favorite.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "已更至 第${item.totalEpisodes}集",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+            Text(
+                text = "已看到 ${item.seenEpisodeTitle()}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
+
+/** 「已看到」后面紧跟的集标题：取历史记录里那一集的视频标题，没有历史就是未开始观看 */
+private fun FavoriteUpdateItem.seenEpisodeTitle(): String =
+    history?.episodeTitle?.takeIf { it.isNotBlank() } ?: "未开始观看"

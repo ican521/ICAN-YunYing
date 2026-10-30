@@ -375,6 +375,10 @@ fun AppRoot() {
                 show = showUpdatePopup,
                 items = updatePopupItems,
                 onDismiss = { showUpdatePopup = false },
+                onOpenAll = {
+                    showUpdatePopup = false
+                    navigator.push(Route.Updates)
+                },
                 onPlay = { item ->
                     showUpdatePopup = false
                     urlParseScope.launch {
@@ -391,7 +395,7 @@ fun AppRoot() {
                             pushCardRouteThrottled(
                                 Route.Player(
                                     prepared.video.id,
-                                    item.firstUnwatchedIndex,
+                                    item.resumeIndex,
                                     prepared.flag,
                                     forceStart = true,
                                 ),

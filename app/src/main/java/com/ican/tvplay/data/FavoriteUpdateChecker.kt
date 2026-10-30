@@ -27,12 +27,8 @@ data class FavoriteUpdateItem(
     val history: HistoryEntity?,
     /** 站源最新总集数 */
     val totalEpisodes: Int,
-    /** 已看集数（历史看到的位置与已读基线的较大值） */
-    val watchedEpisodes: Int,
-    /** 第一条未看集的索引：点条目进播放页直接选中它 */
-    val firstUnwatchedIndex: Int,
-    /** 待看集数 */
-    val unwatchedCount: Int,
+    /** 点条目进播放页的位置：历史记录所在集（有历史就续播），没有历史从头开始 */
+    val resumeIndex: Int,
     /** 最近一次集数增加发生在今天 */
     val updatedToday: Boolean,
 )
@@ -41,9 +37,9 @@ data class FavoriteUpdateItem(
 object FavoriteUpdates {
 
     /**
-     * 由收藏与历史两张表计算待看列表：
-     * 已看集数 = max(已读基线, 历史所在集 + 1)，总集数 - 已看集数 > 0 才算「有更新待看」。
-     * 历史所在集之后的集就是未看集，因此 [FavoriteUpdateItem.firstUnwatchedIndex] 即第一条未看集。
+     * 由收藏表计算「详情页集数比上次记录变多了」的列表：
+     * 只比较详情页集数（[FavoriteEntity.episodeCount]）与上次已确认的集数（ackEpisodeCount），
+     * 与当前看到第几集无关；历史记录只用于展示「已看到」和点击进入时的续播位置。
      */
     fun compute(
         favorites: List<FavoriteEntity>,
@@ -55,16 +51,13 @@ object FavoriteUpdates {
             val total = favorite.episodeCount
             if (total <= 0) return@mapNotNull null
             val history = historyById[favorite.videoId]
-            val historyWatched = (history?.episodeIndex ?: -1) + 1
-            val watched = maxOf(favorite.ackEpisodeCount, historyWatched).coerceIn(0, total)
-            if (watched >= total) return@mapNotNull null
+            val acked = favorite.ackEpisodeCount.coerceIn(0, total)
+            if (acked >= total) return@mapNotNull null
             FavoriteUpdateItem(
                 favorite = favorite,
                 history = history,
                 totalEpisodes = total,
-                watchedEpisodes = watched,
-                firstUnwatchedIndex = watched,
-                unwatchedCount = total - watched,
+                resumeIndex = history?.episodeIndex?.coerceIn(0, total - 1) ?: 0,
                 updatedToday = isSameDay(favorite.lastUpdatedAt, now),
             )
         }.sortedWith(
@@ -149,7 +142,7 @@ class FavoriteUpdateChecker(
         increased
     }
 
-    /** 取站源详情里各线路的最大集数；无法解析返回 0 */
+    /** 取站源详情里首条线路的集数（与播放页「更新至第 x 集」口径一致）；无法解析返回 0 */
     private suspend fun fetchEpisodeCount(
         site: TvBoxSite,
         configSpider: String,
@@ -165,7 +158,7 @@ class FavoriteUpdateChecker(
             apiClient.detail(site, videoId)
         }) ?: return 0
         val video = with(VodParse) { item.toVideo(withEpisodes = true) }
-        return video.playSources.maxOfOrNull { it.episodes.size }
+        return video.playSources.firstOrNull()?.episodes?.size
             ?: video.episodes.size
     }
 

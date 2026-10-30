@@ -1978,7 +1978,8 @@ private fun FavoriteButton(v: Video) {
                                 )
                             }
                             // 追更基线：以收藏时的总集数为已看基线，避免「刚收藏就提示更新」
-                            val episodeCount = v.playSources.maxOfOrNull { it.episodes.size }
+                            // 与播放页「更新至第 x 集」口径一致：取首条线路的集数
+                            val episodeCount = v.playSources.firstOrNull()?.episodes?.size
                                 ?: v.episodes.size
                             val now = System.currentTimeMillis()
                             container.favoriteDao.upsert(

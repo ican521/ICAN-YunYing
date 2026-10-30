@@ -276,14 +276,16 @@ private fun UpdatesEntry(
             if (total > 0) {
                 Box(
                     modifier = Modifier
-                        .background(MaterialTheme.colorScheme.primary, CircleShape)
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                        .size(22.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = "$total",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimary,
+                        maxLines = 1,
                     )
                 }
             }
