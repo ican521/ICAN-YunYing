@@ -8,6 +8,7 @@ import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.data.model.VideoCategory
+import com.ican.tvplay.data.remote.SuggestWordSource
 import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.components.siteShortName
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -120,7 +121,7 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
 }
 
 /** 搜索：关键词防抖 + 历史记录 + 推荐词 */
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
 class SearchViewModel(container: AppContainer) : ViewModel() {
     private val repo = container.videoRepository
     private val settings = container.settingsRepository
@@ -136,6 +137,18 @@ class SearchViewModel(container: AppContainer) : ViewModel() {
                 settings.addSearchHistory(q)
                 repo.search(q)
             }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * 搜索建议：输入关键词时实时返回匹配的关联词列表（爱奇艺搜索建议接口，与 fongmi 一致）。
+     * 空查询时返回空列表，由 UI 回退显示热搜推荐词。
+     */
+    val suggestions: StateFlow<List<String>> = query
+        .debounce(250)
+        .mapLatest { q ->
+            if (q.isBlank()) emptyList()
+            else SuggestWordSource.fetch(q)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

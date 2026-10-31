@@ -107,7 +107,10 @@ fun MiuixBackButton(
  * 照搬 KernelSU 搜索栏形态：全圆角胶囊、左侧搜索图标、输入后右侧出现清除钮、IME 搜索键提交。
  * 背景色用 miuix surfaceContainerHigh（KernelSU 搜索栏同款底色），其余样式全部 miuix 默认。
  *
- * @param expanded 搜索页固定传 true（常驻展开态，无折叠逻辑）；首页假胶囊传 false + enabled=false。
+ * @param expanded 搜索页由外部管理：点击输入框置 true（正常聚焦弹键盘），
+ *   点击外部/提交搜索置 false（收起键盘）。首页假胶囊传 false + enabled=false。
+ *   固定传 false 会导致 miuix InputField 内部 100ms 后自动清焦点清文字，
+ *   键盘动画与输入状态不一致出现上移过冲。
  */
 @Composable
 fun MiuixSearchInput(
@@ -117,8 +120,8 @@ fun MiuixSearchInput(
     modifier: Modifier = Modifier,
     label: String = "",
     enabled: Boolean = true,
-    // 默认收起态：miuix InputField 展开态每次重组都自动聚焦并弹键盘（擦掉小窗热恢复
-    // 时搜索页重组 → 键盘把整页顶动）；收起态不聚焦，点击展开才弹键盘（对齐 fongmi）
+    // 展开态由外部管理：点击输入框时 onExpandedChange(true)，外部置 expanded=true 让 InputField
+    // 正常聚焦弹键盘；点击外部/提交时置 false 收起键盘。默认 false 供首页假胶囊使用。
     expanded: Boolean = false,
     onExpandedChange: (Boolean) -> Unit = {},
 ) {

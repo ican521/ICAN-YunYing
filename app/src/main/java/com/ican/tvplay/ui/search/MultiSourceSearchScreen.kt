@@ -1,6 +1,8 @@
 package com.ican.tvplay.ui.search
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,6 +100,10 @@ fun MultiSourceSearchScreen(
     val searchedQuery by vm.query.collectAsStateWithLifecycle()
 
     var queryText by remember { mutableStateOf(initialQuery) }
+    // miuix InputField 展开态：点击输入框时置 true 正常聚焦弹键盘；
+    // 点击外部/提交搜索时置 false 收起键盘，避免展开态固定 false 导致的动画过冲。
+    var expanded by remember { mutableStateOf(false) }
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     // 首次进入时触发跨站搜索（initialQuery 非空才触发）；
     // 播放页返回时若已有同词结果则跳过，保持列表与滚动位置不变
@@ -107,7 +113,11 @@ fun MultiSourceSearchScreen(
 
     fun doSearch() {
         val q = queryText.trim()
-        if (q.isNotEmpty()) vm.searchAll(q)
+        if (q.isNotEmpty()) {
+            expanded = false
+            focusManager.clearFocus()
+            vm.searchAll(q)
+        }
     }
 
     // KernelSU 同款：固定毛玻璃顶栏（搜索栏不适合折叠，保持固定高度）
@@ -129,12 +139,13 @@ fun MultiSourceSearchScreen(
                     MiuixBackButton(onClick = onBack)
 
                     // miuix 原生胶囊搜索框（左搜索图标 + 输入后右侧清除钮，IME 搜索键提交）
-                    // 收起态不自动聚焦：热恢复重组不会弹键盘，点击展开才弹（对齐 fongmi）
                     MiuixSearchInput(
                         query = queryText,
                         onQueryChange = { queryText = it },
                         onSearch = { doSearch() },
                         label = "跨站源搜索…",
+                        expanded = expanded,
+                        onExpandedChange = { expanded = it },
                         modifier = Modifier
                             .weight(1f)
                             .padding(start = 12.dp),
@@ -150,7 +161,15 @@ fun MultiSourceSearchScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .background(MaterialTheme.colorScheme.background)
+                // 点击输入框以外的区域收起输入法：子项（站源胶囊/视频卡片）的点击会自行消费事件
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) {
+                    expanded = false
+                    focusManager.clearFocus()
+                },
         ) {
             Spacer(Modifier.height(innerPadding.calculateTopPadding() + Spacing.searchBarBottomMargin))
         // ========== 主体：左站源列表 + 右卡片网格（左右边距与顶栏同一基准）==========

@@ -1,6 +1,8 @@
 package com.ican.tvplay.player
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Point
@@ -9,6 +11,7 @@ import android.media.AudioManager
 import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,6 +22,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -141,8 +145,10 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.nav.core.LocalNavTransitionScope
 import top.yukonga.miuix.kmp.nav.transition.NavRole
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
@@ -2022,6 +2028,29 @@ private fun LineSection(
     onLineChange: (String) -> Unit,
     horizontalPadding: Dp,
 ) {
+    // 当前选中线路在列表中的索引
+    val selectedIdx = v.playSources.indexOfFirst { it.flag == lineFlag }.coerceAtLeast(0)
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = selectedIdx,
+    )
+    // 切线路时自动滚动到可见范围：按实际遮挡量精确滚动，只露出被裁的部分
+    LaunchedEffect(lineFlag) {
+        if (v.playSources.isEmpty() || selectedIdx !in v.playSources.indices) return@LaunchedEffect
+        snapshotFlow { listState.layoutInfo.totalItemsCount }
+            .filter { it > selectedIdx }
+            .first()
+        val info = listState.layoutInfo
+        val viewportStart = info.viewportStartOffset
+        val viewportEnd = info.viewportEndOffset
+        val item = info.visibleItemsInfo.firstOrNull { it.index == selectedIdx }
+        when {
+            item == null -> listState.scrollToItem(selectedIdx)
+            item.offset < viewportStart ->
+                listState.animateScrollBy((item.offset - viewportStart).toFloat())
+            item.offset + item.size > viewportEnd ->
+                listState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat())
+        }
+    }
     Column {
         Text(
             text = "线路",
@@ -2034,6 +2063,7 @@ private fun LineSection(
     // 通栏横滑（首页顶部分类 Tab 同款）：列表天然占满全宽，contentPadding 保证
     // 静止时首尾 chips 对齐全局基准线，滑动时条目可完整滑到屏幕最边缘
     LazyRow(
+        state = listState,
         contentPadding = PaddingValues(horizontal = horizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -2133,46 +2163,41 @@ private fun EpisodeSection(
                 initialDispIdx
             } else 0,
         )
-        // 异步加载兜底：仅当进入页面时选集尚未加载完成（首次 size 变化）时定位一次——
-        // 当前集已可见则不动，否则瞬移（无动画）到贴左可见。
+        // positionedInitial：标记首次定位是否已完成。
+        // 首次定位（含异步加载完成后的兜底）一律用无动画 scrollToItem；
+        // 之后手动切集/倒序切换才用 animateScrollToItem 做过渡动画。
         var positionedInitial by remember { mutableStateOf(false) }
-        LaunchedEffect(lineEpisodes.size) {
-            if (!positionedInitial && lineEpisodes.isNotEmpty() && selectedDispIdx in 0 until lineEpisodes.size) {
-                snapshotFlow { listState.layoutInfo.totalItemsCount }
-                    .filter { it > selectedDispIdx }
-                    .first()
-                val info = listState.layoutInfo
-                val viewportStart = info.viewportStartOffset
-                val viewportEnd = info.viewportEndOffset
-                val item = info.visibleItemsInfo.firstOrNull { it.index == selectedDispIdx }
-                if (item == null || item.offset < viewportStart || item.offset + item.size > viewportEnd) {
-                    listState.scrollToItem(selectedDispIdx)
+        LaunchedEffect(selectedDispIdx, lineEpisodes.size) {
+            if (lineEpisodes.isEmpty() || selectedDispIdx !in 0 until lineEpisodes.size) return@LaunchedEffect
+            snapshotFlow { listState.layoutInfo.totalItemsCount }
+                .filter { it > selectedDispIdx }
+                .first()
+            val info = listState.layoutInfo
+            val viewportStart = info.viewportStartOffset
+            val viewportEnd = info.viewportEndOffset
+            val viewportWidth = viewportEnd - viewportStart
+            val item = info.visibleItemsInfo.firstOrNull { it.index == selectedDispIdx }
+            val needsScroll = item == null || item.offset < viewportStart || item.offset + item.size > viewportEnd
+            when {
+                // 首次定位（进入页面 / 异步加载完成）：无动画瞬移到贴左可见
+                !positionedInitial -> {
+                    if (needsScroll) listState.scrollToItem(selectedDispIdx)
+                    positionedInitial = true
                 }
-                positionedInitial = true
-            }
-        }
-        // 手动切集/倒序切换：做轻微滚动——仅当新选中集不在可视范围内时才滚动到刚好露出
-        // （贴最近边缘，不强制居中/贴最左），已完全可见则完全不动；动画滚动带过渡。
-        // 首次组合跳过：进入页面的定位交给上面的初始滚动状态/加载兜底。
-        LaunchedEffect(selectedDispIdx) {
-            if (positionedInitial && lineEpisodes.isNotEmpty() && selectedDispIdx in 0 until lineEpisodes.size) {
-                snapshotFlow { listState.layoutInfo.totalItemsCount }
-                    .filter { it > selectedDispIdx }
-                    .first()
-                val info = listState.layoutInfo
-                val viewportStart = info.viewportStartOffset
-                val viewportEnd = info.viewportEndOffset
-                val viewportWidth = viewportEnd - viewportStart
-                val item = info.visibleItemsInfo.firstOrNull { it.index == selectedDispIdx }
-                when {
-                    item == null || item.offset < viewportStart ->
-                        // 完全不可见 / 左侧外：滚到贴左显示
-                        listState.animateScrollToItem(selectedDispIdx, 0)
+                // 后续切集：仅当新选中集不在可视范围内时才滚动到刚好露出
+                needsScroll -> when {
+                    // item 为 null（尚未布局）时瞬移，避免访问空指针
+                    item == null ->
+                        listState.scrollToItem(selectedDispIdx)
+                    // 左侧被遮挡：向左滚到刚好贴左
+                    item.offset < viewportStart ->
+                        listState.animateScrollBy((item.offset - viewportStart).toFloat())
+                    // 右侧被遮挡：向右滚到刚好完整显示
                     item.offset + item.size > viewportEnd ->
-                        // 右侧外：滚到右缘刚好露出（负偏移 = 目标项起点靠右）
-                        listState.animateScrollToItem(selectedDispIdx, -(viewportWidth - item.size).coerceAtLeast(0))
-                    else -> Unit // 已完全可见：不滚动
+                        listState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat())
                 }
+                // 已完全可见：不滚动
+                else -> Unit
             }
         }
         // 默认横向滚动（fongmi: adapter_episode_hori）；通栏横滑同 LineSection：列表天然占满
@@ -2271,9 +2296,26 @@ private fun EpisodeGridDialog(
             tabListState.scrollToItem(currentPage)
         }
     }
-    // 手势滑动翻页后，Tab 行动画跟随到对应页（点击 Tab 时该 Tab 本就可见，animateScrollToItem 不会多余滚动）
+    // 翻页后 Tab 行跟随：与播放页单行选集同款「智能滚动」——
+    // 目标 Tab 已完全可见则不动；仅露出一部分（左/右缘裁切）时才滚到刚好完整露出，
+    // 避免无论点哪个 Tab 都强制滚到第一位的突兀感。
     LaunchedEffect(pagerState.currentPage) {
-        tabListState.animateScrollToItem(pagerState.currentPage)
+        val target = pagerState.currentPage
+        snapshotFlow { tabListState.layoutInfo.totalItemsCount }
+            .filter { it > target }
+            .first()
+        val info = tabListState.layoutInfo
+        val viewportStart = info.viewportStartOffset
+        val viewportEnd = info.viewportEndOffset
+        val item = info.visibleItemsInfo.firstOrNull { it.index == target }
+        when {
+            item == null -> tabListState.animateScrollToItem(target)
+            item.offset < viewportStart ->
+                tabListState.animateScrollBy((item.offset - viewportStart).toFloat())
+            item.offset + item.size > viewportEnd ->
+                tabListState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat())
+            else -> Unit // 已完全可见：不滚动
+        }
     }
 
     OverlayDialog(
@@ -2510,6 +2552,8 @@ private fun FullscreenPlayLayout(
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
     var showEpisodes by remember { mutableStateOf(false) }
+    // 视频信息弹窗（仿 fongmi InfoDialog：标题/请求头/播放地址，可复制链接分享）
+    var showInfo by remember { mutableStateOf(false) }
     // 选集或字幕设置侧栏打开期间抑制全部播放手势
     val sideSheetOpen = showEpisodes || subtitleSettingsOpen
     // fongmi 同款手势反馈浮层：拖动 seek 预览目标 / 长按倍速提示
@@ -2746,6 +2790,7 @@ private fun FullscreenPlayLayout(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     )
+                    PlainTopBtn(AppIcons.Info, "视频信息") { showInfo = true }
                     PlainTopBtn(AppIcons.Cast, "投屏") { }
                 }
 
@@ -2973,6 +3018,16 @@ private fun FullscreenPlayLayout(
             onDismiss = { showText = false },
             selectedBorderColor = BrandBlueDeep,
         )
+        // 视频信息（仿 fongmi InfoDialog）：标题 / 播放地址 / 请求头，可复制链接与分享
+        PlayerInfoDialog(
+            show = showInfo,
+            info = Players.externalPlayInfo(),
+            title = listOfNotNull(
+                current?.title?.takeIf { it.isNotBlank() },
+                "第${episodeIndex + 1}集",
+            ).joinToString(" · "),
+            onDismiss = { showInfo = false },
+        )
     }
 }
 
@@ -3192,6 +3247,8 @@ private fun EpisodeSideSheet(
                         .fillMaxWidth()
                         .padding(bottom = Spacing.titleContentGap),
                 )
+                // 弹出前就定位到当前集（首帧就位，无滚动动画）：
+                // initialFirstVisibleItemIndex 让当前集作为第一个可见 item 出现在顶部。
                 val listState = rememberLazyListState(
                     initialFirstVisibleItemIndex = currentIndex.coerceIn(0, episodes.lastIndex),
                 )
@@ -3382,6 +3439,127 @@ private fun <T> OptionDialog(
                 }
             }
         }
+    }
+}
+
+/**
+ * 视频信息弹窗（仿 fongmi InfoDialog）：展示当前解析到的真实播放地址与请求头，
+ * 支持复制链接、分享；该地址为解析后的直链（不经过本地代理），可直接粘贴到浏览器播放。
+ */
+@Composable
+private fun PlayerInfoDialog(
+    show: Boolean,
+    info: Players.ExternalPlayInfo?,
+    title: String,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val maxDialogHeight = with(LocalConfiguration.current) { (screenHeightDp * 0.6f).dp }
+    val url = info?.url.orEmpty()
+    val headerText = info?.headers.orEmpty().entries.joinToString("\n") { "${it.key}: ${it.value}" }
+
+    OverlayDialog(
+        show = show,
+        // 同 OptionDialog：标题自绘，边距由内容区自控
+        title = null,
+        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        renderInRootScaffold = true,
+        largeScreen = false,
+        onDismissRequest = onDismiss,
+        outsideMargin = DpSize(Spacing.dialogContentMargin, 0.dp),
+        insideMargin = DpSize(0.dp, 0.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = maxDialogHeight),
+        ) {
+            Text(
+                text = "视频信息",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.titleContentGap),
+            )
+            Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .padding(horizontal = Spacing.dialogContentMargin)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = Spacing.dialogContentMargin),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                InfoField("标题", title.ifBlank { "未知" })
+                InfoField("播放地址", url.ifBlank { "暂无播放地址（本地文件或尚未解析完成）" })
+                InfoField("请求头", headerText.ifBlank { "无" })
+                Text(
+                    text = "复制地址后可粘贴到浏览器直接播放；部分站点需要带上请求头。",
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    TextButton(
+                        text = "复制链接",
+                        onClick = {
+                            if (url.isBlank()) {
+                                Toast.makeText(context, "暂无播放地址", Toast.LENGTH_SHORT).show()
+                            } else {
+                                context.getSystemService(ClipboardManager::class.java)
+                                    ?.setPrimaryClip(ClipData.newPlainText("视频地址", url))
+                                Toast.makeText(context, "已复制链接", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        text = "分享",
+                        onClick = {
+                            if (url.isNotBlank()) {
+                                val send = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, url)
+                                    putExtra(Intent.EXTRA_SUBJECT, title)
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(Intent.createChooser(send, "分享视频地址"))
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 信息弹窗单行字段：小号标签 + 自动换行的值（圆角浅底，随弹窗内容一起滚动） */
+@Composable
+private fun InfoField(label: String, value: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant, SquircleShape(Spacing.corner))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
