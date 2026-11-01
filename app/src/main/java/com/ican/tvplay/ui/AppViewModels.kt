@@ -103,6 +103,19 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
         viewModelScope.launch { repo.switchSite(siteKey) }
     }
 
+    /** 站源「参与搜索」开关（fongmi 同款；返回切换后是否开启；配置锁定的站点返回 false 且不变） */
+    fun toggleSiteSearchable(site: TvBoxSite): Boolean = settings.toggleSiteSearchable(site)
+
+    /** 站源「播放失败自动换源」开关 */
+    fun toggleSiteChangeable(site: TvBoxSite): Boolean = settings.toggleSiteChangeable(site)
+
+    /** 开关是否开启（弹窗图标着色用） */
+    fun isSiteSearchable(site: TvBoxSite): Boolean = settings.isSiteSearchable(site)
+    fun isSiteChangeable(site: TvBoxSite): Boolean = settings.isSiteChangeable(site)
+
+    /** 开关版本号：弹窗 collect 后每次切换自动重组刷新图标 */
+    val siteToggleVersion: StateFlow<Int> = settings.siteToggleVersion
+
     /** 按分类 id 独立取该分类下视频（每页独立加载，不依赖 selectedCategory 选中态） */
     suspend fun getCategoryVideos(categoryId: String): List<Video> = repo.getVideos(categoryId)
 

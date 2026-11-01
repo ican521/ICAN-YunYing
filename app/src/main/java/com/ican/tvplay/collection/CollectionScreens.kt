@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -246,12 +247,12 @@ private fun UpdatesEntry(
                 pressColor = LightOnSurface,
             ),
         insideMargin = PaddingValues(0.dp),
-        colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                // 内边距复用 miuix 设置项默认值（四边 16dp），与设置页行项一致
+                .padding(BasicComponentDefaults.InsideMargin),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {

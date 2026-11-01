@@ -34,7 +34,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
@@ -45,8 +44,8 @@ import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
+import com.ican.tvplay.ui.components.MiuixBottomSheetDialog
 import com.ican.tvplay.ui.components.PosterImage
-import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.topBarPadding
@@ -60,9 +59,7 @@ import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 追番更新页：收藏页入口进入。
@@ -212,43 +209,36 @@ fun UpdatePopupDialog(
     onPlay: (FavoriteUpdateItem) -> Unit,
     onOpenAll: () -> Unit,
 ) {
-    OverlayDialog(
+    MiuixBottomSheetDialog(
         show = show,
         title = "更新提醒",
-        titleColor = MiuixTheme.colorScheme.onBackground,
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        renderInRootScaffold = true,
-        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
-        largeScreen = false,
-        onDismissRequest = onDismiss,
+        onDismiss = onDismiss,
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                items(items, key = { it.favorite.videoId }, contentType = { "update" }) { item ->
-                    PopupUpdateRow(item = item, onClick = { onPlay(item) })
-                }
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
+        ) {
+            items(items, key = { it.favorite.videoId }, contentType = { "update" }) { item ->
+                PopupUpdateRow(item = item, onClick = { onPlay(item) })
             }
-            // 按钮行按全局弹窗规范：两侧等距 16dp（由 OverlayDialog 提供）+ 左右平分、取消在左
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = Spacing.titleContentGap),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                TextButton(
-                    text = "稍后",
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(20.dp))
-                TextButton(
-                    text = "查看全部",
-                    onClick = onOpenAll,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                )
-            }
+        }
+        // 按钮行按全局弹窗规范：左右平分、取消在左
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.titleContentGap),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            TextButton(
+                text = "稍后",
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(Spacing.dialogButtonGap))
+            TextButton(
+                text = "查看全部",
+                onClick = onOpenAll,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.textButtonColorsPrimary(),
+            )
         }
     }
 }
@@ -373,7 +363,7 @@ private fun PopupUpdateRow(item: FavoriteUpdateItem, onClick: () -> Unit) {
                 focusedScale = 1.02f,
                 glow = false,
             )
-            .padding(vertical = 8.dp, horizontal = 4.dp),
+            .padding(Spacing.dialogItemPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(

@@ -1,5 +1,8 @@
 package com.ican.tvplay.ui.theme
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -11,7 +14,7 @@ import top.yukonga.miuix.kmp.utils.getRoundedCorner
  * 全局 UI 间距/圆角规范（所有 Compose 页面强制遵守，禁止硬编码魔法数字）。
  *
  * 规则要点：
- * - 页面左右边距统一 [pageHorizontal]，平板等宽屏最大 [pageHorizontalMax]（内容不限宽，只保证不贴边）
+ * - 页面左右边距统一 [pageHorizontal]（手机/平板均为 16dp）
  * - 页面顶部距状态栏统一 [pageTop]
  * - 大板块之间 [sectionSpacing]；板块标题与内容之间 [titleContentGap]
  * - 卡片网格横向间距 [cardGapH]、纵向间距 [cardGapV]
@@ -19,11 +22,8 @@ import top.yukonga.miuix.kmp.utils.getRoundedCorner
  * - 圆形按钮统一尺寸 [circleButton]
  */
 object Spacing {
-    /** 页面左右内边距（手机） */
+    /** 页面左右内边距（全设备统一） */
     val pageHorizontal = 16.dp
-
-    /** 页面左右内边距上限（平板大屏），保证内容不贴边即可，不限制内容宽度 */
-    val pageHorizontalMax = 24.dp
 
     /** 页面顶部距状态栏间距 */
     val pageTop = 14.dp
@@ -31,31 +31,63 @@ object Spacing {
     /** 大板块之间的间距（今日推荐/分类Tab/视频网格等模块之间） */
     val sectionSpacing = 20.dp
 
-    /** 首页顶部分类Tab的上下间距（搜索栏→Tab、Tab→内容区） */
-    val categoryTabVertical = 3.dp
+    /**
+     * 首页顶部分类Tab的上下间距（搜索栏→Tab、Tab→内容区）。
+     * 取 1dp：Tab 行内文字垂直居中留白 11dp，合计后「Tab 文字 ↔ 搜索胶囊底缘」视觉间距为 12dp，上下对称。
+     */
+    val categoryTabVertical = 1.dp
 
     /**
      * 搜索栏底部到下方第一个内容板块的垂直间距（全局统一，不随屏幕尺寸缩放）。
      * 所有带搜索栏的页面（首页、搜索首页、搜索结果页等）必须复用此常量，
      * 禁止各页面写死不同 dp 值。
      */
-    val searchBarBottomMargin = 10.dp
+    val searchBarBottomMargin = 12.dp
 
-    /** 板块内部标题与下方内容的间距（也是底部弹窗大标题距弹窗顶/距下方内容的间距） */
+    /** 板块内部标题与下方内容的间距（播放页底部弹窗的大标题间距也用此值） */
     val titleContentGap = 12.dp
 
     /**
-     * 底部弹窗内容边距：选项方块距弹窗左右两侧 = 距弹窗底部 = 本值（固定 16dp，不分手机/平板）。
-     * 全屏播放页底部功能弹窗（OptionDialog/SubtitleDialog）与选集「更多」弹窗（EpisodeGridDialog）
-     * 统一引用本常量，禁止各自硬编码。
+     * 底部弹窗（全屏播放页除外）大标题距弹窗顶部 / 距下方内容的间距，上下统一。
+     */
+    val dialogTitleGap = 16.dp
+
+    /**
+     * 底部弹窗内容边距：内容距弹窗左右两侧 = 距弹窗底部 = 本值（固定 16dp，不分手机/平板）。
+     * 除全屏播放页外的所有底部弹窗统一引用本常量；播放页弹窗
+     * （OptionDialog/SubtitleDialog/EpisodeGridDialog）也复用本值。
      */
     val dialogContentMargin = 16.dp
 
-    /** 网格卡片横向间距 */
-    val cardGapH = 12.dp
+    /** 底部弹窗距屏幕左右 / 底部的固定边距（底部由 [dialogBottomMargin] 补偿系统导航栏） */
+    val dialogOutsideMargin = 16.dp
 
-    /** 网格卡片纵向间距 */
+    /** 底部弹窗列表项内边距（四边统一） */
+    val dialogItemPadding = 16.dp
+
+    /** 底部弹窗列表项之间的间距 */
+    val dialogItemGap = 8.dp
+
+    /** 底部弹窗内并排按钮（取消/确认等）之间的间距 */
+    val dialogButtonGap = 16.dp
+
+    /** 网格卡片横向间距（首页/收藏/历史；搜索页用 [searchGridGap]） */
+    val cardGapH = 16.dp
+
+    /** 网格卡片纵向间距（首页/收藏/历史；搜索页用 [searchGridGap]） */
     val cardGapV = 16.dp
+
+    /**
+     * 搜索结果页专属网格间距：卡片横向、卡片纵向、左侧站源列表与卡片网格之间的间距统一用本值。
+     * 搜索页内容密度高（左站源列表 + 右网格），间距独立于 [cardGapH]/[cardGapV]，不随主网格调整。
+     */
+    val searchGridGap = 12.dp
+
+    /** 搜索首页历史 / 推荐词条胶囊的流式排列间距（横向、纵向同值） */
+    val searchChipGap = 8.dp
+
+    /** 搜索结果页左侧站源列表的项间距（纵向） */
+    val siteListItemGap = 8.dp
 
     /** 全局统一圆角（卡片/按钮/输入框/弹窗）；圆形按钮与胶囊用 CircleShape，不适用此值 */
     val corner = 16.dp
@@ -74,8 +106,45 @@ object Spacing {
     /** 圆形按钮统一尺寸 */
     val circleButton = 48.dp
 
-    /** 底部内容避让悬浮胶囊导航的高度 */
-    val bottomBarInset = 120.dp
+    /** 顶栏行高（返回钮 / 搜索栏 / 圆形按钮所在行） */
+    val topBarHeight = 48.dp
+
+    /** 顶栏内部组件之间的间距（搜索栏 ↔ 返回钮、站源钮、历史钮等） */
+    val topBarItemGap = 12.dp
+
+    /** 词条胶囊 / 站源胶囊高度 */
+    val chipHeight = 40.dp
+
+    /**
+     * 底部内容避让悬浮胶囊导航的高度（保证底部卡片距底栏顶部恰好 [bottomBarGap]）：
+     * 胶囊容器高度 [bottomBarHeight] + 胶囊距屏幕底部（[bottomBarBottom]，但不小于系统导航栏高度）
+     * + 内容与胶囊顶部间距 [bottomBarGap]。与 AppRoot 中底栏定位使用同一规则。
+     */
+    val bottomBarInset: Dp
+        @Composable get() {
+            val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val barBottom = maxOf(bottomBarBottom, navBottom)
+            return barBottom + bottomBarHeight + bottomBarGap
+        }
+
+    /** 悬浮胶囊导航距屏幕底部的距离（系统导航栏更高时以导航栏高度为准，取二者较大值） */
+    val bottomBarBottom = 16.dp
+
+    /** 悬浮胶囊导航容器高度（含内部 4dp 内边距） */
+    val bottomBarHeight = 64.dp
+
+    /** 页面底部内容与悬浮胶囊导航顶部的间距 */
+    val bottomBarGap = 16.dp
+
+    /** 悬浮底栏胶囊内部的内边距（内容区上下、指示器左右） */
+    val bottomBarInnerPadding = 4.dp
+
+    /**
+     * 无悬浮底栏页面的列表/网格内容底部留白（滚动到底时最后一行与屏幕底部之间）：
+     * 搜索结果页的站源列表与卡片网格统一引用本值。
+     * 带悬浮底栏的一级页（首页/收藏/历史/设置）底部改用 [bottomBarInset]。
+     */
+    val contentBottomInset = 16.dp
 
     /** 选项描边宽度（播放页弹窗选项与选集「更多」选项共用，全局统一） */
     val optionBorder = 1.dp

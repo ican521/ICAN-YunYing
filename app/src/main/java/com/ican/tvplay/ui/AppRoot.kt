@@ -28,7 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,6 +63,7 @@ import com.ican.tvplay.ui.theme.DarkSurfaceVariant
 import com.ican.tvplay.ui.theme.LightSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.PopupScrim
+import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.TvPlayTheme
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -173,6 +176,7 @@ fun AppRoot() {
         // 一级页面（首页/收藏/设置）放进 HorizontalPager，底栏指示器与页面滑动双向联动
         val pagerState = rememberPagerState(pageCount = { topDestinations.size })
         val mainPagerState = rememberMainPagerState(pagerState)
+        val haptic = LocalHapticFeedback.current
 
         // 手势滑动页面后同步底栏指示器
         val settledPage = pagerState.settledPage
@@ -311,9 +315,9 @@ fun AppRoot() {
                 exit = fadeOut() + slideOutVertically { it / 2 },
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
-                val bottomPadding = WindowInsets.navigationBars.asPaddingValues()
-                    .calculateBottomPadding()
-                    .let { if (it != 0.dp) 8.dp + it else 28.dp }
+                // 底栏距屏幕底部固定 16dp；系统导航栏更高时取导航栏高度，避免压住手势条/三键按键
+                val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                val bottomPadding = maxOf(Spacing.bottomBarBottom, navBottom)
                 FloatingBottomBar(
                     modifier = Modifier
                         .pointerInput(Unit) {
@@ -321,7 +325,13 @@ fun AppRoot() {
                         }
                         .padding(start = 28.dp, end = 28.dp, bottom = bottomPadding),
                     selectedIndex = mainPagerState.selectedPage,
-                    onSelected = { mainPagerState.animateToPage(it) },
+                    onSelected = { index ->
+                        // 底栏切换分页时使用系统触感反馈（不自行定制震动，仅在真正切页时触发一次）
+                        if (index != mainPagerState.selectedPage) {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        }
+                        mainPagerState.animateToPage(index)
+                    },
                     backdrop = backdrop,
                     tabsCount = topDestinations.size,
                     isBlurEnabled = enableBlur,

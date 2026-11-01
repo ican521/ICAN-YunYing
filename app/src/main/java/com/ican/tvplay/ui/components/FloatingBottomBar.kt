@@ -74,6 +74,7 @@ import com.ican.tvplay.ui.components.liquid.rememberCombinedBackdrop
 import com.ican.tvplay.ui.components.liquid.vibrancy
 import com.ican.tvplay.ui.theme.DarkSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
+import com.ican.tvplay.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurColors
@@ -419,8 +420,8 @@ fun FloatingBottomBar(
                     } else Modifier
                 )
                 .then(dampedDragAnimation.modifier)
-                .height(64.dp)
-                .padding(4.dp),
+                .height(Spacing.bottomBarHeight)
+                .padding(Spacing.bottomBarInnerPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CompositionLocalProvider(LocalContentColor provides tabContentColor) {
@@ -456,7 +457,7 @@ fun FloatingBottomBar(
                         )
                         .then(interactiveHighlight.modifier)
                         .height(56.dp)
-                        .padding(horizontal = 4.dp),
+                        .padding(horizontal = Spacing.bottomBarInnerPadding),
                     verticalAlignment = Alignment.CenterVertically,
                     content = { content(::activateTab) }
                 )
@@ -468,7 +469,7 @@ fun FloatingBottomBar(
             if (isBlurEnabled) {
                 Box(
                     Modifier
-                        .padding(horizontal = 4.dp)
+                        .padding(horizontal = Spacing.bottomBarInnerPadding)
                         .graphicsLayer {
                             val progressOffset = dampedDragAnimation.value * tabWidthPx
                             translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
@@ -515,18 +516,30 @@ fun FloatingBottomBar(
             } else {
                 Box(
                     Modifier
-                        .padding(horizontal = 4.dp)
+                        .padding(horizontal = Spacing.bottomBarInnerPadding)
                         .graphicsLayer {
                             val progressOffset = dampedDragAnimation.value * tabWidthPx
                             translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
                         }
+                        // 必须裁剪到胶囊范围：指示器内是整条 tab 内容的主题色副本，只露出当前页那一格
                         .clip(pillShape)
-                        // 关闭毛玻璃：浅色 #E1ECFE（KernelSU 同款视觉），深色主题色 15%
-                        .background(plainIndicatorColor, pillShape)
                         .height(56.dp)
                         .width(tabWidthDp),
                     contentAlignment = Alignment.CenterStart,
                 ) {
+                    // 指示器背景：毛玻璃 / 普通模式下按压时轻微缩小（只缩放指示器，不影响图标文字）
+                    Box(
+                        Modifier
+                            .matchParentSize()
+                            .graphicsLayer {
+                                val scale = 1f - 0.08f * dampedDragAnimation.pressProgress
+                                scaleX = scale
+                                scaleY = scale
+                            }
+                            .clip(pillShape)
+                            // 关闭毛玻璃：浅色 #E1ECFE（KernelSU 同款视觉），深色主题色 15%
+                            .background(plainIndicatorColor, pillShape),
+                    )
                     CompositionLocalProvider(LocalContentColor provides accentColor) {
                         Row(
                             Modifier

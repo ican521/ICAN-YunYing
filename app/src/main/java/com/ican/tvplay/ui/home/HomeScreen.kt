@@ -3,6 +3,7 @@ package com.ican.tvplay.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -38,7 +39,6 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollConfiguration
@@ -80,19 +80,19 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.util.fastRoundToInt
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.ican.tvplay.R
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.data.model.VideoCategory
 import com.ican.tvplay.data.remote.TvBoxSite
@@ -114,6 +114,8 @@ import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -201,6 +203,14 @@ fun HomeScreen(
     // pager 滑动停止（含点击翻页完成、手势滑动）→ 清除点击态，指示器回归跟随 pager
     LaunchedEffect(pagerState.settledPage) {
         tappedChipIndex = null
+    }
+
+    // 站源选择弹窗：单击 GIF 按钮呼出；数据与开关逻辑复用 HomeViewModel
+    val siteToggleVersion by viewModel.siteToggleVersion.collectAsStateWithLifecycle()
+    var showSitePicker by remember { mutableStateOf(false) }
+    var siteList by remember { mutableStateOf<List<TvBoxSite>>(emptyList()) }
+    LaunchedEffect(showSitePicker) {
+        if (showSitePicker) siteList = viewModel.listSites()
     }
 
     // 顶区毛玻璃（收藏/设置页同款 BlurredBar 机制）：随「顶栏毛玻璃」开关，
@@ -301,6 +311,26 @@ fun HomeScreen(
     }
 
     // 折叠纯跟手（对齐 fongmi）：松手不做吸附，手指停在哪搜索行就停在哪
+
+    // 钩子③：翻页停稳后按「最终落点页」统一对齐：
+    // ① 真正切到别的页 → 所有页（含新落点页）回到折叠态顶部，离开的页不保留旧滚动进度，
+    //    返回上一页时进度已重置；同时修正预渲染邻页可能停在 offset=0、与折叠量脱钩导致的
+    //    「卡片与 Tab 之间一大片空白、下拉也无法展开搜索栏」的问题
+    // ② 越半回弹取消拖动（落点页未变）→ 保留当前页进度，只对齐离屏邻页
+    var lastSettledPage by remember { mutableIntStateOf(pagerState.settledPage) }
+    LaunchedEffect(Unit) {
+        snapshotFlow { pagerState.settledPage }.collect { settled ->
+            val pageChanged = settled != lastSettledPage
+            lastSettledPage = settled
+            val collapse = searchRowCollapsePx
+            gridLock.withLock {
+                for ((p, gs) in gridStates) {
+                    if (!pageChanged && p == settled) continue
+                    alignGridToCollapse(gs, collapse)
+                }
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -533,6 +563,7 @@ fun HomeScreen(
                                     onSearchClick = onSearchClick,
                                     onHistoryClick = onHistoryClick,
                                     onUrlPlayClick = onUrlPlayClick,
+                                    onSitePickerClick = { showSitePicker = true },
                                 )
                             }
                         }
@@ -560,6 +591,23 @@ fun HomeScreen(
         }
         }
     }
+
+    // 站源选择弹窗（GIF 按钮单击呼出）：选中后切换站源并关闭；开关项与设置页共用逻辑
+    SitePickerDialog(
+        show = showSitePicker,
+        sites = siteList,
+        currentKey = currentSiteKey,
+        onSelect = { site ->
+            viewModel.switchSite(site.key)
+            showSitePicker = false
+        },
+        onDismiss = { showSitePicker = false },
+        isSearchable = { viewModel.isSiteSearchable(it) },
+        isChangeable = { viewModel.isSiteChangeable(it) },
+        onToggleSearchable = { viewModel.toggleSiteSearchable(it) },
+        onToggleChangeable = { viewModel.toggleSiteChangeable(it) },
+        toggleVersion = siteToggleVersion,
+    )
 }
 
 /** 站源选择对话框：列出配置里全部可用站点（spider + HTTP），高亮当前站；
@@ -580,28 +628,51 @@ fun SitePickerDialog(
 ) {
     OverlayDialog(
         show = show,
-        title = "选择站源",
-        titleColor = MiuixTheme.colorScheme.onBackground,
+        // 标题自绘 + insideMargin 归零：与全屏播放页底部功能弹窗一致，
+        // 列表可一直显示/滚动到弹窗最底缘，不再被 miuix 默认 24dp 内边距留出空白带
+        title = null,
         backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
         renderInRootScaffold = true,
         // 三边统一 16dp：底部 = max(16dp, 系统导航栏高度)，跨设备自适应
-        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
+        outsideMargin = DpSize(Spacing.dialogOutsideMargin, dialogBottomMargin()),
+        insideMargin = DpSize(0.dp, 0.dp),
         // 强制「非大屏」：平板宽窗口下 miuix 会改为屏幕居中，与手机底部呼出不一致
         largeScreen = false,
         onDismissRequest = onDismiss,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            // 标题距弹窗顶部 = 标题距下方列表 = dialogTitleGap
+            Text(
+                text = "选择站源",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.dialogTitleGap),
+            )
+            Spacer(modifier = Modifier.height(Spacing.dialogTitleGap))
             if (sites.isEmpty()) {
                 Text(
                     text = "未获取到可用站点",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.dialogContentMargin),
                 )
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.heightIn(max = 380.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
+                    // 左右 / 底部 16dp 随内容滚动，滑到底时末项仍与弹窗底缘留 16dp
+                    contentPadding = PaddingValues(
+                        start = Spacing.dialogContentMargin,
+                        end = Spacing.dialogContentMargin,
+                        bottom = Spacing.dialogContentMargin,
+                    ),
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .heightIn(max = 380.dp),
                 ) {
                     items(sites, key = { it.key }, contentType = { "site" }) { site ->
                         val isCurrent = site.key == currentKey
@@ -624,7 +695,8 @@ fun SitePickerDialog(
                                     else MaterialTheme.colorScheme.surfaceVariant,
                                     shape,
                                 )
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                                // 项内边距：四边统一 16dp；上下项间距由 LazyColumn 的 8dp 负责
+                                .padding(Spacing.dialogItemPadding),
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
@@ -633,11 +705,6 @@ fun SitePickerDialog(
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    text = if (site.isSpider()) "spider" else "HTTP 采集",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                             // 参与搜索开关（放大镜）；配置 searchable=0 锁定不可点
@@ -688,7 +755,9 @@ private fun SiteToggleIcon(
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(32.dp)
+            // 触控区改为 20dp 正方形（与站名行高一致，不撑高整行），
+            // 保证 CircleShape 裁剪与按压蒙层仍是正圆、不再变扁
+            .size(20.dp)
             .clip(CircleShape)
             .clickable(enabled = !locked, onClick = onClick),
     ) {
@@ -707,12 +776,42 @@ private fun HomeTopBar(
     onSearchClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onUrlPlayClick: () -> Unit,
+    onSitePickerClick: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxWidth().height(48.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.topBarItemGap),
+        modifier = Modifier.fillMaxWidth().height(Spacing.topBarHeight),
     ) {
+        // 嫌弃 GIF 按钮（代替原链接解析按钮）：单击=站源选择，长按=链接解析；透明底循环播放；
+        // 无圆底背景，GIF 缩到 40dp 居中，完整落在 48dp 圆形点击区内，不被圆形容器边缘裁切；
+        // 按压去掉黑色蒙层（pressEffect=false），仅保留 pressable+SinkFeedback 的缩放效果
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(Spacing.circleButton)
+                .pressable(
+                    interactionSource = null,
+                    indication = SinkFeedback(),
+                    delay = null,
+                )
+                .tvCardEffect(
+                    onClick = onSitePickerClick,
+                    onLongClick = onUrlPlayClick,
+                    shape = CircleShape,
+                    focusedScale = 1.1f,
+                    glow = false,
+                    pressEffect = false,
+                ),
+        ) {
+            AsyncImage(
+                model = R.raw.xianqi,
+                contentDescription = "站源",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(40.dp),
+            )
+        }
+
         // 胶囊搜索框：自绘假胶囊（视觉照搬 KernelSU SearchBarFake：左 16dp 起 20dp 放大镜 + 8dp 间距占位字），
         // 点击进入搜索页；胶囊底不渐隐，仅内部占位文字与放大镜按 contentAlpha 渐隐
         Row(
@@ -744,28 +843,6 @@ private fun HomeTopBar(
                 fontSize = 16.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        // 链接解析按钮：输入视频直链直接播放（fongmi PushActivity 同款）
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(Spacing.circleButton)
-                .pressable(
-                    interactionSource = null,
-                    indication = SinkFeedback(),
-                    delay = null,
-                )
-                .tvCardEffect(onClick = onUrlPlayClick, shape = CircleShape, focusedScale = 1.1f, glow = false)
-                .clip(CircleShape)
-                .background(MiuixTheme.colorScheme.surfaceContainerHigh),
-        ) {
-            Icon(
-                imageVector = AppIcons.Link,
-                contentDescription = "链接解析",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
-                modifier = Modifier.size(20.dp),
             )
         }
 
@@ -805,22 +882,21 @@ private fun CategoryChips(
         ?: (pagerState.currentPage + pagerState.currentPageOffsetFraction.toInt())
             .coerceIn(0, (categories.size - 1).coerceAtLeast(0))
 
-    // 下划线式分段 Tab：等宽布局 + 选中自动居中照搬 miuix TabRow 源码，
-    // 指示器改为文字底部主题色小横条（无容器底色、无未选中边框、无选中填充）；
-    // 通栏无外边距，左右基准线由内部 LazyRow contentPadding 保证
     UnderlineTabRow(
         tabs = categories.map { it.name },
         selectedTabIndex = colorTargetIndex,
         onTabSelected = onSelect,
+        pagerState = pagerState,
     )
 }
 
-/** 下划线式分类 Tab：文字贴合宽度，首个/末个 Tab 默认初始位置均落在下方视频卡片「圆角与直线交界处」（页面基线 + 卡片圆角半径，左右对称） */
+/** 分类 Tab 行：无下划线指示器，选中态靠字号+加粗区分；文字贴合宽度，首个/末个 Tab 默认初始位置均落在下方视频卡片「圆角与直线交界处」（页面基线 + 卡片圆角半径，左右对称） */
 @Composable
 private fun UnderlineTabRow(
     tabs: List<String>,
     selectedTabIndex: Int,
     onTabSelected: (Int) -> Unit,
+    pagerState: PagerState,
     modifier: Modifier = Modifier,
     itemSpacing: Dp = 24.dp,
     height: Dp = TabRowHeight,
@@ -828,70 +904,48 @@ private fun UnderlineTabRow(
     BoxWithConstraints(modifier = modifier.fillMaxWidth().height(height)) {
         val availableWidth = this.maxWidth
         val listState = rememberLazyListState()
-        val density = LocalDensity.current
         // 左右基准对称：首个/末个 Tab 的默认初始位置 = 页面基线 + 卡片圆角半径（Spacing.corner），
         // 分别落在下方视频卡片左/右「圆角与直线交界处」（与选集「更多」弹窗 Tab 对齐逻辑同源）
         val edgePadding = pageHorizontalPadding()
         val tabStartPadding = edgePadding + Spacing.corner
         val tabEndPadding = edgePadding + Spacing.corner
-        val tabStartPaddingPx = with(density) { tabStartPadding.toPx() }
-        val spacingPx = with(density) { itemSpacing.toPx() }
-        val availableWidthPx = with(density) { availableWidth.toPx() }
         var lastSettledIndex by remember { mutableIntStateOf(-1) }
 
-        // 各 tab 文字的实际渲染宽度（选中加粗后由 onSizeChanged 重新记录；只需宽度，不用 onGloballyPositioned 监听位置）
+        // 各 tab 文字的实际渲染宽度（选中变大后由 onSizeChanged 重新记录；只需宽度，不用 onGloballyPositioned 监听位置）
         val textWidths = remember { mutableStateMapOf<Int, Int>() }
-        val fallbackIndicatorPx = with(density) { 20.dp.toPx() }
-        val indicatorWidthPx = textWidths[selectedTabIndex]?.toFloat() ?: fallbackIndicatorPx
 
-        // 照搬 miuix：选中 tab 自动滚动居中（首次/回退瞬移，前进动画滚动）；
-        // 文字宽度为异步实测，首次记录后 key 变化会重跑一次校正
+        // 选中 tab 仅在被截断/完全不可见时才滚动到可视范围（与播放页线路/选集同款）：
+        // 完全可见则不滚动；左侧被遮则左滚到贴左，右侧被遮则右滚到完整显示。
+        // 首次定位用无动画 scrollToItem，后续切 tab 用 animateScrollBy 平滑过渡。
         LaunchedEffect(selectedTabIndex, textWidths[selectedTabIndex], availableWidth) {
-            val textW = textWidths[selectedTabIndex]?.toFloat() ?: fallbackIndicatorPx
-            val offsetPx = -((availableWidthPx - textW) / 2f).fastRoundToInt()
-            if (lastSettledIndex < 0 || lastSettledIndex == selectedTabIndex) {
-                listState.scrollToItem(selectedTabIndex, offsetPx)
-            } else {
-                listState.animateScrollToItem(selectedTabIndex, offsetPx)
-            }
+            if (tabs.isEmpty() || selectedTabIndex !in tabs.indices) return@LaunchedEffect
+            snapshotFlow { listState.layoutInfo.totalItemsCount }
+                .filter { it > selectedTabIndex }
+                .first()
+            val isInitial = lastSettledIndex < 0
             lastSettledIndex = selectedTabIndex
+            val info = listState.layoutInfo
+            val viewportStart = info.viewportStartOffset
+            val viewportEnd = info.viewportEndOffset
+            val item = info.visibleItemsInfo.firstOrNull { it.index == selectedTabIndex }
+            val needsScroll = item == null || item.offset < viewportStart || item.offset + item.size > viewportEnd
+            if (!needsScroll) return@LaunchedEffect
+            when {
+                item == null ->
+                    if (isInitial) listState.scrollToItem(selectedTabIndex)
+                    else listState.animateScrollToItem(selectedTabIndex)
+                item.offset < viewportStart ->
+                    listState.animateScrollBy((item.offset - viewportStart).toFloat())
+                else ->
+                    listState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat())
+            }
         }
 
-        val scrollOffset by remember {
-            derivedStateOf {
-                // 文字贴合宽度后无固定步长：前缀 x = 前序各 tab 实测宽度 + 间距 累计
-                var x = 0f
-                for (i in 0 until listState.firstVisibleItemIndex) {
-                    x += (textWidths[i] ?: 0) + spacingPx
-                }
-                x + listState.firstVisibleItemScrollOffset
-            }
-        }
         val hasScrollRange by remember {
             derivedStateOf { listState.canScrollBackward || listState.canScrollForward }
         }
 
         Box(Modifier.fillMaxSize().clipToBounds()) {
-            // 主题色小横条：宽度=选中文字实际宽度（文字左缘→右缘），随选中切换即时变化
-            // padding(bottom)：控制指示条在 Tab 行底部的位置。视觉居中需考虑中文字形下方留白，
-            // 实测后调整（3dp → 视觉偏下；增大值让指示条上移）
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(bottom = 4.5.dp)
-                    .offset {
-                        // 指示条 x = 首个 Tab 初始位置（卡片圆角/直线交界处）+ 前序各 tab 实测宽度累计 − 滚动偏移（文字贴合后无居中补偿项）
-                        var start = tabStartPaddingPx
-                        for (i in 0 until selectedTabIndex) {
-                            start += (textWidths[i] ?: 0) + spacingPx
-                        }
-                        IntOffset((start - scrollOffset).fastRoundToInt(), 0)
-                    }
-                    .width(with(density) { indicatorWidthPx.toDp() })
-                    .height(3.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-            )
             LazyRow(
                 state = listState,
                 contentPadding = PaddingValues(start = tabStartPadding, end = tabEndPadding),
@@ -903,11 +957,11 @@ private fun UnderlineTabRow(
             ) {
                 itemsIndexed(tabs, contentType = { _, _ -> "tab" }) { index, tabText ->
                     val selected = selectedTabIndex == index
-                    // 文字贴底对齐 + 底部预留 12dp = 指示器高3 + 指示器下距3 + 目标间距6：
-                    // 保证「文字底缘→指示器顶缘」与「指示器底缘→下方内容」(3+3=6) 严格相等 6dp，
-                    // 不随字体缩放变化（原垂直居中方案约 5dp vs 6dp，两套对齐无关联）
+                    // 文字垂直居中于 42dp 行内：因 Tab 行本身已居中于「搜索框底→卡片顶」的 48dp 区间
+                    // （上方间距 categoryTabVertical=1dp + 行高42dp + 下方容器余量1dp），
+                    // 行内居中即保证「tab文字底→卡片顶」=「tab文字顶→搜索框底」，且不随字号变化破坏等式
                     Box(
-                        contentAlignment = Alignment.BottomCenter,
+                        contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .fillMaxHeight()
                             // 文字贴合宽度：不再等宽居中，首个/末个 Tab 均落在卡片圆角/直线交界处（左右对称）
@@ -921,17 +975,18 @@ private fun UnderlineTabRow(
                         Text(
                             text = tabText,
                             style = MaterialTheme.typography.labelLarge,
-                            fontSize = 16.sp,
+                            // 选中态比未选中大 3sp（16→19），不加粗，仅字号变化区分
+                            fontSize = if (selected) 19.sp else 16.sp,
                             color = if (selected) {
-                                MaterialTheme.colorScheme.onBackground
+                                // 选中态用主题蓝（主色），未选中保持次要文字色
+                                MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            fontWeight = FontWeight.Normal,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
-                                .padding(bottom = 12.dp)
                                 .onSizeChanged { size ->
                                     textWidths[index] = size.width
                                 },

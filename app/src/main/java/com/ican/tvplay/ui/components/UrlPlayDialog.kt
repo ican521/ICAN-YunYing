@@ -1,7 +1,6 @@
 package com.ican.tvplay.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,14 +14,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import com.ican.tvplay.ui.theme.Spacing
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 链接解析输入框（MIUIX 风格）：
@@ -43,46 +40,36 @@ fun UrlPlayDialog(
         if (show) clipboard.getText()?.text?.let { input = it }
     }
 
-    OverlayDialog(
+    MiuixBottomSheetDialog(
         show = show,
         title = "链接解析播放",
-        titleColor = MiuixTheme.colorScheme.onBackground,
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
-        renderInRootScaffold = true,
-        // 三边统一 16dp：底部 = max(16dp, 系统导航栏高度)，跨设备自适应
-        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
-        // 强制「非大屏」：平板宽窗口下 miuix 会改为屏幕居中，与手机底部呼出不一致
-        largeScreen = false,
-        onDismissRequest = onDismiss,
+        onDismiss = onDismiss,
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            TextField(
-                value = input,
-                onValueChange = { input = it },
-                label = "粘贴视频链接或剧集文本…",
-                useLabelAsPlaceholder = true,
-                singleLine = false,
-                maxLines = 4,
-                modifier = Modifier.fillMaxWidth(),
+        TextField(
+            value = input,
+            onValueChange = { input = it },
+            label = "粘贴视频链接或剧集文本…",
+            useLabelAsPlaceholder = true,
+            singleLine = false,
+            maxLines = 4,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.padding(top = Spacing.titleContentGap),
+        ) {
+            TextButton(
+                text = "取消",
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
             )
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.padding(top = 12.dp),
-            ) {
-                TextButton(
-                    text = "取消",
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(20.dp))
-                TextButton(
-                    text = "解析播放",
-                    onClick = { if (input.isNotBlank()) onConfirm(input) },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                )
-            }
+            Spacer(Modifier.width(Spacing.dialogButtonGap))
+            TextButton(
+                text = "解析播放",
+                onClick = { if (input.isNotBlank()) onConfirm(input) },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.textButtonColorsPrimary(),
+            )
         }
     }
 }

@@ -962,7 +962,7 @@ object Players {
                 // fongmi PlayerEngine.HARD/SOFT → mpv hwdec（C.DECODE_HARDWARE=1 / DECODE_SOFTWARE=0，官方 C 无常量，直接传值）
                 val mpvDecode = if (decode == Decode.SOFT) 0 else 1
                 return try {
-                    val config = buildMpvConfig(ctx)
+                    val config = buildMpvConfig(ctx, tier)
                     MpvPlayer.Builder(ctx).setDecode(mpvDecode).setConfig(config).build().apply {
                         addListener(listener)
                         setPlaybackSpeed(_state.value.speed)
@@ -985,15 +985,21 @@ object Players {
      * 配置目录（mpv.conf 读取）+ shader 缓存 + Android 默认选项，
      * 缺少这些配置时 MPV native 初始化可能崩溃。
      */
-    private fun buildMpvConfig(ctx: Context): androidx.media3.mpvplayer.MpvPlayerConfig {
+    private fun buildMpvConfig(ctx: Context, tier: BufferTier): androidx.media3.mpvplayer.MpvPlayerConfig {
         val mpvDir = java.io.File(ctx.filesDir, "mpv").apply { mkdirs() }
         val mpvCacheDir = java.io.File(ctx.cacheDir, "mpv").apply { mkdirs() }
         // fongmi MpvUtil.buildConfig 同款：指定 CA 证书包，mpv(curl) 拉流 TLS 校验必需，
         // 否则报 "TLS certificate verification failed" 所有 https 分片打不开
         val caFile = java.io.File(ctx.filesDir, "cacert.pem")
+        // MPV 没有 LoadControl，用 demuxer 缓存字节数模拟档位（forward / back 随档位倍增）。
+        // 字节值与 EXO 的 TARGET_BUFFER_BYTES 同量级，高码率时 demuxer 缓存不会爆内存。
+        val forwardBytes = (64L * 1024 * 1024 * tier.multiplier).toString()
+        val backBytes = (32L * 1024 * 1024 * tier.multiplier).toString()
         val builder = androidx.media3.mpvplayer.MpvPlayerConfig.Builder()
             .addConfigDirectory(mpvDir)
             .addTlsCaFileFromAsset(ctx, "cacert.pem", caFile)
+            .addPreInitStringOption("demuxer-max-bytes", forwardBytes)
+            .addPreInitStringOption("demuxer-max-back-bytes", backBytes)
             .addAndroidSubtitleOptions(ctx, buildMpvSubtitleOptions())
             .addAndroidDefaults(
                 androidx.media3.mpvplayer.MpvAndroidOptions.Builder()
@@ -1455,12 +1461,14 @@ private class TieredLoadControl(initialTier: Players.BufferTier) : LoadControl {
          * 缓冲档位只放大「最大缓冲时长」，最小缓冲固定 10s。
          * default 的 min/max 都是 50s：4K 原盘（40Mbps 左右）意味着开播前要先缓存约 250MB，
          * 手机堆根本放不下，表现就是「一直转圈、网速在跑、然后 OOM 闪退」。
+         * 高码率内存上限由下方 setTargetBufferBytes(64MB) 兜底，时长上限不再额外截断，
+         * 否则 HIGH（90s）会被截到 60s 与 MEDIUM 完全相同，档位形同虚设。
          */
         fun buildDelegate(tier: Players.BufferTier): DefaultLoadControl =
             DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
                     10_000,
-                    (30_000L * tier.multiplier).coerceAtMost(60_000L).toInt(),
+                    (30_000L * tier.multiplier).toInt(),
                     DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
                     DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
                 )

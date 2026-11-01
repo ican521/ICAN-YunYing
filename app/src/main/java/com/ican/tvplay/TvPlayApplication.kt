@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.os.Build
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import coil3.gif.GifDecoder
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.ican.tvplay.data.AppContainer
 import com.ican.tvplay.data.remote.VodApiClient
@@ -101,7 +102,10 @@ class TvPlayApplication : Application(), SingletonImageLoader.Factory {
             }
             .build()
         return ImageLoader.Builder(context)
-            .components { add(OkHttpNetworkFetcherFactory(callFactory = { client })) }
+            .components {
+                add(OkHttpNetworkFetcherFactory(callFactory = { client }))
+                add(GifDecoder.Factory())
+            }
             .build()
     }
 }

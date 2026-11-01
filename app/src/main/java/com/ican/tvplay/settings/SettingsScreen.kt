@@ -44,7 +44,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,11 +56,9 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.TvPlayApplication
 import com.ican.tvplay.data.BACKGROUND_PIP
@@ -73,8 +70,8 @@ import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.BlurredBar
-import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
+import com.ican.tvplay.ui.components.MiuixBottomSheetDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
@@ -211,7 +208,7 @@ fun SettingsScreen(
                 top = innerPadding.calculateTopPadding() + Spacing.pageTop,
                 bottom = Spacing.bottomBarInset,
             ),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
         item {
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -474,45 +471,35 @@ private fun ConfigImportDialog(
     onDismiss: () -> Unit,
 ) {
     var url by remember { mutableStateOf(initialUrl) }
-    OverlayDialog(
+    MiuixBottomSheetDialog(
         show = show,
         title = "导入配置",
-        titleColor = MiuixTheme.colorScheme.onBackground,
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
-        renderInRootScaffold = true,
-        // 三边统一 16dp：底部 = max(16dp, 系统导航栏高度)，跨设备自适应
-        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
-        // 强制「非大屏」：平板宽窗口下 miuix 会改为屏幕居中，与手机底部呼出不一致
-        largeScreen = false,
-        onDismissRequest = onDismiss,
+        onDismiss = onDismiss,
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            top.yukonga.miuix.kmp.basic.TextField(
-                value = url,
-                onValueChange = { url = it },
-                label = "输入配置链接（http/https）…",
-                useLabelAsPlaceholder = true,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+        top.yukonga.miuix.kmp.basic.TextField(
+            value = url,
+            onValueChange = { url = it },
+            label = "输入配置链接（http/https）…",
+            useLabelAsPlaceholder = true,
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.padding(top = Spacing.titleContentGap),
+        ) {
+            top.yukonga.miuix.kmp.basic.TextButton(
+                text = "取消",
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
             )
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.padding(top = 12.dp),
-            ) {
-                top.yukonga.miuix.kmp.basic.TextButton(
-                    text = "取消",
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(20.dp))
-                top.yukonga.miuix.kmp.basic.TextButton(
-                    text = "确认",
-                    onClick = { onConfirm(url) },
-                    modifier = Modifier.weight(1f),
-                    colors = top.yukonga.miuix.kmp.basic.ButtonDefaults.textButtonColorsPrimary(),
-                )
-            }
+            Spacer(Modifier.width(Spacing.dialogButtonGap))
+            top.yukonga.miuix.kmp.basic.TextButton(
+                text = "确认",
+                onClick = { onConfirm(url) },
+                modifier = Modifier.weight(1f),
+                colors = top.yukonga.miuix.kmp.basic.ButtonDefaults.textButtonColorsPrimary(),
+            )
         }
     }
 }
@@ -544,19 +531,11 @@ private fun FavoriteSyncDialog(
         }
     }
 
-    OverlayDialog(
+    MiuixBottomSheetDialog(
         show = show,
         title = "选择设备",
-        titleColor = MiuixTheme.colorScheme.onBackground,
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
-        renderInRootScaffold = true,
-        // 左右跟随页面边距（手机 16dp / 平板 24dp），底部 = max(16dp, 系统导航栏高度)
-        outsideMargin = DpSize(pageHorizontalPadding(), dialogBottomMargin()),
-        largeScreen = false,
-        onDismissRequest = onDismiss,
+        onDismiss = onDismiss,
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
             // 操作行：模式切换 | 重新扫描（标题「选择设备」由弹窗提供）
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -637,7 +616,7 @@ private fun FavoriteSyncDialog(
                 }
                 else -> {
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
                     ) {
                         devices.forEach { device ->
                             Row(
@@ -679,7 +658,8 @@ private fun FavoriteSyncDialog(
                                         MaterialTheme.colorScheme.surfaceVariant,
                                         SquircleShape(Spacing.corner),
                                     )
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    // 列表项内边距统一 16dp
+                                    .padding(Spacing.dialogItemPadding),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 // 设备类型图标（fongmi adapter_device：type）
@@ -711,6 +691,5 @@ private fun FavoriteSyncDialog(
                     }
                 }
             }
-        }
     }
 }

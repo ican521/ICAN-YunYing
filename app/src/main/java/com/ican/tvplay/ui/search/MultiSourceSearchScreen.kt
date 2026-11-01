@@ -1,8 +1,6 @@
 package com.ican.tvplay.ui.search
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -100,10 +98,6 @@ fun MultiSourceSearchScreen(
     val searchedQuery by vm.query.collectAsStateWithLifecycle()
 
     var queryText by remember { mutableStateOf(initialQuery) }
-    // miuix InputField 展开态：点击输入框时置 true 正常聚焦弹键盘；
-    // 点击外部/提交搜索时置 false 收起键盘，避免展开态固定 false 导致的动画过冲。
-    var expanded by remember { mutableStateOf(false) }
-    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     // 首次进入时触发跨站搜索（initialQuery 非空才触发）；
     // 播放页返回时若已有同词结果则跳过，保持列表与滚动位置不变
@@ -113,11 +107,7 @@ fun MultiSourceSearchScreen(
 
     fun doSearch() {
         val q = queryText.trim()
-        if (q.isNotEmpty()) {
-            expanded = false
-            focusManager.clearFocus()
-            vm.searchAll(q)
-        }
+        if (q.isNotEmpty()) vm.searchAll(q)
     }
 
     // KernelSU 同款：固定毛玻璃顶栏（搜索栏不适合折叠，保持固定高度）
@@ -144,11 +134,9 @@ fun MultiSourceSearchScreen(
                         onQueryChange = { queryText = it },
                         onSearch = { doSearch() },
                         label = "跨站源搜索…",
-                        expanded = expanded,
-                        onExpandedChange = { expanded = it },
                         modifier = Modifier
                             .weight(1f)
-                            .padding(start = 12.dp),
+                            .padding(start = Spacing.topBarItemGap),
                     )
                 }
             }
@@ -161,15 +149,7 @@ fun MultiSourceSearchScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                // 点击输入框以外的区域收起输入法：子项（站源胶囊/视频卡片）的点击会自行消费事件
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) {
-                    expanded = false
-                    focusManager.clearFocus()
-                },
+                .background(MaterialTheme.colorScheme.background),
         ) {
             Spacer(Modifier.height(innerPadding.calculateTopPadding() + Spacing.searchBarBottomMargin))
         // ========== 主体：左站源列表 + 右卡片网格（左右边距与顶栏同一基准）==========
@@ -178,15 +158,15 @@ fun MultiSourceSearchScreen(
                 .fillMaxSize()
                 .padding(horizontal = pageHorizontalPadding()),
         ) {
-            // 左侧站源列表（纵向；顶部 4dp 与右侧网格第一行卡片齐平）
+            // 左侧站源列表（纵向；与右侧网格第一行卡片顶部齐平）
             // imePadding：窗口禁用系统避让后，键盘弹出时列表底部仍可滚动到键盘上方
             LazyColumn(
                 modifier = Modifier
                     .width(100.dp)
                     .fillMaxHeight()
                     .imePadding(),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 4.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.siteListItemGap),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = Spacing.contentBottomInset),
             ) {
                 // 「全部」合并视图入口（仅在有搜索词时显示；未搜索时本页不出现）
                 if (searchedQuery.isNotBlank()) {
@@ -220,7 +200,7 @@ fun MultiSourceSearchScreen(
             }
 
             // 站源列表与卡片网格之间的间距
-            Spacer(modifier = Modifier.width(Spacing.cardGapH))
+            Spacer(modifier = Modifier.width(Spacing.searchGridGap))
 
             // 右侧卡片网格：手机强制 2 列，大屏（宽 > 640dp）自适应
             BoxWithConstraints(
@@ -242,12 +222,9 @@ fun MultiSourceSearchScreen(
                         columns = columns,
                         // imePadding：键盘弹出时网格底部内容不被遮挡，可滚动到键盘上方
                         modifier = Modifier.fillMaxSize().imePadding(),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            top = 4.dp,
-                            bottom = 16.dp,
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = Spacing.contentBottomInset),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.searchGridGap),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.searchGridGap),
                     ) {
                         items(displayVideos, key = { "${it.video.id}_${it.siteKey}" }, contentType = { "video" }) { dv ->
                             CrossSourceVideoCard(
@@ -321,7 +298,7 @@ private fun SiteSourceChip(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(40.dp)
+            .height(Spacing.chipHeight)
             // pressable 在外层：按压缩放跟随 Sink 动画（与右侧视频卡片同序）；
             // 站源列表自带选中态，蒙层关闭（pressEffect=false），选中色即状态反馈
             .pressable(

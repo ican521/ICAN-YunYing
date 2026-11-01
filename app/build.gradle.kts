@@ -132,6 +132,7 @@ dependencies {
     // Coil 3：网络封面加载
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.coil.gif)
 
     // TVBox 接口：OkHttp + kotlinx.serialization
     implementation(libs.okhttp)

@@ -13,8 +13,8 @@ import com.ican.tvplay.data.HomeLayoutSize
 import com.ican.tvplay.ui.theme.Spacing
 
 /**
- * 页面统一水平内边距：手机 [Spacing.pageHorizontal]，平板大屏 [Spacing.pageHorizontalMax]。
- * 一级页、二级页、顶栏、内容区必须统一走此函数，禁止各页面写死 16/24dp。
+ * 页面统一水平内边距：[Spacing.pageHorizontal]（全设备统一 16dp）。
+ * 一级页、二级页、顶栏、内容区必须统一走此函数，禁止各页面写死 16dp。
  */
 @Composable
 fun pageHorizontalPadding(): Dp = Spacing.pageHorizontal
@@ -37,7 +37,7 @@ fun topBarPadding(): PaddingValues {
 
 /**
  * 一级页面（首页 / 收藏 / 设置 等带悬浮底栏的 Tab 页）统一内容边距：
- * - 左右：手机 [Spacing.pageHorizontal]，平板大屏 [Spacing.pageHorizontalMax]
+ * - 左右：[Spacing.pageHorizontal]
  * - 顶部避开状态栏 + [Spacing.pageTop]
  * - 底部避开悬浮胶囊 [Spacing.bottomBarInset]
  */

@@ -115,7 +115,7 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
                     .padding(start = horizontal, end = horizontal),
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding() + Spacing.pageTop,
-                    bottom = 24.dp,
+                    bottom = Spacing.contentBottomInset,
                 ),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {

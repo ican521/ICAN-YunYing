@@ -1,8 +1,6 @@
 package com.ican.tvplay.ui.search
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -71,18 +68,11 @@ fun SearchHomeScreen(
     val suggestions by vm.suggestions.collectAsStateWithLifecycle()
 
     var queryText by remember { mutableStateOf("") }
-    // miuix InputField 展开态：点击输入框时置 true 让其正常聚焦弹键盘；
-    // 点击外部/提交搜索时置 false 收起键盘。固定传 false 会导致 InputField 内部
-    // 100ms 后自动清焦点清文字，键盘动画与输入状态不一致出现上移过冲。
-    var expanded by remember { mutableStateOf(false) }
-    val focusManager = LocalFocusManager.current
 
     fun submit(keyword: String) {
         val q = keyword.trim()
         if (q.isEmpty()) return
         vm.addHistory(q)
-        expanded = false
-        focusManager.clearFocus()
         onSearch(q)
     }
 
@@ -113,11 +103,9 @@ fun SearchHomeScreen(
                         },
                         onSearch = { submit(it) },
                         label = "搜索影片、剧集",
-                        expanded = expanded,
-                        onExpandedChange = { expanded = it },
                         modifier = Modifier
                             .weight(1f)
-                            .padding(start = 12.dp),
+                            .padding(start = Spacing.topBarItemGap),
                     )
                 }
             }
@@ -128,26 +116,19 @@ fun SearchHomeScreen(
     ) { innerPadding ->
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
         // ========== 内容区：历史 + 推荐 ==========
-        // 点击输入框以外的区域收起输入法：整层内容挂一个无涟漪 clickable，
-        // 子项（历史词/推荐词）的点击会自行消费事件，不会触发外层收起。
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) {
-                    expanded = false
-                    focusManager.clearFocus()
-                }
                 .verticalScroll(rememberScrollState())
                 // 窗口已禁用系统级 IME 避让（MainActivity ADJUST_NOTHING），
                 // 键盘弹出时靠 imePadding 让历史/推荐底部内容仍可滚动到键盘上方
                 .imePadding()
-                .padding(horizontal = pageHorizontalPadding()),
+                .padding(horizontal = pageHorizontalPadding())
+                // 顶部间距走 Column 自身 padding，不放 Spacer 子项：
+                // 否则 spacedBy(sectionSpacing) 会在 Spacer 与首个板块之间多加 20dp
+                .padding(top = innerPadding.calculateTopPadding() + Spacing.searchBarBottomMargin),
             verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
         ) {
-            Spacer(Modifier.height(innerPadding.calculateTopPadding() + Spacing.searchBarBottomMargin))
             // 上半部分：历史（无历史整块隐藏；长按单个词删除）
             if (history.isNotEmpty()) {
                 Column {
@@ -191,13 +172,13 @@ private fun WordFlowRow(
     onWordLongClick: ((String) -> Unit)? = null,
 ) {
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.searchChipGap),
+        verticalArrangement = Arrangement.spacedBy(Spacing.searchChipGap),
     ) {
         words.forEach { word ->
             Box(
                 modifier = Modifier
-                    .height(40.dp)
+                    .height(Spacing.chipHeight)
                     .tvCardEffect(
                         onClick = { onWordClick(word) },
                         onLongClick = onWordLongClick?.let { { it(word) } },

@@ -16,8 +16,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -26,10 +29,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.ican.tvplay.ui.theme.PopupScrim
+import com.ican.tvplay.ui.theme.Spacing
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -102,6 +108,58 @@ internal fun dialogBottomMargin(): Dp = with(LocalDensity.current) {
 }
 
 /**
+ * 全 App 统一底部弹窗（全屏播放页内的弹窗除外）：
+ * 标题自绘（距弹窗顶 / 距内容均为 [Spacing.titleContentGap]），`insideMargin` 归零，
+ * 内容左右 / 底部留白 [Spacing.dialogContentMargin]，可一直显示到弹窗最底缘。
+ * 列表项统一使用 [Spacing.dialogItemPadding] 内边距、[Spacing.dialogItemGap] 项间距。
+ */
+@Composable
+fun MiuixBottomSheetDialog(
+    show: Boolean,
+    title: String,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    OverlayDialog(
+        show = show,
+        // 标题自绘：避免库默认 insideMargin=24dp 在内容底部压出空白带
+        title = null,
+        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
+        renderInRootScaffold = true,
+        // 三边统一 16dp：底部由 dialogBottomMargin 补偿系统导航栏
+        outsideMargin = DpSize(Spacing.dialogOutsideMargin, dialogBottomMargin()),
+        insideMargin = DpSize(0.dp, 0.dp),
+        // 强制「非大屏」：平板宽窗口下 miuix 会改为屏幕居中，与手机底部呼出不一致
+        largeScreen = false,
+        onDismissRequest = onDismiss,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = Spacing.dialogContentMargin,
+                    end = Spacing.dialogContentMargin,
+                    bottom = Spacing.dialogContentMargin,
+                ),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.dialogTitleGap),
+            )
+            Spacer(Modifier.height(Spacing.dialogTitleGap))
+            content()
+        }
+    }
+}
+
+/**
  * 全局统一确认弹窗：照搬 KernelSU ConfirmDialogMiuix（miuix WindowDialog + Text + 双 TextButton）。
  * 取消在左（默认色）、确定在右（主题色）；[danger] = true 时确定钮为红色（删除等破坏性操作）。
  */
@@ -116,47 +174,35 @@ fun MiuixConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // 直接使用 miuix OverlayDialog：遮罩为库自带 windowDim（与 URL 播放弹窗一致）
-    OverlayDialog(
+    MiuixBottomSheetDialog(
         show = show,
         title = title,
-        titleColor = MiuixTheme.colorScheme.onBackground,
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
-        renderInRootScaffold = true,
-        // 三边统一 16dp：底部 = max(16dp, 系统导航栏高度)，跨设备自适应
-        outsideMargin = DpSize(16.dp, dialogBottomMargin()),
-        // 强制按「非大屏」渲染：miuix 默认在宽窗口（平板横/竖屏）把弹窗改成屏幕居中，
-        // 与手机端「从底部呼出」不一致；固定 false 让平板也保持底部对齐
-        largeScreen = false,
-        onDismissRequest = onDismiss,
+        onDismiss = onDismiss,
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(text = content, color = MiuixTheme.colorScheme.onBackground)
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.padding(top = 12.dp),
-            ) {
-                TextButton(
-                    text = dismissText,
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(20.dp))
-                TextButton(
-                    text = confirmText,
-                    onClick = onConfirm,
-                    modifier = Modifier.weight(1f),
-                    colors = if (danger) {
-                        ButtonDefaults.textButtonColorsPrimary(
-                            color = Color(0xFFFF5C5C),
-                            textColor = Color.White,
-                        )
-                    } else {
-                        ButtonDefaults.textButtonColorsPrimary()
-                    },
-                )
-            }
+        Text(text = content, color = MiuixTheme.colorScheme.onBackground)
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.padding(top = Spacing.titleContentGap),
+        ) {
+            TextButton(
+                text = dismissText,
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(Spacing.dialogButtonGap))
+            TextButton(
+                text = confirmText,
+                onClick = onConfirm,
+                modifier = Modifier.weight(1f),
+                colors = if (danger) {
+                    ButtonDefaults.textButtonColorsPrimary(
+                        color = Color(0xFFFF5C5C),
+                        textColor = Color.White,
+                    )
+                } else {
+                    ButtonDefaults.textButtonColorsPrimary()
+                },
+            )
         }
     }
 }

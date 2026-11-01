@@ -565,6 +565,15 @@ fun PlayerScreen(
         video = v
         if (v != null) {
             val history = container.historyDao.observeOne(videoId).first()
+            // 恢复上次所选线路：调用方未指定线路（搜索页等）或指定的线路在新详情中不存在时，
+            // 用历史记录的 lineFlag 兜底；都没有才落回首条线路。
+            // 否则 eps 会取错线路的选集列表，history.episodeIndex 越界被丢弃，表现为"集数重置"。
+            val currentFlagExists = v.playSources.any { it.flag == lineFlag }
+            if (!currentFlagExists && history != null && history.lineFlag.isNotBlank() &&
+                v.playSources.any { it.flag == history.lineFlag }
+            ) {
+                lineFlag = history.lineFlag
+            }
             val eps = v.playSources
                 .let { s -> s.firstOrNull { it.flag == lineFlag } ?: s.firstOrNull() }
                 ?.episodes ?: v.episodes
@@ -2073,9 +2082,7 @@ private fun LineSection(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    // 几何与选集 EpisodeChip 完全一致：40dp 高、40dp 最小宽、左右 12dp 内边距。
-                    // 高度固定后 Spacing.corner(16dp) 小于半高 → 呈圆矩形（此前内容撑高 32dp 时恰好呈胶囊）
-                    .height(40.dp)
+                    // 几何与选集 EpisodeChip 一致：40dp 最小宽、四边 12dp 内边距，高度随内容撑开
                     .defaultMinSize(minWidth = 40.dp)
                     .tvCardEffect(
                         onClick = { onLineChange(source.flag) },
@@ -2089,7 +2096,7 @@ private fun LineSection(
                         else MaterialTheme.colorScheme.surfaceVariant,
                         shape,
                     )
-                    .padding(horizontal = 12.dp),
+                    .padding(12.dp),
             ) {
                 Text(
                     text = source.flag,
@@ -2261,12 +2268,12 @@ private fun EpisodeGridDialog(
         else -> 5
     }
     // 行数宁少勿截：反编译确认 miuix 硬限弹窗总高 = 2/3 × LocalWindowInfo.containerDpSize.height
-    // （窗口容器高，不含系统栏，与 screenHeightDp 不同源），此处用同一基准再预留一整行(46dp)安全余量，
+    // （窗口容器高，不含系统栏，与 screenHeightDp 不同源），此处用同一基准再预留一整行(48dp)安全余量，
     // 保证任意设备/横竖屏/视频下末行完整不截断。固定区 = 标题行28 + titleContentGap×5（留白+安全余量）+ Tab行44；
-    // 每行占高 = chip 40dp（固定 dp，不随字体缩放）+ 行距 6dp
+    // 每行占高 = chip 40dp（固定 dp，不随字体缩放）+ 行距 8dp
     val dialogFixedHeight = 28.dp + Spacing.titleContentGap * 5 + 44.dp
     val dialogCapHeight = androidx.compose.ui.platform.LocalWindowInfo.current.containerDpSize.height * 2f / 3f
-    val rowsPerPage = ((dialogCapHeight - dialogFixedHeight - 46.dp).value / 46f).toInt().coerceIn(3, 10)
+    val rowsPerPage = ((dialogCapHeight - dialogFixedHeight - 48.dp).value / 48f).toInt().coerceIn(3, 10)
     val itemCount = spanCount * rowsPerPage
     // 空集（详情加载中）时 pageCount 至少为 1，避免 coerceIn(0, -1) 崩溃
     val pageCount = ((displayEps.size + itemCount - 1) / itemCount).coerceAtLeast(1)
@@ -2339,7 +2346,8 @@ private fun EpisodeGridDialog(
         insideMargin = DpSize(0.dp, 0.dp),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // 自绘标题：字号/字重/居中与 miuix 原标题一致，顶部间距走 titleContentGap
+            // 自绘标题：字号/字重/居中与 miuix 原标题一致；
+            // 顶部 padding 13.5dp + 标题文字上行留白 ≈2.5dp → 视觉间距 16dp
             Text(
                 text = "选集",
                 style = MaterialTheme.typography.titleLarge,
@@ -2348,12 +2356,12 @@ private fun EpisodeGridDialog(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = Spacing.titleContentGap),
+                    .padding(top = 13.5.dp),
             )
             if (pageCount > 1) {
-                // 标题 ↔ Tab 间距：3dp 实测补偿值——文字行高自带隐藏空隙（标题下缘约 4dp + Tab 内部约 7.8dp），
-                // 补偿后标题墨迹↔Tab 墨迹 ≈ 14.8dp，与「弹窗顶↔标题」14.5dp、「Tab↔网格」14.5dp 三段等距
-                Spacer(modifier = Modifier.height(3.dp))
+                // 标题 ↔ Tab 间距：4.5dp 实测补偿值——文字行高自带隐藏空隙（标题下缘约 4dp + Tab 内部约 7.8dp），
+                // 补偿后标题墨迹↔Tab 墨迹 ≈ 16dp，与「弹窗顶↔标题」「Tab↔网格」视觉间距一致
+                Spacer(modifier = Modifier.height(4.5.dp))
                 // 自绘分页 Tab（LazyRow）：
                 // 几何对齐——内容左右内缩 dialogContentMargin（与选集网格 LazyVerticalGrid 的 horizontal padding 同源），
                 // 每个 Tab 盒内左右再内缩 16dp，故静止时首个 Tab 文字墨迹起点 = 16 + 16 = 32dp，
@@ -2384,13 +2392,13 @@ private fun EpisodeGridDialog(
                         }
                     }
                 }
-                // Tab ↔ 网格间距：5dp 实测补偿值（Tab 行内部隐藏空隙），实测墨迹间距 13.5dp+1dp=14.5dp，
-                // 与「弹窗顶↔标题」14.5dp、「标题↔Tab」14.9dp 三段等距（误差 ≤1px）
-                Spacer(modifier = Modifier.height(5.dp))
+                // Tab ↔ 网格间距：8dp。Tab 文字（数字）底到 Tab 盒底还有约 4dp 隐藏留白
+                // （行高留白约 1dp + 盒内 vertical 4dp），补偿后 Tab 文字墨迹↔首个选集按钮 ≈ 16dp
+                Spacer(modifier = Modifier.height(8.dp))
             } else {
-                // 无 Tab 栏（单页）时没有 Tab 行的隐藏空隙可补偿，直接给 10dp
-                // （+ 标题文字下缘约 4.4dp = 14.4dp，与三段等距体系一致）
-                Spacer(modifier = Modifier.height(10.dp))
+                // 无 Tab 栏（单页）时没有 Tab 行的隐藏空隙可补偿，直接给 11.5dp
+                // （+ 标题文字下缘约 4.5dp = 16dp，与三段视觉间距一致）
+                Spacer(modifier = Modifier.height(11.5.dp))
             }
             HorizontalPager(
                 state = pagerState,
@@ -2406,16 +2414,16 @@ private fun EpisodeGridDialog(
                 val rawPage = displayEps.subList(start, minOf(start + itemCount, displayEps.size))
                 // 倒序只反转本页内部的集顺序（分页本身保持正序）
                 val pageEpisodes = if (reversed) rawPage.asReversed() else rawPage
-                // 页高 = rowsPerPage 行（chip 40dp + 行距 6dp）+ 4dp 视口余量：
-                // 行距换算像素非整数（2.75x 密度下 16.5px），LazyGrid 逐项像素取整会在末行底边
+                // 页高 = rowsPerPage 行（chip 40dp + 行距 8dp）+ 4dp 视口余量：
+                // 行距换算像素非整数（2.75x 密度下 22px），LazyGrid 逐项像素取整会在末行底边
                 // 裁掉 1~2px 圆角；视口略高于内容即可完整渲染末行（网格背景透明，余量不可见）
-                val pageHeight = 40.dp * rowsPerPage + 6.dp * (rowsPerPage - 1) + 4.dp
+                val pageHeight = 40.dp * rowsPerPage + 8.dp * (rowsPerPage - 1) + 4.dp
                 // 左右 dialogContentMargin 内缩放在「每一页内部」并随页滑动：静止时网格有正常边距；
                 // 滑动切页时 pager 视口为弹窗全宽，内容可以一直绘制到弹窗最左/最右边缘
                 LazyVerticalGrid(
                     columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(spanCount),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = Spacing.dialogContentMargin)
@@ -3135,8 +3143,7 @@ private fun EpisodeChip(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            // 高度固定，最小宽度为正方形（40dp）；文字长时宽度自适应撑开
-            .height(40.dp)
+            // 高度随内容撑开（四边 12dp 内边距 + 单行文字），最小宽度为正方形（40dp）；文字长时宽度自适应撑开
             .defaultMinSize(minWidth = 40.dp)
             // 选集列表自带选中态：整列表（含未选中项）统一不要按压/点击蒙层，选中色即反馈
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false, pressEffect = false)
@@ -3149,7 +3156,7 @@ private fun EpisodeChip(
                 shape,
             )
             .then(borderModifier)
-            .padding(horizontal = 12.dp),
+            .padding(12.dp),
     ) {
         Text(
             text = title,
