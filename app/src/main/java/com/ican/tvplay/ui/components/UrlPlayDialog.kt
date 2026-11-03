@@ -56,7 +56,7 @@ fun UrlPlayDialog(
         )
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.padding(top = Spacing.titleContentGap),
+            modifier = Modifier.padding(top = Spacing.dialogTitleGap),
         ) {
             TextButton(
                 text = "取消",

@@ -221,12 +221,14 @@ fun HomeScreen(
     // 搜索行滚动折叠（严格 glued：折叠量 = 列表滚动量）：
     // 上滑列表滚多少收多少、下滑滚多少展多少，卡片始终贴着搜索行底缘，栏无任何自主运动；
     // 列表已在顶部时下拉过界量也用于展开；只改顶区高度、不碰网格布局，无反馈回路
-    // 最大收起量 = HomeTopBar 固定 48dp + 搜索行顶部间距（不含状态栏：状态栏由固定 Spacer 占位
+    // 搜索行上方留白（状态栏下缘 → 搜索胶囊顶）：16dp
+    val homeSearchTopGap = 16.dp
+    // 最大收起量 = 搜索行上方留白 16dp + HomeTopBar 固定 48dp（不含状态栏：状态栏由固定 Spacer 占位
     // 不折叠，否则收起后 Tab 行顶到屏幕最顶端与状态栏重叠），直接计算（不做实测回写，杜绝测量振荡）。
     // 量化成整像素：折叠量同时驱动「顶栏 Layout 的 shift（roundToInt）」和「网格 contentPadding 对齐」，
     // 若保留小数（如 170.5，Layout 取 171 而网格取 170）新页卡片顶部会比 Tab 行底缘低 1px，露出 1px 缝隙
     val searchRowMaxCollapsePx = with(density) {
-        (48.dp + Spacing.pageTop).toPx()
+        (homeSearchTopGap + 48.dp).toPx()
     }.roundToInt().toFloat()
     // 顶区「展开状态」总高度 → 每页网格固定顶部 contentPadding。
     // 确定性计算，不做实测回写：实测值会受「顶栏毛玻璃」开关引起的重排影响出现瞬时偏差，
@@ -467,7 +469,7 @@ fun HomeScreen(
                             VideoCardItem(video = video, onClick = { onItemClick(video) })
                         }
                     }
-                    // 网盘文件夹页短列表兜底：让「最大可上滑距离」恰好 = 搜索行最大折叠量（62dp）。
+                    // 网盘文件夹页短列表兜底：让「最大可上滑距离」恰好 = 搜索行最大折叠量（48dp）。
                     // 完全上滑后第一行贴着分类 Tab 下缘完整显示，不能再往上滑。
                     // 纯确定性计算（不读 layoutInfo，避免与 Spacer 高度互相循环）：
                     //   内容总高 = 项数×行高 + (项数-1)×行间距
@@ -532,10 +534,11 @@ fun HomeScreen(
                         )
                         .clipToBounds(),
                     content = {
-                        // 0：搜索行（含顶部间距；左右边距走页面基准，分类 Tab 保持通栏）
+                        // 0：搜索行（状态栏下缘留白 16dp 由本行顶部 padding 提供，随搜索行一起折叠）
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .padding(top = homeSearchTopGap)
                                 // 折叠状态下在搜索行上向下滑动 → 把拖动转给当前页网格回滚，
                                 // 搜索行跟着展开（折叠量唯一真源是网格滚动位置，不直接改折叠量）
                                 .pointerInput(Unit) {
@@ -549,7 +552,6 @@ fun HomeScreen(
                                     }
                                 },
                         ) {
-                            Spacer(Modifier.height(Spacing.pageTop))
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -780,7 +782,8 @@ private fun HomeTopBar(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.topBarItemGap),
+        // 搜索胶囊左右与圆形按钮的间距 16dp：仅靠加大间距让胶囊变窄，按钮尺寸/位置不变
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxWidth().height(Spacing.topBarHeight),
     ) {
         // 嫌弃 GIF 按钮（代替原链接解析按钮）：单击=站源选择，长按=链接解析；透明底循环播放；
@@ -825,7 +828,7 @@ private fun HomeTopBar(
                     indication = SinkFeedback(),
                     delay = null,
                 )
-                .tvCardEffect(onClick = onSearchClick, shape = CircleShape, focusedScale = 1.04f, glow = false)
+                .tvCardEffect(onClick = onSearchClick, shape = CircleShape, focusedScale = 1.1f, glow = false)
                 .clip(CircleShape)
                 .background(MiuixTheme.colorScheme.surfaceContainerHigh)
                 .padding(start = 16.dp),
@@ -898,7 +901,7 @@ private fun UnderlineTabRow(
     onTabSelected: (Int) -> Unit,
     pagerState: PagerState,
     modifier: Modifier = Modifier,
-    itemSpacing: Dp = 24.dp,
+    itemSpacing: Dp = 16.dp,
     height: Dp = TabRowHeight,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth().height(height)) {
@@ -957,8 +960,8 @@ private fun UnderlineTabRow(
             ) {
                 itemsIndexed(tabs, contentType = { _, _ -> "tab" }) { index, tabText ->
                     val selected = selectedTabIndex == index
-                    // 文字垂直居中于 42dp 行内：因 Tab 行本身已居中于「搜索框底→卡片顶」的 48dp 区间
-                    // （上方间距 categoryTabVertical=1dp + 行高42dp + 下方容器余量1dp），
+                    // 文字垂直居中于 42dp 行内：因 Tab 行本身已居中于「搜索框底→卡片顶」的
+                    // （上方 categoryTabVertical + 行高42dp + 下方同值余量）区间，
                     // 行内居中即保证「tab文字底→卡片顶」=「tab文字顶→搜索框底」，且不随字号变化破坏等式
                     Box(
                         contentAlignment = Alignment.Center,

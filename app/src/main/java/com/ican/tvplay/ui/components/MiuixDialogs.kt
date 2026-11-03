@@ -109,7 +109,7 @@ internal fun dialogBottomMargin(): Dp = with(LocalDensity.current) {
 
 /**
  * 全 App 统一底部弹窗（全屏播放页内的弹窗除外）：
- * 标题自绘（距弹窗顶 / 距内容均为 [Spacing.titleContentGap]），`insideMargin` 归零，
+ * 标题自绘（距弹窗顶 / 距内容均为 [Spacing.dialogTitleGap]），`insideMargin` 归零，
  * 内容左右 / 底部留白 [Spacing.dialogContentMargin]，可一直显示到弹窗最底缘。
  * 列表项统一使用 [Spacing.dialogItemPadding] 内边距、[Spacing.dialogItemGap] 项间距。
  */
@@ -134,6 +134,9 @@ fun MiuixBottomSheetDialog(
         largeScreen = false,
         onDismissRequest = onDismiss,
     ) {
+        // 标题用 titleLarge（22sp / 行高 28sp），行盒上下各多 3dp 半行距；
+        // 扣掉后「弹窗顶边→标题」「标题→内容」的视觉间距均为 dialogTitleGap(16dp)
+        val titleOpticalGap = Spacing.dialogTitleGap - 3.dp
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -151,9 +154,9 @@ fun MiuixBottomSheetDialog(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = Spacing.dialogTitleGap),
+                    .padding(top = titleOpticalGap),
             )
-            Spacer(Modifier.height(Spacing.dialogTitleGap))
+            Spacer(Modifier.height(titleOpticalGap))
             content()
         }
     }
@@ -182,7 +185,7 @@ fun MiuixConfirmDialog(
         Text(text = content, color = MiuixTheme.colorScheme.onBackground)
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.padding(top = Spacing.titleContentGap),
+            modifier = Modifier.padding(top = Spacing.dialogTitleGap),
         ) {
             TextButton(
                 text = dismissText,

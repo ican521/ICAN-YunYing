@@ -60,7 +60,7 @@ fun Modifier.blackElevationShadow(elevation: Dp, shape: Shape): Modifier =
 fun Modifier.tvCardEffect(
     onClick: () -> Unit,
     shape: Shape,
-    focusedScale: Float = 1.07f,
+    focusedScale: Float = 1.03f,
     glow: Boolean = true,
     enabled: Boolean = true,
     onLongClick: (() -> Unit)? = null,

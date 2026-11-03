@@ -1,5 +1,6 @@
 package com.ican.tvplay.ui.search
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
@@ -98,6 +100,8 @@ fun MultiSourceSearchScreen(
     val searchedQuery by vm.query.collectAsStateWithLifecycle()
 
     var queryText by remember { mutableStateOf(initialQuery) }
+    // 输入时点击搜索栏以外区域收起输入法：清焦点（InputField 收起态不自接管外部点击）
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     // 首次进入时触发跨站搜索（initialQuery 非空才触发）；
     // 播放页返回时若已有同词结果则跳过，保持列表与滚动位置不变
@@ -136,7 +140,8 @@ fun MultiSourceSearchScreen(
                         label = "跨站源搜索…",
                         modifier = Modifier
                             .weight(1f)
-                            .padding(start = Spacing.topBarItemGap),
+                            // 距返回钮 16dp（右侧距屏幕保持 pageHorizontalPadding 16dp 不变）
+                            .padding(start = 16.dp),
                     )
                 }
             }
@@ -145,13 +150,18 @@ fun MultiSourceSearchScreen(
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        Box(
+            modifier = (if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                // 空白处点击（子项已消费的点击不受影响）→ 清焦点，输入法随之收起
+                .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background),
         ) {
-            Spacer(Modifier.height(innerPadding.calculateTopPadding() + Spacing.searchBarBottomMargin))
+            // 本页顶部间距 16dp（其余搜索页仍用全局 12dp）
+            Spacer(Modifier.height(innerPadding.calculateTopPadding() + 16.dp))
         // ========== 主体：左站源列表 + 右卡片网格（左右边距与顶栏同一基准）==========
         Row(
             modifier = Modifier
@@ -294,11 +304,11 @@ private fun SiteSourceChip(
     else MaterialTheme.colorScheme.onSurfaceVariant
     val shape = RoundedCornerShape(percent = 50)
 
-    // 固定宽度：所有胶囊等宽，不因名字长短变化；无水平外边距，左缘与返回圆钮（页面边距 16dp）精确对齐
+    // 固定宽度：所有胶囊等宽，不因名字长短变化；无水平外边距，左缘与返回圆钮（页面边距 16dp）精确对齐。
+    // 与搜索首页词条胶囊同几何：固定 40dp 高（文字居中），左右 16dp、上下 0
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(Spacing.chipHeight)
             // pressable 在外层：按压缩放跟随 Sink 动画（与右侧视频卡片同序）；
             // 站源列表自带选中态，蒙层关闭（pressEffect=false），选中色即状态反馈
             .pressable(
@@ -314,14 +324,14 @@ private fun SiteSourceChip(
                 pressEffect = false,
             )
             .background(bg, shape)
-            .padding(horizontal = 6.dp),
+            .height(Spacing.chipHeight)
+            .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = name,
             style = MaterialTheme.typography.labelMedium,
             color = fg,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -396,7 +406,7 @@ private fun CrossSourceVideoCard(
             .tvCardEffect(
                 onClick = onClick,
                 shape = SquircleShape(Spacing.corner),
-                focusedScale = 1.05f,
+                focusedScale = 1.03f,
                 glow = false,
                 // 按压蒙层固定浅色模式同款浅黑：深色模式与浅色表现一致
                 pressColor = LightOnSurface,
@@ -419,9 +429,9 @@ private fun CrossSourceVideoCard(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(8.dp)
+                    .padding(Spacing.posterOverlayMargin)
                     .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                    .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
             ) {
                 Text(
                     text = siteName.ifBlank { video.categoryName.ifBlank { "来源" } },
@@ -447,12 +457,12 @@ private fun CrossSourceVideoCard(
                             // 接近「标题→卡片底边」的约 10dp
                             .offset(y = 1.dp)
                             // 左边距 8dp：与左上角站源胶囊的 8dp 对齐
-                            .padding(start = 8.dp, end = 8.dp, top = 4.dp)
+                            .padding(start = Spacing.posterOverlayMargin, end = Spacing.posterOverlayMargin, top = 4.dp)
                             .background(
                                 PosterBadgeScrim,
-                                SquircleShape(Spacing.corner),
+                                RoundedCornerShape(percent = 50),
                             )
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                            .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
                     ) {
                         Text(
                             text = tags.take(3).joinToString(" "),
@@ -473,7 +483,12 @@ private fun CrossSourceVideoCard(
                             ),
                         )
                         // 高度不变（上下各 6dp），纯黑 80% → 全透明渐变
-                        .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 6.dp),
+                        .padding(
+                            start = Spacing.posterTitlePaddingH,
+                            end = Spacing.posterTitlePaddingH,
+                            bottom = Spacing.posterTitlePaddingV,
+                            top = Spacing.posterTitlePaddingV,
+                        ),
                 ) {
                     Text(
                         text = video.title,

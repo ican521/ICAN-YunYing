@@ -116,14 +116,15 @@ fun FavoritesScreen(
                         .fillMaxWidth()
                         .background(barColor)
                         .padding(WindowInsets.statusBars.asPaddingValues())
-                        .height(48.dp),
-                    contentAlignment = Alignment.Center,
+                        .height(Spacing.centeredTopBarHeight),
+                    contentAlignment = Alignment.TopCenter,
                 ) {
                     Text(
                         text = "我的收藏",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(top = Spacing.centeredTopBarTitleInset),
                     )
                 }
             }
@@ -242,7 +243,7 @@ private fun UpdatesEntry(
             .tvCardEffect(
                 onClick = onClick,
                 shape = SquircleShape(Spacing.corner),
-                focusedScale = 1.02f,
+                focusedScale = 1.03f,
                 glow = false,
                 pressColor = LightOnSurface,
             ),
@@ -315,7 +316,7 @@ private fun FavoriteCard(
             .tvCardEffect(
                     onClick = onClick,
                     shape = SquircleShape(Spacing.corner),
-                    focusedScale = 1.05f,
+                    focusedScale = 1.03f,
                     glow = false,
                     onLongClick = onLongClick,
                     // 按压蒙层固定浅色模式同款浅黑：收藏/历史卡片深色模式与浅色表现一致
@@ -340,9 +341,9 @@ private fun FavoriteCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(8.dp)
+                        .padding(Spacing.posterOverlayMargin)
                         .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
                 ) {
                     Text(
                         text = entity.sourceName.ifBlank { "来源" },
@@ -360,12 +361,12 @@ private fun FavoriteCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
+                        .padding(Spacing.posterOverlayMargin)
                         .size(30.dp)
                         .tvCardEffect(
                             onClick = onDelete,
                             shape = CircleShape,
-                            focusedScale = 1.15f,
+                            focusedScale = 1.10f,
                             glow = false,
                         )
                         .background(PosterActionScrim, CircleShape),
@@ -391,7 +392,12 @@ private fun FavoriteCard(
                         ),
                     )
                     // 底部留 6dp：文字行盒下方还有约 4dp 余量，6+4 才和左侧 10dp 视觉一致
-                    .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 6.dp),
+                    .padding(
+                        start = Spacing.posterTitlePaddingH,
+                        end = Spacing.posterTitlePaddingH,
+                        bottom = Spacing.posterTitlePaddingV,
+                        top = Spacing.posterTitlePaddingV,
+                    ),
             ) {
                 Text(
                     text = entity.title,
@@ -573,7 +579,7 @@ private fun HistoryCard(
             .tvCardEffect(
                     onClick = onClick,
                     shape = SquircleShape(Spacing.corner),
-                    focusedScale = 1.05f,
+                    focusedScale = 1.03f,
                     glow = false,
                     onLongClick = onLongClick,
                     // 按压蒙层固定浅色模式同款浅黑：收藏/历史卡片深色模式与浅色表现一致
@@ -598,9 +604,9 @@ private fun HistoryCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(8.dp)
+                        .padding(Spacing.posterOverlayMargin)
                         .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
                 ) {
                     Text(
                         text = history.sourceName.ifBlank { "来源" },
@@ -618,12 +624,12 @@ private fun HistoryCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
+                        .padding(Spacing.posterOverlayMargin)
                         .size(30.dp)
                         .tvCardEffect(
                             onClick = onDelete,
                             shape = CircleShape,
-                            focusedScale = 1.15f,
+                            focusedScale = 1.10f,
                             glow = false,
                         )
                         .background(PosterActionScrim, CircleShape),
@@ -650,9 +656,9 @@ private fun HistoryCard(
                         modifier = Modifier
                             // 底部不留间距：胶囊底边正好压在渐变 0% 透明分界线上（标题上方 6dp）
                             // 左边距 8dp：与左上角站源胶囊的 8dp 对齐
-                            .padding(start = 8.dp, end = 8.dp, top = 4.dp)
+                            .padding(start = Spacing.posterOverlayMargin, end = Spacing.posterOverlayMargin, top = 4.dp)
                             .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                            .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
                     ) {
                         Text(
                             text = history.episodeTitle,
@@ -673,7 +679,12 @@ private fun HistoryCard(
                             ),
                         )
                         // 高度不变（上下各 6dp），纯黑 80% → 全透明渐变
-                        .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 6.dp),
+                        .padding(
+                            start = Spacing.posterTitlePaddingH,
+                            end = Spacing.posterTitlePaddingH,
+                            bottom = Spacing.posterTitlePaddingV,
+                            top = Spacing.posterTitlePaddingV,
+                        ),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(

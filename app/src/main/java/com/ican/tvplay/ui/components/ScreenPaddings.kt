@@ -20,10 +20,10 @@ import com.ican.tvplay.ui.theme.Spacing
 fun pageHorizontalPadding(): Dp = Spacing.pageHorizontal
 
 /**
- * 二级页面顶栏（返回圆钮 / 搜索栏）统一内容边距：
- * - 左右：[pageHorizontalPadding]（手机 16dp / 平板 24dp）
- * - 顶部：状态栏高度 + [Spacing.pageTop]
- * 不含 bottom —— 顶栏与下方内容的间距由各页内容区自行控制。
+ * 固定顶栏（返回圆钮 / 搜索栏 / 居中大标题）统一内容边距：
+ * - 左右：[pageHorizontalPadding]（全设备统一 16dp）
+ * - 顶部：仅状态栏高度 —— 顶栏内容紧贴状态栏下缘，与收藏/设置页同一基准
+ * 不含 bottom —— 顶栏与下方内容的 [Spacing.pageTop] 间距由各页内容区自行控制。
  */
 @Composable
 fun topBarPadding(): PaddingValues {
@@ -31,7 +31,7 @@ fun topBarPadding(): PaddingValues {
     return PaddingValues(
         start = horizontal,
         end = horizontal,
-        top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + Spacing.pageTop,
+        top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
     )
 }
 

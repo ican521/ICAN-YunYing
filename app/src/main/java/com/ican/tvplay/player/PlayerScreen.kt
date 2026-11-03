@@ -2074,7 +2074,7 @@ private fun LineSection(
     LazyRow(
         state = listState,
         contentPadding = PaddingValues(horizontal = horizontalPadding),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
     ) {
         items(v.playSources, key = { it.flag }, contentType = { "line" }) { source ->
             val selected = source.flag == lineFlag
@@ -2082,11 +2082,11 @@ private fun LineSection(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    // 几何与选集 EpisodeChip 一致：40dp 最小宽、四边 12dp 内边距，高度随内容撑开
+                    // 几何与选集 EpisodeChip 一致：40dp 最小宽、四边 dialogItemPadding，高度随内容撑开
                     .defaultMinSize(minWidth = 40.dp)
                     .tvCardEffect(
                         onClick = { onLineChange(source.flag) },
-                        shape = shape, focusedScale = 1.06f, glow = false,
+                        shape = shape, focusedScale = 1.05f, glow = false,
                         // 线路列表自带选中态：整列表统一去掉按压/点击蒙层，选中色即反馈
                         pressEffect = false,
                     )
@@ -2096,7 +2096,7 @@ private fun LineSection(
                         else MaterialTheme.colorScheme.surfaceVariant,
                         shape,
                     )
-                    .padding(12.dp),
+                    .padding(Spacing.dialogItemPadding),
             ) {
                 Text(
                     text = source.flag,
@@ -2212,7 +2212,7 @@ private fun EpisodeSection(
         LazyRow(
             state = listState,
             contentPadding = PaddingValues(horizontal = horizontalPadding),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
         ) {
             itemsIndexed(displayEps, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { dispIdx, ep ->
                 val idx = if (reversedEp) lineEpisodes.size - 1 - dispIdx else dispIdx
@@ -2268,12 +2268,13 @@ private fun EpisodeGridDialog(
         else -> 5
     }
     // 行数宁少勿截：反编译确认 miuix 硬限弹窗总高 = 2/3 × LocalWindowInfo.containerDpSize.height
-    // （窗口容器高，不含系统栏，与 screenHeightDp 不同源），此处用同一基准再预留一整行(48dp)安全余量，
-    // 保证任意设备/横竖屏/视频下末行完整不截断。固定区 = 标题行28 + titleContentGap×5（留白+安全余量）+ Tab行44；
-    // 每行占高 = chip 40dp（固定 dp，不随字体缩放）+ 行距 8dp
-    val dialogFixedHeight = 28.dp + Spacing.titleContentGap * 5 + 44.dp
+    // （窗口容器高，不含系统栏，与 screenHeightDp 不同源），此处用同一基准预留整行安全余量，
+    // 保证任意设备/横竖屏/视频下末行完整不截断。固定区 = 标题行28 + dialogTitleGap×4（上下留白+安全余量）+ Tab行44；
+    // 每行占高 = chip 48dp（16dp 四边内边距 + 单行文字）+ 行距 8dp
+    val dialogFixedHeight = 28.dp + Spacing.dialogTitleGap * 4 + 44.dp
     val dialogCapHeight = androidx.compose.ui.platform.LocalWindowInfo.current.containerDpSize.height * 2f / 3f
-    val rowsPerPage = ((dialogCapHeight - dialogFixedHeight - 48.dp).value / 48f).toInt().coerceIn(3, 10)
+    val rowPitch = Spacing.episodeChipHeight + Spacing.dialogItemGap
+    val rowsPerPage = ((dialogCapHeight - dialogFixedHeight - rowPitch).value / rowPitch.value).toInt().coerceIn(2, 10)
     val itemCount = spanCount * rowsPerPage
     // 空集（详情加载中）时 pageCount 至少为 1，避免 coerceIn(0, -1) 崩溃
     val pageCount = ((displayEps.size + itemCount - 1) / itemCount).coerceAtLeast(1)
@@ -2346,8 +2347,7 @@ private fun EpisodeGridDialog(
         insideMargin = DpSize(0.dp, 0.dp),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // 自绘标题：字号/字重/居中与 miuix 原标题一致；
-            // 顶部 padding 13.5dp + 标题文字上行留白 ≈2.5dp → 视觉间距 16dp
+            // 自绘标题：字号/字重/居中与 miuix 原标题一致；距弹窗顶部统一 dialogTitleGap
             Text(
                 text = "选集",
                 style = MaterialTheme.typography.titleLarge,
@@ -2356,12 +2356,11 @@ private fun EpisodeGridDialog(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 13.5.dp),
+                    .padding(top = Spacing.dialogTitleGap),
             )
             if (pageCount > 1) {
-                // 标题 ↔ Tab 间距：4.5dp 实测补偿值——文字行高自带隐藏空隙（标题下缘约 4dp + Tab 内部约 7.8dp），
-                // 补偿后标题墨迹↔Tab 墨迹 ≈ 16dp，与「弹窗顶↔标题」「Tab↔网格」视觉间距一致
-                Spacer(modifier = Modifier.height(4.5.dp))
+                // 标题 ↔ Tab 间距统一 dialogTitleGap
+                Spacer(modifier = Modifier.height(Spacing.dialogTitleGap))
                 // 自绘分页 Tab（LazyRow）：
                 // 几何对齐——内容左右内缩 dialogContentMargin（与选集网格 LazyVerticalGrid 的 horizontal padding 同源），
                 // 每个 Tab 盒内左右再内缩 16dp，故静止时首个 Tab 文字墨迹起点 = 16 + 16 = 32dp，
@@ -2392,13 +2391,11 @@ private fun EpisodeGridDialog(
                         }
                     }
                 }
-                // Tab ↔ 网格间距：8dp。Tab 文字（数字）底到 Tab 盒底还有约 4dp 隐藏留白
-                // （行高留白约 1dp + 盒内 vertical 4dp），补偿后 Tab 文字墨迹↔首个选集按钮 ≈ 16dp
-                Spacer(modifier = Modifier.height(8.dp))
+                // Tab ↔ 网格间距统一 dialogTitleGap
+                Spacer(modifier = Modifier.height(Spacing.dialogTitleGap))
             } else {
-                // 无 Tab 栏（单页）时没有 Tab 行的隐藏空隙可补偿，直接给 11.5dp
-                // （+ 标题文字下缘约 4.5dp = 16dp，与三段视觉间距一致）
-                Spacer(modifier = Modifier.height(11.5.dp))
+                // 无 Tab 栏（单页）时标题 ↔ 网格同样是 dialogTitleGap
+                Spacer(modifier = Modifier.height(Spacing.dialogTitleGap))
             }
             HorizontalPager(
                 state = pagerState,
@@ -2414,16 +2411,17 @@ private fun EpisodeGridDialog(
                 val rawPage = displayEps.subList(start, minOf(start + itemCount, displayEps.size))
                 // 倒序只反转本页内部的集顺序（分页本身保持正序）
                 val pageEpisodes = if (reversed) rawPage.asReversed() else rawPage
-                // 页高 = rowsPerPage 行（chip 40dp + 行距 8dp）+ 4dp 视口余量：
+                // 页高 = rowsPerPage 行（chip episodeChipHeight + 行距 dialogItemGap）+ 4dp 视口余量：
                 // 行距换算像素非整数（2.75x 密度下 22px），LazyGrid 逐项像素取整会在末行底边
                 // 裁掉 1~2px 圆角；视口略高于内容即可完整渲染末行（网格背景透明，余量不可见）
-                val pageHeight = 40.dp * rowsPerPage + 8.dp * (rowsPerPage - 1) + 4.dp
+                val pageHeight = Spacing.episodeChipHeight * rowsPerPage +
+                    Spacing.dialogItemGap * (rowsPerPage - 1) + 4.dp
                 // 左右 dialogContentMargin 内缩放在「每一页内部」并随页滑动：静止时网格有正常边距；
                 // 滑动切页时 pager 视口为弹窗全宽，内容可以一直绘制到弹窗最左/最右边缘
                 LazyVerticalGrid(
                     columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(spanCount),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = Spacing.dialogContentMargin)
@@ -2926,7 +2924,7 @@ private fun FullscreenPlayLayout(
                     .align(Alignment.CenterEnd)
                     .padding(end = 4.dp)
                     .size(48.dp)
-                    .tvCardEffect(onClick = { onLockToggle() }, shape = CircleShape, focusedScale = 1.08f, glow = false, pressEffect = false),
+                    .tvCardEffect(onClick = { onLockToggle() }, shape = CircleShape, focusedScale = 1.10f, glow = false, pressEffect = false),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(AppIcons.LockOpen, "锁屏", tint = Color.White, modifier = Modifier.size(24.dp))
@@ -2938,7 +2936,7 @@ private fun FullscreenPlayLayout(
                     .align(Alignment.CenterEnd)
                     .padding(end = 4.dp)
                     .size(48.dp)
-                    .tvCardEffect(onClick = { onUnlock() }, shape = CircleShape, focusedScale = 1.08f, glow = false, pressEffect = false),
+                    .tvCardEffect(onClick = { onUnlock() }, shape = CircleShape, focusedScale = 1.10f, glow = false, pressEffect = false),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(AppIcons.Lock, "解锁", tint = Color.White, modifier = Modifier.size(24.dp))
@@ -3114,7 +3112,7 @@ private fun ActionBtn(
                 onClick = onClick,
                 onLongClick = onLongClick,
                 shape = RoundedCornerShape(percent = 50),
-                focusedScale = 1.08f,
+                focusedScale = 1.05f,
                 glow = false,
                 pressEffect = false,
             )
@@ -3143,8 +3141,10 @@ private fun EpisodeChip(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            // 高度随内容撑开（四边 12dp 内边距 + 单行文字），最小宽度为正方形（40dp）；文字长时宽度自适应撑开
-            .defaultMinSize(minWidth = 40.dp)
+            // 高度随内容撑开（四边 16dp 内边距 + 单行文字），并兜底到 episodeChipHeight：
+            // 与选集网格的分页高度换算（rowsPerPage）严格一致，否则文字行高不足 48dp 时
+            // 网格视口会多出不可见余量，表现为弹窗底部间距比左右大
+            .defaultMinSize(minWidth = 40.dp, minHeight = Spacing.episodeChipHeight)
             // 选集列表自带选中态：整列表（含未选中项）统一不要按压/点击蒙层，选中色即反馈
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false, pressEffect = false)
             // "更多"弹窗选中填充对齐全屏选集弹窗（BrandBlueDeep 25%）；选集栏用全局选中填充透明度
@@ -3156,7 +3156,7 @@ private fun EpisodeChip(
                 shape,
             )
             .then(borderModifier)
-            .padding(12.dp),
+            .padding(Spacing.dialogItemPadding),
     ) {
         Text(
             text = title,
@@ -3261,7 +3261,7 @@ private fun EpisodeSideSheet(
                 )
                 LazyColumn(
                     state = listState,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
                     // 底部边距随内容滚动：列表可一直滑到面板最底缘，静止时末项距底 = 全局弹窗内容边距（与左右一致）
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = Spacing.dialogContentMargin),
                     modifier = Modifier.weight(1f),
@@ -3330,7 +3330,7 @@ private fun PlainTopBtn(icon: ImageVector, desc: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(48.dp)
-            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.08f, glow = false, pressEffect = false),
+            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.10f, glow = false, pressEffect = false),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, desc, tint = Color.White, modifier = Modifier.size(24.dp)) }
 }
@@ -3344,7 +3344,7 @@ private fun MiniLargeBtn(icon: ImageVector, desc: String, onClick: () -> Unit, i
     Box(
         modifier = Modifier
             .size(size)
-            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = if (isPrimary) 1.12f else 1.08f, glow = false, pressEffect = false)
+            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.10f, glow = false, pressEffect = false)
             .background(Color(0x4D000000), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
@@ -3389,7 +3389,7 @@ private fun <T> OptionDialog(
                 .fillMaxWidth()
                 .heightIn(max = maxDialogHeight),
         ) {
-            // 标题距弹窗顶 = 标题距下方选项 = titleContentGap（与选集「更多」弹窗标题同款间距）
+            // 标题距弹窗顶 = 标题距下方选项 = dialogTitleGap
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
@@ -3398,9 +3398,9 @@ private fun <T> OptionDialog(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = Spacing.titleContentGap),
+                    .padding(top = Spacing.dialogTitleGap),
             )
-            Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+            Spacer(modifier = Modifier.height(Spacing.dialogTitleGap))
             Column(
                 modifier = Modifier
                     .weight(1f, fill = false)
@@ -3410,7 +3410,7 @@ private fun <T> OptionDialog(
                     // 底部边距随内容滚动（scroll 之后）：长列表可一直滑到弹窗最底缘，
                     // 静止时末项与弹窗底部的间距 = 全局弹窗内容边距（与左右一致）
                     .padding(bottom = Spacing.dialogContentMargin),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
             ) {
                 options.forEach { opt ->
                     val selected = opt == current
@@ -3438,7 +3438,7 @@ private fun <T> OptionDialog(
                                     Modifier.border(Spacing.optionBorder, borderColor, shape)
                                 } else Modifier,
                             )
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                            .padding(Spacing.dialogItemPadding),
                     ) {
                         Text(label(opt), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
                         if (selected) Icon(AppIcons.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
@@ -3489,16 +3489,16 @@ private fun PlayerInfoDialog(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = Spacing.titleContentGap),
+                    .padding(top = Spacing.dialogTitleGap),
             )
-            Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+            Spacer(modifier = Modifier.height(Spacing.dialogTitleGap))
             Column(
                 modifier = Modifier
                     .weight(1f, fill = false)
                     .padding(horizontal = Spacing.dialogContentMargin)
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = Spacing.dialogContentMargin),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
             ) {
                 InfoField("标题", title.ifBlank { "未知" })
                 InfoField("播放地址", url.ifBlank { "暂无播放地址（本地文件或尚未解析完成）" })
@@ -3509,7 +3509,7 @@ private fun PlayerInfoDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.dialogButtonGap),
                     modifier = Modifier.padding(top = 4.dp),
                 ) {
                     TextButton(
@@ -3554,7 +3554,7 @@ private fun InfoField(label: String, value: String) {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant, SquircleShape(Spacing.corner))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(Spacing.dialogItemPadding),
     ) {
         Text(
             text = label,
@@ -3596,7 +3596,7 @@ private fun SubtitleDialog(
                 .fillMaxWidth()
                 .heightIn(max = maxDialogHeight),
         ) {
-            // 标题距弹窗顶 = 标题距下方选项 = titleContentGap（与选集「更多」弹窗标题同款间距）
+            // 标题距弹窗顶 = 标题距下方选项 = dialogTitleGap
             Text(
                 text = "字幕",
                 style = MaterialTheme.typography.titleLarge,
@@ -3605,10 +3605,10 @@ private fun SubtitleDialog(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = Spacing.titleContentGap),
+                    .padding(top = Spacing.dialogTitleGap),
             )
-            Spacer(modifier = Modifier.height(Spacing.titleContentGap))
-            // 行间距与 OptionDialog（倍速/缓冲等弹窗）统一为 6dp；
+            Spacer(modifier = Modifier.height(Spacing.dialogTitleGap))
+            // 行间距与 OptionDialog（倍速/缓冲等弹窗）统一为 dialogItemGap；
             // 左右/底部边距 = 全局弹窗内容边距，底部边距在 scroll 之后随内容滚动（长列表可滑到弹窗最底缘）
             Column(
                 modifier = Modifier
@@ -3616,7 +3616,7 @@ private fun SubtitleDialog(
                     .padding(horizontal = Spacing.dialogContentMargin)
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = Spacing.dialogContentMargin),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
             ) {
                 tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected, selectedBorderColor) { onSelect(t) } }
                 SubRow("添加字幕", false, selectedBorderColor) { onAddSubtitle() }
@@ -3697,7 +3697,7 @@ private fun SubtitleSettingSideSheet(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = Spacing.titleContentGap),
             )
             Text(
                 text = "字幕大小",
@@ -3740,7 +3740,7 @@ private fun SubtitleSettingSideSheet(
                 color = DarkOnSurfaceMuted,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 20.dp),
+                    .padding(top = Spacing.sectionSpacing),
             )
             Text(
                 text = String.format(
@@ -3782,7 +3782,7 @@ private fun SubtitleSettingSideSheet(
                 color = DarkOnSurfaceMuted,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 20.dp),
+                    .padding(top = Spacing.sectionSpacing),
             )
             OffsetAdjustRow(
                 offsetMs = playerState.subtitleOffsetMs,
@@ -3924,7 +3924,7 @@ private fun SubInfoRow(label: String, value: String) {
                     Modifier.border(Spacing.optionBorder, optionBorderColor(false), shape)
                 } else Modifier,
             )
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(Spacing.dialogItemPadding),
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
         Text(
@@ -3964,7 +3964,7 @@ private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color?
                     Modifier.border(Spacing.optionBorder, borderColor, shape)
                 } else Modifier,
             )
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(Spacing.dialogItemPadding),
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
         if (selected) Icon(AppIcons.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))

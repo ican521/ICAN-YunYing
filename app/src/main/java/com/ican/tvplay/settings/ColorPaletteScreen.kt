@@ -117,7 +117,7 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
                     top = innerPadding.calculateTopPadding() + Spacing.pageTop,
                     bottom = Spacing.contentBottomInset,
                 ),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
             ) {
                 // 第一行：默认色 + 前 3 个色
                 item {
@@ -199,7 +199,7 @@ private fun ColorButton(
             .tvCardEffect(
                 onClick = onClick,
                 shape = CircleShape,
-                focusedScale = 1.15f,
+                focusedScale = 1.1f,
                 glow = false,
             ),
     ) {

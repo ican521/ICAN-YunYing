@@ -10,10 +10,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.ican.tvplay.ui.theme.Spacing
 
 /**
  * 空页面占位：上方颜文字、下方「空空如也」。
@@ -36,7 +36,7 @@ fun EmptyState(modifier: Modifier = Modifier) {
             )
             Text(
                 text = "空空如也",
-                modifier = Modifier.padding(top = 10.dp),
+                modifier = Modifier.padding(top = Spacing.titleContentGap),
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
                 fontSize = 18.sp,
                 lineHeight = 24.sp,

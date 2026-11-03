@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -182,14 +183,15 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .background(barColor)
                         .padding(WindowInsets.statusBars.asPaddingValues())
-                        .height(48.dp),
-                    contentAlignment = Alignment.Center,
+                        .height(Spacing.centeredTopBarHeight),
+                    contentAlignment = Alignment.TopCenter,
                 ) {
                     Text(
                         text = "设置",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(top = Spacing.centeredTopBarTitleInset),
                     )
                 }
             }
@@ -208,7 +210,7 @@ fun SettingsScreen(
                 top = innerPadding.calculateTopPadding() + Spacing.pageTop,
                 bottom = Spacing.bottomBarInset,
             ),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
         ) {
         item {
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -486,7 +488,7 @@ private fun ConfigImportDialog(
         )
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.padding(top = Spacing.titleContentGap),
+            modifier = Modifier.padding(top = Spacing.dialogTitleGap),
         ) {
             top.yukonga.miuix.kmp.basic.TextButton(
                 text = "取消",
@@ -548,7 +550,7 @@ private fun FavoriteSyncDialog(
                         .clickable { viewModel.cycleSyncMode() }
                         .background(
                             MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha),
-                            SquircleShape(Spacing.corner),
+                            RoundedCornerShape(percent = 50),
                         )
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
@@ -582,7 +584,7 @@ private fun FavoriteSyncDialog(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+            Spacer(modifier = Modifier.height(Spacing.dialogTitleGap))
 
             when {
                 scanning && devices.isEmpty() -> {
@@ -669,7 +671,7 @@ private fun FavoriteSyncDialog(
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(24.dp),
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
                                         text = device.name,

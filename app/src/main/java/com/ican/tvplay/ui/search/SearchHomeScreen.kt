@@ -1,5 +1,6 @@
 package com.ican.tvplay.ui.search
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -68,10 +71,18 @@ fun SearchHomeScreen(
     val suggestions by vm.suggestions.collectAsStateWithLifecycle()
 
     var queryText by remember { mutableStateOf("") }
+    // 首页搜索胶囊进入本页即展开（miuix 展开态会自动聚焦并弹键盘，省掉再点一次搜索栏）；
+    // 失焦时库回调收为 false，热恢复/回到本页不会重复弹键盘
+    var expanded by remember { mutableStateOf(true) }
+
+    // 输入时点击搜索栏以外区域（含历史/推荐词）收起输入法：清焦点（InputField 收起态不自接管外部点击）
+    val focusManager = LocalFocusManager.current
 
     fun submit(keyword: String) {
         val q = keyword.trim()
         if (q.isEmpty()) return
+        // 点词条即视为离开输入态：先收起输入法再跳转，避免键盘残留到结果页
+        focusManager.clearFocus()
         vm.addHistory(q)
         onSearch(q)
     }
@@ -92,7 +103,11 @@ fun SearchHomeScreen(
                         .background(barColor)
                         .padding(topBarPadding()),
                 ) {
-                    MiuixBackButton(onClick = onBack)
+                    MiuixBackButton(onClick = {
+                        // 先收键盘再返回，避免键盘跟着页面转场一直留到首页
+                        focusManager.clearFocus()
+                        onBack()
+                    })
 
                     // miuix 原生胶囊搜索框（左搜索图标 + 输入后右侧清除钮，IME 搜索键提交）
                     MiuixSearchInput(
@@ -103,9 +118,12 @@ fun SearchHomeScreen(
                         },
                         onSearch = { submit(it) },
                         label = "搜索影片、剧集",
+                        expanded = expanded,
+                        onExpandedChange = { expanded = it },
                         modifier = Modifier
                             .weight(1f)
-                            .padding(start = Spacing.topBarItemGap),
+                            // 距返回钮 16dp（右侧距屏幕保持 pageHorizontalPadding 16dp 不变）
+                            .padding(start = 16.dp),
                     )
                 }
             }
@@ -114,7 +132,11 @@ fun SearchHomeScreen(
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        Box(
+            modifier = (if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+                // 空白处点击（子项已消费的点击不受影响）→ 清焦点，输入法随之收起
+                .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
+        ) {
         // ========== 内容区：历史 + 推荐 ==========
         Column(
             modifier = Modifier
@@ -163,7 +185,7 @@ fun SearchHomeScreen(
     }
 }
 
-/** 搜索词胶囊流式排列：40dp 高、全圆角、miuix surfaceContainerHigh 底（KernelSU 搜索栏同款底色）、间距 8dp */
+/** 搜索词胶囊流式排列：固定 40dp 高（文字垂直居中）、左右 16dp、全圆角、miuix surfaceContainerHigh 底（KernelSU 搜索栏同款底色）、间距 8dp */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WordFlowRow(
@@ -178,7 +200,6 @@ private fun WordFlowRow(
         words.forEach { word ->
             Box(
                 modifier = Modifier
-                    .height(Spacing.chipHeight)
                     .tvCardEffect(
                         onClick = { onWordClick(word) },
                         onLongClick = onWordLongClick?.let { { it(word) } },
@@ -187,6 +208,7 @@ private fun WordFlowRow(
                         glow = false,
                     )
                     .background(MiuixTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(percent = 50))
+                    .height(Spacing.chipHeight)
                     .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.Center,
             ) {

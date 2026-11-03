@@ -102,7 +102,12 @@ fun VideoCard(
                         ),
                     )
                     // 底部留 6dp：文字行盒本身在字形下方还有约 4dp 余量，6+4 才和左侧 10dp 视觉一致
-                    .padding(start = 10.dp, end = 10.dp, bottom = 6.dp, top = 6.dp),
+                    .padding(
+                        start = Spacing.posterTitlePaddingH,
+                        end = Spacing.posterTitlePaddingH,
+                        bottom = Spacing.posterTitlePaddingV,
+                        top = Spacing.posterTitlePaddingV,
+                    ),
             ) {
                 Text(
                     text = video.title,
@@ -121,9 +126,9 @@ fun VideoCard(
                 color = Color.White,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp)
+                    .padding(Spacing.posterOverlayMargin)
                     .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                    .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
             )
         }
     }

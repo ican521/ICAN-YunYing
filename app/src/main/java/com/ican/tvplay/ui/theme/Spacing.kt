@@ -25,22 +25,22 @@ object Spacing {
     /** 页面左右内边距（全设备统一） */
     val pageHorizontal = 16.dp
 
-    /** 页面顶部距状态栏间距 */
-    val pageTop = 14.dp
+    /** 页面顶部距状态栏的间距（所有页面内容首行与顶栏/搜索栏底部的视觉间距统一 12dp） */
+    val pageTop = 12.dp
 
     /** 大板块之间的间距（今日推荐/分类Tab/视频网格等模块之间） */
-    val sectionSpacing = 20.dp
+    val sectionSpacing = 16.dp
 
     /**
      * 首页顶部分类Tab的上下间距（搜索栏→Tab、Tab→内容区）。
-     * 取 1dp：Tab 行内文字垂直居中留白 11dp，合计后「Tab 文字 ↔ 搜索胶囊底缘」视觉间距为 12dp，上下对称。
+     * 取 5dp：Tab 行内文字垂直居中留白 11dp，合计后「Tab 文字 ↔ 搜索胶囊底缘」视觉间距为 16dp，上下对称。
      */
-    val categoryTabVertical = 1.dp
+    val categoryTabVertical = 5.dp
 
     /**
      * 搜索栏底部到下方第一个内容板块的垂直间距（全局统一，不随屏幕尺寸缩放）。
-     * 所有带搜索栏的页面（首页、搜索首页、搜索结果页等）必须复用此常量，
-     * 禁止各页面写死不同 dp 值。
+     * 视觉基准即首页「搜索栏底 → 文字顶」的 12dp，标题类页面内容首行 [pageTop] 同为此值。
+     * 所有带搜索栏的页面（首页、搜索首页、搜索结果页等）必须复用此常量，禁止各页面写死不同 dp 值。
      */
     val searchBarBottomMargin = 12.dp
 
@@ -68,6 +68,15 @@ object Spacing {
     /** 底部弹窗列表项之间的间距 */
     val dialogItemGap = 8.dp
 
+    /** 选集 chip 高度（四边 [dialogItemPadding] + 单行文字的最小高度）；选集网格分页与弹窗高度按此值换算 */
+    val episodeChipHeight = 48.dp
+
+    /** 居中大标题顶栏高度（状态栏以下）：52dp，与首页顶栏收起态总高（Tab 上下 5dp + 42dp）一致 */
+    val centeredTopBarHeight = 52.dp
+
+    /** 标题在顶栏内的顶部偏移：按可见状态栏内容下缘对齐，使上下视觉间隙相等 */
+    val centeredTopBarTitleInset = 5.dp
+
     /** 底部弹窗内并排按钮（取消/确认等）之间的间距 */
     val dialogButtonGap = 16.dp
 
@@ -77,14 +86,32 @@ object Spacing {
     /** 网格卡片纵向间距（首页/收藏/历史；搜索页用 [searchGridGap]） */
     val cardGapV = 16.dp
 
+    /** 海报叠加层（角标 / 编辑删除钮）距海报边缘的外边距 */
+    val posterOverlayMargin = 8.dp
+
+    /** 海报角标内边距（水平） */
+    val posterBadgePaddingH = 6.dp
+
+    /** 海报角标内边距（垂直） */
+    val posterBadgePaddingV = 2.dp
+
+    /** 海报底部标题层内边距（水平） */
+    val posterTitlePaddingH = 10.dp
+
+    /** 海报底部标题层内边距（垂直） */
+    val posterTitlePaddingV = 6.dp
+
     /**
      * 搜索结果页专属网格间距：卡片横向、卡片纵向、左侧站源列表与卡片网格之间的间距统一用本值。
      * 搜索页内容密度高（左站源列表 + 右网格），间距独立于 [cardGapH]/[cardGapV]，不随主网格调整。
      */
-    val searchGridGap = 12.dp
+    val searchGridGap = 16.dp
 
     /** 搜索首页历史 / 推荐词条胶囊的流式排列间距（横向、纵向同值） */
     val searchChipGap = 8.dp
+
+    /** 词条胶囊固定高度（上下留白由高度居中产生，左右用 16dp 内边距） */
+    val chipHeight = 40.dp
 
     /** 搜索结果页左侧站源列表的项间距（纵向） */
     val siteListItemGap = 8.dp
@@ -111,9 +138,6 @@ object Spacing {
 
     /** 顶栏内部组件之间的间距（搜索栏 ↔ 返回钮、站源钮、历史钮等） */
     val topBarItemGap = 12.dp
-
-    /** 词条胶囊 / 站源胶囊高度 */
-    val chipHeight = 40.dp
 
     /**
      * 底部内容避让悬浮胶囊导航的高度（保证底部卡片距底栏顶部恰好 [bottomBarGap]）：

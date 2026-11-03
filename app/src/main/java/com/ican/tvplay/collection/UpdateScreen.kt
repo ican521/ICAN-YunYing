@@ -224,7 +224,7 @@ fun UpdatePopupDialog(
         }
         // 按钮行按全局弹窗规范：左右平分、取消在左
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = Spacing.titleContentGap),
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.dialogTitleGap),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             TextButton(
@@ -277,14 +277,14 @@ private fun UpdateRow(
             .tvCardEffect(
                 onClick = onClick,
                 shape = SquircleShape(Spacing.corner),
-                focusedScale = 1.02f,
+                focusedScale = 1.03f,
                 glow = false,
             ),
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(10.dp),
+            modifier = Modifier.fillMaxWidth().padding(Spacing.dialogItemPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -360,7 +360,7 @@ private fun PopupUpdateRow(item: FavoriteUpdateItem, onClick: () -> Unit) {
             .tvCardEffect(
                 onClick = onClick,
                 shape = SquircleShape(Spacing.corner),
-                focusedScale = 1.02f,
+                focusedScale = 1.03f,
                 glow = false,
             )
             .padding(Spacing.dialogItemPadding),
