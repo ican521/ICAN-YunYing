@@ -1681,10 +1681,10 @@ private fun LandscapePlayLayout(
                 // 浅色模式下全屏缩回小窗时，根 Box 残留黑底会透出到信息列，
                 // 此处显式覆盖主题背景，确保缩回后恢复浅色
                 .background(MaterialTheme.colorScheme.background)
+                // 顶部不再额外留 12dp：标题文字顶部与小窗顶部对齐（横屏右侧信息列与小窗同锚 playerTop）
                 .padding(
                     start = com.ican.tvplay.ui.theme.Spacing.sectionSpacing,
                     end = pageHorizontal,
-                    top = 12.dp,
                 ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
