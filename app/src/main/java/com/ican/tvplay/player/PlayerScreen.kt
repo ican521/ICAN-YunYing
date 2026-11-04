@@ -1532,8 +1532,8 @@ private fun PortraitPlayLayout(
             .verticalScroll(rememberScrollState())
             // 水平边距下放到各 Section 内部（首页顶部分类 Tab 同款结构性通栏）：
             // 线路/选集横向列表需天然占满全宽，靠自身 contentPadding 对齐基准线并支持贴边横滑
-            .padding(vertical = Spacing.titleContentGap),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
+            // 顶部 3dp：标题行被 48dp 收藏钮撑高，文字居中已含约 8dp 留白，视觉间距约 16dp
+            .padding(top = Spacing.videoTitleRowTopGap, bottom = Spacing.titleContentGap),
     ) {
         val v = current ?: return@Column
 
@@ -1544,6 +1544,9 @@ private fun PortraitPlayLayout(
             modifier = Modifier.padding(horizontal = pageHorizontalPadding()),
         )
 
+        // 类型信息块 → 线路：比常规板块间距更紧（视觉约 19dp）
+        Spacer(modifier = Modifier.height(Spacing.videoMetaToLineGap))
+
         // 线路（标题↔chips 的次间距在组件内部）
         LineSection(
             v = v,
@@ -1552,6 +1555,8 @@ private fun PortraitPlayLayout(
             horizontalPadding = pageHorizontalPadding(),
         )
 
+        Spacer(modifier = Modifier.height(Spacing.sectionSpacing))
+
         // 选集（倒序/展开，横滑↔网格；标题↔按钮的次间距在组件内部）
         EpisodeSection(
             lineEpisodes = lineEpisodes,
@@ -1559,6 +1564,8 @@ private fun PortraitPlayLayout(
             onEpisodeSelect = onEpisodeSelect,
             horizontalPadding = pageHorizontalPadding(),
         )
+
+        Spacer(modifier = Modifier.height(Spacing.sectionSpacing))
 
         // 简介（标题↔正文的次间距在组件内部）
         DescriptionSection(
@@ -1906,8 +1913,8 @@ private fun VideoMetaSection(
             FavoriteButton(v = v)
         }
 
-        // 标题 ↔ 自身信息内容：统一次间距
-        Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+        // 标题 ↔ 自身信息内容：不额外留间距——标题行高被 48dp 收藏钮撑起，
+        // 文字在其内垂直居中已有约 8dp 下部留白，叠加字形留白后视觉间距约 16dp
 
         // 更新备注/站源/年份/地区/类型：信息行之间保持行内密度 itemSpacing
         Column(verticalArrangement = Arrangement.spacedBy(itemSpacing)) {

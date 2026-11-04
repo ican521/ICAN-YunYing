@@ -281,7 +281,6 @@ fun AppRoot() {
                                 pushCardRouteThrottled(Route.Player(videoId, episodeIndex, flag, preInit))
                             }
                         },
-                        onBack = { navigator.pop() },
                     )
                 }
                 entry<Route.Updates>(swipeDismiss = NavSwipeDirection.None) {

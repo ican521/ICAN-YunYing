@@ -184,14 +184,13 @@ fun SettingsScreen(
                         .background(barColor)
                         .padding(WindowInsets.statusBars.asPaddingValues())
                         .height(Spacing.centeredTopBarHeight),
-                    contentAlignment = Alignment.TopCenter,
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = "设置",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(top = Spacing.centeredTopBarTitleInset),
                     )
                 }
             }
@@ -207,7 +206,7 @@ fun SettingsScreen(
             contentPadding = PaddingValues(
                 start = horizontal,
                 end = horizontal,
-                top = innerPadding.calculateTopPadding() + Spacing.pageTop,
+                top = innerPadding.calculateTopPadding(),
                 bottom = Spacing.bottomBarInset,
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),

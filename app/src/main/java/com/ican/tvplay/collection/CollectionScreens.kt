@@ -61,11 +61,9 @@ import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.EmptyState
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
-import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
-import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.components.videoGridColumns
 import com.ican.tvplay.ui.theme.LightOnSurface
@@ -117,14 +115,13 @@ fun FavoritesScreen(
                         .background(barColor)
                         .padding(WindowInsets.statusBars.asPaddingValues())
                         .height(Spacing.centeredTopBarHeight),
-                    contentAlignment = Alignment.TopCenter,
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = "我的收藏",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(top = Spacing.centeredTopBarTitleInset),
                     )
                 }
             }
@@ -144,7 +141,7 @@ fun FavoritesScreen(
                     contentPadding = PaddingValues(
                         start = pageHorizontalPadding(),
                         end = pageHorizontalPadding(),
-                        top = innerPadding.calculateTopPadding() + Spacing.pageTop,
+                        top = innerPadding.calculateTopPadding(),
                         bottom = Spacing.bottomBarInset,
                     ),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
@@ -415,7 +412,6 @@ private fun FavoriteCard(
 @Composable
 fun HistoryScreen(
     onPlay: (videoId: String, episodeIndex: Int, flag: String, preInit: Boolean) -> Unit,
-    onBack: () -> Unit = {},
 ) {
     val viewModel = appViewModel { CollectionViewModel(this) }
     val histories by viewModel.histories.collectAsStateWithLifecycle()
@@ -445,16 +441,12 @@ fun HistoryScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(barColor)
-                        .padding(topBarPadding()),
+                        .padding(WindowInsets.statusBars.asPaddingValues())
+                        .height(Spacing.centeredTopBarHeight),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    // 返回按钮靠左
-                    Box(modifier = Modifier.align(Alignment.CenterStart)) {
-                        MiuixBackButton(onClick = { if (editMode) editMode = false else onBack() })
-                    }
-                    // 标题居中
                     Text(
                         text = "播放历史",
-                        modifier = Modifier.align(Alignment.Center),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.SemiBold,
@@ -477,7 +469,7 @@ fun HistoryScreen(
                     contentPadding = PaddingValues(
                         start = pageHorizontalPadding(),
                         end = pageHorizontalPadding(),
-                        top = innerPadding.calculateTopPadding() + Spacing.pageTop,
+                        top = innerPadding.calculateTopPadding(),
                         bottom = Spacing.bottomBarInset,
                     ),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),

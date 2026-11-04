@@ -101,7 +101,9 @@ fun SearchHomeScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(barColor)
-                        .padding(topBarPadding()),
+                        .padding(topBarPadding())
+                        // 状态栏下缘 → 搜索栏顶 16dp（与首页搜索栏一致）
+                        .padding(top = 16.dp),
                 ) {
                     MiuixBackButton(onClick = {
                         // 先收键盘再返回，避免键盘跟着页面转场一直留到首页

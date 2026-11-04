@@ -136,7 +136,7 @@ fun UpdateScreen(
                 contentPadding = PaddingValues(
                     start = pageHorizontalPadding(),
                     end = pageHorizontalPadding(),
-                    top = innerPadding.calculateTopPadding() + Spacing.pageTop,
+                    top = innerPadding.calculateTopPadding(),
                     bottom = Spacing.bottomBarInset,
                 ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
