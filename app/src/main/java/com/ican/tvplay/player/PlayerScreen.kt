@@ -1542,6 +1542,7 @@ private fun PortraitPlayLayout(
             v = v,
             lineFlag = lineFlag,
             modifier = Modifier.padding(horizontal = pageHorizontalPadding()),
+            metaTopPadding = Spacing.videoTitleToMetaGap,
         )
 
         // 类型信息块 → 线路：比常规板块间距更紧（视觉约 19dp）
@@ -1689,7 +1690,13 @@ private fun LandscapePlayLayout(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (current != null) {
-                VideoMetaSection(v = current, lineFlag = lineFlag, itemSpacing = 10.dp)
+                // 横屏：标题顶部对齐小窗顶（信息列 top=0），仅补回标题→信息行的呼吸感
+                VideoMetaSection(
+                    v = current,
+                    lineFlag = lineFlag,
+                    itemSpacing = 10.dp,
+                    metaTopPadding = com.ican.tvplay.ui.theme.Spacing.videoTitleToMetaGap,
+                )
             }
         }
 
@@ -1893,6 +1900,9 @@ private fun VideoMetaSection(
     lineFlag: String,
     modifier: Modifier = Modifier,
     itemSpacing: Dp = 6.dp,
+    // 标题行 → 下方信息行的间距：竖屏补 8dp（收藏钮缩 32dp 后需恢复呼吸感）；
+    // 横屏 0（横屏标题顶部需与小窗顶对齐，仅标题下方要呼吸感，由 metaTopPadding 提供）
+    metaTopPadding: Dp = 0.dp,
 ) {
     Column(modifier = modifier) {
         // 标题 + 收藏按钮（收藏入口在标题右侧，圆钮尺寸/样式不变）
@@ -1913,8 +1923,10 @@ private fun VideoMetaSection(
             FavoriteButton(v = v)
         }
 
-        // 标题 ↔ 自身信息内容：不额外留间距——标题行高被 48dp 收藏钮撑起，
-        // 文字在其内垂直居中已有约 8dp 下部留白，叠加字形留白后视觉间距约 16dp
+        // 标题 ↔ 自身信息内容：收藏钮缩为 32dp 后行内居中留白消失，按方向补回
+        if (metaTopPadding > 0.dp) {
+            Spacer(modifier = Modifier.height(metaTopPadding))
+        }
 
         // 更新备注/站源/年份/地区/类型：信息行之间保持行内密度 itemSpacing
         Column(verticalArrangement = Arrangement.spacedBy(itemSpacing)) {
@@ -1981,7 +1993,9 @@ private fun FavoriteButton(v: Video) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(Spacing.circleButton)
+            // 32dp（原 48dp circleButton）：不再把标题行撑高，横屏下标题字顶与小窗顶对齐；
+            // 图标仍 26dp 不变，仅点击热区变小
+            .size(32.dp)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
