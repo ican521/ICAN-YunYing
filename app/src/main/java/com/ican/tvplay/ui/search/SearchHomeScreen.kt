@@ -127,8 +127,9 @@ fun SearchHomeScreen(
                         .fillMaxWidth()
                         .background(barColor)
                         .padding(topBarPadding())
-                        // 状态栏下缘 → 搜索栏顶 16dp（与首页搜索栏一致）
-                        .padding(top = 16.dp),
+                        // 状态栏下缘 → 搜索栏顶 16dp（与首页搜索栏一致）；
+                        // 搜索栏底 → 顶栏底 16dp，顶栏底缘直接贴下方内容
+                        .padding(top = 16.dp, bottom = 16.dp),
                 ) {
                     MiuixBackButton(onClick = {
                         // 先收键盘再返回，避免键盘跟着页面转场一直留到首页
@@ -186,7 +187,7 @@ fun SearchHomeScreen(
                         .padding(horizontal = pageHorizontalPadding())
                         // 顶部间距走 Column 自身 padding，不放 Spacer 子项：
                         // 否则 spacedBy(sectionSpacing) 会在 Spacer 与首个板块之间多加 20dp
-                        .padding(top = innerPadding.calculateTopPadding() + Spacing.searchBarBottomMargin),
+                        .padding(top = innerPadding.calculateTopPadding()),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
                 ) {
                     // 上半部分：历史（无历史整块隐藏；长按单个词删除）
@@ -222,11 +223,12 @@ fun SearchHomeScreen(
             } else {
                 // ========== 结果态：沿用原跨站源结果页的顶部间距与边距基准 ==========
                 // 顶部间距走滚动容器 contentPadding（不用外层 Spacer 占位），
-                // 滚动内容才能进入顶栏后方，毛玻璃有内容可采样
+                // 滚动内容才能进入顶栏后方，毛玻璃有内容可采样；
+                // 内容贴顶栏底缘，额外视觉间距由顶栏底部 16dp 承担
                 MultiSourceSearchResults(
                     vm = multiVm,
                     onPlay = onPlay,
-                    topPadding = innerPadding.calculateTopPadding() + 16.dp,
+                    topPadding = innerPadding.calculateTopPadding(),
                     modifier = Modifier.fillMaxSize(),
                 )
             }
