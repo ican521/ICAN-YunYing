@@ -477,6 +477,10 @@ fun HomeScreen(
                     val remain = LOADING_MIN_SHOW_MILLIS - (System.currentTimeMillis() - startedAt)
                     if (remain > 0) delay(remain)
                     pageVideos.value = list
+                    // 有内容且要播逐条渐显时，等第一张卡片淡入完成再收起等待动画
+                    if (list.isNotEmpty() && animateNewCards) {
+                        delay(CARD_FADE_IN_MILLIS.toLong())
+                    }
                 } finally {
                     pageLoading = false
                 }
@@ -595,8 +599,8 @@ fun HomeScreen(
                         }
                     }
                 }
-                // 等待动画：该页加载中且尚无内容时，屏幕居中显示「弧长伸缩」加载弧
-                if (pageLoading && pageVideos.value.isEmpty()) {
+                // 等待动画：一直显示到第一张卡片淡入完成（pageLoading 会在首卡淡入结束后才关闭）
+                if (pageLoading) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
