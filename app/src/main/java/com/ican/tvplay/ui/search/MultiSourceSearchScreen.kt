@@ -1,6 +1,7 @@
 package com.ican.tvplay.ui.search
 
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +30,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,15 +40,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -59,10 +63,10 @@ import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.ui.MultiSourceSearchViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
+import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.EmptyState
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
-import com.ican.tvplay.ui.components.MiuixSearchInput
 import com.ican.tvplay.ui.components.PosterImage
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
@@ -75,23 +79,36 @@ import com.ican.tvplay.ui.theme.PosterTitleScrim
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 
+/** 结果卡片逐个渐显：相邻卡片启动间隔（毫秒） */
+private const val CARD_FADE_STAGGER_MILLIS = 60L
+
+/** 结果卡片错峰索引上限：超出的卡片不再累加延迟 */
+private const val CARD_FADE_MAX_STAGGER_INDEX = 6
+
+/** 淡入时长（毫秒），只做 0 → 1，不做淡出 */
+private const val ITEM_FADE_IN_MILLIS = 200
+
+/** 站源胶囊逐个淡入的间隔（毫秒） */
+private const val SITE_CHIP_FADE_STAGGER_MILLIS = 60
+
 /**
- * 跨站源搜索结果页（图一风格）：
- * - 左侧：「全部」+ 配置里全部可用站源，每个条目显示名称 + 搜索命中数量
+ * 跨站源搜索结果区（左侧站源筛选 + 右侧视频卡片网格），供合并后的搜索页复用：
+ * - 左侧：「全部」+ 配置里全部可用站源
  * - 右侧：默认展示所有站源合并的视频卡片网格；点击左侧筛选单个站源
  * - 卡片比例与首页一致 (3:4)，左上角站源标签，底部显示更新状态 / 备注 / 标题
+ * 调用方负责顶栏与顶部间距，本组合函数保持结果页原有的边距与尺寸基准
  */
 @Composable
-fun MultiSourceSearchScreen(
-    initialQuery: String,
-    onBack: () -> Unit,
+fun MultiSourceSearchResults(
+    vm: MultiSourceSearchViewModel,
     onPlay: (videoId: String, episodeIndex: Int, flag: String, preInitialized: Boolean) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val vm = appViewModel { MultiSourceSearchViewModel(context) }
 
     val sites by vm.sites.collectAsStateWithLifecycle()
     val selectedIndex by vm.selectedIndex.collectAsStateWithLifecycle()
@@ -99,77 +116,36 @@ fun MultiSourceSearchScreen(
     val loading by vm.loading.collectAsStateWithLifecycle()
     val searchedQuery by vm.query.collectAsStateWithLifecycle()
 
-    var queryText by remember { mutableStateOf(initialQuery) }
-    // 输入时点击搜索栏以外区域收起输入法：清焦点（InputField 收起态不自接管外部点击）
-    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
-
-    // 首次进入时触发跨站搜索（initialQuery 非空才触发）；
-    // 播放页返回时若已有同词结果则跳过，保持列表与滚动位置不变
-    LaunchedEffect(initialQuery) {
-        if (initialQuery.isNotBlank() && !vm.hasResultsFor(initialQuery)) vm.searchAll(initialQuery)
-    }
-
-    fun doSearch() {
-        val q = queryText.trim()
-        if (q.isNotEmpty()) vm.searchAll(q)
-    }
-
-    // KernelSU 同款：固定毛玻璃顶栏（搜索栏不适合折叠，保持固定高度）
-    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
-
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            BlurredBar(backdrop) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(barColor)
-                        .padding(topBarPadding())
-                        // 状态栏下缘 → 搜索栏顶 16dp（与首页搜索栏一致）
-                        .padding(top = 16.dp),
-                ) {
-                    MiuixBackButton(onClick = onBack)
-
-                    // miuix 原生胶囊搜索框（左搜索图标 + 输入后右侧清除钮，IME 搜索键提交）
-                    MiuixSearchInput(
-                        query = queryText,
-                        onQueryChange = { queryText = it },
-                        onSearch = { doSearch() },
-                        label = "跨站源搜索…",
-                        modifier = Modifier
-                            .weight(1f)
-                            // 距返回钮 16dp（右侧距屏幕保持 pageHorizontalPadding 16dp 不变）
-                            .padding(start = 16.dp),
-                    )
-                }
+    // 已淡入的元素 key 集合：由父层统一计时，元素滑出屏幕被回收再滑回来时不会重播动画
+    var revealedChips by remember(searchedQuery) { mutableStateOf<Set<String>>(emptySet()) }
+    var revealedCards by remember(searchedQuery) { mutableStateOf<Set<String>>(emptySet()) }
+    LaunchedEffect(searchedQuery, sites.size) {
+        val keys = listOf("all") + sites.indices.map { "site_$it" }
+        keys.forEachIndexed { idx, key ->
+            if (key !in revealedChips) {
+                if (idx > 0) delay(SITE_CHIP_FADE_STAGGER_MILLIS.toLong())
+                revealedChips = revealedChips + key
             }
-        },
-        contentWindowInsets = WindowInsets.systemBars
-            .add(WindowInsets.displayCutout)
-            .only(WindowInsetsSides.Horizontal),
-    ) { innerPadding ->
-        Box(
-            modifier = (if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
-                // 空白处点击（子项已消费的点击不受影响）→ 清焦点，输入法随之收起
-                .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
-        ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-        ) {
-            // 本页顶部间距 16dp（其余搜索页仍用全局 12dp）
-            Spacer(Modifier.height(innerPadding.calculateTopPadding() + 16.dp))
-        // ========== 主体：左站源列表 + 右卡片网格（左右边距与顶栏同一基准）==========
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = pageHorizontalPadding()),
-        ) {
+        }
+    }
+    LaunchedEffect(searchedQuery, displayVideos.size) {
+        val base = System.currentTimeMillis()
+        val keys = displayVideos.indices.map { "card_$it" }
+            .filter { it !in revealedCards }
+            .forEachIndexed { idx, key ->
+                // 前若干张错峰，其后同批一起出现；用绝对时间计算，避免逐个累加
+                val wait = base + idx.coerceAtMost(CARD_FADE_MAX_STAGGER_INDEX) * CARD_FADE_STAGGER_MILLIS - System.currentTimeMillis()
+                if (wait > 0) delay(wait)
+                revealedCards = revealedCards + key
+            }
+    }
+
+    // ========== 主体：左站源列表 + 右卡片网格（左右边距与顶栏同一基准）==========
+    Row(
+        modifier = modifier
+            .fillMaxHeight()
+            .padding(horizontal = pageHorizontalPadding()),
+    ) {
             // 左侧站源列表（纵向；与右侧网格第一行卡片顶部齐平）
             // imePadding：窗口禁用系统避让后，键盘弹出时列表底部仍可滚动到键盘上方
             LazyColumn(
@@ -183,29 +159,27 @@ fun MultiSourceSearchScreen(
                 // 「全部」合并视图入口（仅在有搜索词时显示；未搜索时本页不出现）
                 if (searchedQuery.isNotBlank()) {
                     item(key = "all") {
-                        SiteSourceChip(
-                            name = "全部",
-                            selected = selectedIndex == MultiSourceSearchViewModel.ALL_SITES_INDEX,
-                            onClick = { vm.selectSite(MultiSourceSearchViewModel.ALL_SITES_INDEX) },
-                        )
+                        RevealedFade(visible = "all" in revealedChips) {
+                            SiteSourceChip(
+                                name = "全部",
+                                selected = selectedIndex == MultiSourceSearchViewModel.ALL_SITES_INDEX,
+                                onClick = {
+                                    vm.selectSite(MultiSourceSearchViewModel.ALL_SITES_INDEX)
+                                },
+                            )
+                        }
                     }
                 }
                 // === 具体站源（固定宽度胶囊，仅取 | 前名称，不显示条数）===
-                itemsIndexed(sites, key = { _, entry -> entry.site.key }, contentType = { _, _ -> "site" }) { idx, entry ->
-                    SiteSourceChip(
-                        name = siteShortName(entry.site.name, entry.site.key),
-                        selected = idx == selectedIndex,
-                        onClick = { vm.selectSite(idx) },
-                    )
-                }
-                if (loading) {
-                    item {
-                        Text(
-                            text = "搜索中…",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            modifier = Modifier.fillParentMaxWidth().padding(vertical = 8.dp),
+                // 加载结束后按顺序错峰淡入：第一个先出现，后面的逐个跟上
+                itemsIndexed(sites, key = { idx, _ -> "site_$idx" }, contentType = { _, _ -> "site" }) { idx, entry ->
+                    RevealedFade(visible = "site_$idx" in revealedChips) {
+                        SiteSourceChip(
+                            name = siteShortName(entry.site.name, entry.site.key),
+                            selected = idx == selectedIndex,
+                            onClick = {
+                                vm.selectSite(idx)
+                            },
                         )
                     }
                 }
@@ -226,9 +200,9 @@ fun MultiSourceSearchScreen(
                     GridCells.Adaptive(minSize = 160.dp)
                 }
 
-                // 搜索结束且无结果时显示统一空状态；搜索中不显示，避免结果流式上屏前闪现
-                if (displayVideos.isEmpty() && !loading) {
-                    EmptyState()
+                if (displayVideos.isEmpty()) {
+                    // 搜索结束仍无结果 → 空状态；加载中保持空白，等卡片直接渐显
+                    if (!loading) EmptyState()
                 } else {
                     LazyVerticalGrid(
                         columns = columns,
@@ -238,32 +212,38 @@ fun MultiSourceSearchScreen(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.searchGridGap),
                         verticalArrangement = Arrangement.spacedBy(Spacing.searchGridGap),
                     ) {
-                        items(displayVideos, key = { "${it.video.id}_${it.siteKey}" }, contentType = { "video" }) { dv ->
-                            CrossSourceVideoCard(
-                                video = dv.video,
-                                siteName = dv.siteName,
-                                onClick = {
-                                    // fongmi 同款：action 卡片直接执行 jar action → Toast 返回 msg
-                                    if (dv.video.action.isNotBlank()) {
-                                        vm.executeAction(dv.siteKey, dv.video.action) { msg ->
-                                            if (msg.isNotBlank()) {
-                                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                        itemsIndexed(
+                            displayVideos,
+                            key = { idx, _ -> "card_$idx" },
+                            contentType = { _, _ -> "video" },
+                        ) { index, dv ->
+                            // 真实卡片按站源胶囊同款节奏逐个渐显；滑回屏幕不再重播
+                            RevealedFade(visible = "card_$index" in revealedCards) {
+                                CrossSourceVideoCard(
+                                    video = dv.video,
+                                    siteName = dv.siteName,
+                                    onClick = {
+                                        // fongmi 同款：action 卡片直接执行 jar action → Toast 返回 msg
+                                        if (dv.video.action.isNotBlank()) {
+                                            vm.executeAction(dv.siteKey, dv.video.action) { msg ->
+                                                if (msg.isNotBlank()) {
+                                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                                }
                                             }
+                                        } else {
+                                            handlePlayClick(vm, dv.video, dv.siteKey, onPlay)
                                         }
-                                    } else {
-                                        handlePlayClick(vm, dv.video, dv.siteKey, onPlay)
-                                    }
-                                },
-                            )
+                                    },
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
-        }
-        }
     }
 }
+
+
 
 /**
  * 点击卡片的播放流程（不阻塞等详情接口）：
@@ -286,6 +266,28 @@ private fun handlePlayClick(
 }
 
 // ========== 左侧站源 chip ==========
+
+/**
+ * 站源胶囊淡入：由父层统一决定何时可见；alpha 只从 0 → 1，不做淡出。
+ */
+@Composable
+private fun RevealedFade(
+    visible: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = ITEM_FADE_IN_MILLIS),
+        label = "itemFadeIn",
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(alpha),
+    ) {
+        content()
+    }
+}
 
 @Composable
 private fun SiteSourceChip(
@@ -439,7 +441,6 @@ private fun CrossSourceVideoCard(
                     text = siteName.ifBlank { video.categoryName.ifBlank { "来源" } },
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White,
-                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -470,7 +471,6 @@ private fun CrossSourceVideoCard(
                             text = tags.take(3).joinToString(" "),
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White,
-                            fontWeight = FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -495,7 +495,6 @@ private fun CrossSourceVideoCard(
                     Text(
                         text = video.title,
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
                         color = Color.White,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,

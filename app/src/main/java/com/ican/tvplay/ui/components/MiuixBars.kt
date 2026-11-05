@@ -80,10 +80,13 @@ fun BlurredBar(
  * 二级页顶栏返回按钮：圆形底 + miuix Back 图标。
  * 圆底样式与首页顶栏「链接解析 / 历史」按钮完全一致（48dp 圆形、surfaceContainerHigh 底色、
  * 同款按压缩放），保证全局顶栏按钮形态统一。
+ *
+ * @param showBackground 为 false 时不绘制圆形底色，仅保留箭头图标（追番更新页等要求纯箭头）
  */
 @Composable
 fun MiuixBackButton(
     onClick: () -> Unit,
+    showBackground: Boolean = true,
 ) {
     Box(
         contentAlignment = Alignment.Center,
@@ -91,7 +94,13 @@ fun MiuixBackButton(
             .size(Spacing.circleButton)
             .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.1f, glow = false)
             .clip(CircleShape)
-            .background(MiuixTheme.colorScheme.surfaceContainerHigh),
+            .then(
+                if (showBackground) {
+                    Modifier.background(MiuixTheme.colorScheme.surfaceContainerHigh)
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Icon(
             imageVector = MiuixIcons.Back,

@@ -79,7 +79,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
+
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -88,6 +88,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -647,8 +649,7 @@ fun SitePickerDialog(
             // 标题距弹窗顶部 = 标题距下方列表 = dialogTitleGap
             Text(
                 text = "选择站源",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.titleLarge,
                 color = MiuixTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -834,10 +835,10 @@ private fun HomeTopBar(
                 .padding(start = 16.dp),
         ) {
             Icon(
-                imageVector = AppIcons.Search,
+                // 与搜索页搜索栏（miuix 官方 Search 图标）保持一致：图标、颜色、尺寸完全对齐
+                imageVector = MiuixIcons.Basic.Search,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
-                modifier = Modifier.size(20.dp),
+                tint = MiuixTheme.colorScheme.onSurfaceContainerHigh.copy(alpha = contentAlpha),
             )
             Spacer(Modifier.width(8.dp))
             Text(
@@ -985,8 +986,7 @@ private fun UnderlineTabRow(
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            fontWeight = FontWeight.Normal,
+                            },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier

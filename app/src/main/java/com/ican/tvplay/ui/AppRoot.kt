@@ -55,7 +55,6 @@ import com.ican.tvplay.ui.nav.rememberNavigator
 import com.ican.tvplay.ui.nav.topDestinations
 import com.ican.tvplay.player.PlayerScreen
 import com.ican.tvplay.player.core.Players
-import com.ican.tvplay.ui.search.MultiSourceSearchScreen
 import com.ican.tvplay.ui.search.SearchHomeScreen
 import com.ican.tvplay.ui.settings.ColorPaletteScreen
 import com.ican.tvplay.ui.settings.SettingsScreen
@@ -216,7 +215,9 @@ fun AppRoot() {
                     .fillMaxSize()
                     .layerBackdrop(backdrop),
                 effects = NavDisplayEffects(cornerClipRadius = navCornerRadius),
-                onBack = { navigator.pop() },
+                onBack = {
+                    navigator.pop()
+                },
             ) {
                 entry<Route.Main>(swipeDismiss = NavSwipeDirection.None) {
                     // 根路由关闭 miuix 边缘拖出：否则边缘手势被根页面消费，返回事件不派发。
@@ -232,9 +233,9 @@ fun AppRoot() {
                         when (page) {
                             0 -> HomeScreen(
                                 onVideoClick = { video ->
-                                    pushCardRouteThrottled(Route.MultiSearch(video.title))
+                                    pushCardRouteThrottled(Route.Search(video.title))
                                 },
-                                onSearchClick = { navigator.push(Route.Search) },
+                                onSearchClick = { navigator.push(Route.Search()) },
                                 onHistoryClick = { navigator.push(Route.History) },
                                 onUrlPlayClick = { showUrlDialog = true },
                             )
@@ -259,15 +260,9 @@ fun AppRoot() {
                 entry<Route.ColorPalette>(swipeDismiss = NavSwipeDirection.None) {
                     ColorPaletteScreen(onBack = { navigator.pop() })
                 }
-                entry<Route.Search>(swipeDismiss = NavSwipeDirection.None) {
+                entry<Route.Search>(swipeDismiss = NavSwipeDirection.None) { key ->
                     SearchHomeScreen(
-                        onBack = { navigator.pop() },
-                        onSearch = { query -> navigator.push(Route.MultiSearch(query)) },
-                    )
-                }
-                entry<Route.MultiSearch>(swipeDismiss = NavSwipeDirection.None) { key ->
-                    MultiSourceSearchScreen(
-                        initialQuery = key.query,
+                        initialQuery = key.initialQuery,
                         onBack = { navigator.pop() },
                         onPlay = { videoId, episodeIndex, flag, preInit ->
                             pushCardRouteThrottled(Route.Player(videoId, episodeIndex, flag, preInit))

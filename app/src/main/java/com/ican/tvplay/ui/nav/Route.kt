@@ -20,14 +20,13 @@ sealed interface Route : NavKey, Parcelable {
     @Serializable
     data object ColorPalette : Route
 
+    /**
+     * 搜索页（搜索入口与首页热词/卡片直达结果共用同一页）：
+     * initialQuery 为空 → 历史 + 推荐态；非空 → 直接进入跨站源结果态
+     */
     @Parcelize
     @Serializable
-    data object Search : Route
-
-    /** 跨站源搜索结果页：query 是搜索关键词 */
-    @Parcelize
-    @Serializable
-    data class MultiSearch(val query: String) : Route
+    data class Search(val initialQuery: String = "") : Route
 
     @Parcelize
     @Serializable

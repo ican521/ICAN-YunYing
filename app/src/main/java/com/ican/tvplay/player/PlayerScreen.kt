@@ -124,6 +124,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -1913,7 +1914,7 @@ private fun VideoMetaSection(
             Text(
                 text = v.title,
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
@@ -2124,7 +2125,6 @@ private fun LineSection(
                     style = MaterialTheme.typography.labelMedium,
                     color = if (selected) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                 )
             }
@@ -2372,7 +2372,6 @@ private fun EpisodeGridDialog(
             Text(
                 text = "选集",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Medium,
                 color = MiuixTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -3187,7 +3186,6 @@ private fun EpisodeChip(
             style = MaterialTheme.typography.labelMedium,
             color = if (selected) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
         )
     }
@@ -3271,7 +3269,6 @@ private fun EpisodeSideSheet(
                 Text(
                     text = "选集",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
                     color = DarkOnSurface,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -3417,7 +3414,6 @@ private fun <T> OptionDialog(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Medium,
                 color = MiuixTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -3508,7 +3504,6 @@ private fun PlayerInfoDialog(
             Text(
                 text = "视频信息",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Medium,
                 color = MiuixTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -3624,7 +3619,6 @@ private fun SubtitleDialog(
             Text(
                 text = "字幕",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Medium,
                 color = MiuixTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -3716,7 +3710,6 @@ private fun SubtitleSettingSideSheet(
             Text(
                 text = "字幕设置",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
                 color = DarkOnSurface,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -3732,7 +3725,6 @@ private fun SubtitleSettingSideSheet(
             Text(
                 text = "${(subtitleScale * 100).roundToInt()}%",
                 fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
                 color = Color.White,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -3773,7 +3765,6 @@ private fun SubtitleSettingSideSheet(
                     subtitlePosition,
                 ),
                 fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
                 color = Color.White,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -4243,7 +4234,6 @@ private fun PlayerErrorScreen(
             Text(
                 text = "视频加载失败",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Text(
@@ -4267,7 +4257,6 @@ private fun PlayerErrorScreen(
                 Text(
                     text = "返回",
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
             }

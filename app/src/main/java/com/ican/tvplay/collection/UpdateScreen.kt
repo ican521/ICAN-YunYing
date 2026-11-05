@@ -32,7 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -48,7 +48,6 @@ import com.ican.tvplay.ui.components.MiuixBottomSheetDialog
 import com.ican.tvplay.ui.components.PosterImage
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
-import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
@@ -111,17 +110,19 @@ fun UpdateScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(barColor)
-                        .padding(topBarPadding()),
+                        .padding(WindowInsets.statusBars.asPaddingValues())
+                        .height(Spacing.centeredTopBarHeight),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(modifier = Modifier.align(Alignment.CenterStart)) {
-                        MiuixBackButton(onClick = onBack)
+                    Box(modifier = Modifier.align(Alignment.CenterStart).padding(start = pageHorizontalPadding())) {
+                        // 返回箭头不画圆形底色，尺寸/图标与其他页返回键一致（48dp 按钮 + 20dp 图标）
+                        MiuixBackButton(onClick = onBack, showBackground = false)
                     }
                     Text(
                         text = "追番更新",
                         modifier = Modifier.align(Alignment.Center),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onBackground,
-                        fontWeight = FontWeight.SemiBold,
                     )
                 }
             }
@@ -251,8 +252,7 @@ private fun SectionTitle(text: String, count: Int) {
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Spacer(Modifier.width(8.dp))
@@ -309,8 +309,7 @@ private fun UpdateRow(
             ) {
                 Text(
                     text = item.favorite.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -363,12 +362,13 @@ private fun PopupUpdateRow(item: FavoriteUpdateItem, onClick: () -> Unit) {
                 focusedScale = 1.03f,
                 glow = false,
             )
-            .padding(Spacing.dialogItemPadding),
+            // 上下不留白：标题→本行、本行→按钮的视觉间距均为 16dp
+            .padding(horizontal = Spacing.dialogItemPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(width = 44.dp, height = 60.dp)
+                .size(width = 56.dp, height = 76.dp)
                 .clip(SquircleShape(8.dp)),
         ) {
             PosterImage(
@@ -378,30 +378,29 @@ private fun PopupUpdateRow(item: FavoriteUpdateItem, onClick: () -> Unit) {
             )
         }
         Spacer(Modifier.width(12.dp))
-        // 文字块与海报同高（60dp），三行均分：标题 / 已更至 / 已看到
+        // 文字块与海报同高（76dp），三行均分：标题 / 已更至 / 已看到
         Column(
             modifier = Modifier
                 .weight(1f)
-                .height(60.dp),
+                .height(76.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
                 text = item.favorite.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = "已更至 第${item.totalEpisodes}集",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
             Text(
                 text = "已看到 ${item.seenEpisodeTitle()}",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

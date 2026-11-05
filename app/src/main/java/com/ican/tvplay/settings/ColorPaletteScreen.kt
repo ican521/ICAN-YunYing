@@ -35,7 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.text.font.FontWeight
+
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -54,7 +54,6 @@ import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
-import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.BrandBlue
 import com.ican.tvplay.ui.theme.BrandBlueDeep
@@ -86,10 +85,12 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(barColor)
-                        .padding(topBarPadding()),
+                        .padding(WindowInsets.statusBars.asPaddingValues())
+                        .height(Spacing.centeredTopBarHeight),
+                    contentAlignment = Alignment.Center,
                 ) {
                     // 返回按钮靠左
-                    Box(modifier = Modifier.align(Alignment.CenterStart)) {
+                    Box(modifier = Modifier.align(Alignment.CenterStart).padding(start = pageHorizontalPadding())) {
                         MiuixBackButton(onClick = onBack)
                     }
                     // 标题居中
@@ -98,7 +99,6 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
                         modifier = Modifier.align(Alignment.Center),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onBackground,
-                        fontWeight = FontWeight.SemiBold,
                     )
                 }
             }
@@ -107,7 +107,13 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                // 页面底色与设置页一致（主题 background 的浅灰白），避免露出窗口纯白
+                .background(MaterialTheme.colorScheme.background)
+                .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
+        ) {
             val horizontal = pageHorizontalPadding()
             LazyColumn(
                 modifier = Modifier

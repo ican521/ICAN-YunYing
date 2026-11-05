@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +42,7 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.ican.tvplay.ui.MultiSourceSearchViewModel
 import com.ican.tvplay.ui.SearchViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
@@ -54,37 +56,60 @@ import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
 
 /**
- * 搜索首页（未搜索时的落地页）：
- * - 顶部：左上角返回圆钮 + 胶囊搜索栏（样式与搜索结果页顶栏一致）
- * - 上半部分：历史（标题 + 胶囊流式排列，无历史整块隐藏）
- * - 下半部分：推荐（标题 + 胶囊流式排列；输入关键词时变为匹配的影片标题）
- * 点击历史词/推荐词、或提交输入 → 记录历史并跳转跨站源搜索结果页
+ * 合并后的搜索页（搜索入口与首页热词/卡片直达结果共用）：
+ * - 顶部：左上角返回圆钮 + 可编辑胶囊搜索栏
+ * - 编辑态（未提交/输入中）：上半部分历史、下半部分推荐
+ * - 结果态：左侧站源筛选 + 右侧跨站源视频卡片网格（边距/尺寸沿用原结果页基准）
+ * - 结果态点击搜索栏 → 回到编辑态并保留当前词；返回 → 直接回首页
  */
 @Composable
 fun SearchHomeScreen(
+    initialQuery: String = "",
     onBack: () -> Unit,
-    onSearch: (String) -> Unit,
+    onPlay: (videoId: String, episodeIndex: Int, flag: String, preInitialized: Boolean) -> Unit,
 ) {
     val vm = appViewModel { SearchViewModel(this) }
     val history by vm.history.collectAsStateWithLifecycle()
     val hotWords by vm.hotWords.collectAsStateWithLifecycle(initialValue = emptyList())
     val suggestions by vm.suggestions.collectAsStateWithLifecycle()
 
-    var queryText by remember { mutableStateOf("") }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val multiVm = appViewModel { MultiSourceSearchViewModel(context) }
+
+    var queryText by remember {
+        mutableStateOf(initialQuery.ifBlank { multiVm.query.value })
+    }
     // 首页搜索胶囊进入本页即展开（miuix 展开态会自动聚焦并弹键盘，省掉再点一次搜索栏）；
-    // 失焦时库回调收为 false，热恢复/回到本页不会重复弹键盘
-    var expanded by remember { mutableStateOf(true) }
+    // 从热词/卡片直达结果时保持收起，不弹键盘
+    var expanded by remember {
+        mutableStateOf(initialQuery.isBlank() && multiVm.query.value.isBlank())
+    }
+    // true = 编辑态（历史 + 推荐）；false = 结果态
+    var editing by remember {
+        mutableStateOf(initialQuery.isBlank() && multiVm.query.value.isBlank())
+    }
 
     // 输入时点击搜索栏以外区域（含历史/推荐词）收起输入法：清焦点（InputField 收起态不自接管外部点击）
     val focusManager = LocalFocusManager.current
 
+    // 热词/卡片直达：进入即搜索并展示结果（已有同词结果则复用）
+    LaunchedEffect(initialQuery) {
+        if (initialQuery.isNotBlank()) {
+            editing = false
+            if (!multiVm.hasResultsFor(initialQuery)) multiVm.searchAll(initialQuery)
+        }
+    }
+
     fun submit(keyword: String) {
         val q = keyword.trim()
         if (q.isEmpty()) return
-        // 点词条即视为离开输入态：先收起输入法再跳转，避免键盘残留到结果页
+        // 提交即离开输入态：先收起输入法，再切换到结果态
         focusManager.clearFocus()
+        expanded = false
         vm.addHistory(q)
-        onSearch(q)
+        queryText = q
+        editing = false
+        multiVm.searchAll(q)
     }
 
     // KernelSU 同款：固定毛玻璃顶栏（搜索栏不适合折叠，保持固定高度）
@@ -117,11 +142,21 @@ fun SearchHomeScreen(
                         onQueryChange = {
                             queryText = it
                             vm.onQueryChange(it)
+                            // 输入即回到编辑态（显示历史 + 实时推荐）
+                            editing = true
                         },
                         onSearch = { submit(it) },
                         label = "搜索影片、剧集",
                         expanded = expanded,
-                        onExpandedChange = { expanded = it },
+                        onExpandedChange = {
+                            expanded = it
+                            // 结果态点击搜索栏 → 回到编辑态并保留当前词；
+                            // 补一次 onQueryChange，让「推荐」区按当前词即时给出相关影片名
+                            if (it) {
+                                editing = true
+                                vm.onQueryChange(queryText)
+                            }
+                        },
                         modifier = Modifier
                             .weight(1f)
                             // 距返回钮 16dp（右侧距屏幕保持 pageHorizontalPadding 16dp 不变）
@@ -139,50 +174,69 @@ fun SearchHomeScreen(
                 // 空白处点击（子项已消费的点击不受影响）→ 清焦点，输入法随之收起
                 .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
         ) {
-        // ========== 内容区：历史 + 推荐 ==========
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                // 窗口已禁用系统级 IME 避让（MainActivity ADJUST_NOTHING），
-                // 键盘弹出时靠 imePadding 让历史/推荐底部内容仍可滚动到键盘上方
-                .imePadding()
-                .padding(horizontal = pageHorizontalPadding())
-                // 顶部间距走 Column 自身 padding，不放 Spacer 子项：
-                // 否则 spacedBy(sectionSpacing) 会在 Spacer 与首个板块之间多加 20dp
-                .padding(top = innerPadding.calculateTopPadding() + Spacing.searchBarBottomMargin),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
-        ) {
-            // 上半部分：历史（无历史整块隐藏；长按单个词删除）
-            if (history.isNotEmpty()) {
-                Column {
-                    Text(
-                        text = "历史",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(Spacing.titleContentGap))
-                    WordFlowRow(
-                        words = history.asReversed(),
-                        onWordClick = { submit(it) },
-                        onWordLongClick = { vm.removeHistory(it) },
+            if (editing) {
+                // ========== 编辑态：历史 + 推荐 ==========
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        // 窗口已禁用系统级 IME 避让（MainActivity ADJUST_NOTHING），
+                        // 键盘弹出时靠 imePadding 让历史/推荐底部内容仍可滚动到键盘上方
+                        .imePadding()
+                        .padding(horizontal = pageHorizontalPadding())
+                        // 顶部间距走 Column 自身 padding，不放 Spacer 子项：
+                        // 否则 spacedBy(sectionSpacing) 会在 Spacer 与首个板块之间多加 20dp
+                        .padding(top = innerPadding.calculateTopPadding() + Spacing.searchBarBottomMargin),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
+                ) {
+                    // 上半部分：历史（无历史整块隐藏；长按单个词删除）
+                    if (history.isNotEmpty()) {
+                        Column {
+                            Text(
+                                text = "历史",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(Modifier.height(Spacing.titleContentGap))
+                            WordFlowRow(
+                                words = history.asReversed(),
+                                onWordClick = { submit(it) },
+                                onWordLongClick = { vm.removeHistory(it) },
+                            )
+                        }
+                    }
+
+                    // 下半部分：推荐（空查询时显示热搜词；输入关键词时显示匹配的影片标题）
+                    Column {
+                        Text(
+                            text = "推荐",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        Spacer(Modifier.height(Spacing.titleContentGap))
+                        val recommendWords = if (queryText.isBlank()) hotWords else suggestions
+                        WordFlowRow(words = recommendWords, onWordClick = { submit(it) })
+                    }
+                }
+            } else {
+                // ========== 结果态：沿用原跨站源结果页的顶部间距与边距基准 ==========
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
+                ) {
+                    // 本页顶部间距 16dp
+                    Spacer(Modifier.height(innerPadding.calculateTopPadding() + 16.dp))
+                    MultiSourceSearchResults(
+                        vm = multiVm,
+                        onPlay = onPlay,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
                     )
                 }
             }
-
-            // 下半部分：推荐（空查询时显示热搜词；输入关键词时显示匹配的影片标题）
-            Column {
-                Text(
-                    text = "推荐",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-                Spacer(Modifier.height(Spacing.titleContentGap))
-                val recommendWords = if (queryText.isBlank()) hotWords else suggestions
-                WordFlowRow(words = recommendWords, onWordClick = { submit(it) })
-            }
-        }
         }
     }
 }
