@@ -141,6 +141,9 @@ private const val CARD_FADE_MAX_STAGGER_INDEX = 6
 /** 单张卡片淡入时长（毫秒），与跨站源搜索页一致 */
 private const val CARD_FADE_IN_MILLIS = 200
 
+/** 首页等待动画最短展示时长（毫秒）：网络过快时不至于一闪而过 */
+private const val LOADING_MIN_SHOW_MILLIS = 350L
+
 /** pager 是否已停稳：不在滚动，且偏移已归位。拖动中 / 松手回弹中都为 false */
 private fun PagerState.isIdle(): Boolean =
     !isScrollInProgress && abs(currentPageOffsetFraction) < 0.01f
@@ -433,6 +436,7 @@ fun HomeScreen(
                     return@LaunchedEffect
                 }
                 pageLoading = true
+                val startedAt = System.currentTimeMillis()
                 try {
                     val folder = folderStack.value.lastOrNull()
                     val list = if (folder == null) {
@@ -443,6 +447,9 @@ fun HomeScreen(
                     if (!driveStyle.value && list.any { it.isFolder }) {
                         driveStyle.value = true
                     }
+                    // 最短展示时长：数据来得太快时也让等待动画完整走一小段，避免闪烁
+                    val remain = LOADING_MIN_SHOW_MILLIS - (System.currentTimeMillis() - startedAt)
+                    if (remain > 0) delay(remain)
                     pageVideos.value = list
                 } finally {
                     pageLoading = false
