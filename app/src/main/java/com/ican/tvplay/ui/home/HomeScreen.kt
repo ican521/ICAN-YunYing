@@ -1,6 +1,8 @@
 package com.ican.tvplay.ui.home
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -37,7 +39,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -74,6 +76,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
@@ -116,6 +119,7 @@ import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -126,6 +130,15 @@ import kotlin.math.roundToInt
 
 /** 顶部分类 Tab 行高度（与 [UnderlineTabRow] 默认高度一致，用于确定性计算顶区展开总高） */
 private val TabRowHeight = 42.dp
+
+/** 卡片逐个渐显：相邻卡片启动间隔（毫秒），与跨站源搜索页一致 */
+private const val CARD_FADE_STAGGER_MILLIS = 60L
+
+/** 卡片错峰索引上限：超出的卡片不再累加延迟 */
+private const val CARD_FADE_MAX_STAGGER_INDEX = 6
+
+/** 单张卡片淡入时长（毫秒），与跨站源搜索页一致 */
+private const val CARD_FADE_IN_MILLIS = 200
 
 /** pager 是否已停稳：不在滚动，且偏移已归位。拖动中 / 松手回弹中都为 false */
 private fun PagerState.isIdle(): Boolean =
@@ -390,6 +403,24 @@ fun HomeScreen(
             // 但它的卡片样式要保持原海报网格不变；只有配置好云盘后新出现的那些 tab
             // （内容是文件夹 / 文件）才切到行样式
             val driveStyle = remember(page, pageCategory?.id, currentSiteKey) { mutableStateOf(false) }
+            // 已渐显的卡片索引：计时放在父层，卡片滑出屏幕被回收再滑回来不会重播。
+            // 切站源 / 换分类 / 进出子目录都会重建该集合，从而重播一次逐个渐显
+            var revealedCards by remember(page, pageCategory?.id, currentSiteKey, folderStack.value) {
+                mutableStateOf<Set<Int>>(emptySet())
+            }
+            LaunchedEffect(pageVideos.value) {
+                val base = System.currentTimeMillis()
+                pageVideos.value.indices
+                    .filter { it !in revealedCards }
+                    .forEachIndexed { idx, index ->
+                        // 前若干张错峰，其后同批一起出现；用绝对时间计算，避免逐个累加
+                        val wait = base +
+                            idx.coerceAtMost(CARD_FADE_MAX_STAGGER_INDEX) * CARD_FADE_STAGGER_MILLIS -
+                            System.currentTimeMillis()
+                        if (wait > 0) delay(wait)
+                        revealedCards = revealedCards + index
+                    }
+            }
             // 首次进入该页、分类变化、切站源或进出子目录时触发加载
             LaunchedEffect(pageCategory?.id, currentSiteKey, folderStack.value) {
                 if (pageCategory == null) return@LaunchedEffect
@@ -464,11 +495,29 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                     verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                 ) {
-                    gridItems(pageVideos.value, key = { it.id }, contentType = { if (driveStyle.value) "drive" else "video" }) { video ->
+                    gridItemsIndexed(
+                        pageVideos.value,
+                        key = { _, v -> v.id },
+                        contentType = { _, _ -> if (driveStyle.value) "drive" else "video" },
+                    ) { index, video ->
+                        // 逐个渐显：alpha 只挂在卡片自身的 modifier 上，不新增布局层，尺寸/位置/间距不变
+                        val cardAlpha by animateFloatAsState(
+                            targetValue = if (index in revealedCards) 1f else 0f,
+                            animationSpec = tween(CARD_FADE_IN_MILLIS),
+                            label = "homeCardFade",
+                        )
                         if (driveStyle.value) {
-                            DriveRowItem(video = video, onClick = { onItemClick(video) })
+                            DriveRowItem(
+                                video = video,
+                                onClick = { onItemClick(video) },
+                                modifier = Modifier.alpha(cardAlpha),
+                            )
                         } else {
-                            VideoCardItem(video = video, onClick = { onItemClick(video) })
+                            VideoCardItem(
+                                video = video,
+                                onClick = { onItemClick(video) },
+                                modifier = Modifier.alpha(cardAlpha),
+                            )
                         }
                     }
                     // 网盘文件夹页短列表兜底：让「最大可上滑距离」恰好 = 搜索行最大折叠量（48dp）。
@@ -1005,10 +1054,12 @@ private fun UnderlineTabRow(
 private fun VideoCardItem(
     video: Video,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     com.ican.tvplay.ui.components.VideoCard(
         video = video,
         onClick = onClick,
+        modifier = modifier,
     )
 }
 
@@ -1024,9 +1075,10 @@ private fun VideoCardItem(
 private fun DriveRowItem(
     video: Video,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     top.yukonga.miuix.kmp.basic.Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(64.dp)
             .tvCardEffect(onClick = onClick, shape = SquircleShape(Spacing.corner), glow = false),
