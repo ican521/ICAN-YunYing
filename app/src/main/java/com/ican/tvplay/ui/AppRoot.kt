@@ -229,6 +229,8 @@ fun AppRoot() {
                         state = pagerState,
                         modifier = Modifier.fillMaxSize(),
                         userScrollEnabled = false,
+                        // 三个一级页面常驻组合：切 Tab 回来时不重建页面，不重播卡片动画、不重新加载
+                        beyondViewportPageCount = 2,
                     ) { page ->
                         when (page) {
                             0 -> HomeScreen(

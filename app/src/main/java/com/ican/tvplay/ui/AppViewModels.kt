@@ -119,6 +119,32 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     /** 开关版本号：弹窗 collect 后每次切换自动重组刷新图标 */
     val siteToggleVersion: StateFlow<Int> = settings.siteToggleVersion
 
+    /**
+     * 卡片逐个渐显开关：App 首次加载、切站源后的首次加载为 true；
+     * 切换分类 Tab 后关闭。放在 ViewModel 里，页面被回收重建也不会误判为首次加载。
+     */
+    private val _animateCards = MutableStateFlow(true)
+    val animateCards: StateFlow<Boolean> = _animateCards.asStateFlow()
+
+    /** 切分类 Tab（pager 滚动）后关闭逐条渐显 */
+    fun stopCardStagger() {
+        _animateCards.value = false
+    }
+
+    init {
+        // 站源真正发生变化时重新开启一次逐条渐显
+        viewModelScope.launch {
+            var lastKey = ""
+            repo.currentSite.collect { site ->
+                val key = site?.site?.key.orEmpty()
+                if (key != lastKey) {
+                    lastKey = key
+                    _animateCards.value = true
+                }
+            }
+        }
+    }
+
     // ===== 分类首页数据缓存：启动 / 切站后后台预取，Tab 切换直接命中，不再出现短暂加载 =====
     private val categoryCache = mutableMapOf<String, List<Video>>()
     private val categoryCacheLock = Mutex()

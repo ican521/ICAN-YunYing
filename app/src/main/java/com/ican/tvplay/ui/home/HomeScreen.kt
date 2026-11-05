@@ -202,11 +202,8 @@ fun HomeScreen(
 
     // 卡片逐条渐显只在「App 启动首次加载」和「切换站源后的首次加载」播放；
     // 分类 Tab 切换（点击 chip 翻页 / 手势滑动）不播：pager 一旦发生用户滚动就关闭，
-    // 直到再次切换站源才重新开启
-    var animateNewCards by remember { mutableStateOf(true) }
-    LaunchedEffect(currentSiteKey) {
-        animateNewCards = true
-    }
+    // 直到再次切换站源才重新开启。开关存放在 ViewModel 中，页面被回收重建也不会重播
+    val animateNewCards by viewModel.animateCards.collectAsStateWithLifecycle()
     // 启动 / 切站后后台预取其余分类的首页数据，快速滑 Tab 时直接命中缓存，不再出现短暂加载
     LaunchedEffect(categories, currentSiteKey) {
         viewModel.prefetchCategories()
@@ -226,7 +223,7 @@ fun HomeScreen(
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.isScrollInProgress }
             .filter { it }
-            .collect { animateNewCards = false }
+            .collect { viewModel.stopCardStagger() }
     }
 
     // pager 滑动停止后 → 同步分类选中态到 ViewModel
