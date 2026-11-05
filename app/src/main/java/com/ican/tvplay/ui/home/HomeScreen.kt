@@ -562,12 +562,10 @@ fun HomeScreen(
                         }
                     }
                 }
-                // 等待动画：该页加载中且尚无内容时，居中显示「弧长伸缩」加载弧
+                // 等待动画：该页加载中且尚无内容时，屏幕居中显示「弧长伸缩」加载弧
                 if (pageLoading && pageVideos.value.isEmpty()) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = with(density) { topBarHeightPx.toDp() }),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
                         ArcStretchSpinner()

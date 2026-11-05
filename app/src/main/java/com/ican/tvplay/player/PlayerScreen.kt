@@ -69,7 +69,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TabRowDefaults
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
@@ -175,6 +174,7 @@ import com.ican.tvplay.player.core.SubItem
 import com.ican.tvplay.player.core.MediaItemFactory
 import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.ArcStretchSpinner
 import com.ican.tvplay.ui.components.FadingScrim
 import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.pageHorizontalPadding
@@ -1071,7 +1071,7 @@ fun PlayerScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 if (!inPip) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(36.dp))
+                    ArcStretchSpinner(size = 36.dp, strokeWidth = 3.dp, color = Color.White)
                 }
             }
             return
@@ -1423,9 +1423,10 @@ fun PlayerScreen(
             visible = detailLoading,
             contentAlignment = Alignment.Center,
         ) {
-            CircularProgressIndicator(
+            ArcStretchSpinner(
+                size = 48.dp,
+                strokeWidth = 3.5.dp,
                 color = Color.White,
-                modifier = Modifier.size(48.dp),
             )
         }
 
@@ -1812,11 +1813,11 @@ private fun PreviewPlayerArea(
         // 放在控制层下面：缓冲时转圈在按钮后方，按钮仍然可点击（与 fongmi 同款 z-order）
         // 转圈固定在屏幕中心，不随网速文字出现而位移
         if (showLoading || playerState.buffering || playerState.switching) {
-            CircularProgressIndicator(
+            ArcStretchSpinner(
+                modifier = Modifier.align(Alignment.Center),
+                size = 36.dp,
+                strokeWidth = 3.dp,
                 color = Color.White,
-                modifier = Modifier
-                    .size(36.dp)
-                    .align(Alignment.Center),
             )
             // fongmi view_progress 同款：网速文字与转圈同为中心锚点、marginTop=40dp（12sp 白色），
             // 缓冲期间每秒采样刷新（TrafficStats），缓冲结束随转圈一起消失
@@ -2968,11 +2969,11 @@ private fun FullscreenPlayLayout(
 
         // 缓冲转圈（fongmi 全屏 view_progress 同款：中心固定位置，不随网速文字位移）
         if (playerState.buffering || playerState.switching) {
-            CircularProgressIndicator(
+            ArcStretchSpinner(
+                modifier = Modifier.align(Alignment.Center),
+                size = 36.dp,
+                strokeWidth = 3.dp,
                 color = Color.White,
-                modifier = Modifier
-                    .size(36.dp)
-                    .align(Alignment.Center),
             )
             // fongmi view_progress 同款：网速文字居中偏下 40dp（12sp 白色），缓冲期间每秒刷新
             var fsSpeedText by remember { mutableStateOf("") }

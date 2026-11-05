@@ -70,6 +70,7 @@ import com.ican.tvplay.ui.CollectionViewModel
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.ArcStretchSpinner
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBottomSheetDialog
@@ -592,9 +593,9 @@ private fun FavoriteSyncDialog(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        androidx.compose.material3.CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
+                        ArcStretchSpinner(
+                            size = 20.dp,
+                            strokeWidth = 1.5.dp,
                             color = MaterialTheme.colorScheme.primary,
                         )
                         Spacer(modifier = Modifier.width(Spacing.titleContentGap))

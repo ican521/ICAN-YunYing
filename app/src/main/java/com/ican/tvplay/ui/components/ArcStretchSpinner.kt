@@ -27,6 +27,7 @@ import androidx.tv.material3.MaterialTheme
 fun ArcStretchSpinner(
     modifier: Modifier = Modifier,
     size: Dp = 30.dp,
+    strokeWidth: Dp = 2.5.dp,
     color: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     val transition = rememberInfiniteTransition(label = "arcStretch")
@@ -55,7 +56,7 @@ fun ArcStretchSpinner(
             startAngle = rotation - 90f,
             sweepAngle = sweep,
             useCenter = false,
-            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round),
+            style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round),
         )
     }
 }
