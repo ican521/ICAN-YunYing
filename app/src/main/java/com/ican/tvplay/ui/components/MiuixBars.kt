@@ -106,7 +106,7 @@ fun MiuixBackButton(
             imageVector = MiuixIcons.Back,
             contentDescription = "返回",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(24.dp),
         )
     }
 }
