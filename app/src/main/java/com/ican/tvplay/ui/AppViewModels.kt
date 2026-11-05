@@ -180,7 +180,10 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     suspend fun getCategoryVideos(categoryId: String): List<Video> {
         cachedCategoryVideos(categoryId)?.let { return it }
         val list = repo.getVideos(categoryId)
-        categoryCacheLock.withLock { categoryCache[categoryCacheKey(categoryId)] = list }
+        // 空结果不入缓存：冷启动 spider 未就绪时取到的空列表若被缓存，该分类会一直空白
+        if (list.isNotEmpty()) {
+            categoryCacheLock.withLock { categoryCache[categoryCacheKey(categoryId)] = list }
+        }
         return list
     }
 

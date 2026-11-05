@@ -110,7 +110,9 @@ class VideoRepository(
                 return
             }
             cache.sections.forEach { s ->
-                homeCache["${siteKey}|${s.catId}"] = s.videos
+                // 空分区不入缓存：历史上「spider 未就绪时取了空数据并落盘」会污染磁盘缓存，
+                // 导致之后每次冷启动首页都命中空列表（表现为首次启动没有卡片）
+                if (s.videos.isNotEmpty()) homeCache["${siteKey}|${s.catId}"] = s.videos
             }
             Log.d(REPO_TAG, "home disk cache loaded sections=${cache.sections.size}")
         }.onFailure { Log.d(REPO_TAG, "home disk cache miss: ${it.message}") }
@@ -121,7 +123,7 @@ class VideoRepository(
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             runCatching {
                 val sections = cats.mapNotNull { cat ->
-                    homeCache["${siteKey}|${cat.id}"]?.let {
+                    homeCache["${siteKey}|${cat.id}"]?.takeIf { it.isNotEmpty() }?.let {
                         HomeDiskSection(catId = cat.id, catName = cat.name, videos = it)
                     }
                 }
@@ -543,7 +545,10 @@ class VideoRepository(
         // 首页第一页走缓存（预热的收益点）；翻页不缓存
         val list = if (page == 1) {
             val key = "${loaded.site.key}|${cat.id}"
-            homeCache[key] ?: fetchCategoryVideos(loaded, cat).also { homeCache[key] = it }
+            // 空结果不入缓存：spider 未就绪 / 网络异常时取到空列表若被缓存，
+            // 之后首页会一直命中空缓存（历史 bug：首次启动首页没有视频卡片）
+            homeCache[key] ?: fetchCategoryVideos(loaded, cat)
+                .also { if (it.isNotEmpty()) homeCache[key] = it }
         } else {
             fetchCategoryVideos(loaded, cat)
         }
@@ -560,7 +565,13 @@ class VideoRepository(
         cat: VideoCategory,
     ): List<Video> {
         return if (loaded.site.isSpider()) {
-            val spider = currentSpider ?: return emptyList()
+            // 冷启动时「配置+分类」先由磁盘缓存恢复，spider 仍在后台加载（[ensureLoaded] 网络刷新）。
+            // 此时直接取会拿到空列表，历史上还会把空列表写进缓存与磁盘 → 之后每次启动首页都空白。
+            // 这里等启动刷新（持 loadMutex）走完再取，spider 就绪后正常返回数据
+            val spider = currentSpider ?: run {
+                loadMutex.withLock { }
+                currentSpider
+            } ?: return emptyList()
             val json = spiderManager.categoryContent(spider, cat.id, 1, filter = true)
             parseList(json).map { it.toVideo(cat) }
         } else {
@@ -579,9 +590,11 @@ class VideoRepository(
         if (cats.isEmpty()) return
         coroutineScope {
             cats.map { cat -> async {
-                // 强制网络刷新（不走 loadCategoryVideos 的缓存命中），刷新后写入内存
+                // 强制网络刷新（不走 loadCategoryVideos 的缓存命中），刷新后写入内存；
+                // 空结果不写缓存，避免覆盖磁盘恢复出来的有效数据
                 runCatching { fetchCategoryVideos(loaded, cat) }
                     .getOrNull()
+                    ?.takeIf { it.isNotEmpty() }
                     ?.let { homeCache["${loaded.site.key}|${cat.id}"] = it }
             } }.awaitAll()
         }
