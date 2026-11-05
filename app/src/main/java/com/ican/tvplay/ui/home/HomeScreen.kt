@@ -184,6 +184,12 @@ fun HomeScreen(
     onUrlPlayClick: () -> Unit,
 ) {
     val viewModel = appViewModel { HomeViewModel(this) }
+    // 预加载收藏页：首页加载期间同步建好 CollectionViewModel 并等首条收藏数据，
+    // 之后进入收藏页可直接拿到已就绪的卡片列表，不再等数据库首帧查询
+    val collectionPrefetch = appViewModel { com.ican.tvplay.ui.CollectionViewModel(this) }
+    LaunchedEffect(collectionPrefetch) {
+        collectionPrefetch.favorites.first()
+    }
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
 

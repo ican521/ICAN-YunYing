@@ -204,8 +204,9 @@ class CollectionViewModel(container: AppContainer) : ViewModel() {
     private val spiderManager = container.spiderManager
     private val apiClient = com.ican.tvplay.data.remote.VodApiClient()
 
+    // 收藏列表读本地数据库：采用 Eagerly，首页启动时即可把数据备好（进收藏页不用等首帧查询）
     val favorites = favoriteDao.observeAll()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val histories = historyDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
