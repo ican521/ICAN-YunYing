@@ -200,6 +200,14 @@ fun HomeScreen(
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
+    // 卡片逐条渐显只在「App 启动首次加载」和「切换站源后的首次加载」播放；
+    // 分类 Tab 切换（点击 chip 翻页 / 手势滑动）不播：pager 一旦发生用户滚动就关闭，
+    // 直到再次切换站源才重新开启
+    var animateNewCards by remember { mutableStateOf(true) }
+    LaunchedEffect(currentSiteKey) {
+        animateNewCards = true
+    }
+
     // 「全部」页已删除：分类就绪后默认选中第一个分类
     LaunchedEffect(categories) {
         if (selectedCategory == null && categories.isNotEmpty()) {
@@ -209,6 +217,13 @@ fun HomeScreen(
 
     // 顶部分类 pager：每个分类一页（第 0 页 = 第一个分类）
     val pagerState = rememberPagerState(pageCount = { categories.size })
+
+    // 用户一旦滚动 / 翻页 pager（点 chip 或手势），本次会话就不再播放逐条渐显
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.isScrollInProgress }
+            .filter { it }
+            .collect { animateNewCards = false }
+    }
 
     // pager 滑动停止后 → 同步分类选中态到 ViewModel
     LaunchedEffect(pagerState.settledPage) {
@@ -422,7 +437,12 @@ fun HomeScreen(
             var pageLoading by remember(page, pageCategory?.id, currentSiteKey, folderStack.value) {
                 mutableStateOf(true)
             }
-            LaunchedEffect(pageVideos.value) {
+            LaunchedEffect(pageVideos.value, animateNewCards) {
+                // 非首次加载（分类 Tab 切换）不留动画：直接标记全部已显示
+                if (!animateNewCards) {
+                    revealedCards = pageVideos.value.indices.toSet()
+                    return@LaunchedEffect
+                }
                 val base = System.currentTimeMillis()
                 pageVideos.value.indices
                     .filter { it !in revealedCards }
@@ -528,7 +548,7 @@ fun HomeScreen(
                     ) { index, video ->
                         // 逐个渐显：alpha 只挂在卡片自身的 modifier 上，不新增布局层，尺寸/位置/间距不变
                         val cardAlpha by animateFloatAsState(
-                            targetValue = if (index in revealedCards) 1f else 0f,
+                            targetValue = if (animateNewCards && index !in revealedCards) 0f else 1f,
                             animationSpec = tween(CARD_FADE_IN_MILLIS),
                             label = "homeCardFade",
                         )
