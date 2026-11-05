@@ -207,6 +207,10 @@ fun HomeScreen(
     LaunchedEffect(currentSiteKey) {
         animateNewCards = true
     }
+    // 启动 / 切站后后台预取其余分类的首页数据，快速滑 Tab 时直接命中缓存，不再出现短暂加载
+    LaunchedEffect(categories, currentSiteKey) {
+        viewModel.prefetchCategories()
+    }
 
     // 「全部」页已删除：分类就绪后默认选中第一个分类
     LaunchedEffect(categories) {
@@ -461,10 +465,22 @@ fun HomeScreen(
                     pageLoading = false
                     return@LaunchedEffect
                 }
+                val folder = folderStack.value.lastOrNull()
+                // 命中启动预取缓存：直接铺卡片，不显示等待动画
+                if (folder == null) {
+                    val cached = viewModel.cachedCategoryVideos(pageCategory.id)
+                    if (cached != null) {
+                        if (!driveStyle.value && cached.any { it.isFolder }) {
+                            driveStyle.value = true
+                        }
+                        pageVideos.value = cached
+                        pageLoading = false
+                        return@LaunchedEffect
+                    }
+                }
                 pageLoading = true
                 val startedAt = System.currentTimeMillis()
                 try {
-                    val folder = folderStack.value.lastOrNull()
                     val list = if (folder == null) {
                         viewModel.getCategoryVideos(pageCategory.id)
                     } else {

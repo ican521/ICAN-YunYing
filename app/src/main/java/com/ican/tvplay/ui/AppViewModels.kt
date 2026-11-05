@@ -12,6 +12,7 @@ import com.ican.tvplay.data.remote.SuggestWordSource
 import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.components.siteShortName
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +27,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** 热搜榜不可用（无缓存/首次启动/离线）时的兜底推荐词 */
 private val DEFAULT_HOT_WORDS = listOf("仙逆", "狂飙", "三体", "庆余年", "繁花", "凡人修仙传", "长风渡")
@@ -116,8 +119,44 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     /** 开关版本号：弹窗 collect 后每次切换自动重组刷新图标 */
     val siteToggleVersion: StateFlow<Int> = settings.siteToggleVersion
 
-    /** 按分类 id 独立取该分类下视频（每页独立加载，不依赖 selectedCategory 选中态） */
-    suspend fun getCategoryVideos(categoryId: String): List<Video> = repo.getVideos(categoryId)
+    // ===== 分类首页数据缓存：启动 / 切站后后台预取，Tab 切换直接命中，不再出现短暂加载 =====
+    private val categoryCache = mutableMapOf<String, List<Video>>()
+    private val categoryCacheLock = Mutex()
+    private var prefetchJob: Job? = null
+
+    private fun categoryCacheKey(categoryId: String) = "${currentSiteKey.value}|$categoryId"
+
+    /** 已预取的分类数据；未就绪返回 null */
+    suspend fun cachedCategoryVideos(categoryId: String): List<Video>? =
+        categoryCacheLock.withLock { categoryCache[categoryCacheKey(categoryId)] }
+
+    /**
+     * 后台串行预取全部分类首页数据（跳过第一页：pager 当前页会自行加载）。
+     * 切站源时清掉旧站缓存并重新开始。
+     */
+    fun prefetchCategories() {
+        val site = currentSiteKey.value
+        if (site.isBlank()) return
+        prefetchJob?.cancel()
+        prefetchJob = viewModelScope.launch {
+            categoryCacheLock.withLock {
+                categoryCache.keys.removeAll { !it.startsWith("$site|") }
+            }
+            categories.value.drop(1).forEach { cat ->
+                if (currentSiteKey.value != site) return@launch
+                if (cachedCategoryVideos(cat.id) != null) return@forEach
+                runCatching { getCategoryVideos(cat.id) }
+            }
+        }
+    }
+
+    /** 按分类 id 独立取该分类下视频（每页独立加载，不依赖 selectedCategory 选中态）；命中预取缓存则直接返回 */
+    suspend fun getCategoryVideos(categoryId: String): List<Video> {
+        cachedCategoryVideos(categoryId)?.let { return it }
+        val list = repo.getVideos(categoryId)
+        categoryCacheLock.withLock { categoryCache[categoryCacheKey(categoryId)] = list }
+        return list
+    }
 
     /** 网盘目录钻取：按文件夹 id 取子目录内容（fongmi openFolder 同款） */
     suspend fun getFolderVideos(folderId: String): List<Video> = repo.getFolderVideos(folderId)
