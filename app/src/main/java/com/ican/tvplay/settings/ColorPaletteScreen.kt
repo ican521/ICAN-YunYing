@@ -78,6 +78,10 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
     val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
 
     Scaffold(
+        // 整窗底色（含状态栏 / 导航条区域）与设置页一致
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             BlurredBar(backdrop) {
