@@ -107,6 +107,7 @@ fun MultiSourceSearchResults(
     vm: MultiSourceSearchViewModel,
     onPlay: (videoId: String, episodeIndex: Int, flag: String, preInitialized: Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    topPadding: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -154,7 +155,7 @@ fun MultiSourceSearchResults(
                     .fillMaxHeight()
                     .imePadding(),
                 verticalArrangement = Arrangement.spacedBy(Spacing.siteListItemGap),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = Spacing.contentBottomInset),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(top = topPadding, bottom = Spacing.contentBottomInset),
             ) {
                 // 「全部」合并视图入口（仅在有搜索词时显示；未搜索时本页不出现）
                 if (searchedQuery.isNotBlank()) {
@@ -208,7 +209,7 @@ fun MultiSourceSearchResults(
                         columns = columns,
                         // imePadding：键盘弹出时网格底部内容不被遮挡，可滚动到键盘上方
                         modifier = Modifier.fillMaxSize().imePadding(),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = Spacing.contentBottomInset),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(top = topPadding, bottom = Spacing.contentBottomInset),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.searchGridGap),
                         verticalArrangement = Arrangement.spacedBy(Spacing.searchGridGap),
                     ) {

@@ -221,21 +221,14 @@ fun SearchHomeScreen(
                 }
             } else {
                 // ========== 结果态：沿用原跨站源结果页的顶部间距与边距基准 ==========
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background),
-                ) {
-                    // 本页顶部间距 16dp
-                    Spacer(Modifier.height(innerPadding.calculateTopPadding() + 16.dp))
-                    MultiSourceSearchResults(
-                        vm = multiVm,
-                        onPlay = onPlay,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    )
-                }
+                // 顶部间距走滚动容器 contentPadding（不用外层 Spacer 占位），
+                // 滚动内容才能进入顶栏后方，毛玻璃有内容可采样
+                MultiSourceSearchResults(
+                    vm = multiVm,
+                    onPlay = onPlay,
+                    topPadding = innerPadding.calculateTopPadding() + 16.dp,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }
