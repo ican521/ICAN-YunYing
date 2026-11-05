@@ -95,7 +95,7 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
                 ) {
                     // 返回按钮靠左
                     Box(modifier = Modifier.align(Alignment.CenterStart).padding(start = pageHorizontalPadding())) {
-                        MiuixBackButton(onClick = onBack)
+                        MiuixBackButton(onClick = onBack, showBackground = false)
                     }
                     // 标题居中
                     Text(
