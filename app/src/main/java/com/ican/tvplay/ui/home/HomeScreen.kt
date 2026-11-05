@@ -104,6 +104,7 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
+import com.ican.tvplay.ui.components.ArcStretchSpinner
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
@@ -408,6 +409,10 @@ fun HomeScreen(
             var revealedCards by remember(page, pageCategory?.id, currentSiteKey, folderStack.value) {
                 mutableStateOf<Set<Int>>(emptySet())
             }
+            // 该页是否正在加载：显示居中等待动画，数据到达后关闭
+            var pageLoading by remember(page, pageCategory?.id, currentSiteKey, folderStack.value) {
+                mutableStateOf(true)
+            }
             LaunchedEffect(pageVideos.value) {
                 val base = System.currentTimeMillis()
                 pageVideos.value.indices
@@ -423,17 +428,25 @@ fun HomeScreen(
             }
             // 首次进入该页、分类变化、切站源或进出子目录时触发加载
             LaunchedEffect(pageCategory?.id, currentSiteKey, folderStack.value) {
-                if (pageCategory == null) return@LaunchedEffect
-                val folder = folderStack.value.lastOrNull()
-                val list = if (folder == null) {
-                    viewModel.getCategoryVideos(pageCategory.id)
-                } else {
-                    viewModel.getFolderVideos(folder.first)
+                if (pageCategory == null) {
+                    pageLoading = false
+                    return@LaunchedEffect
                 }
-                if (!driveStyle.value && list.any { it.isFolder }) {
-                    driveStyle.value = true
+                pageLoading = true
+                try {
+                    val folder = folderStack.value.lastOrNull()
+                    val list = if (folder == null) {
+                        viewModel.getCategoryVideos(pageCategory.id)
+                    } else {
+                        viewModel.getFolderVideos(folder.first)
+                    }
+                    if (!driveStyle.value && list.any { it.isFolder }) {
+                        driveStyle.value = true
+                    }
+                    pageVideos.value = list
+                } finally {
+                    pageLoading = false
                 }
-                pageVideos.value = list
             }
             // 子目录内按返回键退回上一级（fongmi FolderFragment.goBack → popBackStack）
             BackHandler(enabled = folderStack.value.isNotEmpty()) {
@@ -547,6 +560,17 @@ fun HomeScreen(
                                     .fillMaxWidth(),
                             )
                         }
+                    }
+                }
+                // 等待动画：该页加载中且尚无内容时，居中显示「弧长伸缩」加载弧
+                if (pageLoading && pageVideos.value.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = with(density) { topBarHeightPx.toDp() }),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ArcStretchSpinner()
                     }
                 }
             }
