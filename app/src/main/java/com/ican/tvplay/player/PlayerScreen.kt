@@ -3161,11 +3161,13 @@ private fun EpisodeChip(
             // 选集列表自带选中态：整列表（含未选中项）统一不要按压/点击蒙层，选中色即反馈
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false, pressEffect = false)
             // "更多"弹窗选中填充对齐全屏选集弹窗（BrandBlueDeep 25%）；选集栏用全局选中填充透明度
+            // "更多"弹窗未选中底色固定 #F0F0F0（深浅色模式一致）；单行选集栏用 surfaceContainer
             .background(
                 if (selected) {
                     if (showBorder) BrandBlueDeep.copy(alpha = EpisodeSelectedFillAlpha)
                     else MiuixTheme.colorScheme.primaryContainer
-                } else MiuixTheme.colorScheme.surfaceContainer,
+                } else if (showBorder) Color(0xFFF0F0F0)
+                else MiuixTheme.colorScheme.surfaceContainer,
                 shape,
             )
             .then(borderModifier)
