@@ -282,9 +282,8 @@ fun FloatingBottomBar(
             visibilityThreshold = 0.001f,
             initialScale = 1f,
             pressedScale = 78f / 56f,
-            // 液态玻璃模式保持按下即触发；普通/毛玻璃模式只在长按超过阈值后才给按压缩小
-            delayPressUntilLongPress = !isBlurEnabled,
-            pressOnActivate = isBlurEnabled,
+            // 液态玻璃模式保留按下即触发的按压反馈；普通/毛玻璃模式完全不给按压缩小
+            pressFeedbackEnabled = isBlurEnabled,
             canDrag = { offset ->
                 offset.x in 0f..totalWidthPx
             },
@@ -530,15 +529,10 @@ fun FloatingBottomBar(
                         .width(tabWidthDp),
                     contentAlignment = Alignment.CenterStart,
                 ) {
-                    // 指示器背景：毛玻璃 / 普通模式下按压时轻微缩小（只缩放指示器，不影响图标文字）
+                    // 指示器背景：普通/毛玻璃模式无任何按压缩放，点击、长按都保持原尺寸
                     Box(
                         Modifier
                             .matchParentSize()
-                            .graphicsLayer {
-                                val scale = 1f - 0.08f * dampedDragAnimation.pressProgress
-                                scaleX = scale
-                                scaleY = scale
-                            }
                             .clip(pillShape)
                             // 关闭毛玻璃：浅色 #E1ECFE（KernelSU 同款视觉），深色主题色 15%
                             .background(plainIndicatorColor, pillShape),

@@ -13,7 +13,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.android.awaitFrame
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -26,10 +25,8 @@ class DampedDragAnimation(
     val visibilityThreshold: Float,
     val initialScale: Float,
     val pressedScale: Float,
-    // true 时按压反馈只在按住超过长按阈值后触发，轻点不缩放；false 时按下即触发
-    private val delayPressUntilLongPress: Boolean = false,
-    // true 时切页动画（animateToValue）自带按压反馈；false 时切页不触发缩放
-    private val pressOnActivate: Boolean = true,
+    // false 时完全关闭按压反馈（按下不缩放、切页也不缩放），用于普通/毛玻璃模式的底栏
+    private val pressFeedbackEnabled: Boolean = true,
     val canDrag: (Offset) -> Boolean = { true },
     val onDragStarted: DampedDragAnimation.(position: Offset) -> Unit,
     val onDragStopped: DampedDragAnimation.() -> Unit,
@@ -62,7 +59,6 @@ class DampedDragAnimation(
     private val mutatorMutex = MutatorMutex()
 
     private var pressJob: Job? = null
-    private var pendingPressJob: Job? = null
     private var releaseJob: Job? = null
 
     private val velocityTracker = VelocityTracker()
@@ -75,21 +71,19 @@ class DampedDragAnimation(
     val scaleY: Float get() = scaleYAnimation.value
     val velocity: Float get() = velocityAnimation.value
 
-    val modifier: Modifier = Modifier.pointerInput(delayPressUntilLongPress) {
+    val modifier: Modifier = Modifier.pointerInput(pressFeedbackEnabled) {
         inspectDragGestures(
             onDragStart = { down ->
                 onDragStarted(down.position)
-                schedulePress(if (delayPressUntilLongPress) viewConfiguration.longPressTimeoutMillis else 0L)
+                if (pressFeedbackEnabled) press()
             },
             onDragEnd = {
-                cancelPendingPress()
                 onDragStopped()
-                release()
+                if (pressFeedbackEnabled) release()
             },
             onDragCancel = {
-                cancelPendingPress()
                 onDragCancelled()
-                release()
+                if (pressFeedbackEnabled) release()
             }
         ) { change, dragAmount ->
             val position = change.position
@@ -113,25 +107,6 @@ class DampedDragAnimation(
             launch { scaleXAnimation.animateTo(pressedScale, scaleXAnimationSpec) }
             launch { scaleYAnimation.animateTo(pressedScale, scaleYAnimationSpec) }
         }
-    }
-
-    /** 按下后按需等长按阈值再触发按压反馈；[delayMillis] <= 0 时立即触发。 */
-    fun schedulePress(delayMillis: Long) {
-        pendingPressJob?.cancel()
-        if (delayMillis <= 0L) {
-            press()
-        } else {
-            pendingPressJob = animationScope.launch {
-                delay(delayMillis)
-                press()
-            }
-        }
-    }
-
-    /** 取消尚未触发的延迟按压（轻点在长按阈值前抬手时调用）。 */
-    fun cancelPendingPress() {
-        pendingPressJob?.cancel()
-        pendingPressJob = null
     }
 
     fun release() {
@@ -158,13 +133,13 @@ class DampedDragAnimation(
     fun animateToValue(value: Float) {
         animationScope.launch {
             mutatorMutex.mutate {
-                if (pressOnActivate) press()
+                if (pressFeedbackEnabled) press()
                 val targetValue = value.coerceIn(valueRange)
                 launch { valueAnimation.animateTo(targetValue, valueAnimationSpec) }
                 if (velocity != 0f) {
                     launch { velocityAnimation.animateTo(0f, velocityAnimationSpec) }
                 }
-                if (pressOnActivate) release()
+                if (pressFeedbackEnabled) release()
             }
         }
     }
