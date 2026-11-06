@@ -306,7 +306,7 @@ private fun SiteSourceChip(
         MiuixTheme.colorScheme.surfaceContainerHigh
     }
     val fg = if (selected) MaterialTheme.colorScheme.primary
-    else MaterialTheme.colorScheme.onSurfaceVariant
+    else MiuixTheme.colorScheme.onSurfaceVariantSummary
     val shape = RoundedCornerShape(percent = 50)
 
     // 固定宽度：所有胶囊等宽，不因名字长短变化；无水平外边距，左缘与返回圆钮（页面边距 16dp）精确对齐。
