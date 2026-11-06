@@ -69,13 +69,8 @@ class MainActivity : ComponentActivity() {
         // 实测窗口格式为 TRANSLUCENT（系统/edge-to-edge 造成），即使铺了黑色背景，
         // 1px 的结构缝仍会透出壁纸，表现为小窗底部/放大过程中的白线。强制不透明表面。
         window.setFormat(android.graphics.PixelFormat.OPAQUE)
-        // 小屏（手机）禁用自动横向：锁定竖屏，仅播放全屏时由播放页临时请求横屏；平板保持系统方向。
-        // 必须按「物理屏幕」判断，不能用 resources.configuration.screenWidthDp：
-        // Activity 处于小窗或被信箱化时，该值是小窗/信箱宽度（实测平板 548dp < 600），
-        // 会把自己锁成竖屏 → 系统再信箱化成竖条 → 下次启动又读到 548dp，越锁越死。
-        if (isSmallScreenDevice()) {
-            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        }
+        // 不再强制锁方向：整个 Activity 跟随系统方向（fongmi 同款），
+        // 只在播放全屏时临时请求横屏，退出全屏后按用户自动旋转设置恢复。
         // targetSdk 35+ 对声明 supportsPictureInPicture 的 Activity 默认开启「手势回桌面自动进 PiP」，
         // 导致平板横屏预览小窗上滑回桌面时被系统塞进画中画、视频继续播放。
         // 显式关闭自动进入：本 App 只在「全屏 + 后台播放=画中画」时由 onUserLeaveHint 主动进 PiP。
@@ -104,20 +99,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** 是否小屏设备（手机）：按物理屏幕短边 dp 判断，不受小窗/信箱化窗口尺寸影响 */
-    private fun isSmallScreenDevice(): Boolean {
-        val bounds: Rect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            windowManager.maximumWindowMetrics.bounds
-        } else {
-            val point = android.graphics.Point()
-            @Suppress("DEPRECATION")
-            windowManager.defaultDisplay.getRealSize(point)
-            Rect(0, 0, point.x, point.y)
-        }
-        val shortSideDp = minOf(bounds.width(), bounds.height()) / resources.displayMetrics.density
-        return shortSideDp < 600
-    }
-
     /** 用户是否开着自动旋转（即没锁方向）。只读系统设置，无需任何权限。 */
     private fun isAutoRotate(): Boolean = runCatching {
         android.provider.Settings.System.getInt(
@@ -127,11 +108,12 @@ class MainActivity : ComponentActivity() {
         ) == 1
     }.getOrDefault(true)
 
-    /** 平板恢复方向：用户开着自动旋转才跟随系统；锁着方向时按当前实际方向恢复。
-     *  绝不能再返回 SCREEN_ORIENTATION_UNSPECIFIED —— MIUI/HyperOS 把「无偏好」当成
+    /** 按用户自动旋转设置返回期望的方向常量：
+     *  用户开着自动旋转才跟随系统（FULL_USER）；锁着方向时按当前实际方向恢复。
+     *  绝不能返回 SCREEN_ORIENTATION_UNSPECIFIED —— MIUI/HyperOS 把「无偏好」当成
      *  「放开旋转」，会把用户锁好的方向一并解锁（可用设置里的方向锁定按钮复现）。
      *  fongmi 同款：VideoActivity.isAutoRotate() + PlaybackOrientation.getExitFullscreenOrientation。 */
-    private fun tabletRestoreOrientation(): Int = if (isAutoRotate()) {
+    private fun getUserDesiredOrientation(): Int = if (isAutoRotate()) {
         ActivityInfo.SCREEN_ORIENTATION_FULL_USER
     } else if (resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
         ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
@@ -139,14 +121,9 @@ class MainActivity : ComponentActivity() {
         ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
     }
 
-    /** 退出全屏/离开播放页后恢复屏幕方向：小屏手机锁竖屏，平板按用户旋转锁状态恢复。
-     *  由播放页调用，判定同样按物理屏（播放页所在窗口可能已被信箱化） */
+    /** 退出全屏/离开播放页后恢复屏幕方向：统一跟随用户自动旋转设置恢复（fongmi 同款）。 */
     fun restoreDefaultOrientation() {
-        requestedOrientation = if (isSmallScreenDevice()) {
-            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        } else {
-            tabletRestoreOrientation()
-        }
+        requestedOrientation = getUserDesiredOrientation()
     }
 
     /** fongmi PiP 类同款：整个画中画生命周期复用同一个 builder。
@@ -337,13 +314,7 @@ class MainActivity : ComponentActivity() {
             // 恢复方向 + 清全屏标记：不解除横屏请求的话，下次打开 App 会先横屏再转竖屏，
             // 且残留的 isFullscreen 会让首页按 Home 误触画中画
             Players.isFullscreen = false
-            // 小屏判定同样必须按物理屏：此时窗口还是小窗尺寸（371dp），
-            // 用窗口宽度会把平板误锁成竖屏，重开 App 就成横屏里的竖条
-            requestedOrientation = if (isSmallScreenDevice()) {
-                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            } else {
-                tabletRestoreOrientation()
-            }
+            requestedOrientation = getUserDesiredOrientation()
             // 同步恢复状态栏：全屏播放时隐藏的状态栏若不在此处恢复，系统会记住「隐藏」，
             // 重开回前台首帧按无状态栏渲染，播放页退出的恢复调用约 370ms 后才生效，
             // 状态栏 inset 从 0 动画到满高会把整页顶得上下跳动
