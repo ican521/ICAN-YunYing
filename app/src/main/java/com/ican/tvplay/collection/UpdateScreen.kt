@@ -161,7 +161,7 @@ fun UpdateScreen(
                                 onClick = { viewModel.markAllRead() },
                             )
                             ArrowPreference(
-                                title = "更新提醒配置",
+                                title = "配置更新提醒",
                                 summary = "为收藏的视频设置每周更新日",
                                 onClick = onScheduleClick,
                             )
