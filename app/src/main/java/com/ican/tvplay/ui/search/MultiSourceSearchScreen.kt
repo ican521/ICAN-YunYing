@@ -76,7 +76,6 @@ import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
 import com.ican.tvplay.ui.theme.PosterTitleScrim
-import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.Icon
@@ -296,17 +295,15 @@ private fun SiteSourceChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val isDark = com.ican.tvplay.ui.theme.LocalDarkTheme.current
-    // 未选中底色：浅色模式用 miuix surfaceContainer（纯白，与设置页卡片一致），
-    // 深色模式保持项目 DarkSurfaceVariant（#242424 全局板块色）不变
+    // 统一使用 MiuixTheme.colorScheme：
+    // 选中态用 primaryContainer（实心蓝底）+ onPrimaryContainer（白字），符合 Miuix 容器/文本配对规范；
+    // 未选中态用 surfaceContainer（表面容器）+ onSurfaceVariantSummary（次级摘要文本）。
     val bg = if (selected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
-    } else if (isDark) {
-        MaterialTheme.colorScheme.surfaceVariant
+        MiuixTheme.colorScheme.primaryContainer
     } else {
         MiuixTheme.colorScheme.surfaceContainer
     }
-    val fg = if (selected) MaterialTheme.colorScheme.primary
+    val fg = if (selected) MiuixTheme.colorScheme.onPrimaryContainer
     else MiuixTheme.colorScheme.onSurfaceVariantSummary
     val shape = RoundedCornerShape(percent = 50)
 
