@@ -96,8 +96,12 @@ class FavoriteUpdateChecker(
     /**
      * 执行检测。返回本次检测到「集数增加」的剧集数量。
      * [force] = true 忽略频率节流（手动「重新检查」）。
+     * [onItemUpdated] 每检测到一部剧集数增加时回调一次，供调用方逐条刷新界面。
      */
-    suspend fun check(force: Boolean = false): Int = withContext(Dispatchers.IO) {
+    suspend fun check(
+        force: Boolean = false,
+        onItemUpdated: (suspend () -> Unit)? = null,
+    ): Int = withContext(Dispatchers.IO) {
         if (!settings.favoriteUpdateCheckEnabled.value) return@withContext 0
         val configUrl = settings.configUrl.value
         if (configUrl.isBlank()) return@withContext 0
@@ -131,7 +135,12 @@ class FavoriteUpdateChecker(
                                 }.getOrNull()
                         }
                         if (latest == null || latest <= 0) return@withPermit 0
-                        if (applyResult(favorite, latest, System.currentTimeMillis())) 1 else 0
+                        if (applyResult(favorite, latest, System.currentTimeMillis())) {
+                            onItemUpdated?.invoke()
+                            1
+                        } else {
+                            0
+                        }
                     }
                 }
             }.awaitAll()

@@ -495,30 +495,37 @@ class UpdatesViewModel(container: AppContainer) : ViewModel() {
 
     /**
      * 启动检测：先按库里现有数据算出面板内容并立即返回，追更检测放后台跑；
-     * 只有「今天有更新且今天还没弹过」才返回非空列表（内容含今日更新 + 以前更新未看）；
-     * 空列表 = 不弹面板。
+     * 检测期间每发现一部剧更新就回调一次，面板内容逐条增加。
+     * 只有「今天有更新且今天还没弹过」才返回非空列表；空列表 = 不弹面板。
      */
     suspend fun startupTodayUpdates(): List<com.ican.tvplay.data.FavoriteUpdateItem> {
-        // 先用库里已有数据立刻判断，不再阻塞在追更检测上；检测放到后台跑完再刷新面板
-        val immediate = computeStartupItems()
+        val today = com.ican.tvplay.data.FavoriteUpdates.todayKey()
+        // 本次启动是否允许弹窗：开关打开，且（每次启动 或 今天还没弹过）
+        val allowPopup = settings.favoriteUpdateStartupPopup.value &&
+            (settings.favoriteUpdatePopupEveryLaunch.value ||
+                settings.favoriteUpdatePopupDate() != today)
+        val immediate = if (allowPopup) computePopupItems() else emptyList()
         if (settings.favoriteUpdateCheckEnabled.value) {
             viewModelScope.launch {
-                runCatching { checker.check(force = false) }
-                _startupPopupItems.value = computeStartupItems()
+                val refreshLock = Mutex()
+                runCatching {
+                    // 每检测出一部更新就立刻刷新面板，实现「检测一个出现一个」
+                    checker.check(force = false) {
+                        if (allowPopup) {
+                            val items = computePopupItems()
+                            refreshLock.withLock { _startupPopupItems.value = items }
+                        }
+                    }
+                }
+                if (allowPopup) _startupPopupItems.value = computePopupItems()
             }
         }
         return immediate
     }
 
-    private suspend fun computeStartupItems(): List<com.ican.tvplay.data.FavoriteUpdateItem> {
+    /** 按数据库现有数据算出弹窗内容（今日有更新才返回非空） */
+    private suspend fun computePopupItems(): List<com.ican.tvplay.data.FavoriteUpdateItem> {
         if (!settings.favoriteUpdateStartupPopup.value) return emptyList()
-        val today = com.ican.tvplay.data.FavoriteUpdates.todayKey()
-        // 「每天一次」模式下当天已弹过就不再弹；「每次启动」模式下不受此限制
-        if (!settings.favoriteUpdatePopupEveryLaunch.value &&
-            settings.favoriteUpdatePopupDate() == today
-        ) {
-            return emptyList()
-        }
         val favorites = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             favoriteDao.getAll()
         }
