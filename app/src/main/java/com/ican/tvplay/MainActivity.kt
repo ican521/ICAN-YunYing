@@ -99,27 +99,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** 用户是否开着自动旋转（即没锁方向）。只读系统设置，无需任何权限。 */
-    private fun isAutoRotate(): Boolean = runCatching {
-        android.provider.Settings.System.getInt(
-            contentResolver,
-            android.provider.Settings.System.ACCELEROMETER_ROTATION,
-            1,
-        ) == 1
-    }.getOrDefault(true)
-
-    /** 按用户自动旋转设置返回期望的方向常量：
-     *  用户开着自动旋转才跟随系统（FULL_USER）；锁着方向时按当前实际方向恢复。
-     *  绝不能返回 SCREEN_ORIENTATION_UNSPECIFIED —— MIUI/HyperOS 把「无偏好」当成
-     *  「放开旋转」，会把用户锁好的方向一并解锁（可用设置里的方向锁定按钮复现）。
-     *  fongmi 同款：VideoActivity.isAutoRotate() + PlaybackOrientation.getExitFullscreenOrientation。 */
-    private fun getUserDesiredOrientation(): Int = if (isAutoRotate()) {
-        ActivityInfo.SCREEN_ORIENTATION_FULL_USER
-    } else if (resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
-        ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
-    } else {
-        ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
-    }
+    /** 恢复默认方向：一律用 FULL_USER —— 自动旋转开启时跟随传感器，
+     *  关闭时遵循用户锁定的方向（锁竖屏回竖屏、锁横屏保持横屏）。
+     *  不能返回 SCREEN_ORIENTATION_UNSPECIFIED：MIUI/HyperOS 把「无偏好」当成放开旋转，
+     *  会把用户锁好的方向一并解锁（可用设置里的方向锁定按钮复现）。
+     *  也不能按当前窗口方向返回 USER_LANDSCAPE/USER_PORTRAIT：退全屏那一刻 Activity
+     *  还是横屏，会把自己锁死在横屏、回不到竖屏。
+     *  fongmi 同款：PlaybackOrientation.getExitFullscreenOrientation() 非竖屏视频返回 FULL_USER。 */
+    private fun getUserDesiredOrientation(): Int = ActivityInfo.SCREEN_ORIENTATION_FULL_USER
 
     /** 退出全屏/离开播放页后恢复屏幕方向：统一跟随用户自动旋转设置恢复（fongmi 同款）。 */
     fun restoreDefaultOrientation() {
