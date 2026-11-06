@@ -255,9 +255,8 @@ private fun WordFlowRow(
         words.forEach { word ->
             Box(
                 modifier = Modifier
-                    // 浅色模式下 chip 外圈投影（与底栏阴影同款：黑色 10%），
-                    // shadow 在 background 之前，保证阴影落在胶囊外部、不被内部 clip 裁剪
-                    .then(if (isDark) Modifier else Modifier.shadow(elevation = 10.dp, shape = chipShape, clip = false))
+                    // 浅色模式下 chip 外圈投影：从胶囊边缘向四周小范围扩散
+                    .then(if (isDark) Modifier else Modifier.shadow(elevation = 4.dp, shape = chipShape, clip = false))
                     .tvCardEffect(
                         onClick = { onWordClick(word) },
                         onLongClick = onWordLongClick?.let { { it(word) } },

@@ -43,7 +43,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
@@ -316,9 +315,6 @@ private fun SiteSourceChip(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            // 浅色模式下胶囊外圈投影（与底栏阴影同款），用 Modifier.shadow 在图层合成阶段绘制，
-            // 不受 tvCardEffect 内部 clip 影响，保证阴影落在胶囊外部
-            .then(if (isDark) Modifier else Modifier.shadow(elevation = 10.dp, shape = shape, clip = false))
             // pressable 在外层：按压缩放跟随 Sink 动画（与右侧视频卡片同序）；
             // 站源列表自带选中态，蒙层关闭（pressEffect=false），选中色即状态反馈
             .pressable(
