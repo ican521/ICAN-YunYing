@@ -283,7 +283,7 @@ private fun UpdateRow(
         // 与上方「重新检查 / 全部标记已读」卡片一致：miuix 默认 surfaceContainer（浅色主题为纯白）
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
