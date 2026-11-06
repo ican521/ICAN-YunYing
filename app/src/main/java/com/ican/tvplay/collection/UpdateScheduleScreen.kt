@@ -1,6 +1,7 @@
 package com.ican.tvplay.collection
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -17,6 +18,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
@@ -34,6 +36,7 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** 每周更新日选项：索引即存储值（0=不配置，1..7=周一..周日） */
 private val WeekdayOptions = listOf("不配置", "周一", "周二", "周三", "周四", "周五", "周六", "周日")
@@ -90,7 +93,7 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
                     top = innerPadding.calculateTopPadding(),
                     bottom = Spacing.contentBottomInset,
                 ),
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.sectionSpacing),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
             ) {
                 if (favorites.isEmpty()) {
                     item {
@@ -109,15 +112,18 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
                     item {
                         Card(modifier = Modifier.fillMaxWidth()) {
                             favorites.forEachIndexed { index, favorite ->
-                                if (index > 0) HorizontalDivider()
-                                OverlayDropdownPreference(
+                                if (index > 0) {
+                                    // 分隔线左右各缩 16dp，与卡片内容边距一致
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                    )
+                                }
+                                ScheduleRow(
                                     title = favorite.title,
-                                    summary = "",
-                                    items = WeekdayOptions,
-                                    selectedIndex = favorite.updateWeekday.coerceIn(0, 7),
-                                    onSelectedIndexChange = { selected ->
+                                    selected = favorite.updateWeekday.coerceIn(0, 7),
+                                    onSelect = { weekday ->
                                         scope.launch {
-                                            viewModel.setUpdateWeekday(favorite.videoId, selected)
+                                            viewModel.setUpdateWeekday(favorite.videoId, weekday)
                                         }
                                     },
                                 )
@@ -127,5 +133,42 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
                 }
             }
         }
+    }
+}
+
+/**
+ * 单行配置：保留原生 OverlayDropdownPreference（行高、右侧「不配置 ⌄」和星期选择弹窗都不变）。
+ * 组件自带的标题行 + 空副标题行会把标题顶在上半部分，所以这里传空占位，
+ * 再把真实标题左对齐叠在整行上做垂直居中，与右侧选项同一条中线。
+ */
+@Composable
+private fun ScheduleRow(
+    title: String,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OverlayDropdownPreference(
+            title = " ",
+            // 传 null 才不渲染副标题行；空串仍会占一行高度，导致标题到分隔线看起来远超 16dp
+            summary = null,
+            items = WeekdayOptions,
+            selectedIndex = selected,
+            onSelectedIndexChange = onSelect,
+            // 每个选项卡片内边距统一 16dp
+            insideMargin = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+        )
+        Text(
+            text = title,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .fillMaxWidth()
+                // 左侧距卡片 16dp，右侧给选项留出空间避免长标题重叠
+                .padding(start = 16.dp, end = 96.dp),
+            style = MiuixTheme.textStyles.body1,
+            color = MiuixTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
