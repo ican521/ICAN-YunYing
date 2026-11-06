@@ -2469,7 +2469,6 @@ private fun EpisodeGridDialog(
                             selected = realIdx == currentIndex,
                             onClick = { onSelect(realIdx) },
                             modifier = Modifier.fillMaxWidth(),
-                            showBorder = true,
                         )
                     }
                 }
@@ -3146,19 +3145,9 @@ private fun EpisodeChip(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    showBorder: Boolean = false,
     enforceMinHeight: Boolean = true,
 ) {
     val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
-    // 描边：仅"更多"弹窗（showBorder=true）且仅深色模式；浅色模式选中/未选中一律不描边。
-    // 深色选中描边对齐全屏选集弹窗（BrandBlueDeep），未选中沿用 optionBorderColor
-    val borderModifier = if (showBorder && LocalDarkTheme.current) {
-        Modifier.border(
-            width = Spacing.optionBorder,
-            color = if (selected) BrandBlueDeep else optionBorderColor(false),
-            shape = shape,
-        )
-    } else Modifier
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -3175,7 +3164,6 @@ private fun EpisodeChip(
                 else MiuixTheme.colorScheme.secondary,
                 shape,
             )
-            .then(borderModifier)
             .padding(12.dp),
     ) {
         Text(
