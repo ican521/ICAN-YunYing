@@ -155,15 +155,27 @@ fun AppRoot() {
             }
         }
 
-        // 启动追番检测：按频率节流检查收藏剧集；当天有更新且今天未弹过时自动弹面板
+        // 启动追番检测：先按库里已有数据立即判断是否弹面板，追更检测放后台跑，跑完再刷新面板内容
         LaunchedEffect(Unit) {
             // 【临时测试】先等测试数据写入完成，保证更新提醒能弹出来
             com.ican.tvplay.TvPlayApplication.debugSeedJob?.join()
             val todayItems = updatesViewModel.startupTodayUpdates()
+            var shown = false
             if (todayItems.isNotEmpty()) {
                 updatePopupItems = todayItems
                 showUpdatePopup = true
+                shown = true
                 updatesViewModel.markPopupShown()
+            }
+            // 后台检测完成后，若面板已开则刷新内容；此前没有可弹数据则此时补弹
+            updatesViewModel.startupPopupItems.collect { items ->
+                if (items.isEmpty()) return@collect
+                updatePopupItems = items
+                if (!shown) {
+                    showUpdatePopup = true
+                    shown = true
+                    updatesViewModel.markPopupShown()
+                }
             }
         }
 

@@ -487,16 +487,38 @@ class UpdatesViewModel(container: AppContainer) : ViewModel() {
         viewModelScope.launch { favoriteDao.acknowledgeAll() }
     }
 
+    /** 后台检测完成后刷新的启动弹窗内容（供已打开的弹窗实时更新） */
+    private val _startupPopupItems =
+        MutableStateFlow<List<com.ican.tvplay.data.FavoriteUpdateItem>>(emptyList())
+    val startupPopupItems: StateFlow<List<com.ican.tvplay.data.FavoriteUpdateItem>> =
+        _startupPopupItems.asStateFlow()
+
     /**
-     * 启动检测：按频率节流执行一次。
-     * 只有「今天有更新且今天还没弹过」才返回非空列表（面板内容含今日更新 + 以前更新未看）；
+     * 启动检测：先按库里现有数据算出面板内容并立即返回，追更检测放后台跑；
+     * 只有「今天有更新且今天还没弹过」才返回非空列表（内容含今日更新 + 以前更新未看）；
      * 空列表 = 不弹面板。
      */
     suspend fun startupTodayUpdates(): List<com.ican.tvplay.data.FavoriteUpdateItem> {
-        runCatching { checker.check(force = false) }
+        // 先用库里已有数据立刻判断，不再阻塞在追更检测上；检测放到后台跑完再刷新面板
+        val immediate = computeStartupItems()
+        if (settings.favoriteUpdateCheckEnabled.value) {
+            viewModelScope.launch {
+                runCatching { checker.check(force = false) }
+                _startupPopupItems.value = computeStartupItems()
+            }
+        }
+        return immediate
+    }
+
+    private suspend fun computeStartupItems(): List<com.ican.tvplay.data.FavoriteUpdateItem> {
         if (!settings.favoriteUpdateStartupPopup.value) return emptyList()
         val today = com.ican.tvplay.data.FavoriteUpdates.todayKey()
-        if (settings.favoriteUpdatePopupDate() == today) return emptyList()
+        // 「每天一次」模式下当天已弹过就不再弹；「每次启动」模式下不受此限制
+        if (!settings.favoriteUpdatePopupEveryLaunch.value &&
+            settings.favoriteUpdatePopupDate() == today
+        ) {
+            return emptyList()
+        }
         val favorites = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             favoriteDao.getAll()
         }
@@ -536,6 +558,7 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val favoriteUpdateCheckEnabled: StateFlow<Boolean> = settings.favoriteUpdateCheckEnabled
     val favoriteUpdateIntervalHours: StateFlow<Int> = settings.favoriteUpdateIntervalHours
     val favoriteUpdateStartupPopup: StateFlow<Boolean> = settings.favoriteUpdateStartupPopup
+    val favoriteUpdatePopupEveryLaunch: StateFlow<Boolean> = settings.favoriteUpdatePopupEveryLaunch
 
     /** 当前站源名；未加载成功时为「未配置」 */
     val siteName: StateFlow<String> = videoRepository.currentSite
@@ -561,6 +584,8 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setFavoriteUpdateIntervalHours(hours: Int) = settings.setFavoriteUpdateIntervalHours(hours)
     fun setFavoriteUpdateStartupPopup(enabled: Boolean) =
         settings.setFavoriteUpdateStartupPopup(enabled)
+    fun setFavoriteUpdatePopupEveryLaunch(everyLaunch: Boolean) =
+        settings.setFavoriteUpdatePopupEveryLaunch(everyLaunch)
 
     /** 保存配置 URL 后立即重新拉取站点与分类，并后台预热首页各分类首屏（fongmi 式） */
     fun setConfigUrl(url: String) {

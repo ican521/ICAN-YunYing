@@ -100,6 +100,8 @@ fun SettingsScreen(
     val favoriteUpdateCheckEnabled by viewModel.favoriteUpdateCheckEnabled.collectAsStateWithLifecycle()
     val favoriteUpdateIntervalHours by viewModel.favoriteUpdateIntervalHours.collectAsStateWithLifecycle()
     val favoriteUpdateStartupPopup by viewModel.favoriteUpdateStartupPopup.collectAsStateWithLifecycle()
+    val favoriteUpdatePopupEveryLaunch by
+        viewModel.favoriteUpdatePopupEveryLaunch.collectAsStateWithLifecycle()
     val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     val configUrl by viewModel.configUrl.collectAsStateWithLifecycle()
     val siteName by viewModel.siteName.collectAsStateWithLifecycle()
@@ -375,9 +377,18 @@ fun SettingsScreen(
                     )
                 },
             )
+            OverlayDropdownPreference(
+                title = "弹窗频率",
+                summary = "控制打开 APP 时更新面板弹出的频率",
+                items = listOf("每次启动", "每天一次"),
+                selectedIndex = if (favoriteUpdatePopupEveryLaunch) 0 else 1,
+                onSelectedIndexChange = { index ->
+                    viewModel.setFavoriteUpdatePopupEveryLaunch(index == 0)
+                },
+            )
             SwitchPreference(
                 title = "启动自动弹窗",
-                summary = "当天有更新时，打开 APP 自动弹出一次更新面板",
+                summary = "打开 APP 时自动弹出更新面板",
                 checked = favoriteUpdateStartupPopup,
                 onCheckedChange = { viewModel.setFavoriteUpdateStartupPopup(it) },
             )

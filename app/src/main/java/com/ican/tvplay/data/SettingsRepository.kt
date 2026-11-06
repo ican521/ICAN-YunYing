@@ -318,6 +318,18 @@ class SettingsRepository(context: Context) {
         _favoriteUpdateStartupPopup.value = enabled
     }
 
+    /** 弹窗频率：true = 每次启动都弹，false = 每天只弹一次（默认每次启动） */
+    private val _favoriteUpdatePopupEveryLaunch = MutableStateFlow(
+        prefs.getBoolean(KEY_FAVORITE_UPDATE_POPUP_EVERY_LAUNCH, true),
+    )
+    val favoriteUpdatePopupEveryLaunch: StateFlow<Boolean> =
+        _favoriteUpdatePopupEveryLaunch.asStateFlow()
+
+    fun setFavoriteUpdatePopupEveryLaunch(everyLaunch: Boolean) {
+        prefs.edit().putBoolean(KEY_FAVORITE_UPDATE_POPUP_EVERY_LAUNCH, everyLaunch).apply()
+        _favoriteUpdatePopupEveryLaunch.value = everyLaunch
+    }
+
     /** 最近一次弹窗日期（yyyy-MM-dd），用于「每天只弹一次」；普通读写即可 */
     fun favoriteUpdatePopupDate(): String =
         prefs.getString(KEY_FAVORITE_UPDATE_POPUP_DATE, null).orEmpty()
@@ -408,6 +420,8 @@ class SettingsRepository(context: Context) {
         _favoriteUpdateCheckEnabled.value = prefs.getBoolean(KEY_FAVORITE_UPDATE_CHECK, true)
         _favoriteUpdateIntervalHours.value = prefs.getInt(KEY_FAVORITE_UPDATE_INTERVAL, 0)
         _favoriteUpdateStartupPopup.value = prefs.getBoolean(KEY_FAVORITE_UPDATE_POPUP, true)
+        _favoriteUpdatePopupEveryLaunch.value =
+            prefs.getBoolean(KEY_FAVORITE_UPDATE_POPUP_EVERY_LAUNCH, true)
         _searchHistory.value = runCatching {
             prefs.getStringSet(KEY_SEARCH_HISTORY, emptySet()).orEmpty().toList()
         }.getOrDefault(emptyList())
@@ -440,6 +454,7 @@ class SettingsRepository(context: Context) {
         const val KEY_FAVORITE_UPDATE_INTERVAL = "favorite_update_interval"
         const val KEY_FAVORITE_UPDATE_INTERVAL_MIGRATED = "favorite_update_interval_migrated"
         const val KEY_FAVORITE_UPDATE_POPUP = "favorite_update_popup"
+        const val KEY_FAVORITE_UPDATE_POPUP_EVERY_LAUNCH = "favorite_update_popup_every_launch"
         const val KEY_FAVORITE_UPDATE_POPUP_DATE = "favorite_update_popup_date"
         const val KEY_FAVORITE_UPDATE_LAST_CHECK = "favorite_update_last_check"
         const val KEY_SEARCH_HISTORY = "search_history"
