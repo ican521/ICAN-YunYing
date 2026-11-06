@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.Favorites
 import top.yukonga.miuix.kmp.icon.extended.FavoritesFill
 
@@ -66,7 +66,7 @@ object AppIcons {
             "M12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z",
     )
 
-    val Back: ImageVector = MiuixIcons.Demibold.Back
+    val Back: ImageVector = MiuixIcons.Regular.ChevronBackward
 
     val Play: ImageVector = vector("play", "M8 5v14l11-7z")
 
