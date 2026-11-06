@@ -135,7 +135,7 @@ fun SearchHomeScreen(
                         // 先收键盘再返回，避免键盘跟着页面转场一直留到首页
                         focusManager.clearFocus()
                         onBack()
-                    }, showBackground = false)
+                    }, showBackground = true)
 
                     // miuix 原生胶囊搜索框（左搜索图标 + 输入后右侧清除钮，IME 搜索键提交）
                     MiuixSearchInput(

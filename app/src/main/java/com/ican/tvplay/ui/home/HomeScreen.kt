@@ -959,12 +959,12 @@ private fun HomeTopBar(
                 // 与搜索页搜索栏（miuix 官方 Search 图标）保持一致：图标、颜色、尺寸完全对齐
                 imageVector = MiuixIcons.Basic.Search,
                 contentDescription = null,
-                tint = MiuixTheme.colorScheme.onSurfaceContainerHigh.copy(alpha = contentAlpha),
+                tint = MiuixTheme.colorScheme.onSurfaceContainerHigh,
             )
             Spacer(Modifier.width(8.dp))
             Text(
                 text = "搜索影片、剧集",
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+                color = MiuixTheme.colorScheme.onSurfaceContainerHigh,
                 fontSize = 16.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -988,7 +988,7 @@ private fun HomeTopBar(
             Icon(
                 imageVector = AppIcons.History,
                 contentDescription = "历史",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+                tint = MiuixTheme.colorScheme.onSurfaceContainerHigh,
                 modifier = Modifier.size(22.dp),
             )
         }
