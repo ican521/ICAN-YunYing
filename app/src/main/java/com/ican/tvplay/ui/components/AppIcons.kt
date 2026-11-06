@@ -8,9 +8,13 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Favorites
+import top.yukonga.miuix.kmp.icon.extended.FavoritesFill
 
 /**
- * 全部图标手写矢量路径，不依赖 material-icons 与任何 Leanback 资源。
+ * 图标集合：大部分手写矢量路径（不依赖 material-icons / Leanback），
+ * 收藏爱心使用 MiuixIcons.Normal（澎湃OS 风格）。
  */
 object AppIcons {
 
@@ -37,12 +41,8 @@ object AppIcons {
             "M9.5 14A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z",
     )
 
-    val Favorite: ImageVector = vector(
-        "favorite",
-        "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3" +
-            "c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5" +
-            "c0 3.78-3.4 6.86-8.55 11.54z",
-    )
+    // 收藏爱心（澎湃OS MIUIX Normal 粗细）
+    val Favorite: ImageVector = MiuixIcons.Normal.FavoritesFill
 
     val History: ImageVector = vector(
         "history",
@@ -133,26 +133,8 @@ object AppIcons {
             "1.31.26 2s-.1 1.36-.26 2h-3.38z",
     )
 
-    // 空心心形：外轮廓与 [Favorite] 完全相同的复合路径 + evenOdd 挖空，
-    // 保证空心/实心两态外边缘完全重合、视觉尺寸一致（描边画法会因线宽外扩显得更大）
-    val FavoriteBorder: ImageVector = ImageVector.Builder(
-        name = "favorite_border",
-        defaultWidth = 24.dp,
-        defaultHeight = 24.dp,
-        viewportWidth = 24f,
-        viewportHeight = 24f,
-    ).addPath(
-        pathData = addPathNodes(
-            "M16.5 3c-1.74 0 -3.41 0.81 -4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5" +
-                "c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45 -1.32C18.6 15.36 22 12.28 22 8.5" +
-                " 22 5.42 19.58 3 16.5 3z" +
-                "M12.1 18.55l-0.1 0.1 -0.1 -0.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5" +
-                "c1.54 0 3.04 0.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5" +
-                " 0 2.89 -3.14 5.74 -7.9 10.05z",
-        ),
-        fill = SolidColor(Color.Black),
-        pathFillType = PathFillType.EvenOdd,
-    ).build()
+    // 空心爱心（澎湃OS MIUIX Normal 粗细）
+    val FavoriteBorder: ImageVector = MiuixIcons.Normal.Favorites
 
     // ---- 播放器控制 ----
 
