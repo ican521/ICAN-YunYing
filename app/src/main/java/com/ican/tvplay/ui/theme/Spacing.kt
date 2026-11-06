@@ -98,6 +98,9 @@ object Spacing {
     /** 网格卡片纵向间距（首页/收藏/历史；搜索页用 [searchGridGap]） */
     val cardGapV = 16.dp
 
+    /** 追番更新页条目卡片之间的间距（卡片高度贴内容，间距比常规板块略紧） */
+    val updateCardGap = 12.dp
+
     /** 海报叠加层（角标 / 编辑删除钮）距海报边缘的外边距 */
     val posterOverlayMargin = 8.dp
 

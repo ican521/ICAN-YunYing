@@ -50,11 +50,13 @@ import com.ican.tvplay.ui.components.PosterImage
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -140,7 +142,7 @@ fun UpdateScreen(
                     top = innerPadding.calculateTopPadding(),
                     bottom = Spacing.bottomBarInset,
                 ),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
+                verticalArrangement = Arrangement.spacedBy(Spacing.updateCardGap),
             ) {
                     item {
                         Card(modifier = Modifier.fillMaxWidth()) {
@@ -165,7 +167,14 @@ fun UpdateScreen(
                             key = { _, item -> item.favorite.videoId },
                             contentType = { _, _ -> "update" },
                         ) { index, item ->
-                            Column {
+                            Column(
+                                // 卡片间距改为 12dp 后，这里补 4dp 使板块之间的间距仍为 sectionSpacing(16dp)
+                                modifier = if (index == 0) {
+                                    Modifier.padding(top = Spacing.sectionSpacing - Spacing.updateCardGap)
+                                } else {
+                                    Modifier
+                                },
+                            ) {
                                 if (index == 0) SectionTitle("今日更新", today.size)
                                 UpdateRow(
                                     item = item,
@@ -182,7 +191,14 @@ fun UpdateScreen(
                             key = { _, item -> item.favorite.videoId },
                             contentType = { _, _ -> "update" },
                         ) { index, item ->
-                            Column {
+                            Column(
+                                // 同上：首条上方补 4dp，保证与上一板块的间距为 16dp
+                                modifier = if (index == 0) {
+                                    Modifier.padding(top = Spacing.sectionSpacing - Spacing.updateCardGap)
+                                } else {
+                                    Modifier
+                                },
+                            ) {
                                 if (index == 0) SectionTitle("待看更新", pending.size)
                                 UpdateRow(
                                     item = item,
@@ -286,6 +302,7 @@ private fun UpdateRow(
     onClick: () -> Unit,
     onMarkRead: () -> Unit,
 ) {
+    val isDark = LocalDarkTheme.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -296,10 +313,16 @@ private fun UpdateRow(
                 glow = false,
             ),
         insideMargin = PaddingValues(0.dp),
-        // 与上方「重新检查 / 全部标记已读」卡片一致：miuix 默认 surfaceContainer（浅色主题为纯白）
+        // 浅色主题去掉卡片背景（直接透出页面底色）；深色主题沿用 miuix 默认背景
+        colors = if (isDark) {
+            CardDefaults.defaultColors()
+        } else {
+            CardDefaults.defaultColors(color = Color.Transparent)
+        },
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.dialogItemPadding),
+            // 海报与文字贴卡片最左；上下不留白，卡片高度与海报（76dp）一致
+            modifier = Modifier.fillMaxWidth().padding(end = Spacing.dialogItemPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
