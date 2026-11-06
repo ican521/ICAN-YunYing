@@ -292,7 +292,8 @@ private fun UpdateSectionCard(
 @Composable
 private fun SectionTitle(text: String, count: Int, modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.fillMaxWidth().padding(bottom = Spacing.titleContentGap),
+        // 本页板块标题底部间距固定 8dp（仅本页，不改全局 Spacing.titleContentGap）
+        modifier = modifier.fillMaxWidth().padding(bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
