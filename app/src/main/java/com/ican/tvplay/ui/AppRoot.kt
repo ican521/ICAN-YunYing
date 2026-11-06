@@ -157,6 +157,8 @@ fun AppRoot() {
 
         // 启动追番检测：按频率节流检查收藏剧集；当天有更新且今天未弹过时自动弹面板
         LaunchedEffect(Unit) {
+            // 【临时测试】先等测试数据写入完成，保证更新提醒能弹出来
+            com.ican.tvplay.TvPlayApplication.debugSeedJob?.join()
             val todayItems = updatesViewModel.startupTodayUpdates()
             if (todayItems.isNotEmpty()) {
                 updatePopupItems = todayItems
