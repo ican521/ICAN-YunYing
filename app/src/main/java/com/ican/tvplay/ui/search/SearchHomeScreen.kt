@@ -266,7 +266,7 @@ private fun WordFlowRow(
                 Text(
                     text = word,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MiuixTheme.colorScheme.onBackgroundVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
