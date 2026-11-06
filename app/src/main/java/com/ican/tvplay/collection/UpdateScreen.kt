@@ -157,25 +157,39 @@ fun UpdateScreen(
                         }
                     }
 
+                    // 标题与第一条同属一个 item：标题底部到底部卡片的间距只保留
+                    // titleContentGap(12dp)，不会再被 spacedBy(sectionSpacing) 叠加 16dp
                     if (today.isNotEmpty()) {
-                        item { SectionTitle("今日更新", today.size) }
-                        items(today, key = { it.favorite.videoId }, contentType = { "update" }) { item ->
-                            UpdateRow(
-                                item = item,
-                                onClick = { play(item) },
-                                onMarkRead = { viewModel.markRead(item.favorite.videoId) },
-                            )
+                        itemsIndexed(
+                            today,
+                            key = { _, item -> item.favorite.videoId },
+                            contentType = { _, _ -> "update" },
+                        ) { index, item ->
+                            Column {
+                                if (index == 0) SectionTitle("今日更新", today.size)
+                                UpdateRow(
+                                    item = item,
+                                    onClick = { play(item) },
+                                    onMarkRead = { viewModel.markRead(item.favorite.videoId) },
+                                )
+                            }
                         }
                     }
 
                     if (pending.isNotEmpty()) {
-                        item { SectionTitle("待看更新", pending.size) }
-                        items(pending, key = { it.favorite.videoId }, contentType = { "update" }) { item ->
-                            UpdateRow(
-                                item = item,
-                                onClick = { play(item) },
-                                onMarkRead = { viewModel.markRead(item.favorite.videoId) },
-                            )
+                        itemsIndexed(
+                            pending,
+                            key = { _, item -> item.favorite.videoId },
+                            contentType = { _, _ -> "update" },
+                        ) { index, item ->
+                            Column {
+                                if (index == 0) SectionTitle("待看更新", pending.size)
+                                UpdateRow(
+                                    item = item,
+                                    onClick = { play(item) },
+                                    onMarkRead = { viewModel.markRead(item.favorite.videoId) },
+                                )
+                            }
                         }
                     }
 
@@ -217,14 +231,11 @@ fun UpdatePopupDialog(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
+            // 卡片之间的间距统一 16dp；首条贴标题、末条贴按钮，不额外叠加
+            verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemPadding),
         ) {
-            itemsIndexed(items, key = { _, item -> item.favorite.videoId }, contentType = { _, _ -> "update" }) { index, item ->
-                PopupUpdateRow(
-                    item = item,
-                    onClick = { onPlay(item) },
-                    // 第一条紧贴弹窗标题（0 间距），其余每条上方留 16dp
-                    topPadding = if (index == 0) 0.dp else Spacing.dialogItemPadding,
-                )
+            items(items, key = { it.favorite.videoId }, contentType = { "update" }) { item ->
+                PopupUpdateRow(item = item, onClick = { onPlay(item) })
             }
         }
         // 按钮行按全局弹窗规范：左右平分、取消在左
@@ -359,23 +370,16 @@ private fun UpdateRow(
 private fun PopupUpdateRow(
     item: FavoriteUpdateItem,
     onClick: () -> Unit,
-    topPadding: androidx.compose.ui.unit.Dp = Spacing.dialogItemPadding,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .tvCardEffect(
                 onClick = onClick,
-                shape = SquircleShape(Spacing.corner),
+                // 与条目内预览小图的圆角保持一致
+                shape = SquircleShape(8.dp),
                 focusedScale = 1.03f,
                 glow = false,
-            )
-            // 卡片内边距四周 16dp；第一条的上边距由调用方给 0，紧贴弹窗标题
-            .padding(
-                start = Spacing.dialogItemPadding,
-                end = Spacing.dialogItemPadding,
-                top = topPadding,
-                bottom = Spacing.dialogItemPadding,
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
