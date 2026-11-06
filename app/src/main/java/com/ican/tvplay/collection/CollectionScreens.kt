@@ -50,6 +50,8 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
 import com.ican.tvplay.ui.components.PosterImage
@@ -57,7 +59,6 @@ import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.ui.CollectionViewModel
 import com.ican.tvplay.ui.appViewModel
-import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.EmptyState
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
@@ -366,7 +367,7 @@ private fun FavoriteCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = AppIcons.Close,
+                        imageVector = MiuixIcons.Close,
                         contentDescription = "删除",
                         tint = Color.White,
                         modifier = Modifier.size(14.dp),
@@ -621,7 +622,7 @@ private fun HistoryCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = AppIcons.Close,
+                        imageVector = MiuixIcons.Close,
                         contentDescription = "删除",
                         tint = Color.White,
                         modifier = Modifier.size(14.dp),
