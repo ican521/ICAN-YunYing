@@ -52,6 +52,7 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
@@ -228,6 +229,9 @@ fun FavoritesScreen(
 /**
  * 收藏页顶部的「追番更新」入口：今日更新 + 待看更新数量汇总，
  * 点击进入追番更新页。没有任何更新时也保留入口（说明文字改为引导语）。
+ *
+ * 用 miuix ArrowPreference，与设置页入口同构：标题 / 副标题沿用 ArrowPreference
+ * 默认字号；有更新时右侧显示数字角标（覆盖默认箭头），无更新时显示默认箭头。
  */
 @Composable
 private fun UpdatesEntry(
@@ -236,43 +240,14 @@ private fun UpdatesEntry(
     onClick: () -> Unit,
 ) {
     val total = todayCount + pendingCount
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .tvCardEffect(
-                onClick = onClick,
-                shape = SquircleShape(Spacing.corner),
-                focusedScale = 1.03f,
-                glow = false,
-                pressColor = LightOnSurface,
-            ),
-        insideMargin = PaddingValues(0.dp),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                // 内边距复用 miuix 设置项默认值（四边 16dp），与设置页行项一致
-                .padding(BasicComponentDefaults.InsideMargin),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "追番更新",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MiuixTheme.colorScheme.onBackground,
-                )
-                Text(
-                    text = when {
-                        total == 0 -> "收藏的剧集有更新时会在这里提醒"
-                        todayCount > 0 -> "今日更新 $todayCount 部 · 待看 $total 部"
-                        else -> "有 $total 部已更新未看"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MiuixTheme.colorScheme.onBackgroundVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+    ArrowPreference(
+        title = "追番更新",
+        summary = when {
+            total == 0 -> "收藏的剧集有更新时会在这里提醒"
+            todayCount > 0 -> "今日更新 $todayCount 部 · 待看 $total 部"
+            else -> "有 $total 部已更新未看"
+        },
+        endActions = {
             if (total > 0) {
                 Box(
                     modifier = Modifier
@@ -288,8 +263,9 @@ private fun UpdatesEntry(
                     )
                 }
             }
-        }
-    }
+        },
+        onClick = onClick,
+    )
 }
 
 /** 收藏卡片：与首页 [VideoCard] 同款 miuix Card 容器 + SinkFeedback 按压形变；
