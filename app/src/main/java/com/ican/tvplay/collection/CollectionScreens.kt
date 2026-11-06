@@ -367,7 +367,7 @@ private fun FavoriteCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = MiuixIcons.Medium.Close,
+                        imageVector = MiuixIcons.Demibold.Close,
                         contentDescription = "删除",
                         tint = Color.White,
                         modifier = Modifier.size(14.dp),
@@ -622,7 +622,7 @@ private fun HistoryCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = MiuixIcons.Medium.Close,
+                        imageVector = MiuixIcons.Demibold.Close,
                         contentDescription = "删除",
                         tint = Color.White,
                         modifier = Modifier.size(14.dp),
