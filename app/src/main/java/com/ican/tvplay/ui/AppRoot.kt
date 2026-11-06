@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -28,11 +29,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -76,7 +80,12 @@ import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
+import top.yukonga.miuix.kmp.nav.transition.NavMotion
 import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
+import top.yukonga.miuix.kmp.nav.transition.NavTransition
+import top.yukonga.miuix.kmp.nav.transition.NavTransitionScope
+import top.yukonga.miuix.kmp.nav.transition.NavTransitions
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -304,7 +313,10 @@ fun AppRoot() {
                         onBack = { navigator.pop() },
                     )
                 }
-                entry<Route.Player>(swipeDismiss = NavSwipeDirection.None) { key ->
+                entry<Route.Player>(
+                    transition = PlayerEntryTransition,
+                    swipeDismiss = NavSwipeDirection.None,
+                ) { key ->
                     PlayerScreen(
                         videoId = key.videoId,
                         startEpisode = key.episodeIndex,
@@ -428,5 +440,38 @@ fun AppRoot() {
         }
         }
         }
+    }
+}
+
+/** 播放页专用转场：位移公式与 miuix 默认转场一致，但改用布局位移（Modifier.offset）。
+ *
+ *  默认转场通过 graphicsLayer 平移页面，而播放页内嵌的 PlayerView 是 SurfaceView：
+ *  画面由系统合成器作为独立图层绘制，不参与 graphicsLayer 变换，页面移动时视频层
+ *  会滞后/错位，返回过程中视频顶部露出一条缝（透出上一页）。
+ *  改为布局位移后，AndroidView 与 SurfaceView 跟随同一次 layout 更新，位置保持一致。 */
+private object PlayerEntryTransition : NavTransition {
+    private val base: NavTransition get() = NavTransitions.MiuixDefault
+
+    override val opaqueDepth: Float get() = base.opaqueDepth
+    override val dismissDirection: NavSwipeDirection get() = base.dismissDirection
+    override val motion: NavMotion get() = base.motion
+
+    override fun scrimFraction(scope: NavTransitionScope): Float = base.scrimFraction(scope)
+
+    override fun Modifier.transformEntry(scope: NavTransitionScope): Modifier {
+        val width = scope.layoutSize.width.toFloat()
+        val depth = scope.relativeDepth
+        val rtl = scope.layoutDirection == LayoutDirection.Rtl
+        val cover = depth.coerceIn(0f, 1f)
+        // depth <= 0：当前页退场，整页右移滑出；depth > 0：当前页进场，从右侧 1/4 屏宽滑入
+        val dx = if (depth <= 0f) {
+            (-depth).coerceIn(0f, 1f) * width * if (rtl) -1f else 1f
+        } else {
+            cover * width * 0.25f * if (rtl) 1f else -1f
+        }
+        val alpha = if (depth > 0f) 1f - 0.1f * cover else 1f
+        return this
+            .offset { IntOffset(dx.roundToInt(), 0) }
+            .graphicsLayer { this.alpha = alpha }
     }
 }
