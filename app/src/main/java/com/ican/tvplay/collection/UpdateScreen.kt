@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -216,10 +217,14 @@ fun UpdatePopupDialog(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
-            verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
         ) {
-            items(items, key = { it.favorite.videoId }, contentType = { "update" }) { item ->
-                PopupUpdateRow(item = item, onClick = { onPlay(item) })
+            itemsIndexed(items, key = { _, item -> item.favorite.videoId }, contentType = { _, _ -> "update" }) { index, item ->
+                PopupUpdateRow(
+                    item = item,
+                    onClick = { onPlay(item) },
+                    // 第一条紧贴弹窗标题（0 间距），其余每条上方留 16dp
+                    topPadding = if (index == 0) 0.dp else Spacing.dialogItemPadding,
+                )
             }
         }
         // 按钮行按全局弹窗规范：左右平分、取消在左
@@ -351,7 +356,11 @@ private fun UpdateRow(
  * 第一行「标题 + 右侧已更至 第 x 集」，第二行「已看到 + 已看那一集的视频标题」。
  */
 @Composable
-private fun PopupUpdateRow(item: FavoriteUpdateItem, onClick: () -> Unit) {
+private fun PopupUpdateRow(
+    item: FavoriteUpdateItem,
+    onClick: () -> Unit,
+    topPadding: androidx.compose.ui.unit.Dp = Spacing.dialogItemPadding,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -361,8 +370,13 @@ private fun PopupUpdateRow(item: FavoriteUpdateItem, onClick: () -> Unit) {
                 focusedScale = 1.03f,
                 glow = false,
             )
-            // 上下不留白：标题→本行、本行→按钮的视觉间距均为 16dp
-            .padding(horizontal = Spacing.dialogItemPadding),
+            // 卡片内边距四周 16dp；第一条的上边距由调用方给 0，紧贴弹窗标题
+            .padding(
+                start = Spacing.dialogItemPadding,
+                end = Spacing.dialogItemPadding,
+                top = topPadding,
+                bottom = Spacing.dialogItemPadding,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(

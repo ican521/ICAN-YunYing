@@ -22,7 +22,7 @@ object DebugUpdateSeed {
 
     private const val TAG = "DebugUpdateSeed"
     private const val SITE_NAME_PART = "玩偶"
-    private const val DONE_KEY = "debug_seed_xianni_v3"
+    private const val DONE_KEY = "debug_seed_xianni_v4"
 
     /** 前 3 部记为「今日更新」，其余记为「待看更新」（更新时间放到昨天），让更新页能滚动 */
     private val KEYWORDS = listOf(
