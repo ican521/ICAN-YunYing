@@ -451,11 +451,21 @@ fun PlayerScreen(
     LaunchedEffect(inPip, pipExitHold) {
         Players.setPipTransition(inPip || pipExitHold)
     }
-    // 视频铺满全屏/画中画（含过渡期）时上报给 AppRoot：根底色保持黑色。
+    // 返回转场期间本页正在退场（NavRole.Outgoing）：上报保持 videoPresent，
+    // AppRoot 根底色跟随保持黑色——否则播放页缩小/右移时，页面外露出的容器底色
+    // 是浅色 surface，视频区顶部形成一条灰色横条（预测返回手势中途取消时自动恢复）
+    val navTransitionScope = LocalNavTransitionScope.current
+    var exiting by remember { mutableStateOf(false) }
+    LaunchedEffect(navTransitionScope) {
+        snapshotFlow { navTransitionScope.role }.collect { role ->
+            exiting = (role == NavRole.Outgoing)
+        }
+    }
+    // 视频铺满全屏/画中画（含过渡期）或本页返回退场中时上报给 AppRoot：根底色保持黑色。
     // 仅靠 pipTransition（进出过渡）覆盖不到稳态全屏——全屏下窗口底部最后约 1px
     // 仍由根底色绘制，浅色主题会露出一条白色细线。
-    val videoPresent = inPip || pipExitHold || fullscreen || pendingFullscreen != null
-    LaunchedEffect(inPip, pipExitHold, fullscreen, pendingFullscreen) {
+    val videoPresent = inPip || pipExitHold || fullscreen || pendingFullscreen != null || exiting
+    LaunchedEffect(inPip, pipExitHold, fullscreen, pendingFullscreen, exiting) {
         Players.setVideoPresent(videoPresent)
     }
     val activityWindow = (context as? Activity)?.window
@@ -955,7 +965,7 @@ fun PlayerScreen(
     // 返回转场（含系统手势预测返回）一开始就暂停：转场期间视频若继续按片源帧率（约 25fps）出帧，
     // 会把整页转场观感拉低到 25fps；先让画面静止，转场即可按屏幕刷新率满帧播放。
     // 用导航转场作用域判断「本页正在退场」，返回键/边缘手势/页面返回按钮三种返回方式都能覆盖。
-    val navTransitionScope = LocalNavTransitionScope.current
+    // （navTransitionScope 已在上方 videoPresent 处声明复用）
     var pausedForExit by remember { mutableStateOf(false) }
     LaunchedEffect(navTransitionScope) {
         snapshotFlow { navTransitionScope.role }.collect { role ->
