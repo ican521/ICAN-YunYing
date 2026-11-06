@@ -31,9 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
@@ -256,18 +255,15 @@ private fun WordFlowRow(
         words.forEach { word ->
             Box(
                 modifier = Modifier
+                    // 浅色模式下 chip 外圈投影（与底栏阴影同款：黑色 10%），
+                    // shadow 在 background 之前，保证阴影落在胶囊外部、不被内部 clip 裁剪
+                    .then(if (isDark) Modifier else Modifier.shadow(elevation = 10.dp, shape = chipShape, clip = false))
                     .tvCardEffect(
                         onClick = { onWordClick(word) },
                         onLongClick = onWordLongClick?.let { { it(word) } },
                         shape = chipShape,
                         focusedScale = 1.05f,
                         glow = false,
-                    )
-                    .then(
-                        if (isDark) Modifier else Modifier.dropShadow(
-                            shape = chipShape,
-                            shadow = Shadow(radius = 10.dp, color = Color.Black, alpha = 0.1f),
-                        ),
                     )
                     .background(MiuixTheme.colorScheme.surfaceContainer, chipShape)
                     .height(Spacing.chipHeight)
