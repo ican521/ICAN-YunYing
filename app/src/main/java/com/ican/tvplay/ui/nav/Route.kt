@@ -37,6 +37,11 @@ sealed interface Route : NavKey, Parcelable {
     @Serializable
     data object Updates : Route
 
+    /** 更新提醒配置页：为收藏的视频设置每周更新日 */
+    @Parcelize
+    @Serializable
+    data object UpdateSchedule : Route
+
     @Parcelize
     @Serializable
     data class Player(

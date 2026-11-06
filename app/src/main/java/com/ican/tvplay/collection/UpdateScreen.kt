@@ -73,6 +73,7 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 fun UpdateScreen(
     onPlay: (videoId: String, episodeIndex: Int, flag: String, preInit: Boolean) -> Unit,
     onBack: () -> Unit = {},
+    onScheduleClick: () -> Unit = {},
 ) {
     val viewModel = appViewModel { UpdatesViewModel(this) }
     val today by viewModel.todayUpdates.collectAsStateWithLifecycle()
@@ -159,6 +160,11 @@ fun UpdateScreen(
                                 summary = "把当前所有更新标记为已看",
                                 onClick = { viewModel.markAllRead() },
                             )
+                            ArrowPreference(
+                                title = "更新提醒配置",
+                                summary = "为收藏的视频设置每周更新日",
+                                onClick = onScheduleClick,
+                            )
                         }
                     }
 
@@ -216,10 +222,11 @@ fun UpdatePopupDialog(
     onDismiss: () -> Unit,
     onPlay: (FavoriteUpdateItem) -> Unit,
     onOpenAll: () -> Unit,
+    title: String = "更新提醒",
 ) {
     MiuixBottomSheetDialog(
         show = show,
-        title = "更新提醒",
+        title = title,
         onDismiss = onDismiss,
     ) {
         LazyColumn(

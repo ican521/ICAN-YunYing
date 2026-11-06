@@ -160,23 +160,12 @@ fun AppRoot() {
             // 【临时测试】先等测试数据写入完成，保证更新提醒能弹出来
             com.ican.tvplay.TvPlayApplication.debugSeedJob?.join()
             val todayItems = updatesViewModel.startupTodayUpdates()
-            var shown = false
             if (todayItems.isNotEmpty()) {
                 updatePopupItems = todayItems
                 showUpdatePopup = true
-                shown = true
                 updatesViewModel.markPopupShown()
             }
-            // 后台检测完成后，若面板已开则刷新内容；此前没有可弹数据则此时补弹
-            updatesViewModel.startupPopupItems.collect { items ->
-                if (items.isEmpty()) return@collect
-                updatePopupItems = items
-                if (!shown) {
-                    showUpdatePopup = true
-                    shown = true
-                    updatesViewModel.markPopupShown()
-                }
-            }
+            // 后台检测只更新追番更新页的数据，与启动面板无关
         }
 
         // 液态玻璃底栏的模糊内容源：先铺背景色再记录内容
@@ -304,6 +293,12 @@ fun AppRoot() {
                             }
                         },
                         onBack = { navigator.pop() },
+                        onScheduleClick = { navigator.push(Route.UpdateSchedule) },
+                    )
+                }
+                entry<Route.UpdateSchedule>(swipeDismiss = NavSwipeDirection.None) {
+                    com.ican.tvplay.collection.UpdateScheduleScreen(
+                        onBack = { navigator.pop() },
                     )
                 }
                 entry<Route.Player>(swipeDismiss = NavSwipeDirection.None) { key ->
@@ -394,6 +389,7 @@ fun AppRoot() {
             UpdatePopupDialog(
                 show = showUpdatePopup,
                 items = updatePopupItems,
+                title = updatesViewModel.updatePopupTitle(),
                 onDismiss = { showUpdatePopup = false },
                 onOpenAll = {
                     showUpdatePopup = false

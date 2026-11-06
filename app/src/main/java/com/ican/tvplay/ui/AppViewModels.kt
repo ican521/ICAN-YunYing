@@ -423,6 +423,16 @@ class UpdatesViewModel(container: AppContainer) : ViewModel() {
         .map { list -> list.filterNot { it.updatedToday } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** 全部收藏（配置每周更新日使用） */
+    val scheduleFavorites: StateFlow<List<com.ican.tvplay.data.local.FavoriteEntity>> =
+        favoriteDao.observeAll()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 设置某部收藏的每周更新日（0=不配置，1..7=周一..周日） */
+    suspend fun setUpdateWeekday(videoId: String, weekday: Int) {
+        favoriteDao.setUpdateWeekday(videoId, weekday)
+    }
+
     /** 点击更新条目跳播放页所需：元数据空壳 + 站源（完整选集由播放页异步补拉） */
     data class PreparedUpdatePlay(
         val video: Video,
@@ -494,9 +504,9 @@ class UpdatesViewModel(container: AppContainer) : ViewModel() {
         _startupPopupItems.asStateFlow()
 
     /**
-     * 启动检测：先按库里现有数据算出面板内容并立即返回，追更检测放后台跑；
-     * 检测期间每发现一部剧更新就回调一次，面板内容逐条增加。
-     * 只有「今天有更新且今天还没弹过」才返回非空列表；空列表 = 不弹面板。
+     * 启动提醒：按用户为收藏配置的「每周更新时间」筛出今天会更新的剧，
+     * 与站源集数检测无关；追更检测照常后台跑，只用于追番更新页。
+     * 只有「今天有配置的更新且今天还没弹过」才返回非空列表；空列表 = 不弹面板。
      */
     suspend fun startupTodayUpdates(): List<com.ican.tvplay.data.FavoriteUpdateItem> {
         val today = com.ican.tvplay.data.FavoriteUpdates.todayKey()
@@ -504,37 +514,47 @@ class UpdatesViewModel(container: AppContainer) : ViewModel() {
         val allowPopup = settings.favoriteUpdateStartupPopup.value &&
             (settings.favoriteUpdatePopupEveryLaunch.value ||
                 settings.favoriteUpdatePopupDate() != today)
-        val immediate = if (allowPopup) computePopupItems() else emptyList()
         if (settings.favoriteUpdateCheckEnabled.value) {
             viewModelScope.launch {
-                val refreshLock = Mutex()
-                runCatching {
-                    // 每检测出一部更新就立刻刷新面板，实现「检测一个出现一个」
-                    checker.check(force = false) {
-                        if (allowPopup) {
-                            val items = computePopupItems()
-                            refreshLock.withLock { _startupPopupItems.value = items }
-                        }
-                    }
-                }
-                if (allowPopup) _startupPopupItems.value = computePopupItems()
+                runCatching { checker.check(force = false) }
             }
         }
-        return immediate
+        val items = if (allowPopup) computeTodayScheduleItems() else emptyList()
+        _startupPopupItems.value = items
+        return items
     }
 
-    /** 按数据库现有数据算出弹窗内容（今日有更新才返回非空） */
-    private suspend fun computePopupItems(): List<com.ican.tvplay.data.FavoriteUpdateItem> {
-        if (!settings.favoriteUpdateStartupPopup.value) return emptyList()
+    /** 今天（周 X）会更新的收藏：只看用户配置的 updateWeekday，不比较集数 */
+    private suspend fun computeTodayScheduleItems(): List<com.ican.tvplay.data.FavoriteUpdateItem> {
+        val weekday = com.ican.tvplay.data.FavoriteUpdates.todayWeekday()
+        if (weekday == 0) return emptyList()
         val favorites = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             favoriteDao.getAll()
-        }
+        }.filter { it.updateWeekday == weekday }
+        if (favorites.isEmpty()) return emptyList()
         val histories = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             historyDao.observeAll().first()
         }
-        val all = com.ican.tvplay.data.FavoriteUpdates.compute(favorites, histories)
-        return if (all.any { it.updatedToday }) all else emptyList()
+        val byId = histories.associateBy { it.videoId }
+        return favorites.map { favorite ->
+            val history = byId[favorite.videoId]
+            val total = favorite.episodeCount
+            val resume = history?.episodeIndex?.coerceIn(0, (total - 1).coerceAtLeast(0)) ?: 0
+            com.ican.tvplay.data.FavoriteUpdateItem(
+                favorite = favorite,
+                history = history,
+                totalEpisodes = total,
+                resumeIndex = resume,
+                updatedToday = true,
+            )
+        }.sortedBy { it.favorite.title }
     }
+
+    /** 启动弹窗标题：跟随今天是周几，如「周五的更新」 */
+    fun updatePopupTitle(): String =
+        com.ican.tvplay.data.FavoriteUpdates.weekdayTitle(
+            com.ican.tvplay.data.FavoriteUpdates.todayWeekday(),
+        )
 
     /** 记录今天已弹过面板（每天只弹一次） */
     fun markPopupShown() {

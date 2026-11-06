@@ -79,6 +79,8 @@ data class VodItem(
     @SerialName("vod_play_from") val vodPlayFrom: String = "",
     @SerialName("vod_play_url") val vodPlayUrl: String = "",
     @SerialName("type_name") val typeName: String = "",
+    /** 站源记录的最后更新时刻（形如 2026-11-06 12:00:00），部分站源不返回 */
+    @SerialName("vod_time") val vodTime: String = "",
     @SerialName("action") val action: String = "",
     /** 目录标记（fongmi Vod.vod_tag）：等于 "folder" 时该卡片是网盘文件夹，点击进入子目录 */
     @SerialName("vod_tag") val vodTag: String = "",

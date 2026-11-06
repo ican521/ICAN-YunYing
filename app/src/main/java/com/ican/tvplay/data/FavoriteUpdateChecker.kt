@@ -78,6 +78,28 @@ object FavoriteUpdates {
     /** 弹窗日期键（yyyy-MM-dd），用于「每天只弹一次」 */
     fun todayKey(now: Long = System.currentTimeMillis()): String =
         java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date(now))
+
+    /** 今天星期几：1=周一 … 7=周日（Calendar 的周日=1，这里归一到 7） */
+    fun todayWeekday(now: Long = System.currentTimeMillis()): Int {
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = now }
+        return if (cal.get(java.util.Calendar.DAY_OF_WEEK) == java.util.Calendar.SUNDAY) {
+            7
+        } else {
+            cal.get(java.util.Calendar.DAY_OF_WEEK) - 1
+        }
+    }
+
+    /** 启动弹窗标题：跟随今天星期，如「周五的更新」 */
+    fun weekdayTitle(weekday: Int): String = when (weekday) {
+        1 -> "周一的更新"
+        2 -> "周二的更新"
+        3 -> "周三的更新"
+        4 -> "周四的更新"
+        5 -> "周五的更新"
+        6 -> "周六的更新"
+        7 -> "周日的更新"
+        else -> "今天的更新"
+    }
 }
 
 /**

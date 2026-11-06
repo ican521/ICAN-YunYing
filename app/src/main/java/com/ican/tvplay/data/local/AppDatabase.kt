@@ -33,6 +33,8 @@ data class FavoriteEntity(
     val lastUpdatedAt: Long = 0,
     /** 追更：最近一次成功检测时间（0 = 从未检测） */
     val lastCheckedAt: Long = 0,
+    /** 用户配置的每周更新时间标记：1=周一 … 7=周日，0=不配置 */
+    val updateWeekday: Int = 0,
 )
 
 /** 播放历史（含播放进度） */
@@ -117,6 +119,10 @@ interface FavoriteDao {
         lastCheckedAt: Long,
     )
 
+    /** 设置某部收藏的每周更新日（0=不配置，1..7=周一..周日） */
+    @androidx.room.Query("UPDATE favorites SET updateWeekday = :weekday WHERE videoId = :videoId")
+    suspend fun setUpdateWeekday(videoId: String, weekday: Int)
+
     /** 标记单部已读：把已看基线推到当前总集数 */
     @Query("UPDATE favorites SET ackEpisodeCount = episodeCount WHERE videoId = :videoId")
     suspend fun acknowledge(videoId: String)
@@ -156,7 +162,7 @@ interface HistoryDao {
 
 @Database(
     entities = [FavoriteEntity::class, HistoryEntity::class, DeviceEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -221,6 +227,13 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v7→v8：favorites 表增加用户配置的每周更新时间（0=不配置，1..7=周一..周日） */
+        private val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE favorites ADD COLUMN updateWeekday INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
@@ -229,7 +242,7 @@ abstract class AppDatabase : RoomDatabase() {
             )
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
-                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                 )
                 .fallbackToDestructiveMigration()
                 .build()
