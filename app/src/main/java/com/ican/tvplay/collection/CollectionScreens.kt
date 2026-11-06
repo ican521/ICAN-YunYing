@@ -240,32 +240,34 @@ private fun UpdatesEntry(
     onClick: () -> Unit,
 ) {
     val total = todayCount + pendingCount
-    ArrowPreference(
-        title = "追番更新",
-        summary = when {
-            total == 0 -> "收藏的剧集有更新时会在这里提醒"
-            todayCount > 0 -> "今日更新 $todayCount 部 · 待看 $total 部"
-            else -> "有 $total 部已更新未看"
-        },
-        endActions = {
-            if (total > 0) {
-                Box(
-                    modifier = Modifier
-                        .size(22.dp)
-                        .background(MaterialTheme.colorScheme.primary, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "$total",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MiuixTheme.colorScheme.onPrimary,
-                        maxLines = 1,
-                    )
+    Card(modifier = Modifier.fillMaxWidth()) {
+        ArrowPreference(
+            title = "追番更新",
+            summary = when {
+                total == 0 -> "收藏的剧集有更新时会在这里提醒"
+                todayCount > 0 -> "今日更新 $todayCount 部 · 待看 $total 部"
+                else -> "有 $total 部已更新未看"
+            },
+            endActions = {
+                if (total > 0) {
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "$total",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MiuixTheme.colorScheme.onPrimary,
+                            maxLines = 1,
+                        )
+                    }
                 }
-            }
-        },
-        onClick = onClick,
-    )
+            },
+            onClick = onClick,
+        )
+    }
 }
 
 /** 收藏卡片：与首页 [VideoCard] 同款 miuix Card 容器 + SinkFeedback 按压形变；
