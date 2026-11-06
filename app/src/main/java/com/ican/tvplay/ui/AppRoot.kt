@@ -158,8 +158,6 @@ fun AppRoot() {
 
         // 启动追番检测：先按库里已有数据立即判断是否弹面板，追更检测放后台跑，跑完再刷新面板内容
         LaunchedEffect(Unit) {
-            // 【临时测试】先等测试数据写入完成，保证更新提醒能弹出来
-            com.ican.tvplay.TvPlayApplication.debugSeedJob?.join()
             val todayItems = updatesViewModel.startupTodayUpdates()
             if (todayItems.isNotEmpty()) {
                 updatePopupItems = todayItems

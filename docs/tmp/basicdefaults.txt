@@ -1,0 +1,284 @@
+﻿Compiled from "Component.kt"
+public final class top.yukonga.miuix.kmp.basic.BasicComponentDefaults {
+  public static final top.yukonga.miuix.kmp.basic.BasicComponentDefaults INSTANCE;
+
+  private static final androidx.compose.foundation.layout.PaddingValues InsideMargin;
+
+  public static final int $stable;
+
+  private top.yukonga.miuix.kmp.basic.BasicComponentDefaults();
+    Code:
+       0: aload_0
+       1: invokespecial #8                  // Method java/lang/Object."<init>":()V
+       4: return
+
+  public final androidx.compose.foundation.layout.PaddingValues getInsideMargin();
+    Code:
+       0: getstatic     #17                 // Field InsideMargin:Landroidx/compose/foundation/layout/PaddingValues;
+       3: areturn
+
+  public final top.yukonga.miuix.kmp.basic.BasicComponentColors titleColor-dgg9oW8(long, long, androidx.compose.runtime.Composer, int, int);
+    Code:
+       0: aload         5
+       2: ldc           #23                 // int -1739626979
+       4: ldc           #30                 // String C(titleColor)N(color:c#ui.graphics.Color,disabledColor:c#ui.graphics.Color)272@11673L11,273@11741L11,274@11811L148:Component.kt#8ey7mx
+       6: invokestatic  #36                 // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+       9: iload         7
+      11: iconst_1
+      12: iand
+      13: ifeq          30
+      16: getstatic     #42                 // Field top/yukonga/miuix/kmp/theme/MiuixTheme.INSTANCE:Ltop/yukonga/miuix/kmp/theme/MiuixTheme;
+      19: aload         5
+      21: bipush        6
+      23: invokevirtual #46                 // Method top/yukonga/miuix/kmp/theme/MiuixTheme.getColorScheme:(Landroidx/compose/runtime/Composer;I)Ltop/yukonga/miuix/kmp/theme/Colors;
+      26: invokevirtual #52                 // Method top/yukonga/miuix/kmp/theme/Colors."getOnBackground-0d7_KjU":()J
+      29: lstore_1
+      30: iload         7
+      32: iconst_2
+      33: iand
+      34: ifeq          51
+      37: getstatic     #42                 // Field top/yukonga/miuix/kmp/theme/MiuixTheme.INSTANCE:Ltop/yukonga/miuix/kmp/theme/MiuixTheme;
+      40: aload         5
+      42: bipush        6
+      44: invokevirtual #46                 // Method top/yukonga/miuix/kmp/theme/MiuixTheme.getColorScheme:(Landroidx/compose/runtime/Composer;I)Ltop/yukonga/miuix/kmp/theme/Colors;
+      47: invokevirtual #55                 // Method top/yukonga/miuix/kmp/theme/Colors."getDisabledOnSecondaryVariant-0d7_KjU":()J
+      50: lstore_3
+      51: invokestatic  #59                 // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+      54: ifeq          67
+      57: ldc           #23                 // int -1739626979
+      59: iload         6
+      61: iconst_m1
+      62: ldc           #61                 // String top.yukonga.miuix.kmp.basic.BasicComponentDefaults.titleColor (Component.kt:274)
+      64: invokestatic  #65                 // Method androidx/compose/runtime/ComposerKt.traceEventStart:(IIILjava/lang/String;)V
+      67: aload         5
+      69: ldc           #66                 // int -1039242511
+      71: ldc           #68                 // String CC(remember):Component.kt#9igjgp
+      73: invokestatic  #36                 // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+      76: aload         5
+      78: astore        10
+      80: iload         6
+      82: bipush        14
+      84: iand
+      85: bipush        6
+      87: ixor
+      88: iconst_4
+      89: if_icmple     103
+      92: aload         5
+      94: lload_1
+      95: invokeinterface #74,  3           // InterfaceMethod androidx/compose/runtime/Composer.changed:(J)Z
+     100: ifne          112
+     103: iload         6
+     105: bipush        6
+     107: iand
+     108: iconst_4
+     109: if_icmpne     116
+     112: iconst_1
+     113: goto          117
+     116: iconst_0
+     117: iload         6
+     119: bipush        112
+     121: iand
+     122: bipush        48
+     124: ixor
+     125: bipush        32
+     127: if_icmple     141
+     130: aload         5
+     132: lload_3
+     133: invokeinterface #74,  3           // InterfaceMethod androidx/compose/runtime/Composer.changed:(J)Z
+     138: ifne          151
+     141: iload         6
+     143: bipush        48
+     145: iand
+     146: bipush        32
+     148: if_icmpne     155
+     151: iconst_1
+     152: goto          156
+     155: iconst_0
+     156: ior
+     157: istore        11
+     159: iconst_0
+     160: istore        12
+     162: aload         10
+     164: invokeinterface #78,  1           // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+     169: astore        13
+     171: iconst_0
+     172: istore        14
+     174: iload         11
+     176: ifne          190
+     179: aload         13
+     181: getstatic     #82                 // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+     184: invokevirtual #87                 // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+     187: if_acmpne     220
+     190: iconst_0
+     191: istore        15
+     193: new           #89                 // class top/yukonga/miuix/kmp/basic/BasicComponentColors
+     196: dup
+     197: lload_1
+     198: lload_3
+     199: aconst_null
+     200: invokespecial #92                 // Method top/yukonga/miuix/kmp/basic/BasicComponentColors."<init>":(JJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+     203: nop
+     204: astore        16
+     206: aload         10
+     208: aload         16
+     210: invokeinterface #96,  2           // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+     215: aload         16
+     217: goto          222
+     220: aload         13
+     222: nop
+     223: nop
+     224: checkcast     #89                 // class top/yukonga/miuix/kmp/basic/BasicComponentColors
+     227: astore        9
+     229: aload         5
+     231: invokestatic  #100                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+     234: aload         9
+     236: astore        8
+     238: invokestatic  #59                 // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+     241: ifeq          247
+     244: invokestatic  #103                // Method androidx/compose/runtime/ComposerKt.traceEventEnd:()V
+     247: aload         5
+     249: invokestatic  #100                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+     252: aload         8
+     254: areturn
+
+  public final top.yukonga.miuix.kmp.basic.BasicComponentColors summaryColor-dgg9oW8(long, long, androidx.compose.runtime.Composer, int, int);
+    Code:
+       0: aload         5
+       2: ldc           #121                // int -1460340209
+       4: ldc           #125                // String C(summaryColor)N(color:c#ui.graphics.Color,disabledColor:c#ui.graphics.Color)286@12090L11,287@12169L11,288@12239L148:Component.kt#8ey7mx
+       6: invokestatic  #36                 // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+       9: iload         7
+      11: iconst_1
+      12: iand
+      13: ifeq          30
+      16: getstatic     #42                 // Field top/yukonga/miuix/kmp/theme/MiuixTheme.INSTANCE:Ltop/yukonga/miuix/kmp/theme/MiuixTheme;
+      19: aload         5
+      21: bipush        6
+      23: invokevirtual #46                 // Method top/yukonga/miuix/kmp/theme/MiuixTheme.getColorScheme:(Landroidx/compose/runtime/Composer;I)Ltop/yukonga/miuix/kmp/theme/Colors;
+      26: invokevirtual #128                // Method top/yukonga/miuix/kmp/theme/Colors."getOnSurfaceVariantSummary-0d7_KjU":()J
+      29: lstore_1
+      30: iload         7
+      32: iconst_2
+      33: iand
+      34: ifeq          51
+      37: getstatic     #42                 // Field top/yukonga/miuix/kmp/theme/MiuixTheme.INSTANCE:Ltop/yukonga/miuix/kmp/theme/MiuixTheme;
+      40: aload         5
+      42: bipush        6
+      44: invokevirtual #46                 // Method top/yukonga/miuix/kmp/theme/MiuixTheme.getColorScheme:(Landroidx/compose/runtime/Composer;I)Ltop/yukonga/miuix/kmp/theme/Colors;
+      47: invokevirtual #55                 // Method top/yukonga/miuix/kmp/theme/Colors."getDisabledOnSecondaryVariant-0d7_KjU":()J
+      50: lstore_3
+      51: invokestatic  #59                 // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+      54: ifeq          67
+      57: ldc           #121                // int -1460340209
+      59: iload         6
+      61: iconst_m1
+      62: ldc           #130                // String top.yukonga.miuix.kmp.basic.BasicComponentDefaults.summaryColor (Component.kt:288)
+      64: invokestatic  #65                 // Method androidx/compose/runtime/ComposerKt.traceEventStart:(IIILjava/lang/String;)V
+      67: aload         5
+      69: ldc           #131                // int 1067371523
+      71: ldc           #68                 // String CC(remember):Component.kt#9igjgp
+      73: invokestatic  #36                 // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+      76: aload         5
+      78: astore        10
+      80: iload         6
+      82: bipush        14
+      84: iand
+      85: bipush        6
+      87: ixor
+      88: iconst_4
+      89: if_icmple     103
+      92: aload         5
+      94: lload_1
+      95: invokeinterface #74,  3           // InterfaceMethod androidx/compose/runtime/Composer.changed:(J)Z
+     100: ifne          112
+     103: iload         6
+     105: bipush        6
+     107: iand
+     108: iconst_4
+     109: if_icmpne     116
+     112: iconst_1
+     113: goto          117
+     116: iconst_0
+     117: iload         6
+     119: bipush        112
+     121: iand
+     122: bipush        48
+     124: ixor
+     125: bipush        32
+     127: if_icmple     141
+     130: aload         5
+     132: lload_3
+     133: invokeinterface #74,  3           // InterfaceMethod androidx/compose/runtime/Composer.changed:(J)Z
+     138: ifne          151
+     141: iload         6
+     143: bipush        48
+     145: iand
+     146: bipush        32
+     148: if_icmpne     155
+     151: iconst_1
+     152: goto          156
+     155: iconst_0
+     156: ior
+     157: istore        11
+     159: iconst_0
+     160: istore        12
+     162: aload         10
+     164: invokeinterface #78,  1           // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+     169: astore        13
+     171: iconst_0
+     172: istore        14
+     174: iload         11
+     176: ifne          190
+     179: aload         13
+     181: getstatic     #82                 // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+     184: invokevirtual #87                 // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+     187: if_acmpne     220
+     190: iconst_0
+     191: istore        15
+     193: new           #89                 // class top/yukonga/miuix/kmp/basic/BasicComponentColors
+     196: dup
+     197: lload_1
+     198: lload_3
+     199: aconst_null
+     200: invokespecial #92                 // Method top/yukonga/miuix/kmp/basic/BasicComponentColors."<init>":(JJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+     203: nop
+     204: astore        16
+     206: aload         10
+     208: aload         16
+     210: invokeinterface #96,  2           // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+     215: aload         16
+     217: goto          222
+     220: aload         13
+     222: nop
+     223: nop
+     224: checkcast     #89                 // class top/yukonga/miuix/kmp/basic/BasicComponentColors
+     227: astore        9
+     229: aload         5
+     231: invokestatic  #100                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+     234: aload         9
+     236: astore        8
+     238: invokestatic  #59                 // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+     241: ifeq          247
+     244: invokestatic  #103                // Method androidx/compose/runtime/ComposerKt.traceEventEnd:()V
+     247: aload         5
+     249: invokestatic  #100                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+     252: aload         8
+     254: areturn
+
+  static {};
+    Code:
+       0: new           #2                  // class top/yukonga/miuix/kmp/basic/BasicComponentDefaults
+       3: dup
+       4: invokespecial #134                // Method "<init>":()V
+       7: putstatic     #136                // Field INSTANCE:Ltop/yukonga/miuix/kmp/basic/BasicComponentDefaults;
+      10: bipush        16
+      12: istore_0
+      13: iconst_0
+      14: istore_1
+      15: iload_0
+      16: i2f
+      17: invokestatic  #142                // Method androidx/compose/ui/unit/Dp."constructor-impl":(F)F
+      20: invokestatic  #148                // Method androidx/compose/foundation/layout/PaddingKt."PaddingValues-0680j_4":(F)Landroidx/compose/foundation/layout/PaddingValues;
+      23: putstatic     #17                 // Field InsideMargin:Landroidx/compose/foundation/layout/PaddingValues;
+      26: return
+}

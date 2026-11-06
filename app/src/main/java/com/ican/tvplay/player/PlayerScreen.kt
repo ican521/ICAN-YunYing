@@ -1894,14 +1894,14 @@ private fun PreviewPlayerArea(
 
 /**
  * 影片基础信息区块（竖屏信息流 / 横屏右侧信息列共用）：
- * 标题+收藏 / 更新胶囊（主题色锚点） / 站源·年份·地区·类型（紧凑单行）
+ * 标题+收藏 / 更新备注 / 站源 / 年份·地区·类型
  */
 @Composable
 private fun VideoMetaSection(
     v: Video,
     lineFlag: String,
     modifier: Modifier = Modifier,
-    itemSpacing: Dp = 10.dp,
+    itemSpacing: Dp = 6.dp,
     // 标题行 → 下方信息行的间距：竖屏补 8dp（收藏钮缩 32dp 后需恢复呼吸感）；
     // 横屏 0（横屏标题顶部需与小窗顶对齐，仅标题下方要呼吸感，由 metaTopPadding 提供）
     metaTopPadding: Dp = 0.dp,
@@ -1930,47 +1930,52 @@ private fun VideoMetaSection(
             Spacer(modifier = Modifier.height(metaTopPadding))
         }
 
-        // 更新备注（主题色胶囊，作为 meta 区块唯一视觉锚点）
-        val eps = v.playSources.firstOrNull()?.episodes ?: v.episodes
-        val remark = when {
-            eps.isEmpty() -> ""
-            eps.last().title.contains("完结") -> "已完结"
-            else -> "更新至第${eps.size}集"
-        }
-        if (remark.isNotBlank()) {
-            Spacer(modifier = Modifier.height(itemSpacing))
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.primary)
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-            ) {
+        // 更新备注/站源/年份/地区/类型：信息行之间保持行内密度 itemSpacing
+        Column(verticalArrangement = Arrangement.spacedBy(itemSpacing)) {
+            // 更新备注（fongmi: remark）
+            val eps = v.playSources.firstOrNull()?.episodes ?: v.episodes
+            val remark = when {
+                eps.isEmpty() -> ""
+                eps.last().title.contains("完结") -> "已完结"
+                else -> "更新至第${eps.size}集"
+            }
+            if (remark.isNotBlank()) {
                 Text(
                     text = remark,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
 
-        // 站源·年份·地区·类型：紧凑单行排列，减少垂直占用
-        val metaParts = buildList {
-            val sourceName = v.sourceName.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")
-            if (sourceName.isNotBlank()) add(sourceName)
-            if (v.year > 0) add(v.year.toString())
-            if (v.region.isNotBlank()) add(v.region)
-            if (v.categoryName.isNotBlank()) add(v.categoryName)
-        }
-        if (metaParts.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(6.dp))
+            // 站源（fongmi: site）
             Text(
-                text = metaParts.joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
+                text = "站源：${v.sourceName.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")}",
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
+
+            // 年份/地区/类型各占一行（fongmi: other）
+            if (v.year > 0) {
+                Text(
+                    text = "年份：${v.year}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (v.region.isNotBlank()) {
+                Text(
+                    text = "地区：${v.region}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (v.categoryName.isNotBlank()) {
+                Text(
+                    text = "类型：${v.categoryName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

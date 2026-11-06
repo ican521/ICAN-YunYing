@@ -23,9 +23,6 @@ import java.util.concurrent.TimeUnit
 class TvPlayApplication : Application(), SingletonImageLoader.Factory {
 
     companion object {
-        /** 【临时测试】追番更新测试数据的写入任务：AppRoot 等它结束后再判断是否弹更新提醒 */
-        var debugSeedJob: kotlinx.coroutines.Job? = null
-            private set
 
         /**
          * 图片请求默认浏览器 UA（对齐 fongmi Glide 默认值）。
@@ -81,14 +78,6 @@ class TvPlayApplication : Application(), SingletonImageLoader.Factory {
         appScope.launch {
             android.util.Log.d("Startup", "ensureLoaded launch")
             container.videoRepository.ensureLoaded()
-        }
-
-        // 【临时测试】写入「仙逆 · 玩偶哥哥」的真实追番更新数据（仅首次启动执行一次）
-        debugSeedJob = appScope.launch {
-            runCatching { com.ican.tvplay.data.DebugUpdateSeed.runOnceIfNeeded(this@TvPlayApplication, container) }
-                .onFailure { android.util.Log.e("DebugUpdateSeed", "seed fail", it) }
-            runCatching { com.ican.tvplay.data.DebugUpdateReseed.runOnceIfNeeded(this@TvPlayApplication, container) }
-                .onFailure { android.util.Log.e("DebugUpdateReseed", "reseed fail", it) }
         }
     }
 

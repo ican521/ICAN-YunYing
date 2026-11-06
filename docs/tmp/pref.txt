@@ -1,0 +1,3976 @@
+﻿Compiled from "OverlayDropdownPreference.kt"
+public final class top.yukonga.miuix.kmp.preference.OverlayDropdownPreferenceKt {
+  public static final void OverlayDropdownPreference-4Xcw_4U(java.util.List<java.lang.String>, int, java.lang.String, androidx.compose.ui.Modifier, top.yukonga.miuix.kmp.basic.BasicComponentColors, java.lang.String, top.yukonga.miuix.kmp.basic.BasicComponentColors, top.yukonga.miuix.kmp.basic.DropdownColors, kotlin.jvm.functions.Function2<? super androidx.compose.runtime.Composer, ? super java.lang.Integer, kotlin.Unit>, kotlin.jvm.functions.Function2<? super androidx.compose.runtime.Composer, ? super java.lang.Integer, kotlin.Unit>, androidx.compose.foundation.layout.PaddingValues, androidx.compose.ui.unit.Dp, boolean, boolean, boolean, kotlin.jvm.functions.Function1<? super java.lang.Boolean, kotlin.Unit>, kotlin.jvm.functions.Function1<? super java.lang.Integer, kotlin.Unit>, androidx.compose.runtime.Composer, int, int, int);
+    Code:
+       0: aload_0
+       1: ldc           #22                 // String items
+       3: invokestatic  #28                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       6: aload_2
+       7: ldc           #30                 // String title
+       9: invokestatic  #28                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+      12: aload         17
+      14: ldc           #14                 // int 1830221612
+      16: invokeinterface #36,  2           // InterfaceMethod androidx/compose/runtime/Composer.startRestartGroup:(I)Landroidx/compose/runtime/Composer;
+      21: astore        17
+      23: aload         17
+      25: ldc           #38                 // String C(OverlayDropdownPreference)N(items,selectedIndex,title,modifier,titleColor,summary,summaryColor,dropdownColors,startAction,bottomAction,insideMargin,maxHeight:c#ui.unit.Dp,enabled,showValue,renderInRootScaffold,onExpandedChange,onSelectedIndexChange)76@3822L394,91@4221L577:OverlayDropdownPreference.kt#zbuo5c
+      27: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+      30: iload         18
+      32: istore        21
+      34: iload         19
+      36: istore        22
+      38: iload         18
+      40: bipush        6
+      42: iand
+      43: ifne          86
+      46: iload         21
+      48: iload         18
+      50: bipush        8
+      52: iand
+      53: ifne          67
+      56: aload         17
+      58: aload_0
+      59: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+      64: goto          75
+      67: aload         17
+      69: aload_0
+      70: invokeinterface #51,  2           // InterfaceMethod androidx/compose/runtime/Composer.changedInstance:(Ljava/lang/Object;)Z
+      75: ifeq          82
+      78: iconst_4
+      79: goto          83
+      82: iconst_2
+      83: ior
+      84: istore        21
+      86: iload         18
+      88: bipush        48
+      90: iand
+      91: ifne          117
+      94: iload         21
+      96: aload         17
+      98: iload_1
+      99: invokeinterface #54,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(I)Z
+     104: ifeq          112
+     107: bipush        32
+     109: goto          114
+     112: bipush        16
+     114: ior
+     115: istore        21
+     117: iload         18
+     119: sipush        384
+     122: iand
+     123: ifne          151
+     126: iload         21
+     128: aload         17
+     130: aload_2
+     131: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     136: ifeq          145
+     139: sipush        256
+     142: goto          148
+     145: sipush        128
+     148: ior
+     149: istore        21
+     151: iload         20
+     153: bipush        8
+     155: iand
+     156: ifeq          170
+     159: iload         21
+     161: sipush        3072
+     164: ior
+     165: istore        21
+     167: goto          204
+     170: iload         18
+     172: sipush        3072
+     175: iand
+     176: ifne          204
+     179: iload         21
+     181: aload         17
+     183: aload_3
+     184: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     189: ifeq          198
+     192: sipush        2048
+     195: goto          201
+     198: sipush        1024
+     201: ior
+     202: istore        21
+     204: iload         18
+     206: sipush        24576
+     209: iand
+     210: ifne          247
+     213: iload         21
+     215: iload         20
+     217: bipush        16
+     219: iand
+     220: ifne          241
+     223: aload         17
+     225: aload         4
+     227: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     232: ifeq          241
+     235: sipush        16384
+     238: goto          244
+     241: sipush        8192
+     244: ior
+     245: istore        21
+     247: iload         20
+     249: bipush        32
+     251: iand
+     252: ifeq          265
+     255: iload         21
+     257: ldc           #55                 // int 196608
+     259: ior
+     260: istore        21
+     262: goto          297
+     265: iload         18
+     267: ldc           #55                 // int 196608
+     269: iand
+     270: ifne          297
+     273: iload         21
+     275: aload         17
+     277: aload         5
+     279: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     284: ifeq          292
+     287: ldc           #56                 // int 131072
+     289: goto          294
+     292: ldc           #57                 // int 65536
+     294: ior
+     295: istore        21
+     297: iload         18
+     299: ldc           #58                 // int 1572864
+     301: iand
+     302: ifne          337
+     305: iload         21
+     307: iload         20
+     309: bipush        64
+     311: iand
+     312: ifne          332
+     315: aload         17
+     317: aload         6
+     319: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     324: ifeq          332
+     327: ldc           #59                 // int 1048576
+     329: goto          334
+     332: ldc           #60                 // int 524288
+     334: ior
+     335: istore        21
+     337: iload         18
+     339: ldc           #61                 // int 12582912
+     341: iand
+     342: ifne          378
+     345: iload         21
+     347: iload         20
+     349: sipush        128
+     352: iand
+     353: ifne          373
+     356: aload         17
+     358: aload         7
+     360: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     365: ifeq          373
+     368: ldc           #62                 // int 8388608
+     370: goto          375
+     373: ldc           #63                 // int 4194304
+     375: ior
+     376: istore        21
+     378: iload         20
+     380: sipush        256
+     383: iand
+     384: ifeq          397
+     387: iload         21
+     389: ldc           #64                 // int 100663296
+     391: ior
+     392: istore        21
+     394: goto          429
+     397: iload         18
+     399: ldc           #64                 // int 100663296
+     401: iand
+     402: ifne          429
+     405: iload         21
+     407: aload         17
+     409: aload         8
+     411: invokeinterface #51,  2           // InterfaceMethod androidx/compose/runtime/Composer.changedInstance:(Ljava/lang/Object;)Z
+     416: ifeq          424
+     419: ldc           #65                 // int 67108864
+     421: goto          426
+     424: ldc           #66                 // int 33554432
+     426: ior
+     427: istore        21
+     429: iload         20
+     431: sipush        512
+     434: iand
+     435: ifeq          448
+     438: iload         21
+     440: ldc           #67                 // int 805306368
+     442: ior
+     443: istore        21
+     445: goto          480
+     448: iload         18
+     450: ldc           #67                 // int 805306368
+     452: iand
+     453: ifne          480
+     456: iload         21
+     458: aload         17
+     460: aload         9
+     462: invokeinterface #51,  2           // InterfaceMethod androidx/compose/runtime/Composer.changedInstance:(Ljava/lang/Object;)Z
+     467: ifeq          475
+     470: ldc           #68                 // int 536870912
+     472: goto          477
+     475: ldc           #69                 // int 268435456
+     477: ior
+     478: istore        21
+     480: iload         19
+     482: bipush        6
+     484: iand
+     485: ifne          519
+     488: iload         22
+     490: iload         20
+     492: sipush        1024
+     495: iand
+     496: ifne          515
+     499: aload         17
+     501: aload         10
+     503: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     508: ifeq          515
+     511: iconst_4
+     512: goto          516
+     515: iconst_2
+     516: ior
+     517: istore        22
+     519: iload         20
+     521: sipush        2048
+     524: iand
+     525: ifeq          538
+     528: iload         22
+     530: bipush        48
+     532: ior
+     533: istore        22
+     535: goto          570
+     538: iload         19
+     540: bipush        48
+     542: iand
+     543: ifne          570
+     546: iload         22
+     548: aload         17
+     550: aload         11
+     552: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     557: ifeq          565
+     560: bipush        32
+     562: goto          567
+     565: bipush        16
+     567: ior
+     568: istore        22
+     570: iload         20
+     572: sipush        4096
+     575: iand
+     576: ifeq          590
+     579: iload         22
+     581: sipush        384
+     584: ior
+     585: istore        22
+     587: goto          625
+     590: iload         19
+     592: sipush        384
+     595: iand
+     596: ifne          625
+     599: iload         22
+     601: aload         17
+     603: iload         12
+     605: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+     610: ifeq          619
+     613: sipush        256
+     616: goto          622
+     619: sipush        128
+     622: ior
+     623: istore        22
+     625: iload         20
+     627: sipush        8192
+     630: iand
+     631: ifeq          645
+     634: iload         22
+     636: sipush        3072
+     639: ior
+     640: istore        22
+     642: goto          680
+     645: iload         19
+     647: sipush        3072
+     650: iand
+     651: ifne          680
+     654: iload         22
+     656: aload         17
+     658: iload         13
+     660: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+     665: ifeq          674
+     668: sipush        2048
+     671: goto          677
+     674: sipush        1024
+     677: ior
+     678: istore        22
+     680: iload         20
+     682: sipush        16384
+     685: iand
+     686: ifeq          700
+     689: iload         22
+     691: sipush        24576
+     694: ior
+     695: istore        22
+     697: goto          735
+     700: iload         19
+     702: sipush        24576
+     705: iand
+     706: ifne          735
+     709: iload         22
+     711: aload         17
+     713: iload         14
+     715: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+     720: ifeq          729
+     723: sipush        16384
+     726: goto          732
+     729: sipush        8192
+     732: ior
+     733: istore        22
+     735: iload         20
+     737: ldc           #73                 // int 32768
+     739: iand
+     740: ifeq          753
+     743: iload         22
+     745: ldc           #55                 // int 196608
+     747: ior
+     748: istore        22
+     750: goto          785
+     753: iload         19
+     755: ldc           #55                 // int 196608
+     757: iand
+     758: ifne          785
+     761: iload         22
+     763: aload         17
+     765: aload         15
+     767: invokeinterface #51,  2           // InterfaceMethod androidx/compose/runtime/Composer.changedInstance:(Ljava/lang/Object;)Z
+     772: ifeq          780
+     775: ldc           #56                 // int 131072
+     777: goto          782
+     780: ldc           #57                 // int 65536
+     782: ior
+     783: istore        22
+     785: iload         20
+     787: ldc           #57                 // int 65536
+     789: iand
+     790: ifeq          803
+     793: iload         22
+     795: ldc           #58                 // int 1572864
+     797: ior
+     798: istore        22
+     800: goto          835
+     803: iload         19
+     805: ldc           #58                 // int 1572864
+     807: iand
+     808: ifne          835
+     811: iload         22
+     813: aload         17
+     815: aload         16
+     817: invokeinterface #51,  2           // InterfaceMethod androidx/compose/runtime/Composer.changedInstance:(Ljava/lang/Object;)Z
+     822: ifeq          830
+     825: ldc           #59                 // int 1048576
+     827: goto          832
+     830: ldc           #60                 // int 524288
+     832: ior
+     833: istore        22
+     835: aload         17
+     837: iload         21
+     839: ldc           #74                 // int 306783379
+     841: iand
+     842: ldc           #75                 // int 306783378
+     844: if_icmpne     857
+     847: iload         22
+     849: ldc           #76                 // int 599187
+     851: iand
+     852: ldc           #77                 // int 599186
+     854: if_icmpeq     861
+     857: iconst_1
+     858: goto          862
+     861: iconst_0
+     862: iload         21
+     864: iconst_1
+     865: iand
+     866: invokeinterface #81,  3           // InterfaceMethod androidx/compose/runtime/Composer.shouldExecute:(ZI)Z
+     871: ifeq          1738
+     874: aload         17
+     876: invokeinterface #85,  1           // InterfaceMethod androidx/compose/runtime/Composer.startDefaults:()V
+     881: aload         17
+     883: ldc           #87                 // String 62@3201L12,64@3308L14,65@3378L16
+     885: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+     888: iload         18
+     890: iconst_1
+     891: iand
+     892: ifeq          905
+     895: aload         17
+     897: invokeinterface #91,  1           // InterfaceMethod androidx/compose/runtime/Composer.getDefaultsInvalid:()Z
+     902: ifeq          1151
+     905: iload         20
+     907: bipush        8
+     909: iand
+     910: ifeq          920
+     913: getstatic     #97                 // Field androidx/compose/ui/Modifier.Companion:Landroidx/compose/ui/Modifier$Companion;
+     916: checkcast     #93                 // class androidx/compose/ui/Modifier
+     919: astore_3
+     920: iload         20
+     922: bipush        16
+     924: iand
+     925: ifeq          951
+     928: getstatic     #103                // Field top/yukonga/miuix/kmp/basic/BasicComponentDefaults.INSTANCE:Ltop/yukonga/miuix/kmp/basic/BasicComponentDefaults;
+     931: lconst_0
+     932: lconst_0
+     933: aload         17
+     935: sipush        384
+     938: iconst_3
+     939: invokevirtual #107                // Method top/yukonga/miuix/kmp/basic/BasicComponentDefaults."titleColor-dgg9oW8":(JJLandroidx/compose/runtime/Composer;II)Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;
+     942: astore        4
+     944: iload         21
+     946: ldc           #108                // int -57345
+     948: iand
+     949: istore        21
+     951: iload         20
+     953: bipush        32
+     955: iand
+     956: ifeq          962
+     959: aconst_null
+     960: astore        5
+     962: iload         20
+     964: bipush        64
+     966: iand
+     967: ifeq          993
+     970: getstatic     #103                // Field top/yukonga/miuix/kmp/basic/BasicComponentDefaults.INSTANCE:Ltop/yukonga/miuix/kmp/basic/BasicComponentDefaults;
+     973: lconst_0
+     974: lconst_0
+     975: aload         17
+     977: sipush        384
+     980: iconst_3
+     981: invokevirtual #111                // Method top/yukonga/miuix/kmp/basic/BasicComponentDefaults."summaryColor-dgg9oW8":(JJLandroidx/compose/runtime/Composer;II)Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;
+     984: astore        6
+     986: iload         21
+     988: ldc           #112                // int -3670017
+     990: iand
+     991: istore        21
+     993: iload         20
+     995: sipush        128
+     998: iand
+     999: ifeq          1030
+    1002: getstatic     #117                // Field top/yukonga/miuix/kmp/basic/DropdownDefaults.INSTANCE:Ltop/yukonga/miuix/kmp/basic/DropdownDefaults;
+    1005: lconst_0
+    1006: lconst_0
+    1007: lconst_0
+    1008: lconst_0
+    1009: lconst_0
+    1010: lconst_0
+    1011: lconst_0
+    1012: aload         17
+    1014: ldc           #61                 // int 12582912
+    1016: bipush        127
+    1018: invokevirtual #121                // Method top/yukonga/miuix/kmp/basic/DropdownDefaults."dropdownColors-69fazGs":(JJJJJJJLandroidx/compose/runtime/Composer;II)Ltop/yukonga/miuix/kmp/basic/DropdownColors;
+    1021: astore        7
+    1023: iload         21
+    1025: ldc           #122                // int -29360129
+    1027: iand
+    1028: istore        21
+    1030: iload         20
+    1032: sipush        256
+    1035: iand
+    1036: ifeq          1042
+    1039: aconst_null
+    1040: astore        8
+    1042: iload         20
+    1044: sipush        512
+    1047: iand
+    1048: ifeq          1054
+    1051: aconst_null
+    1052: astore        9
+    1054: iload         20
+    1056: sipush        1024
+    1059: iand
+    1060: ifeq          1078
+    1063: getstatic     #103                // Field top/yukonga/miuix/kmp/basic/BasicComponentDefaults.INSTANCE:Ltop/yukonga/miuix/kmp/basic/BasicComponentDefaults;
+    1066: invokevirtual #126                // Method top/yukonga/miuix/kmp/basic/BasicComponentDefaults.getInsideMargin:()Landroidx/compose/foundation/layout/PaddingValues;
+    1069: astore        10
+    1071: iload         22
+    1073: bipush        -15
+    1075: iand
+    1076: istore        22
+    1078: iload         20
+    1080: sipush        2048
+    1083: iand
+    1084: ifeq          1090
+    1087: aconst_null
+    1088: astore        11
+    1090: iload         20
+    1092: sipush        4096
+    1095: iand
+    1096: ifeq          1102
+    1099: iconst_1
+    1100: istore        12
+    1102: iload         20
+    1104: sipush        8192
+    1107: iand
+    1108: ifeq          1114
+    1111: iconst_1
+    1112: istore        13
+    1114: iload         20
+    1116: sipush        16384
+    1119: iand
+    1120: ifeq          1126
+    1123: iconst_1
+    1124: istore        14
+    1126: iload         20
+    1128: ldc           #73                 // int 32768
+    1130: iand
+    1131: ifeq          1137
+    1134: aconst_null
+    1135: astore        15
+    1137: iload         20
+    1139: ldc           #57                 // int 65536
+    1141: iand
+    1142: ifeq          1220
+    1145: aconst_null
+    1146: astore        16
+    1148: goto          1220
+    1151: aload         17
+    1153: invokeinterface #129,  1          // InterfaceMethod androidx/compose/runtime/Composer.skipToGroupEnd:()V
+    1158: iload         20
+    1160: bipush        16
+    1162: iand
+    1163: ifeq          1173
+    1166: iload         21
+    1168: ldc           #108                // int -57345
+    1170: iand
+    1171: istore        21
+    1173: iload         20
+    1175: bipush        64
+    1177: iand
+    1178: ifeq          1188
+    1181: iload         21
+    1183: ldc           #112                // int -3670017
+    1185: iand
+    1186: istore        21
+    1188: iload         20
+    1190: sipush        128
+    1193: iand
+    1194: ifeq          1204
+    1197: iload         21
+    1199: ldc           #122                // int -29360129
+    1201: iand
+    1202: istore        21
+    1204: iload         20
+    1206: sipush        1024
+    1209: iand
+    1210: ifeq          1220
+    1213: iload         22
+    1215: bipush        -15
+    1217: iand
+    1218: istore        22
+    1220: aload         17
+    1222: invokeinterface #132,  1          // InterfaceMethod androidx/compose/runtime/Composer.endDefaults:()V
+    1227: invokestatic  #135                // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+    1230: ifeq          1244
+    1233: ldc           #14                 // int 1830221612
+    1235: iload         21
+    1237: iload         22
+    1239: ldc           #137                // String top.yukonga.miuix.kmp.preference.OverlayDropdownPreference (OverlayDropdownPreference.kt:75)
+    1241: invokestatic  #141                // Method androidx/compose/runtime/ComposerKt.traceEventStart:(IIILjava/lang/String;)V
+    1244: aload         17
+    1246: ldc           #142                // int -2093595690
+    1248: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+    1250: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1253: aload         17
+    1255: astore        25
+    1257: iload         21
+    1259: bipush        14
+    1261: iand
+    1262: iconst_4
+    1263: if_icmpeq     1285
+    1266: iload         21
+    1268: bipush        8
+    1270: iand
+    1271: ifeq          1289
+    1274: aload         17
+    1276: aload_0
+    1277: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+    1282: ifeq          1289
+    1285: iconst_1
+    1286: goto          1290
+    1289: iconst_0
+    1290: iload         21
+    1292: bipush        112
+    1294: iand
+    1295: bipush        32
+    1297: if_icmpne     1304
+    1300: iconst_1
+    1301: goto          1305
+    1304: iconst_0
+    1305: ior
+    1306: iload         22
+    1308: ldc           #149                // int 3670016
+    1310: iand
+    1311: ldc           #59                 // int 1048576
+    1313: if_icmpne     1320
+    1316: iconst_1
+    1317: goto          1321
+    1320: iconst_0
+    1321: ior
+    1322: istore        26
+    1324: nop
+    1325: iconst_0
+    1326: istore        27
+    1328: aload         25
+    1330: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+    1335: astore        28
+    1337: iconst_0
+    1338: istore        29
+    1340: iload         26
+    1342: ifne          1356
+    1345: aload         28
+    1347: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+    1350: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+    1353: if_acmpne     1556
+    1356: iconst_0
+    1357: istore        30
+    1359: aload_0
+    1360: checkcast     #163                // class java/lang/Iterable
+    1363: astore        31
+    1365: iconst_0
+    1366: istore        32
+    1368: aload         31
+    1370: astore        33
+    1372: new           #165                // class java/util/ArrayList
+    1375: dup
+    1376: aload         31
+    1378: bipush        10
+    1380: invokestatic  #171                // Method kotlin/collections/CollectionsKt.collectionSizeOrDefault:(Ljava/lang/Iterable;I)I
+    1383: invokespecial #175                // Method java/util/ArrayList."<init>":(I)V
+    1386: checkcast     #177                // class java/util/Collection
+    1389: astore        34
+    1391: iconst_0
+    1392: istore        35
+    1394: iconst_0
+    1395: istore        36
+    1397: aload         33
+    1399: invokeinterface #181,  1          // InterfaceMethod java/lang/Iterable.iterator:()Ljava/util/Iterator;
+    1404: astore        37
+    1406: aload         37
+    1408: invokeinterface #186,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+    1413: ifeq          1507
+    1416: aload         37
+    1418: invokeinterface #189,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+    1423: astore        38
+    1425: aload         34
+    1427: iload         36
+    1429: iinc          36, 1
+    1432: istore        39
+    1434: iload         39
+    1436: ifge          1442
+    1439: invokestatic  #192                // Method kotlin/collections/CollectionsKt.throwIndexOverflow:()V
+    1442: iload         39
+    1444: aload         38
+    1446: checkcast     #194                // class java/lang/String
+    1449: astore        40
+    1451: istore        41
+    1453: astore        42
+    1455: iconst_0
+    1456: istore        43
+    1458: new           #196                // class top/yukonga/miuix/kmp/basic/DropdownItem
+    1461: dup
+    1462: aload         40
+    1464: iconst_0
+    1465: iload         41
+    1467: iload_1
+    1468: if_icmpne     1475
+    1471: iconst_1
+    1472: goto          1476
+    1475: iconst_0
+    1476: aload         16
+    1478: iload         41
+    1480: invokedynamic #215,  0            // InvokeDynamic #0:invoke:(Lkotlin/jvm/functions/Function1;I)Lkotlin/jvm/functions/Function0;
+    1485: aconst_null
+    1486: aconst_null
+    1487: aconst_null
+    1488: bipush        114
+    1490: aconst_null
+    1491: invokespecial #218                // Method top/yukonga/miuix/kmp/basic/DropdownItem."<init>":(Ljava/lang/String;ZZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function3;Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+    1494: nop
+    1495: aload         42
+    1497: swap
+    1498: invokeinterface #221,  2          // InterfaceMethod java/util/Collection.add:(Ljava/lang/Object;)Z
+    1503: pop
+    1504: goto          1406
+    1507: aload         34
+    1509: checkcast     #223                // class java/util/List
+    1512: nop
+    1513: iconst_0
+    1514: iconst_2
+    1515: aconst_null
+    1516: astore        45
+    1518: istore        46
+    1520: istore        47
+    1522: astore        48
+    1524: new           #225                // class top/yukonga/miuix/kmp/basic/DropdownEntry
+    1527: dup
+    1528: aload         48
+    1530: iload         47
+    1532: iload         46
+    1534: aload         45
+    1536: invokespecial #228                // Method top/yukonga/miuix/kmp/basic/DropdownEntry."<init>":(Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+    1539: nop
+    1540: astore        44
+    1542: aload         25
+    1544: aload         44
+    1546: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+    1551: aload         44
+    1553: goto          1558
+    1556: aload         28
+    1558: nop
+    1559: nop
+    1560: checkcast     #225                // class top/yukonga/miuix/kmp/basic/DropdownEntry
+    1563: astore        24
+    1565: aload         17
+    1567: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    1570: aload         24
+    1572: astore        23
+    1574: aload         23
+    1576: aload_2
+    1577: aload_3
+    1578: aload         4
+    1580: aload         5
+    1582: aload         6
+    1584: aload         7
+    1586: aload         8
+    1588: aload         9
+    1590: aload         10
+    1592: aload         11
+    1594: iload         12
+    1596: iload         13
+    1598: iload         14
+    1600: iconst_1
+    1601: aload         15
+    1603: aload         17
+    1605: bipush        112
+    1607: iload         21
+    1609: iconst_3
+    1610: ishr
+    1611: iand
+    1612: sipush        896
+    1615: iload         21
+    1617: iconst_3
+    1618: ishr
+    1619: iand
+    1620: ior
+    1621: sipush        7168
+    1624: iload         21
+    1626: iconst_3
+    1627: ishr
+    1628: iand
+    1629: ior
+    1630: ldc           #237                // int 57344
+    1632: iload         21
+    1634: iconst_3
+    1635: ishr
+    1636: iand
+    1637: ior
+    1638: ldc           #238                // int 458752
+    1640: iload         21
+    1642: iconst_3
+    1643: ishr
+    1644: iand
+    1645: ior
+    1646: ldc           #149                // int 3670016
+    1648: iload         21
+    1650: iconst_3
+    1651: ishr
+    1652: iand
+    1653: ior
+    1654: ldc           #239                // int 29360128
+    1656: iload         21
+    1658: iconst_3
+    1659: ishr
+    1660: iand
+    1661: ior
+    1662: ldc           #240                // int 234881024
+    1664: iload         21
+    1666: iconst_3
+    1667: ishr
+    1668: iand
+    1669: ior
+    1670: ldc           #241                // int 1879048192
+    1672: iload         22
+    1674: bipush        27
+    1676: ishl
+    1677: iand
+    1678: ior
+    1679: sipush        24576
+    1682: bipush        14
+    1684: iload         22
+    1686: iconst_3
+    1687: ishr
+    1688: iand
+    1689: ior
+    1690: bipush        112
+    1692: iload         22
+    1694: iconst_3
+    1695: ishr
+    1696: iand
+    1697: ior
+    1698: sipush        896
+    1701: iload         22
+    1703: iconst_3
+    1704: ishr
+    1705: iand
+    1706: ior
+    1707: sipush        7168
+    1710: iload         22
+    1712: iconst_3
+    1713: ishr
+    1714: iand
+    1715: ior
+    1716: ldc           #238                // int 458752
+    1718: iload         22
+    1720: iand
+    1721: ior
+    1722: iconst_0
+    1723: invokestatic  #245                // Method "OverlayDropdownPreference-84PZ-4c":(Ltop/yukonga/miuix/kmp/basic/DropdownEntry;Ljava/lang/String;Landroidx/compose/ui/Modifier;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ljava/lang/String;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ltop/yukonga/miuix/kmp/basic/DropdownColors;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/ui/unit/Dp;ZZZZLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;III)V
+    1726: invokestatic  #135                // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+    1729: ifeq          1745
+    1732: invokestatic  #248                // Method androidx/compose/runtime/ComposerKt.traceEventEnd:()V
+    1735: goto          1745
+    1738: aload         17
+    1740: invokeinterface #129,  1          // InterfaceMethod androidx/compose/runtime/Composer.skipToGroupEnd:()V
+    1745: aload         17
+    1747: invokeinterface #252,  1          // InterfaceMethod androidx/compose/runtime/Composer.endRestartGroup:()Landroidx/compose/runtime/ScopeUpdateScope;
+    1752: dup
+    1753: ifnull        1805
+    1756: aload_0
+    1757: iload_1
+    1758: aload_2
+    1759: aload_3
+    1760: aload         4
+    1762: aload         5
+    1764: aload         6
+    1766: aload         7
+    1768: aload         8
+    1770: aload         9
+    1772: aload         10
+    1774: aload         11
+    1776: iload         12
+    1778: iload         13
+    1780: iload         14
+    1782: aload         15
+    1784: aload         16
+    1786: iload         18
+    1788: iload         19
+    1790: iload         20
+    1792: invokedynamic #264,  0            // InvokeDynamic #1:invoke:(Ljava/util/List;ILjava/lang/String;Landroidx/compose/ui/Modifier;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ljava/lang/String;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ltop/yukonga/miuix/kmp/basic/DropdownColors;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/ui/unit/Dp;ZZZLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;III)Lkotlin/jvm/functions/Function2;
+    1797: invokeinterface #270,  2          // InterfaceMethod androidx/compose/runtime/ScopeUpdateScope.updateScope:(Lkotlin/jvm/functions/Function2;)V
+    1802: goto          1806
+    1805: pop
+    1806: return
+
+  public static final void OverlayDropdownPreference-84PZ-4c(top.yukonga.miuix.kmp.basic.DropdownEntry, java.lang.String, androidx.compose.ui.Modifier, top.yukonga.miuix.kmp.basic.BasicComponentColors, java.lang.String, top.yukonga.miuix.kmp.basic.BasicComponentColors, top.yukonga.miuix.kmp.basic.DropdownColors, kotlin.jvm.functions.Function2<? super androidx.compose.runtime.Composer, ? super java.lang.Integer, kotlin.Unit>, kotlin.jvm.functions.Function2<? super androidx.compose.runtime.Composer, ? super java.lang.Integer, kotlin.Unit>, androidx.compose.foundation.layout.PaddingValues, androidx.compose.ui.unit.Dp, boolean, boolean, boolean, boolean, kotlin.jvm.functions.Function1<? super java.lang.Boolean, kotlin.Unit>, androidx.compose.runtime.Composer, int, int, int);
+    Code:
+       0: aload_0
+       1: ldc_w         #341                // String entry
+       4: invokestatic  #28                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_1
+       8: ldc           #30                 // String title
+      10: invokestatic  #28                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+      13: aload         16
+      15: ldc_w         #338                // int 1728747215
+      18: invokeinterface #36,  2           // InterfaceMethod androidx/compose/runtime/Composer.startRestartGroup:(I)Landroidx/compose/runtime/Composer;
+      23: astore        16
+      25: aload         16
+      27: ldc_w         #343                // String C(OverlayDropdownPreference)N(entry,title,modifier,titleColor,summary,summaryColor,dropdownColors,startAction,bottomAction,insideMargin,maxHeight:c#ui.unit.Dp,enabled,showValue,renderInRootScaffold,collapseOnSelection,onExpandedChange)130@5609L39,131@5678L34,132@5734L34,133@5814L7,134@5855L36,135@5926L38,136@6006L234,154@6539L360,175@7210L1306,166@6905L1795:OverlayDropdownPreference.kt#zbuo5c
+      30: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+      33: iload         17
+      35: istore        20
+      37: iload         18
+      39: istore        21
+      41: iload         17
+      43: bipush        6
+      45: iand
+      46: ifne          70
+      49: iload         20
+      51: aload         16
+      53: aload_0
+      54: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+      59: ifeq          66
+      62: iconst_4
+      63: goto          67
+      66: iconst_2
+      67: ior
+      68: istore        20
+      70: iload         17
+      72: bipush        48
+      74: iand
+      75: ifne          101
+      78: iload         20
+      80: aload         16
+      82: aload_1
+      83: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+      88: ifeq          96
+      91: bipush        32
+      93: goto          98
+      96: bipush        16
+      98: ior
+      99: istore        20
+     101: iload         19
+     103: iconst_4
+     104: iand
+     105: ifeq          119
+     108: iload         20
+     110: sipush        384
+     113: ior
+     114: istore        20
+     116: goto          153
+     119: iload         17
+     121: sipush        384
+     124: iand
+     125: ifne          153
+     128: iload         20
+     130: aload         16
+     132: aload_2
+     133: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     138: ifeq          147
+     141: sipush        256
+     144: goto          150
+     147: sipush        128
+     150: ior
+     151: istore        20
+     153: iload         17
+     155: sipush        3072
+     158: iand
+     159: ifne          195
+     162: iload         20
+     164: iload         19
+     166: bipush        8
+     168: iand
+     169: ifne          189
+     172: aload         16
+     174: aload_3
+     175: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     180: ifeq          189
+     183: sipush        2048
+     186: goto          192
+     189: sipush        1024
+     192: ior
+     193: istore        20
+     195: iload         19
+     197: bipush        16
+     199: iand
+     200: ifeq          214
+     203: iload         20
+     205: sipush        24576
+     208: ior
+     209: istore        20
+     211: goto          249
+     214: iload         17
+     216: sipush        24576
+     219: iand
+     220: ifne          249
+     223: iload         20
+     225: aload         16
+     227: aload         4
+     229: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     234: ifeq          243
+     237: sipush        16384
+     240: goto          246
+     243: sipush        8192
+     246: ior
+     247: istore        20
+     249: iload         17
+     251: ldc           #55                 // int 196608
+     253: iand
+     254: ifne          289
+     257: iload         20
+     259: iload         19
+     261: bipush        32
+     263: iand
+     264: ifne          284
+     267: aload         16
+     269: aload         5
+     271: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     276: ifeq          284
+     279: ldc           #56                 // int 131072
+     281: goto          286
+     284: ldc           #57                 // int 65536
+     286: ior
+     287: istore        20
+     289: iload         17
+     291: ldc           #58                 // int 1572864
+     293: iand
+     294: ifne          329
+     297: iload         20
+     299: iload         19
+     301: bipush        64
+     303: iand
+     304: ifne          324
+     307: aload         16
+     309: aload         6
+     311: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     316: ifeq          324
+     319: ldc           #59                 // int 1048576
+     321: goto          326
+     324: ldc           #60                 // int 524288
+     326: ior
+     327: istore        20
+     329: iload         19
+     331: sipush        128
+     334: iand
+     335: ifeq          348
+     338: iload         20
+     340: ldc           #61                 // int 12582912
+     342: ior
+     343: istore        20
+     345: goto          380
+     348: iload         17
+     350: ldc           #61                 // int 12582912
+     352: iand
+     353: ifne          380
+     356: iload         20
+     358: aload         16
+     360: aload         7
+     362: invokeinterface #51,  2           // InterfaceMethod androidx/compose/runtime/Composer.changedInstance:(Ljava/lang/Object;)Z
+     367: ifeq          375
+     370: ldc           #62                 // int 8388608
+     372: goto          377
+     375: ldc           #63                 // int 4194304
+     377: ior
+     378: istore        20
+     380: iload         19
+     382: sipush        256
+     385: iand
+     386: ifeq          399
+     389: iload         20
+     391: ldc           #64                 // int 100663296
+     393: ior
+     394: istore        20
+     396: goto          431
+     399: iload         17
+     401: ldc           #64                 // int 100663296
+     403: iand
+     404: ifne          431
+     407: iload         20
+     409: aload         16
+     411: aload         8
+     413: invokeinterface #51,  2           // InterfaceMethod androidx/compose/runtime/Composer.changedInstance:(Ljava/lang/Object;)Z
+     418: ifeq          426
+     421: ldc           #65                 // int 67108864
+     423: goto          428
+     426: ldc           #66                 // int 33554432
+     428: ior
+     429: istore        20
+     431: iload         17
+     433: ldc           #67                 // int 805306368
+     435: iand
+     436: ifne          472
+     439: iload         20
+     441: iload         19
+     443: sipush        512
+     446: iand
+     447: ifne          467
+     450: aload         16
+     452: aload         9
+     454: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     459: ifeq          467
+     462: ldc           #68                 // int 536870912
+     464: goto          469
+     467: ldc           #69                 // int 268435456
+     469: ior
+     470: istore        20
+     472: iload         19
+     474: sipush        1024
+     477: iand
+     478: ifeq          491
+     481: iload         21
+     483: bipush        6
+     485: ior
+     486: istore        21
+     488: goto          521
+     491: iload         18
+     493: bipush        6
+     495: iand
+     496: ifne          521
+     499: iload         21
+     501: aload         16
+     503: aload         10
+     505: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     510: ifeq          517
+     513: iconst_4
+     514: goto          518
+     517: iconst_2
+     518: ior
+     519: istore        21
+     521: iload         19
+     523: sipush        2048
+     526: iand
+     527: ifeq          540
+     530: iload         21
+     532: bipush        48
+     534: ior
+     535: istore        21
+     537: goto          572
+     540: iload         18
+     542: bipush        48
+     544: iand
+     545: ifne          572
+     548: iload         21
+     550: aload         16
+     552: iload         11
+     554: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+     559: ifeq          567
+     562: bipush        32
+     564: goto          569
+     567: bipush        16
+     569: ior
+     570: istore        21
+     572: iload         19
+     574: sipush        4096
+     577: iand
+     578: ifeq          592
+     581: iload         21
+     583: sipush        384
+     586: ior
+     587: istore        21
+     589: goto          627
+     592: iload         18
+     594: sipush        384
+     597: iand
+     598: ifne          627
+     601: iload         21
+     603: aload         16
+     605: iload         12
+     607: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+     612: ifeq          621
+     615: sipush        256
+     618: goto          624
+     621: sipush        128
+     624: ior
+     625: istore        21
+     627: iload         19
+     629: sipush        8192
+     632: iand
+     633: ifeq          647
+     636: iload         21
+     638: sipush        3072
+     641: ior
+     642: istore        21
+     644: goto          682
+     647: iload         18
+     649: sipush        3072
+     652: iand
+     653: ifne          682
+     656: iload         21
+     658: aload         16
+     660: iload         13
+     662: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+     667: ifeq          676
+     670: sipush        2048
+     673: goto          679
+     676: sipush        1024
+     679: ior
+     680: istore        21
+     682: iload         19
+     684: sipush        16384
+     687: iand
+     688: ifeq          702
+     691: iload         21
+     693: sipush        24576
+     696: ior
+     697: istore        21
+     699: goto          737
+     702: iload         18
+     704: sipush        24576
+     707: iand
+     708: ifne          737
+     711: iload         21
+     713: aload         16
+     715: iload         14
+     717: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+     722: ifeq          731
+     725: sipush        16384
+     728: goto          734
+     731: sipush        8192
+     734: ior
+     735: istore        21
+     737: iload         19
+     739: ldc           #73                 // int 32768
+     741: iand
+     742: ifeq          755
+     745: iload         21
+     747: ldc           #55                 // int 196608
+     749: ior
+     750: istore        21
+     752: goto          787
+     755: iload         18
+     757: ldc           #55                 // int 196608
+     759: iand
+     760: ifne          787
+     763: iload         21
+     765: aload         16
+     767: aload         15
+     769: invokeinterface #51,  2           // InterfaceMethod androidx/compose/runtime/Composer.changedInstance:(Ljava/lang/Object;)Z
+     774: ifeq          782
+     777: ldc           #56                 // int 131072
+     779: goto          784
+     782: ldc           #57                 // int 65536
+     784: ior
+     785: istore        21
+     787: aload         16
+     789: iload         20
+     791: ldc           #74                 // int 306783379
+     793: iand
+     794: ldc           #75                 // int 306783378
+     796: if_icmpne     811
+     799: iload         21
+     801: ldc_w         #344                // int 74899
+     804: iand
+     805: ldc_w         #345                // int 74898
+     808: if_icmpeq     815
+     811: iconst_1
+     812: goto          816
+     815: iconst_0
+     816: iload         20
+     818: iconst_1
+     819: iand
+     820: invokeinterface #81,  3           // InterfaceMethod androidx/compose/runtime/Composer.shouldExecute:(ZI)Z
+     825: ifeq          2059
+     828: aload         16
+     830: invokeinterface #85,  1           // InterfaceMethod androidx/compose/runtime/Composer.startDefaults:()V
+     835: aload         16
+     837: ldc_w         #347                // String 116@4987L12,118@5094L14,119@5164L16
+     840: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+     843: iload         17
+     845: iconst_1
+     846: iand
+     847: ifeq          860
+     850: aload         16
+     852: invokeinterface #91,  1           // InterfaceMethod androidx/compose/runtime/Composer.getDefaultsInvalid:()Z
+     857: ifeq          1107
+     860: iload         19
+     862: iconst_4
+     863: iand
+     864: ifeq          874
+     867: getstatic     #97                 // Field androidx/compose/ui/Modifier.Companion:Landroidx/compose/ui/Modifier$Companion;
+     870: checkcast     #93                 // class androidx/compose/ui/Modifier
+     873: astore_2
+     874: iload         19
+     876: bipush        8
+     878: iand
+     879: ifeq          905
+     882: getstatic     #103                // Field top/yukonga/miuix/kmp/basic/BasicComponentDefaults.INSTANCE:Ltop/yukonga/miuix/kmp/basic/BasicComponentDefaults;
+     885: lconst_0
+     886: lconst_0
+     887: aload         16
+     889: sipush        384
+     892: iconst_3
+     893: invokevirtual #107                // Method top/yukonga/miuix/kmp/basic/BasicComponentDefaults."titleColor-dgg9oW8":(JJLandroidx/compose/runtime/Composer;II)Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;
+     896: astore_3
+     897: iload         20
+     899: sipush        -7169
+     902: iand
+     903: istore        20
+     905: iload         19
+     907: bipush        16
+     909: iand
+     910: ifeq          916
+     913: aconst_null
+     914: astore        4
+     916: iload         19
+     918: bipush        32
+     920: iand
+     921: ifeq          948
+     924: getstatic     #103                // Field top/yukonga/miuix/kmp/basic/BasicComponentDefaults.INSTANCE:Ltop/yukonga/miuix/kmp/basic/BasicComponentDefaults;
+     927: lconst_0
+     928: lconst_0
+     929: aload         16
+     931: sipush        384
+     934: iconst_3
+     935: invokevirtual #111                // Method top/yukonga/miuix/kmp/basic/BasicComponentDefaults."summaryColor-dgg9oW8":(JJLandroidx/compose/runtime/Composer;II)Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;
+     938: astore        5
+     940: iload         20
+     942: ldc_w         #348                // int -458753
+     945: iand
+     946: istore        20
+     948: iload         19
+     950: bipush        64
+     952: iand
+     953: ifeq          984
+     956: getstatic     #117                // Field top/yukonga/miuix/kmp/basic/DropdownDefaults.INSTANCE:Ltop/yukonga/miuix/kmp/basic/DropdownDefaults;
+     959: lconst_0
+     960: lconst_0
+     961: lconst_0
+     962: lconst_0
+     963: lconst_0
+     964: lconst_0
+     965: lconst_0
+     966: aload         16
+     968: ldc           #61                 // int 12582912
+     970: bipush        127
+     972: invokevirtual #121                // Method top/yukonga/miuix/kmp/basic/DropdownDefaults."dropdownColors-69fazGs":(JJJJJJJLandroidx/compose/runtime/Composer;II)Ltop/yukonga/miuix/kmp/basic/DropdownColors;
+     975: astore        6
+     977: iload         20
+     979: ldc           #112                // int -3670017
+     981: iand
+     982: istore        20
+     984: iload         19
+     986: sipush        128
+     989: iand
+     990: ifeq          996
+     993: aconst_null
+     994: astore        7
+     996: iload         19
+     998: sipush        256
+    1001: iand
+    1002: ifeq          1008
+    1005: aconst_null
+    1006: astore        8
+    1008: iload         19
+    1010: sipush        512
+    1013: iand
+    1014: ifeq          1033
+    1017: getstatic     #103                // Field top/yukonga/miuix/kmp/basic/BasicComponentDefaults.INSTANCE:Ltop/yukonga/miuix/kmp/basic/BasicComponentDefaults;
+    1020: invokevirtual #126                // Method top/yukonga/miuix/kmp/basic/BasicComponentDefaults.getInsideMargin:()Landroidx/compose/foundation/layout/PaddingValues;
+    1023: astore        9
+    1025: iload         20
+    1027: ldc_w         #349                // int -1879048193
+    1030: iand
+    1031: istore        20
+    1033: iload         19
+    1035: sipush        1024
+    1038: iand
+    1039: ifeq          1045
+    1042: aconst_null
+    1043: astore        10
+    1045: iload         19
+    1047: sipush        2048
+    1050: iand
+    1051: ifeq          1057
+    1054: iconst_1
+    1055: istore        11
+    1057: iload         19
+    1059: sipush        4096
+    1062: iand
+    1063: ifeq          1069
+    1066: iconst_1
+    1067: istore        12
+    1069: iload         19
+    1071: sipush        8192
+    1074: iand
+    1075: ifeq          1081
+    1078: iconst_1
+    1079: istore        13
+    1081: iload         19
+    1083: sipush        16384
+    1086: iand
+    1087: ifeq          1093
+    1090: iconst_1
+    1091: istore        14
+    1093: iload         19
+    1095: ldc           #73                 // int 32768
+    1097: iand
+    1098: ifeq          1178
+    1101: aconst_null
+    1102: astore        15
+    1104: goto          1178
+    1107: aload         16
+    1109: invokeinterface #129,  1          // InterfaceMethod androidx/compose/runtime/Composer.skipToGroupEnd:()V
+    1114: iload         19
+    1116: bipush        8
+    1118: iand
+    1119: ifeq          1130
+    1122: iload         20
+    1124: sipush        -7169
+    1127: iand
+    1128: istore        20
+    1130: iload         19
+    1132: bipush        32
+    1134: iand
+    1135: ifeq          1146
+    1138: iload         20
+    1140: ldc_w         #348                // int -458753
+    1143: iand
+    1144: istore        20
+    1146: iload         19
+    1148: bipush        64
+    1150: iand
+    1151: ifeq          1161
+    1154: iload         20
+    1156: ldc           #112                // int -3670017
+    1158: iand
+    1159: istore        20
+    1161: iload         19
+    1163: sipush        512
+    1166: iand
+    1167: ifeq          1178
+    1170: iload         20
+    1172: ldc_w         #349                // int -1879048193
+    1175: iand
+    1176: istore        20
+    1178: aload         16
+    1180: invokeinterface #132,  1          // InterfaceMethod androidx/compose/runtime/Composer.endDefaults:()V
+    1185: invokestatic  #135                // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+    1188: ifeq          1204
+    1191: ldc_w         #338                // int 1728747215
+    1194: iload         20
+    1196: iload         21
+    1198: ldc_w         #351                // String top.yukonga.miuix.kmp.preference.OverlayDropdownPreference (OverlayDropdownPreference.kt:129)
+    1201: invokestatic  #141                // Method androidx/compose/runtime/ComposerKt.traceEventStart:(IIILjava/lang/String;)V
+    1204: aload         16
+    1206: ldc_w         #352                // int -826244458
+    1209: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+    1211: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1214: aload         16
+    1216: astore        24
+    1218: iconst_0
+    1219: istore        25
+    1221: iconst_0
+    1222: istore        26
+    1224: aload         24
+    1226: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+    1231: astore        27
+    1233: iconst_0
+    1234: istore        28
+    1236: aload         27
+    1238: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+    1241: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+    1244: if_acmpne     1269
+    1247: iconst_0
+    1248: istore        29
+    1250: invokestatic  #358                // Method androidx/compose/foundation/interaction/InteractionSourceKt.MutableInteractionSource:()Landroidx/compose/foundation/interaction/MutableInteractionSource;
+    1253: astore        29
+    1255: aload         24
+    1257: aload         29
+    1259: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+    1264: aload         29
+    1266: goto          1271
+    1269: aload         27
+    1271: nop
+    1272: nop
+    1273: checkcast     #360                // class androidx/compose/foundation/interaction/MutableInteractionSource
+    1276: astore        23
+    1278: aload         16
+    1280: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    1283: aload         23
+    1285: astore        22
+    1287: aload         16
+    1289: ldc_w         #361                // int -826242255
+    1292: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+    1294: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1297: aload         16
+    1299: astore        25
+    1301: iconst_0
+    1302: istore        26
+    1304: iconst_0
+    1305: istore        27
+    1307: aload         25
+    1309: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+    1314: astore        28
+    1316: iconst_0
+    1317: istore        29
+    1319: aload         28
+    1321: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+    1324: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+    1327: if_acmpne     1359
+    1330: iconst_0
+    1331: istore        30
+    1333: iconst_0
+    1334: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+    1337: aconst_null
+    1338: iconst_2
+    1339: aconst_null
+    1340: invokestatic  #373                // Method androidx/compose/runtime/SnapshotStateKt.mutableStateOf$default:(Ljava/lang/Object;Landroidx/compose/runtime/SnapshotMutationPolicy;ILjava/lang/Object;)Landroidx/compose/runtime/MutableState;
+    1343: astore        30
+    1345: aload         25
+    1347: aload         30
+    1349: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+    1354: aload         30
+    1356: goto          1361
+    1359: aload         28
+    1361: nop
+    1362: nop
+    1363: checkcast     #375                // class androidx/compose/runtime/MutableState
+    1366: astore        24
+    1368: aload         16
+    1370: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    1373: aload         24
+    1375: astore        23
+    1377: aload         16
+    1379: ldc_w         #376                // int -826240463
+    1382: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+    1384: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1387: aload         16
+    1389: astore        26
+    1391: iconst_0
+    1392: istore        27
+    1394: iconst_0
+    1395: istore        28
+    1397: aload         26
+    1399: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+    1404: astore        29
+    1406: iconst_0
+    1407: istore        30
+    1409: aload         29
+    1411: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+    1414: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+    1417: if_acmpne     1449
+    1420: iconst_0
+    1421: istore        31
+    1423: iconst_0
+    1424: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+    1427: aconst_null
+    1428: iconst_2
+    1429: aconst_null
+    1430: invokestatic  #373                // Method androidx/compose/runtime/SnapshotStateKt.mutableStateOf$default:(Ljava/lang/Object;Landroidx/compose/runtime/SnapshotMutationPolicy;ILjava/lang/Object;)Landroidx/compose/runtime/MutableState;
+    1433: astore        31
+    1435: aload         26
+    1437: aload         31
+    1439: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+    1444: aload         31
+    1446: goto          1451
+    1449: aload         29
+    1451: nop
+    1452: nop
+    1453: checkcast     #375                // class androidx/compose/runtime/MutableState
+    1456: astore        25
+    1458: aload         16
+    1460: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    1463: aload         25
+    1465: astore        24
+    1467: invokestatic  #382                // Method androidx/compose/ui/platform/CompositionLocalsKt.getLocalHapticFeedback:()Landroidx/compose/runtime/ProvidableCompositionLocal;
+    1470: checkcast     #384                // class androidx/compose/runtime/CompositionLocal
+    1473: astore        26
+    1475: aload         16
+    1477: astore        27
+    1479: iconst_0
+    1480: istore        28
+    1482: iconst_0
+    1483: istore        29
+    1485: aload         27
+    1487: ldc_w         #385                // int 2023513938
+    1490: ldc_w         #387                // String CC(<get-current>):CompositionLocal.kt#9igjgp
+    1493: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1496: aload         27
+    1498: aload         26
+    1500: invokeinterface #391,  2          // InterfaceMethod androidx/compose/runtime/Composer.consume:(Landroidx/compose/runtime/CompositionLocal;)Ljava/lang/Object;
+    1505: astore        30
+    1507: aload         27
+    1509: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    1512: aload         30
+    1514: checkcast     #393                // class androidx/compose/ui/hapticfeedback/HapticFeedback
+    1517: astore        25
+    1519: aload         25
+    1521: aload         16
+    1523: iconst_0
+    1524: invokestatic  #397                // Method androidx/compose/runtime/SnapshotStateKt.rememberUpdatedState:(Ljava/lang/Object;Landroidx/compose/runtime/Composer;I)Landroidx/compose/runtime/State;
+    1527: astore        26
+    1529: aload         15
+    1531: aload         16
+    1533: bipush        14
+    1535: iload         21
+    1537: bipush        15
+    1539: ishr
+    1540: iand
+    1541: invokestatic  #397                // Method androidx/compose/runtime/SnapshotStateKt.rememberUpdatedState:(Ljava/lang/Object;Landroidx/compose/runtime/Composer;I)Landroidx/compose/runtime/State;
+    1544: astore        27
+    1546: aload         16
+    1548: ldc_w         #398                // int -826231559
+    1551: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+    1553: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1556: aload         16
+    1558: astore        30
+    1560: iconst_0
+    1561: istore        31
+    1563: iconst_0
+    1564: istore        32
+    1566: aload         30
+    1568: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+    1573: astore        33
+    1575: iconst_0
+    1576: istore        34
+    1578: aload         33
+    1580: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+    1583: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+    1586: if_acmpne     1618
+    1589: iconst_0
+    1590: istore        35
+    1592: aload         23
+    1594: aload         27
+    1596: invokedynamic #410,  0            // InvokeDynamic #2:invoke:(Landroidx/compose/runtime/MutableState;Landroidx/compose/runtime/State;)Lkotlin/jvm/functions/Function1;
+    1601: nop
+    1602: astore        36
+    1604: aload         30
+    1606: aload         36
+    1608: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+    1613: aload         36
+    1615: goto          1620
+    1618: aload         33
+    1620: nop
+    1621: nop
+    1622: checkcast     #336                // class kotlin/jvm/functions/Function1
+    1625: astore        29
+    1627: aload         16
+    1629: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    1632: aload         29
+    1634: astore        28
+    1636: aload_0
+    1637: invokevirtual #414                // Method top/yukonga/miuix/kmp/basic/DropdownEntry.getItems:()Ljava/util/List;
+    1640: checkcast     #177                // class java/util/Collection
+    1643: invokeinterface #417,  1          // InterfaceMethod java/util/Collection.isEmpty:()Z
+    1648: ifne          1655
+    1651: iconst_1
+    1652: goto          1656
+    1655: iconst_0
+    1656: istore        29
+    1658: iload         11
+    1660: ifeq          1672
+    1663: iload         29
+    1665: ifeq          1672
+    1668: iconst_1
+    1669: goto          1673
+    1672: iconst_0
+    1673: istore        30
+    1675: iload         30
+    1677: ifeq          1725
+    1680: aload         16
+    1682: ldc_w         #418                // int 156993109
+    1685: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+    1690: aload         16
+    1692: ldc_w         #423                // String 149@6403L11
+    1695: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+    1698: getstatic     #428                // Field top/yukonga/miuix/kmp/theme/MiuixTheme.INSTANCE:Ltop/yukonga/miuix/kmp/theme/MiuixTheme;
+    1701: aload         16
+    1703: bipush        6
+    1705: invokevirtual #432                // Method top/yukonga/miuix/kmp/theme/MiuixTheme.getColorScheme:(Landroidx/compose/runtime/Composer;I)Ltop/yukonga/miuix/kmp/theme/Colors;
+    1708: invokevirtual #438                // Method top/yukonga/miuix/kmp/theme/Colors."getOnSurfaceVariantActions-0d7_KjU":()J
+    1711: lstore        33
+    1713: aload         16
+    1715: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+    1720: lload         33
+    1722: goto          1767
+    1725: aload         16
+    1727: ldc_w         #442                // int 157060658
+    1730: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+    1735: aload         16
+    1737: ldc_w         #444                // String 151@6471L11
+    1740: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+    1743: getstatic     #428                // Field top/yukonga/miuix/kmp/theme/MiuixTheme.INSTANCE:Ltop/yukonga/miuix/kmp/theme/MiuixTheme;
+    1746: aload         16
+    1748: bipush        6
+    1750: invokevirtual #432                // Method top/yukonga/miuix/kmp/theme/MiuixTheme.getColorScheme:(Landroidx/compose/runtime/Composer;I)Ltop/yukonga/miuix/kmp/theme/Colors;
+    1753: invokevirtual #447                // Method top/yukonga/miuix/kmp/theme/Colors."getDisabledOnSecondaryVariant-0d7_KjU":()J
+    1756: lstore        33
+    1758: aload         16
+    1760: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+    1765: lload         33
+    1767: lstore        31
+    1769: aload         16
+    1771: ldc_w         #448                // int -826214377
+    1774: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+    1776: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1779: aload         16
+    1781: astore        35
+    1783: aload         16
+    1785: iload         30
+    1787: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+    1792: istore        36
+    1794: iconst_0
+    1795: istore        37
+    1797: aload         35
+    1799: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+    1804: astore        38
+    1806: iconst_0
+    1807: istore        39
+    1809: iload         36
+    1811: ifne          1825
+    1814: aload         38
+    1816: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+    1819: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+    1822: if_acmpne     1860
+    1825: iconst_0
+    1826: istore        40
+    1828: iload         30
+    1830: aload         28
+    1832: aload         23
+    1834: aload         24
+    1836: aload         26
+    1838: invokedynamic #456,  0            // InvokeDynamic #3:invoke:(ZLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/MutableState;Landroidx/compose/runtime/MutableState;Landroidx/compose/runtime/State;)Lkotlin/jvm/functions/Function0;
+    1843: nop
+    1844: astore        41
+    1846: aload         35
+    1848: aload         41
+    1850: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+    1855: aload         41
+    1857: goto          1862
+    1860: aload         38
+    1862: nop
+    1863: nop
+    1864: checkcast     #458                // class kotlin/jvm/functions/Function0
+    1867: astore        34
+    1869: aload         16
+    1871: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    1874: aload         34
+    1876: astore        33
+    1878: getstatic     #463                // Field androidx/compose/ui/semantics/Role.Companion:Landroidx/compose/ui/semantics/Role$Companion;
+    1881: invokevirtual #469                // Method androidx/compose/ui/semantics/Role$Companion."getDropdownList-o7Vup1c":()I
+    1884: istore        34
+    1886: aload         24
+    1888: invokeinterface #472,  1          // InterfaceMethod androidx/compose/runtime/MutableState.getValue:()Ljava/lang/Object;
+    1893: checkcast     #363                // class java/lang/Boolean
+    1896: invokevirtual #475                // Method java/lang/Boolean.booleanValue:()Z
+    1899: istore        35
+    1901: aload_2
+    1902: aload_1
+    1903: aload_3
+    1904: aload         4
+    1906: aload         5
+    1908: aload         7
+    1910: ldc_w         #476                // int -687487771
+    1913: iconst_1
+    1914: iload         12
+    1916: iload         29
+    1918: aload_0
+    1919: lload         31
+    1921: aload         23
+    1923: aload         10
+    1925: aload         6
+    1927: iload         13
+    1929: iload         14
+    1931: aload         28
+    1933: aload         24
+    1935: invokedynamic #488,  0            // InvokeDynamic #4:invoke:(ZZLtop/yukonga/miuix/kmp/basic/DropdownEntry;JLandroidx/compose/runtime/MutableState;Landroidx/compose/ui/unit/Dp;Ltop/yukonga/miuix/kmp/basic/DropdownColors;ZZLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/MutableState;)Lkotlin/jvm/functions/Function3;
+    1940: aload         16
+    1942: bipush        54
+    1944: invokestatic  #494                // Method androidx/compose/runtime/internal/ComposableLambdaKt.rememberComposableLambda:(IZLjava/lang/Object;Landroidx/compose/runtime/Composer;I)Landroidx/compose/runtime/internal/ComposableLambda;
+    1947: checkcast     #496                // class kotlin/jvm/functions/Function3
+    1950: aload         8
+    1952: aload         9
+    1954: aload         33
+    1956: aconst_null
+    1957: iload         34
+    1959: invokestatic  #500                // Method androidx/compose/ui/semantics/Role."box-impl":(I)Landroidx/compose/ui/semantics/Role;
+    1962: iload         35
+    1964: iload         30
+    1966: aload         22
+    1968: aload         16
+    1970: ldc           #58                 // int 1572864
+    1972: bipush        14
+    1974: iload         20
+    1976: bipush        6
+    1978: ishr
+    1979: iand
+    1980: ior
+    1981: bipush        112
+    1983: iload         20
+    1985: iand
+    1986: ior
+    1987: sipush        896
+    1990: iload         20
+    1992: iconst_3
+    1993: ishr
+    1994: iand
+    1995: ior
+    1996: sipush        7168
+    1999: iload         20
+    2001: iconst_3
+    2002: ishr
+    2003: iand
+    2004: ior
+    2005: ldc           #237                // int 57344
+    2007: iload         20
+    2009: iconst_3
+    2010: ishr
+    2011: iand
+    2012: ior
+    2013: ldc           #238                // int 458752
+    2015: iload         20
+    2017: bipush        6
+    2019: ishr
+    2020: iand
+    2021: ior
+    2022: ldc           #239                // int 29360128
+    2024: iload         20
+    2026: iconst_3
+    2027: ishr
+    2028: iand
+    2029: ior
+    2030: ldc           #240                // int 234881024
+    2032: iload         20
+    2034: iconst_3
+    2035: ishr
+    2036: iand
+    2037: ior
+    2038: sipush        24576
+    2041: sipush        1024
+    2044: invokestatic  #506                // Method top/yukonga/miuix/kmp/basic/ComponentKt."BasicComponent-fIIZQVk":(Landroidx/compose/ui/Modifier;Ljava/lang/String;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ljava/lang/String;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Landroidx/compose/foundation/layout/PaddingValues;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/semantics/Role;ZZLandroidx/compose/foundation/interaction/MutableInteractionSource;Landroidx/compose/runtime/Composer;III)V
+    2047: invokestatic  #135                // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+    2050: ifeq          2066
+    2053: invokestatic  #248                // Method androidx/compose/runtime/ComposerKt.traceEventEnd:()V
+    2056: goto          2066
+    2059: aload         16
+    2061: invokeinterface #129,  1          // InterfaceMethod androidx/compose/runtime/Composer.skipToGroupEnd:()V
+    2066: aload         16
+    2068: invokeinterface #252,  1          // InterfaceMethod androidx/compose/runtime/Composer.endRestartGroup:()Landroidx/compose/runtime/ScopeUpdateScope;
+    2073: dup
+    2074: ifnull        2124
+    2077: aload_0
+    2078: aload_1
+    2079: aload_2
+    2080: aload_3
+    2081: aload         4
+    2083: aload         5
+    2085: aload         6
+    2087: aload         7
+    2089: aload         8
+    2091: aload         9
+    2093: aload         10
+    2095: iload         11
+    2097: iload         12
+    2099: iload         13
+    2101: iload         14
+    2103: aload         15
+    2105: iload         17
+    2107: iload         18
+    2109: iload         19
+    2111: invokedynamic #514,  0            // InvokeDynamic #5:invoke:(Ltop/yukonga/miuix/kmp/basic/DropdownEntry;Ljava/lang/String;Landroidx/compose/ui/Modifier;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ljava/lang/String;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ltop/yukonga/miuix/kmp/basic/DropdownColors;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/ui/unit/Dp;ZZZZLkotlin/jvm/functions/Function1;III)Lkotlin/jvm/functions/Function2;
+    2116: invokeinterface #270,  2          // InterfaceMethod androidx/compose/runtime/ScopeUpdateScope.updateScope:(Lkotlin/jvm/functions/Function2;)V
+    2121: goto          2125
+    2124: pop
+    2125: return
+
+  public static final void OverlayDropdownPreference-84PZ-4c(java.util.List<top.yukonga.miuix.kmp.basic.DropdownEntry>, java.lang.String, androidx.compose.ui.Modifier, top.yukonga.miuix.kmp.basic.BasicComponentColors, java.lang.String, top.yukonga.miuix.kmp.basic.BasicComponentColors, top.yukonga.miuix.kmp.basic.DropdownColors, kotlin.jvm.functions.Function2<? super androidx.compose.runtime.Composer, ? super java.lang.Integer, kotlin.Unit>, kotlin.jvm.functions.Function2<? super androidx.compose.runtime.Composer, ? super java.lang.Integer, kotlin.Unit>, androidx.compose.foundation.layout.PaddingValues, androidx.compose.ui.unit.Dp, boolean, boolean, boolean, boolean, kotlin.jvm.functions.Function1<? super java.lang.Boolean, kotlin.Unit>, androidx.compose.runtime.Composer, int, int, int);
+    Code:
+       0: aload_0
+       1: ldc_w         #551                // String entries
+       4: invokestatic  #28                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_1
+       8: ldc           #30                 // String title
+      10: invokestatic  #28                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+      13: aload         16
+      15: ldc_w         #547                // int -1586377538
+      18: invokeinterface #36,  2           // InterfaceMethod androidx/compose/runtime/Composer.startRestartGroup:(I)Landroidx/compose/runtime/Composer;
+      23: astore        16
+      25: aload         16
+      27: ldc_w         #553                // String C(OverlayDropdownPreference)N(entries,title,modifier,titleColor,summary,summaryColor,dropdownColors,startAction,bottomAction,insideMargin,maxHeight:c#ui.unit.Dp,enabled,showValue,renderInRootScaffold,collapseOnSelection,onExpandedChange)234@9532L39,235@9601L34,236@9657L34,237@9737L7,238@9778L36,239@9849L38,240@9929L234,259@10527L360,280@11198L1372,271@10893L1861:OverlayDropdownPreference.kt#zbuo5c
+      30: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+      33: iload         17
+      35: istore        20
+      37: iload         18
+      39: istore        21
+      41: iload         17
+      43: bipush        6
+      45: iand
+      46: ifne          89
+      49: iload         20
+      51: iload         17
+      53: bipush        8
+      55: iand
+      56: ifne          70
+      59: aload         16
+      61: aload_0
+      62: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+      67: goto          78
+      70: aload         16
+      72: aload_0
+      73: invokeinterface #51,  2           // InterfaceMethod androidx/compose/runtime/Composer.changedInstance:(Ljava/lang/Object;)Z
+      78: ifeq          85
+      81: iconst_4
+      82: goto          86
+      85: iconst_2
+      86: ior
+      87: istore        20
+      89: iload         17
+      91: bipush        48
+      93: iand
+      94: ifne          120
+      97: iload         20
+      99: aload         16
+     101: aload_1
+     102: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     107: ifeq          115
+     110: bipush        32
+     112: goto          117
+     115: bipush        16
+     117: ior
+     118: istore        20
+     120: iload         19
+     122: iconst_4
+     123: iand
+     124: ifeq          138
+     127: iload         20
+     129: sipush        384
+     132: ior
+     133: istore        20
+     135: goto          172
+     138: iload         17
+     140: sipush        384
+     143: iand
+     144: ifne          172
+     147: iload         20
+     149: aload         16
+     151: aload_2
+     152: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     157: ifeq          166
+     160: sipush        256
+     163: goto          169
+     166: sipush        128
+     169: ior
+     170: istore        20
+     172: iload         17
+     174: sipush        3072
+     177: iand
+     178: ifne          214
+     181: iload         20
+     183: iload         19
+     185: bipush        8
+     187: iand
+     188: ifne          208
+     191: aload         16
+     193: aload_3
+     194: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     199: ifeq          208
+     202: sipush        2048
+     205: goto          211
+     208: sipush        1024
+     211: ior
+     212: istore        20
+     214: iload         19
+     216: bipush        16
+     218: iand
+     219: ifeq          233
+     222: iload         20
+     224: sipush        24576
+     227: ior
+     228: istore        20
+     230: goto          268
+     233: iload         17
+     235: sipush        24576
+     238: iand
+     239: ifne          268
+     242: iload         20
+     244: aload         16
+     246: aload         4
+     248: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     253: ifeq          262
+     256: sipush        16384
+     259: goto          265
+     262: sipush        8192
+     265: ior
+     266: istore        20
+     268: iload         17
+     270: ldc           #55                 // int 196608
+     272: iand
+     273: ifne          308
+     276: iload         20
+     278: iload         19
+     280: bipush        32
+     282: iand
+     283: ifne          303
+     286: aload         16
+     288: aload         5
+     290: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     295: ifeq          303
+     298: ldc           #56                 // int 131072
+     300: goto          305
+     303: ldc           #57                 // int 65536
+     305: ior
+     306: istore        20
+     308: iload         17
+     310: ldc           #58                 // int 1572864
+     312: iand
+     313: ifne          348
+     316: iload         20
+     318: iload         19
+     320: bipush        64
+     322: iand
+     323: ifne          343
+     326: aload         16
+     328: aload         6
+     330: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     335: ifeq          343
+     338: ldc           #59                 // int 1048576
+     340: goto          345
+     343: ldc           #60                 // int 524288
+     345: ior
+     346: istore        20
+     348: iload         19
+     350: sipush        128
+     353: iand
+     354: ifeq          367
+     357: iload         20
+     359: ldc           #61                 // int 12582912
+     361: ior
+     362: istore        20
+     364: goto          399
+     367: iload         17
+     369: ldc           #61                 // int 12582912
+     371: iand
+     372: ifne          399
+     375: iload         20
+     377: aload         16
+     379: aload         7
+     381: invokeinterface #51,  2           // InterfaceMethod androidx/compose/runtime/Composer.changedInstance:(Ljava/lang/Object;)Z
+     386: ifeq          394
+     389: ldc           #62                 // int 8388608
+     391: goto          396
+     394: ldc           #63                 // int 4194304
+     396: ior
+     397: istore        20
+     399: iload         19
+     401: sipush        256
+     404: iand
+     405: ifeq          418
+     408: iload         20
+     410: ldc           #64                 // int 100663296
+     412: ior
+     413: istore        20
+     415: goto          450
+     418: iload         17
+     420: ldc           #64                 // int 100663296
+     422: iand
+     423: ifne          450
+     426: iload         20
+     428: aload         16
+     430: aload         8
+     432: invokeinterface #51,  2           // InterfaceMethod androidx/compose/runtime/Composer.changedInstance:(Ljava/lang/Object;)Z
+     437: ifeq          445
+     440: ldc           #65                 // int 67108864
+     442: goto          447
+     445: ldc           #66                 // int 33554432
+     447: ior
+     448: istore        20
+     450: iload         17
+     452: ldc           #67                 // int 805306368
+     454: iand
+     455: ifne          491
+     458: iload         20
+     460: iload         19
+     462: sipush        512
+     465: iand
+     466: ifne          486
+     469: aload         16
+     471: aload         9
+     473: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     478: ifeq          486
+     481: ldc           #68                 // int 536870912
+     483: goto          488
+     486: ldc           #69                 // int 268435456
+     488: ior
+     489: istore        20
+     491: iload         19
+     493: sipush        1024
+     496: iand
+     497: ifeq          510
+     500: iload         21
+     502: bipush        6
+     504: ior
+     505: istore        21
+     507: goto          540
+     510: iload         18
+     512: bipush        6
+     514: iand
+     515: ifne          540
+     518: iload         21
+     520: aload         16
+     522: aload         10
+     524: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+     529: ifeq          536
+     532: iconst_4
+     533: goto          537
+     536: iconst_2
+     537: ior
+     538: istore        21
+     540: iload         19
+     542: sipush        2048
+     545: iand
+     546: ifeq          559
+     549: iload         21
+     551: bipush        48
+     553: ior
+     554: istore        21
+     556: goto          591
+     559: iload         18
+     561: bipush        48
+     563: iand
+     564: ifne          591
+     567: iload         21
+     569: aload         16
+     571: iload         11
+     573: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+     578: ifeq          586
+     581: bipush        32
+     583: goto          588
+     586: bipush        16
+     588: ior
+     589: istore        21
+     591: iload         19
+     593: sipush        4096
+     596: iand
+     597: ifeq          611
+     600: iload         21
+     602: sipush        384
+     605: ior
+     606: istore        21
+     608: goto          646
+     611: iload         18
+     613: sipush        384
+     616: iand
+     617: ifne          646
+     620: iload         21
+     622: aload         16
+     624: iload         12
+     626: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+     631: ifeq          640
+     634: sipush        256
+     637: goto          643
+     640: sipush        128
+     643: ior
+     644: istore        21
+     646: iload         19
+     648: sipush        8192
+     651: iand
+     652: ifeq          666
+     655: iload         21
+     657: sipush        3072
+     660: ior
+     661: istore        21
+     663: goto          701
+     666: iload         18
+     668: sipush        3072
+     671: iand
+     672: ifne          701
+     675: iload         21
+     677: aload         16
+     679: iload         13
+     681: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+     686: ifeq          695
+     689: sipush        2048
+     692: goto          698
+     695: sipush        1024
+     698: ior
+     699: istore        21
+     701: iload         18
+     703: sipush        24576
+     706: iand
+     707: ifne          745
+     710: iload         21
+     712: iload         19
+     714: sipush        16384
+     717: iand
+     718: ifne          739
+     721: aload         16
+     723: iload         14
+     725: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+     730: ifeq          739
+     733: sipush        16384
+     736: goto          742
+     739: sipush        8192
+     742: ior
+     743: istore        21
+     745: iload         19
+     747: ldc           #73                 // int 32768
+     749: iand
+     750: ifeq          763
+     753: iload         21
+     755: ldc           #55                 // int 196608
+     757: ior
+     758: istore        21
+     760: goto          795
+     763: iload         18
+     765: ldc           #55                 // int 196608
+     767: iand
+     768: ifne          795
+     771: iload         21
+     773: aload         16
+     775: aload         15
+     777: invokeinterface #51,  2           // InterfaceMethod androidx/compose/runtime/Composer.changedInstance:(Ljava/lang/Object;)Z
+     782: ifeq          790
+     785: ldc           #56                 // int 131072
+     787: goto          792
+     790: ldc           #57                 // int 65536
+     792: ior
+     793: istore        21
+     795: aload         16
+     797: iload         20
+     799: ldc           #74                 // int 306783379
+     801: iand
+     802: ldc           #75                 // int 306783378
+     804: if_icmpne     819
+     807: iload         21
+     809: ldc_w         #344                // int 74899
+     812: iand
+     813: ldc_w         #345                // int 74898
+     816: if_icmpeq     823
+     819: iconst_1
+     820: goto          824
+     823: iconst_0
+     824: iload         20
+     826: iconst_1
+     827: iand
+     828: invokeinterface #81,  3           // InterfaceMethod androidx/compose/runtime/Composer.shouldExecute:(ZI)Z
+     833: ifeq          2215
+     836: aload         16
+     838: invokeinterface #85,  1           // InterfaceMethod androidx/compose/runtime/Composer.startDefaults:()V
+     843: aload         16
+     845: ldc_w         #555                // String 220@8897L12,222@9004L14,223@9074L16
+     848: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+     851: iload         17
+     853: iconst_1
+     854: iand
+     855: ifeq          868
+     858: aload         16
+     860: invokeinterface #91,  1           // InterfaceMethod androidx/compose/runtime/Composer.getDefaultsInvalid:()Z
+     865: ifeq          1136
+     868: iload         19
+     870: iconst_4
+     871: iand
+     872: ifeq          882
+     875: getstatic     #97                 // Field androidx/compose/ui/Modifier.Companion:Landroidx/compose/ui/Modifier$Companion;
+     878: checkcast     #93                 // class androidx/compose/ui/Modifier
+     881: astore_2
+     882: iload         19
+     884: bipush        8
+     886: iand
+     887: ifeq          913
+     890: getstatic     #103                // Field top/yukonga/miuix/kmp/basic/BasicComponentDefaults.INSTANCE:Ltop/yukonga/miuix/kmp/basic/BasicComponentDefaults;
+     893: lconst_0
+     894: lconst_0
+     895: aload         16
+     897: sipush        384
+     900: iconst_3
+     901: invokevirtual #107                // Method top/yukonga/miuix/kmp/basic/BasicComponentDefaults."titleColor-dgg9oW8":(JJLandroidx/compose/runtime/Composer;II)Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;
+     904: astore_3
+     905: iload         20
+     907: sipush        -7169
+     910: iand
+     911: istore        20
+     913: iload         19
+     915: bipush        16
+     917: iand
+     918: ifeq          924
+     921: aconst_null
+     922: astore        4
+     924: iload         19
+     926: bipush        32
+     928: iand
+     929: ifeq          956
+     932: getstatic     #103                // Field top/yukonga/miuix/kmp/basic/BasicComponentDefaults.INSTANCE:Ltop/yukonga/miuix/kmp/basic/BasicComponentDefaults;
+     935: lconst_0
+     936: lconst_0
+     937: aload         16
+     939: sipush        384
+     942: iconst_3
+     943: invokevirtual #111                // Method top/yukonga/miuix/kmp/basic/BasicComponentDefaults."summaryColor-dgg9oW8":(JJLandroidx/compose/runtime/Composer;II)Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;
+     946: astore        5
+     948: iload         20
+     950: ldc_w         #348                // int -458753
+     953: iand
+     954: istore        20
+     956: iload         19
+     958: bipush        64
+     960: iand
+     961: ifeq          992
+     964: getstatic     #117                // Field top/yukonga/miuix/kmp/basic/DropdownDefaults.INSTANCE:Ltop/yukonga/miuix/kmp/basic/DropdownDefaults;
+     967: lconst_0
+     968: lconst_0
+     969: lconst_0
+     970: lconst_0
+     971: lconst_0
+     972: lconst_0
+     973: lconst_0
+     974: aload         16
+     976: ldc           #61                 // int 12582912
+     978: bipush        127
+     980: invokevirtual #121                // Method top/yukonga/miuix/kmp/basic/DropdownDefaults."dropdownColors-69fazGs":(JJJJJJJLandroidx/compose/runtime/Composer;II)Ltop/yukonga/miuix/kmp/basic/DropdownColors;
+     983: astore        6
+     985: iload         20
+     987: ldc           #112                // int -3670017
+     989: iand
+     990: istore        20
+     992: iload         19
+     994: sipush        128
+     997: iand
+     998: ifeq          1004
+    1001: aconst_null
+    1002: astore        7
+    1004: iload         19
+    1006: sipush        256
+    1009: iand
+    1010: ifeq          1016
+    1013: aconst_null
+    1014: astore        8
+    1016: iload         19
+    1018: sipush        512
+    1021: iand
+    1022: ifeq          1041
+    1025: getstatic     #103                // Field top/yukonga/miuix/kmp/basic/BasicComponentDefaults.INSTANCE:Ltop/yukonga/miuix/kmp/basic/BasicComponentDefaults;
+    1028: invokevirtual #126                // Method top/yukonga/miuix/kmp/basic/BasicComponentDefaults.getInsideMargin:()Landroidx/compose/foundation/layout/PaddingValues;
+    1031: astore        9
+    1033: iload         20
+    1035: ldc_w         #349                // int -1879048193
+    1038: iand
+    1039: istore        20
+    1041: iload         19
+    1043: sipush        1024
+    1046: iand
+    1047: ifeq          1053
+    1050: aconst_null
+    1051: astore        10
+    1053: iload         19
+    1055: sipush        2048
+    1058: iand
+    1059: ifeq          1065
+    1062: iconst_1
+    1063: istore        11
+    1065: iload         19
+    1067: sipush        4096
+    1070: iand
+    1071: ifeq          1077
+    1074: iconst_1
+    1075: istore        12
+    1077: iload         19
+    1079: sipush        8192
+    1082: iand
+    1083: ifeq          1089
+    1086: iconst_1
+    1087: istore        13
+    1089: iload         19
+    1091: sipush        16384
+    1094: iand
+    1095: ifeq          1122
+    1098: aload_0
+    1099: invokeinterface #558,  1          // InterfaceMethod java/util/List.size:()I
+    1104: iconst_1
+    1105: if_icmpgt     1112
+    1108: iconst_1
+    1109: goto          1113
+    1112: iconst_0
+    1113: istore        14
+    1115: iload         21
+    1117: ldc           #108                // int -57345
+    1119: iand
+    1120: istore        21
+    1122: iload         19
+    1124: ldc           #73                 // int 32768
+    1126: iand
+    1127: ifeq          1223
+    1130: aconst_null
+    1131: astore        15
+    1133: goto          1223
+    1136: aload         16
+    1138: invokeinterface #129,  1          // InterfaceMethod androidx/compose/runtime/Composer.skipToGroupEnd:()V
+    1143: iload         19
+    1145: bipush        8
+    1147: iand
+    1148: ifeq          1159
+    1151: iload         20
+    1153: sipush        -7169
+    1156: iand
+    1157: istore        20
+    1159: iload         19
+    1161: bipush        32
+    1163: iand
+    1164: ifeq          1175
+    1167: iload         20
+    1169: ldc_w         #348                // int -458753
+    1172: iand
+    1173: istore        20
+    1175: iload         19
+    1177: bipush        64
+    1179: iand
+    1180: ifeq          1190
+    1183: iload         20
+    1185: ldc           #112                // int -3670017
+    1187: iand
+    1188: istore        20
+    1190: iload         19
+    1192: sipush        512
+    1195: iand
+    1196: ifeq          1207
+    1199: iload         20
+    1201: ldc_w         #349                // int -1879048193
+    1204: iand
+    1205: istore        20
+    1207: iload         19
+    1209: sipush        16384
+    1212: iand
+    1213: ifeq          1223
+    1216: iload         21
+    1218: ldc           #108                // int -57345
+    1220: iand
+    1221: istore        21
+    1223: aload         16
+    1225: invokeinterface #132,  1          // InterfaceMethod androidx/compose/runtime/Composer.endDefaults:()V
+    1230: invokestatic  #135                // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+    1233: ifeq          1249
+    1236: ldc_w         #547                // int -1586377538
+    1239: iload         20
+    1241: iload         21
+    1243: ldc_w         #560                // String top.yukonga.miuix.kmp.preference.OverlayDropdownPreference (OverlayDropdownPreference.kt:233)
+    1246: invokestatic  #141                // Method androidx/compose/runtime/ComposerKt.traceEventStart:(IIILjava/lang/String;)V
+    1249: aload         16
+    1251: ldc_w         #561                // int 204602213
+    1254: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+    1256: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1259: aload         16
+    1261: astore        24
+    1263: iconst_0
+    1264: istore        25
+    1266: iconst_0
+    1267: istore        26
+    1269: aload         24
+    1271: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+    1276: astore        27
+    1278: iconst_0
+    1279: istore        28
+    1281: aload         27
+    1283: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+    1286: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+    1289: if_acmpne     1314
+    1292: iconst_0
+    1293: istore        29
+    1295: invokestatic  #358                // Method androidx/compose/foundation/interaction/InteractionSourceKt.MutableInteractionSource:()Landroidx/compose/foundation/interaction/MutableInteractionSource;
+    1298: astore        29
+    1300: aload         24
+    1302: aload         29
+    1304: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+    1309: aload         29
+    1311: goto          1316
+    1314: aload         27
+    1316: nop
+    1317: nop
+    1318: checkcast     #360                // class androidx/compose/foundation/interaction/MutableInteractionSource
+    1321: astore        23
+    1323: aload         16
+    1325: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    1328: aload         23
+    1330: astore        22
+    1332: aload         16
+    1334: ldc_w         #562                // int 204604416
+    1337: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+    1339: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1342: aload         16
+    1344: astore        25
+    1346: iconst_0
+    1347: istore        26
+    1349: iconst_0
+    1350: istore        27
+    1352: aload         25
+    1354: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+    1359: astore        28
+    1361: iconst_0
+    1362: istore        29
+    1364: aload         28
+    1366: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+    1369: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+    1372: if_acmpne     1404
+    1375: iconst_0
+    1376: istore        30
+    1378: iconst_0
+    1379: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+    1382: aconst_null
+    1383: iconst_2
+    1384: aconst_null
+    1385: invokestatic  #373                // Method androidx/compose/runtime/SnapshotStateKt.mutableStateOf$default:(Ljava/lang/Object;Landroidx/compose/runtime/SnapshotMutationPolicy;ILjava/lang/Object;)Landroidx/compose/runtime/MutableState;
+    1388: astore        30
+    1390: aload         25
+    1392: aload         30
+    1394: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+    1399: aload         30
+    1401: goto          1406
+    1404: aload         28
+    1406: nop
+    1407: nop
+    1408: checkcast     #375                // class androidx/compose/runtime/MutableState
+    1411: astore        24
+    1413: aload         16
+    1415: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    1418: aload         24
+    1420: astore        23
+    1422: aload         16
+    1424: ldc_w         #563                // int 204606208
+    1427: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+    1429: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1432: aload         16
+    1434: astore        26
+    1436: iconst_0
+    1437: istore        27
+    1439: iconst_0
+    1440: istore        28
+    1442: aload         26
+    1444: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+    1449: astore        29
+    1451: iconst_0
+    1452: istore        30
+    1454: aload         29
+    1456: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+    1459: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+    1462: if_acmpne     1494
+    1465: iconst_0
+    1466: istore        31
+    1468: iconst_0
+    1469: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+    1472: aconst_null
+    1473: iconst_2
+    1474: aconst_null
+    1475: invokestatic  #373                // Method androidx/compose/runtime/SnapshotStateKt.mutableStateOf$default:(Ljava/lang/Object;Landroidx/compose/runtime/SnapshotMutationPolicy;ILjava/lang/Object;)Landroidx/compose/runtime/MutableState;
+    1478: astore        31
+    1480: aload         26
+    1482: aload         31
+    1484: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+    1489: aload         31
+    1491: goto          1496
+    1494: aload         29
+    1496: nop
+    1497: nop
+    1498: checkcast     #375                // class androidx/compose/runtime/MutableState
+    1501: astore        25
+    1503: aload         16
+    1505: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    1508: aload         25
+    1510: astore        24
+    1512: invokestatic  #382                // Method androidx/compose/ui/platform/CompositionLocalsKt.getLocalHapticFeedback:()Landroidx/compose/runtime/ProvidableCompositionLocal;
+    1515: checkcast     #384                // class androidx/compose/runtime/CompositionLocal
+    1518: astore        26
+    1520: aload         16
+    1522: astore        27
+    1524: iconst_0
+    1525: istore        28
+    1527: iconst_0
+    1528: istore        29
+    1530: aload         27
+    1532: ldc_w         #385                // int 2023513938
+    1535: ldc_w         #387                // String CC(<get-current>):CompositionLocal.kt#9igjgp
+    1538: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1541: aload         27
+    1543: aload         26
+    1545: invokeinterface #391,  2          // InterfaceMethod androidx/compose/runtime/Composer.consume:(Landroidx/compose/runtime/CompositionLocal;)Ljava/lang/Object;
+    1550: astore        30
+    1552: aload         27
+    1554: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    1557: aload         30
+    1559: checkcast     #393                // class androidx/compose/ui/hapticfeedback/HapticFeedback
+    1562: astore        25
+    1564: aload         25
+    1566: aload         16
+    1568: iconst_0
+    1569: invokestatic  #397                // Method androidx/compose/runtime/SnapshotStateKt.rememberUpdatedState:(Ljava/lang/Object;Landroidx/compose/runtime/Composer;I)Landroidx/compose/runtime/State;
+    1572: astore        26
+    1574: aload         15
+    1576: aload         16
+    1578: bipush        14
+    1580: iload         21
+    1582: bipush        15
+    1584: ishr
+    1585: iand
+    1586: invokestatic  #397                // Method androidx/compose/runtime/SnapshotStateKt.rememberUpdatedState:(Ljava/lang/Object;Landroidx/compose/runtime/Composer;I)Landroidx/compose/runtime/State;
+    1589: astore        27
+    1591: aload         16
+    1593: ldc_w         #564                // int 204615112
+    1596: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+    1598: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1601: aload         16
+    1603: astore        30
+    1605: iconst_0
+    1606: istore        31
+    1608: iconst_0
+    1609: istore        32
+    1611: aload         30
+    1613: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+    1618: astore        33
+    1620: iconst_0
+    1621: istore        34
+    1623: aload         33
+    1625: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+    1628: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+    1631: if_acmpne     1663
+    1634: iconst_0
+    1635: istore        35
+    1637: aload         23
+    1639: aload         27
+    1641: invokedynamic #569,  0            // InvokeDynamic #6:invoke:(Landroidx/compose/runtime/MutableState;Landroidx/compose/runtime/State;)Lkotlin/jvm/functions/Function1;
+    1646: nop
+    1647: astore        36
+    1649: aload         30
+    1651: aload         36
+    1653: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+    1658: aload         36
+    1660: goto          1665
+    1663: aload         33
+    1665: nop
+    1666: nop
+    1667: checkcast     #336                // class kotlin/jvm/functions/Function1
+    1670: astore        29
+    1672: aload         16
+    1674: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    1677: aload         29
+    1679: astore        28
+    1681: aload_0
+    1682: checkcast     #163                // class java/lang/Iterable
+    1685: astore        30
+    1687: iconst_0
+    1688: istore        31
+    1690: aload         30
+    1692: astore        32
+    1694: new           #165                // class java/util/ArrayList
+    1697: dup
+    1698: invokespecial #571                // Method java/util/ArrayList."<init>":()V
+    1701: checkcast     #177                // class java/util/Collection
+    1704: astore        33
+    1706: iconst_0
+    1707: istore        34
+    1709: aload         32
+    1711: invokeinterface #181,  1          // InterfaceMethod java/lang/Iterable.iterator:()Ljava/util/Iterator;
+    1716: astore        35
+    1718: aload         35
+    1720: invokeinterface #186,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+    1725: ifeq          1785
+    1728: aload         35
+    1730: invokeinterface #189,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+    1735: astore        36
+    1737: aload         36
+    1739: checkcast     #225                // class top/yukonga/miuix/kmp/basic/DropdownEntry
+    1742: astore        37
+    1744: iconst_0
+    1745: istore        38
+    1747: aload         37
+    1749: invokevirtual #414                // Method top/yukonga/miuix/kmp/basic/DropdownEntry.getItems:()Ljava/util/List;
+    1752: checkcast     #177                // class java/util/Collection
+    1755: invokeinterface #417,  1          // InterfaceMethod java/util/Collection.isEmpty:()Z
+    1760: ifne          1767
+    1763: iconst_1
+    1764: goto          1768
+    1767: iconst_0
+    1768: nop
+    1769: ifeq          1718
+    1772: aload         33
+    1774: aload         36
+    1776: invokeinterface #221,  2          // InterfaceMethod java/util/Collection.add:(Ljava/lang/Object;)Z
+    1781: pop
+    1782: goto          1718
+    1785: aload         33
+    1787: checkcast     #223                // class java/util/List
+    1790: nop
+    1791: astore        29
+    1793: aload         29
+    1795: checkcast     #177                // class java/util/Collection
+    1798: invokeinterface #417,  1          // InterfaceMethod java/util/Collection.isEmpty:()Z
+    1803: ifne          1810
+    1806: iconst_1
+    1807: goto          1811
+    1810: iconst_0
+    1811: istore        30
+    1813: iload         11
+    1815: ifeq          1827
+    1818: iload         30
+    1820: ifeq          1827
+    1823: iconst_1
+    1824: goto          1828
+    1827: iconst_0
+    1828: istore        31
+    1830: iload         31
+    1832: ifeq          1880
+    1835: aload         16
+    1837: ldc_w         #572                // int 2048533318
+    1840: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+    1845: aload         16
+    1847: ldc_w         #574                // String 254@10391L11
+    1850: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+    1853: getstatic     #428                // Field top/yukonga/miuix/kmp/theme/MiuixTheme.INSTANCE:Ltop/yukonga/miuix/kmp/theme/MiuixTheme;
+    1856: aload         16
+    1858: bipush        6
+    1860: invokevirtual #432                // Method top/yukonga/miuix/kmp/theme/MiuixTheme.getColorScheme:(Landroidx/compose/runtime/Composer;I)Ltop/yukonga/miuix/kmp/theme/Colors;
+    1863: invokevirtual #438                // Method top/yukonga/miuix/kmp/theme/Colors."getOnSurfaceVariantActions-0d7_KjU":()J
+    1866: lstore        34
+    1868: aload         16
+    1870: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+    1875: lload         34
+    1877: goto          1922
+    1880: aload         16
+    1882: ldc_w         #575                // int 2048600867
+    1885: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+    1890: aload         16
+    1892: ldc_w         #577                // String 256@10459L11
+    1895: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+    1898: getstatic     #428                // Field top/yukonga/miuix/kmp/theme/MiuixTheme.INSTANCE:Ltop/yukonga/miuix/kmp/theme/MiuixTheme;
+    1901: aload         16
+    1903: bipush        6
+    1905: invokevirtual #432                // Method top/yukonga/miuix/kmp/theme/MiuixTheme.getColorScheme:(Landroidx/compose/runtime/Composer;I)Ltop/yukonga/miuix/kmp/theme/Colors;
+    1908: invokevirtual #447                // Method top/yukonga/miuix/kmp/theme/Colors."getDisabledOnSecondaryVariant-0d7_KjU":()J
+    1911: lstore        34
+    1913: aload         16
+    1915: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+    1920: lload         34
+    1922: lstore        32
+    1924: aload         16
+    1926: ldc_w         #578                // int 204634374
+    1929: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+    1931: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+    1934: aload         16
+    1936: astore        36
+    1938: aload         16
+    1940: iload         31
+    1942: invokeinterface #72,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Z)Z
+    1947: istore        37
+    1949: iconst_0
+    1950: istore        38
+    1952: aload         36
+    1954: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+    1959: astore        39
+    1961: iconst_0
+    1962: istore        40
+    1964: iload         37
+    1966: ifne          1980
+    1969: aload         39
+    1971: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+    1974: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+    1977: if_acmpne     2015
+    1980: iconst_0
+    1981: istore        41
+    1983: iload         31
+    1985: aload         28
+    1987: aload         23
+    1989: aload         24
+    1991: aload         26
+    1993: invokedynamic #583,  0            // InvokeDynamic #7:invoke:(ZLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/MutableState;Landroidx/compose/runtime/MutableState;Landroidx/compose/runtime/State;)Lkotlin/jvm/functions/Function0;
+    1998: nop
+    1999: astore        42
+    2001: aload         36
+    2003: aload         42
+    2005: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+    2010: aload         42
+    2012: goto          2017
+    2015: aload         39
+    2017: nop
+    2018: nop
+    2019: checkcast     #458                // class kotlin/jvm/functions/Function0
+    2022: astore        35
+    2024: aload         16
+    2026: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+    2029: aload         35
+    2031: astore        34
+    2033: getstatic     #463                // Field androidx/compose/ui/semantics/Role.Companion:Landroidx/compose/ui/semantics/Role$Companion;
+    2036: invokevirtual #469                // Method androidx/compose/ui/semantics/Role$Companion."getDropdownList-o7Vup1c":()I
+    2039: istore        35
+    2041: aload         24
+    2043: invokeinterface #472,  1          // InterfaceMethod androidx/compose/runtime/MutableState.getValue:()Ljava/lang/Object;
+    2048: checkcast     #363                // class java/lang/Boolean
+    2051: invokevirtual #475                // Method java/lang/Boolean.booleanValue:()Z
+    2054: istore        36
+    2056: aload_2
+    2057: aload_1
+    2058: aload_3
+    2059: aload         4
+    2061: aload         5
+    2063: aload         7
+    2065: ldc_w         #584                // int -1010545176
+    2068: iconst_1
+    2069: aload         29
+    2071: iload         12
+    2073: iload         30
+    2075: lload         32
+    2077: aload         23
+    2079: aload         10
+    2081: aload         6
+    2083: iload         13
+    2085: iload         14
+    2087: aload         28
+    2089: aload         24
+    2091: invokedynamic #592,  0            // InvokeDynamic #8:invoke:(Ljava/util/List;ZZJLandroidx/compose/runtime/MutableState;Landroidx/compose/ui/unit/Dp;Ltop/yukonga/miuix/kmp/basic/DropdownColors;ZZLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/MutableState;)Lkotlin/jvm/functions/Function3;
+    2096: aload         16
+    2098: bipush        54
+    2100: invokestatic  #494                // Method androidx/compose/runtime/internal/ComposableLambdaKt.rememberComposableLambda:(IZLjava/lang/Object;Landroidx/compose/runtime/Composer;I)Landroidx/compose/runtime/internal/ComposableLambda;
+    2103: checkcast     #496                // class kotlin/jvm/functions/Function3
+    2106: aload         8
+    2108: aload         9
+    2110: aload         34
+    2112: aconst_null
+    2113: iload         35
+    2115: invokestatic  #500                // Method androidx/compose/ui/semantics/Role."box-impl":(I)Landroidx/compose/ui/semantics/Role;
+    2118: iload         36
+    2120: iload         31
+    2122: aload         22
+    2124: aload         16
+    2126: ldc           #58                 // int 1572864
+    2128: bipush        14
+    2130: iload         20
+    2132: bipush        6
+    2134: ishr
+    2135: iand
+    2136: ior
+    2137: bipush        112
+    2139: iload         20
+    2141: iand
+    2142: ior
+    2143: sipush        896
+    2146: iload         20
+    2148: iconst_3
+    2149: ishr
+    2150: iand
+    2151: ior
+    2152: sipush        7168
+    2155: iload         20
+    2157: iconst_3
+    2158: ishr
+    2159: iand
+    2160: ior
+    2161: ldc           #237                // int 57344
+    2163: iload         20
+    2165: iconst_3
+    2166: ishr
+    2167: iand
+    2168: ior
+    2169: ldc           #238                // int 458752
+    2171: iload         20
+    2173: bipush        6
+    2175: ishr
+    2176: iand
+    2177: ior
+    2178: ldc           #239                // int 29360128
+    2180: iload         20
+    2182: iconst_3
+    2183: ishr
+    2184: iand
+    2185: ior
+    2186: ldc           #240                // int 234881024
+    2188: iload         20
+    2190: iconst_3
+    2191: ishr
+    2192: iand
+    2193: ior
+    2194: sipush        24576
+    2197: sipush        1024
+    2200: invokestatic  #506                // Method top/yukonga/miuix/kmp/basic/ComponentKt."BasicComponent-fIIZQVk":(Landroidx/compose/ui/Modifier;Ljava/lang/String;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ljava/lang/String;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Landroidx/compose/foundation/layout/PaddingValues;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Landroidx/compose/ui/semantics/Role;ZZLandroidx/compose/foundation/interaction/MutableInteractionSource;Landroidx/compose/runtime/Composer;III)V
+    2203: invokestatic  #135                // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+    2206: ifeq          2222
+    2209: invokestatic  #248                // Method androidx/compose/runtime/ComposerKt.traceEventEnd:()V
+    2212: goto          2222
+    2215: aload         16
+    2217: invokeinterface #129,  1          // InterfaceMethod androidx/compose/runtime/Composer.skipToGroupEnd:()V
+    2222: aload         16
+    2224: invokeinterface #252,  1          // InterfaceMethod androidx/compose/runtime/Composer.endRestartGroup:()Landroidx/compose/runtime/ScopeUpdateScope;
+    2229: dup
+    2230: ifnull        2280
+    2233: aload_0
+    2234: aload_1
+    2235: aload_2
+    2236: aload_3
+    2237: aload         4
+    2239: aload         5
+    2241: aload         6
+    2243: aload         7
+    2245: aload         8
+    2247: aload         9
+    2249: aload         10
+    2251: iload         11
+    2253: iload         12
+    2255: iload         13
+    2257: iload         14
+    2259: aload         15
+    2261: iload         17
+    2263: iload         18
+    2265: iload         19
+    2267: invokedynamic #600,  0            // InvokeDynamic #9:invoke:(Ljava/util/List;Ljava/lang/String;Landroidx/compose/ui/Modifier;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ljava/lang/String;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ltop/yukonga/miuix/kmp/basic/DropdownColors;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/ui/unit/Dp;ZZZZLkotlin/jvm/functions/Function1;III)Lkotlin/jvm/functions/Function2;
+    2272: invokeinterface #270,  2          // InterfaceMethod androidx/compose/runtime/ScopeUpdateScope.updateScope:(Lkotlin/jvm/functions/Function2;)V
+    2277: goto          2281
+    2280: pop
+    2281: return
+
+  private static final androidx.compose.ui.hapticfeedback.HapticFeedback OverlayDropdownPreference_84PZ_4c$lambda$3(androidx.compose.runtime.State<? extends androidx.compose.ui.hapticfeedback.HapticFeedback>);
+    Code:
+       0: aload_0
+       1: astore_1
+       2: aconst_null
+       3: astore_2
+       4: aconst_null
+       5: astore_3
+       6: iconst_0
+       7: istore        4
+       9: aload_1
+      10: invokeinterface #618,  1          // InterfaceMethod androidx/compose/runtime/State.getValue:()Ljava/lang/Object;
+      15: checkcast     #393                // class androidx/compose/ui/hapticfeedback/HapticFeedback
+      18: areturn
+
+  private static final androidx.compose.ui.hapticfeedback.HapticFeedback OverlayDropdownPreference_84PZ_4c$lambda$11(androidx.compose.runtime.State<? extends androidx.compose.ui.hapticfeedback.HapticFeedback>);
+    Code:
+       0: aload_0
+       1: astore_1
+       2: aconst_null
+       3: astore_2
+       4: aconst_null
+       5: astore_3
+       6: iconst_0
+       7: istore        4
+       9: aload_1
+      10: invokeinterface #618,  1          // InterfaceMethod androidx/compose/runtime/State.getValue:()Ljava/lang/Object;
+      15: checkcast     #393                // class androidx/compose/ui/hapticfeedback/HapticFeedback
+      18: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_4Xcw_4U$lambda$0$0$0(kotlin.jvm.functions.Function1, int);
+    Code:
+       0: aload_0
+       1: dup
+       2: ifnull        18
+       5: iload_1
+       6: invokestatic  #630                // Method java/lang/Integer.valueOf:(I)Ljava/lang/Integer;
+       9: invokeinterface #632,  2          // InterfaceMethod kotlin/jvm/functions/Function1.invoke:(Ljava/lang/Object;)Ljava/lang/Object;
+      14: pop
+      15: goto          19
+      18: pop
+      19: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+      22: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_4Xcw_4U$lambda$1(java.util.List, int, java.lang.String, androidx.compose.ui.Modifier, top.yukonga.miuix.kmp.basic.BasicComponentColors, java.lang.String, top.yukonga.miuix.kmp.basic.BasicComponentColors, top.yukonga.miuix.kmp.basic.DropdownColors, kotlin.jvm.functions.Function2, kotlin.jvm.functions.Function2, androidx.compose.foundation.layout.PaddingValues, androidx.compose.ui.unit.Dp, boolean, boolean, boolean, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function1, int, int, int, androidx.compose.runtime.Composer, int);
+    Code:
+       0: aload_0
+       1: iload_1
+       2: aload_2
+       3: aload_3
+       4: aload         4
+       6: aload         5
+       8: aload         6
+      10: aload         7
+      12: aload         8
+      14: aload         9
+      16: aload         10
+      18: aload         11
+      20: iload         12
+      22: iload         13
+      24: iload         14
+      26: aload         15
+      28: aload         16
+      30: aload         20
+      32: iload         17
+      34: iconst_1
+      35: ior
+      36: invokestatic  #645                // Method androidx/compose/runtime/RecomposeScopeImplKt.updateChangedFlags:(I)I
+      39: iload         18
+      41: invokestatic  #645                // Method androidx/compose/runtime/RecomposeScopeImplKt.updateChangedFlags:(I)I
+      44: iload         19
+      46: invokestatic  #647                // Method "OverlayDropdownPreference-4Xcw_4U":(Ljava/util/List;ILjava/lang/String;Landroidx/compose/ui/Modifier;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ljava/lang/String;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ltop/yukonga/miuix/kmp/basic/DropdownColors;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/ui/unit/Dp;ZZZLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;III)V
+      49: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+      52: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_84PZ_4c$lambda$4$0(androidx.compose.runtime.MutableState, androidx.compose.runtime.State, boolean);
+    Code:
+       0: aload_0
+       1: invokeinterface #472,  1          // InterfaceMethod androidx/compose/runtime/MutableState.getValue:()Ljava/lang/Object;
+       6: checkcast     #363                // class java/lang/Boolean
+       9: invokevirtual #475                // Method java/lang/Boolean.booleanValue:()Z
+      12: iload_2
+      13: if_icmpeq     53
+      16: aload_0
+      17: iload_2
+      18: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+      21: invokeinterface #670,  2          // InterfaceMethod androidx/compose/runtime/MutableState.setValue:(Ljava/lang/Object;)V
+      26: aload_1
+      27: invokeinterface #618,  1          // InterfaceMethod androidx/compose/runtime/State.getValue:()Ljava/lang/Object;
+      32: checkcast     #336                // class kotlin/jvm/functions/Function1
+      35: dup
+      36: ifnull        52
+      39: iload_2
+      40: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+      43: invokeinterface #632,  2          // InterfaceMethod kotlin/jvm/functions/Function1.invoke:(Ljava/lang/Object;)Ljava/lang/Object;
+      48: pop
+      49: goto          53
+      52: pop
+      53: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+      56: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_84PZ_4c$lambda$5$0(boolean, kotlin.jvm.functions.Function1, androidx.compose.runtime.MutableState, androidx.compose.runtime.MutableState, androidx.compose.runtime.State);
+    Code:
+       0: iload_0
+       1: ifeq          75
+       4: aload_1
+       5: aload_2
+       6: invokeinterface #472,  1          // InterfaceMethod androidx/compose/runtime/MutableState.getValue:()Ljava/lang/Object;
+      11: checkcast     #363                // class java/lang/Boolean
+      14: invokevirtual #475                // Method java/lang/Boolean.booleanValue:()Z
+      17: ifne          24
+      20: iconst_1
+      21: goto          25
+      24: iconst_0
+      25: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+      28: invokeinterface #632,  2          // InterfaceMethod kotlin/jvm/functions/Function1.invoke:(Ljava/lang/Object;)Ljava/lang/Object;
+      33: pop
+      34: aload_2
+      35: invokeinterface #472,  1          // InterfaceMethod androidx/compose/runtime/MutableState.getValue:()Ljava/lang/Object;
+      40: checkcast     #363                // class java/lang/Boolean
+      43: invokevirtual #475                // Method java/lang/Boolean.booleanValue:()Z
+      46: ifeq          75
+      49: aload_3
+      50: iconst_1
+      51: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+      54: invokeinterface #670,  2          // InterfaceMethod androidx/compose/runtime/MutableState.setValue:(Ljava/lang/Object;)V
+      59: aload         4
+      61: invokestatic  #675                // Method OverlayDropdownPreference_84PZ_4c$lambda$3:(Landroidx/compose/runtime/State;)Landroidx/compose/ui/hapticfeedback/HapticFeedback;
+      64: getstatic     #680                // Field androidx/compose/ui/hapticfeedback/HapticFeedbackType.Companion:Landroidx/compose/ui/hapticfeedback/HapticFeedbackType$Companion;
+      67: invokevirtual #685                // Method androidx/compose/ui/hapticfeedback/HapticFeedbackType$Companion."getContextClick-5zf0vsI":()I
+      70: invokeinterface #688,  2          // InterfaceMethod androidx/compose/ui/hapticfeedback/HapticFeedback."performHapticFeedback-CdsT49E":(I)V
+      75: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+      78: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_84PZ_4c$lambda$6$1$0(kotlin.jvm.functions.Function1);
+    Code:
+       0: aload_0
+       1: iconst_0
+       2: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+       5: invokeinterface #632,  2          // InterfaceMethod kotlin/jvm/functions/Function1.invoke:(Ljava/lang/Object;)Ljava/lang/Object;
+      10: pop
+      11: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+      14: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_84PZ_4c$lambda$6$2$0(androidx.compose.runtime.MutableState);
+    Code:
+       0: aload_0
+       1: iconst_0
+       2: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+       5: invokeinterface #670,  2          // InterfaceMethod androidx/compose/runtime/MutableState.setValue:(Ljava/lang/Object;)V
+      10: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+      13: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_84PZ_4c$lambda$6(boolean, boolean, top.yukonga.miuix.kmp.basic.DropdownEntry, long, androidx.compose.runtime.MutableState, androidx.compose.ui.unit.Dp, top.yukonga.miuix.kmp.basic.DropdownColors, boolean, boolean, kotlin.jvm.functions.Function1, androidx.compose.runtime.MutableState, androidx.compose.foundation.layout.RowScope, androidx.compose.runtime.Composer, int);
+    Code:
+       0: aload         12
+       2: ldc_w         #702                // String $this$BasicComponent
+       5: invokestatic  #28                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       8: aload         13
+      10: ldc_w         #704                // String C191@7885L80:OverlayDropdownPreference.kt#zbuo5c
+      13: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+      16: iload         14
+      18: istore        15
+      20: iload         14
+      22: bipush        6
+      24: iand
+      25: ifne          50
+      28: iload         15
+      30: aload         13
+      32: aload         12
+      34: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+      39: ifeq          46
+      42: iconst_4
+      43: goto          47
+      46: iconst_2
+      47: ior
+      48: istore        15
+      50: aload         13
+      52: iload         15
+      54: bipush        19
+      56: iand
+      57: bipush        18
+      59: if_icmpeq     66
+      62: iconst_1
+      63: goto          67
+      66: iconst_0
+      67: iload         15
+      69: iconst_1
+      70: iand
+      71: invokeinterface #81,  3           // InterfaceMethod androidx/compose/runtime/Composer.shouldExecute:(ZI)Z
+      76: ifeq          728
+      79: invokestatic  #135                // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+      82: ifeq          97
+      85: ldc_w         #476                // int -687487771
+      88: iload         15
+      90: iconst_m1
+      91: ldc_w         #706                // String top.yukonga.miuix.kmp.preference.OverlayDropdownPreference.<anonymous> (OverlayDropdownPreference.kt:176)
+      94: invokestatic  #141                // Method androidx/compose/runtime/ComposerKt.traceEventStart:(IIILjava/lang/String;)V
+      97: iload_0
+      98: ifeq          406
+     101: iload_1
+     102: ifeq          406
+     105: aload         13
+     107: ldc_w         #707                // int 1750913493
+     110: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+     115: aload         13
+     117: ldc_w         #709                // String
+     120: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+     123: aload_2
+     124: invokevirtual #414                // Method top/yukonga/miuix/kmp/basic/DropdownEntry.getItems:()Ljava/util/List;
+     127: checkcast     #163                // class java/lang/Iterable
+     130: astore        18
+     132: iconst_0
+     133: istore        19
+     135: aload         18
+     137: invokeinterface #181,  1          // InterfaceMethod java/lang/Iterable.iterator:()Ljava/util/Iterator;
+     142: astore        20
+     144: aload         20
+     146: invokeinterface #186,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+     151: ifeq          186
+     154: aload         20
+     156: invokeinterface #189,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+     161: astore        21
+     163: aload         21
+     165: checkcast     #196                // class top/yukonga/miuix/kmp/basic/DropdownItem
+     168: astore        22
+     170: iconst_0
+     171: istore        23
+     173: aload         22
+     175: invokevirtual #712                // Method top/yukonga/miuix/kmp/basic/DropdownItem.getSelected:()Z
+     178: ifeq          144
+     181: aload         21
+     183: goto          187
+     186: aconst_null
+     187: checkcast     #196                // class top/yukonga/miuix/kmp/basic/DropdownItem
+     190: dup
+     191: ifnull        200
+     194: invokevirtual #716                // Method top/yukonga/miuix/kmp/basic/DropdownItem.getText:()Ljava/lang/String;
+     197: goto          202
+     200: pop
+     201: aconst_null
+     202: astore        16
+     204: aload         16
+     206: checkcast     #718                // class java/lang/CharSequence
+     209: astore        17
+     211: aload         17
+     213: ifnull        226
+     216: aload         17
+     218: invokeinterface #721,  1          // InterfaceMethod java/lang/CharSequence.length:()I
+     223: ifne          230
+     226: iconst_1
+     227: goto          231
+     230: iconst_0
+     231: ifne          379
+     234: aload         13
+     236: ldc_w         #722                // int 1751047041
+     239: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+     244: aload         13
+     246: ldc_w         #724                // String 185@7696L10,179@7396L444
+     249: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+     252: aload         16
+     254: astore        17
+     256: aload         12
+     258: aload         12
+     260: getstatic     #97                 // Field androidx/compose/ui/Modifier.Companion:Landroidx/compose/ui/Modifier$Companion;
+     263: checkcast     #93                 // class androidx/compose/ui/Modifier
+     266: fconst_0
+     267: fconst_0
+     268: bipush        8
+     270: istore        19
+     272: iconst_0
+     273: istore        20
+     275: iload         19
+     277: i2f
+     278: invokestatic  #728                // Method androidx/compose/ui/unit/Dp."constructor-impl":(F)F
+     281: fconst_0
+     282: bipush        11
+     284: aconst_null
+     285: invokestatic  #734                // Method androidx/compose/foundation/layout/PaddingKt."padding-qDBjuR0$default":(Landroidx/compose/ui/Modifier;FFFFILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+     288: getstatic     #739                // Field androidx/compose/ui/Alignment.Companion:Landroidx/compose/ui/Alignment$Companion;
+     291: invokevirtual #745                // Method androidx/compose/ui/Alignment$Companion.getCenterVertically:()Landroidx/compose/ui/Alignment$Vertical;
+     294: invokeinterface #751,  3          // InterfaceMethod androidx/compose/foundation/layout/RowScope.align:(Landroidx/compose/ui/Modifier;Landroidx/compose/ui/Alignment$Vertical;)Landroidx/compose/ui/Modifier;
+     299: fconst_1
+     300: iconst_0
+     301: invokeinterface #755,  4          // InterfaceMethod androidx/compose/foundation/layout/RowScope.weight:(Landroidx/compose/ui/Modifier;FZ)Landroidx/compose/ui/Modifier;
+     306: astore        18
+     308: getstatic     #428                // Field top/yukonga/miuix/kmp/theme/MiuixTheme.INSTANCE:Ltop/yukonga/miuix/kmp/theme/MiuixTheme;
+     311: aload         13
+     313: bipush        6
+     315: invokevirtual #759                // Method top/yukonga/miuix/kmp/theme/MiuixTheme.getTextStyles:(Landroidx/compose/runtime/Composer;I)Ltop/yukonga/miuix/kmp/theme/TextStyles;
+     318: invokevirtual #765                // Method top/yukonga/miuix/kmp/theme/TextStyles.getBody2:()Landroidx/compose/ui/text/TextStyle;
+     321: invokevirtual #770                // Method androidx/compose/ui/text/TextStyle."getFontSize-XSAIIZE":()J
+     324: lstore        19
+     326: getstatic     #775                // Field androidx/compose/ui/text/style/TextAlign.Companion:Landroidx/compose/ui/text/style/TextAlign$Companion;
+     329: invokevirtual #780                // Method androidx/compose/ui/text/style/TextAlign$Companion."getEnd-e0LSkKk":()I
+     332: istore        21
+     334: aload         17
+     336: aload         18
+     338: lload_3
+     339: aconst_null
+     340: lload         19
+     342: aconst_null
+     343: aconst_null
+     344: aconst_null
+     345: lconst_0
+     346: aconst_null
+     347: iload         21
+     349: invokestatic  #783                // Method androidx/compose/ui/text/style/TextAlign."box-impl":(I)Landroidx/compose/ui/text/style/TextAlign;
+     352: lconst_0
+     353: iconst_0
+     354: iconst_0
+     355: iconst_0
+     356: iconst_0
+     357: aconst_null
+     358: aconst_null
+     359: aload         13
+     361: iconst_0
+     362: iconst_0
+     363: ldc_w         #784                // int 261096
+     366: invokestatic  #790                // Method top/yukonga/miuix/kmp/basic/TextKt."Text-Nvy7gAk":(Ljava/lang/String;Landroidx/compose/ui/Modifier;JLandroidx/compose/foundation/text/TextAutoSize;JLandroidx/compose/ui/text/font/FontStyle;Landroidx/compose/ui/text/font/FontWeight;Landroidx/compose/ui/text/font/FontFamily;JLandroidx/compose/ui/text/style/TextDecoration;Landroidx/compose/ui/text/style/TextAlign;JIZIILkotlin/jvm/functions/Function1;Landroidx/compose/ui/text/TextStyle;Landroidx/compose/runtime/Composer;III)V
+     369: aload         13
+     371: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+     376: goto          396
+     379: aload         13
+     381: ldc_w         #791                // int 1751491581
+     384: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+     389: aload         13
+     391: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+     396: aload         13
+     398: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+     403: goto          423
+     406: aload         13
+     408: ldc_w         #792                // int 1751505469
+     411: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+     416: aload         13
+     418: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+     423: aload         12
+     425: lload_3
+     426: aconst_null
+     427: aload         13
+     429: bipush        14
+     431: iload         15
+     433: iand
+     434: iconst_2
+     435: invokestatic  #798                // Method top/yukonga/miuix/kmp/basic/DropdownKt."DropdownArrowEndAction-3IgeMak":(Landroidx/compose/foundation/layout/RowScope;JLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+     438: iload_1
+     439: ifeq          699
+     442: aload         13
+     444: ldc_w         #799                // int 1751645248
+     447: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+     452: aload         13
+     454: ldc_w         #801                // String 198@8157L22,199@8221L28,195@8015L477
+     457: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+     460: aload_2
+     461: aload         5
+     463: invokeinterface #472,  1          // InterfaceMethod androidx/compose/runtime/MutableState.getValue:()Ljava/lang/Object;
+     468: checkcast     #363                // class java/lang/Boolean
+     471: invokevirtual #475                // Method java/lang/Boolean.booleanValue:()Z
+     474: aload         13
+     476: ldc_w         #802                // int 749245979
+     479: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+     481: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+     484: aload         13
+     486: astore        17
+     488: iconst_0
+     489: istore        18
+     491: iconst_0
+     492: istore        19
+     494: aload         17
+     496: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+     501: astore        20
+     503: iconst_0
+     504: istore        21
+     506: aload         20
+     508: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+     511: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+     514: if_acmpne     555
+     517: istore        25
+     519: astore        24
+     521: iconst_0
+     522: istore        22
+     524: aload         10
+     526: invokedynamic #808,  0            // InvokeDynamic #10:invoke:(Lkotlin/jvm/functions/Function1;)Lkotlin/jvm/functions/Function0;
+     531: astore        26
+     533: aload         24
+     535: iload         25
+     537: aload         26
+     539: astore        23
+     541: aload         17
+     543: aload         23
+     545: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+     550: aload         23
+     552: goto          557
+     555: aload         20
+     557: nop
+     558: nop
+     559: checkcast     #458                // class kotlin/jvm/functions/Function0
+     562: astore        16
+     564: aload         13
+     566: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+     569: aload         16
+     571: aload         13
+     573: ldc_w         #809                // int 749248033
+     576: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+     578: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+     581: aload         13
+     583: astore        17
+     585: iconst_0
+     586: istore        18
+     588: iconst_0
+     589: istore        19
+     591: aload         17
+     593: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+     598: astore        20
+     600: iconst_0
+     601: istore        21
+     603: aload         20
+     605: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+     608: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+     611: if_acmpne     656
+     614: astore        26
+     616: istore        25
+     618: astore        24
+     620: iconst_0
+     621: istore        22
+     623: aload         11
+     625: invokedynamic #815,  0            // InvokeDynamic #11:invoke:(Landroidx/compose/runtime/MutableState;)Lkotlin/jvm/functions/Function0;
+     630: astore        27
+     632: aload         24
+     634: iload         25
+     636: aload         26
+     638: aload         27
+     640: astore        23
+     642: aload         17
+     644: aload         23
+     646: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+     651: aload         23
+     653: goto          658
+     656: aload         20
+     658: nop
+     659: nop
+     660: checkcast     #458                // class kotlin/jvm/functions/Function0
+     663: astore        16
+     665: aload         13
+     667: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+     670: aload         16
+     672: aload         6
+     674: aload         7
+     676: iload         8
+     678: iload         9
+     680: aload         13
+     682: sipush        3456
+     685: iconst_0
+     686: invokestatic  #821                // Method top/yukonga/miuix/kmp/popup/OverlayDropdownPopupKt."OverlayDropdownPopup-ROuykTE":(Ltop/yukonga/miuix/kmp/basic/DropdownEntry;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/unit/Dp;Ltop/yukonga/miuix/kmp/basic/DropdownColors;ZZLandroidx/compose/runtime/Composer;II)V
+     689: aload         13
+     691: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+     696: goto          716
+     699: aload         13
+     701: ldc_w         #822                // int 1752134397
+     704: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+     709: aload         13
+     711: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+     716: invokestatic  #135                // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+     719: ifeq          735
+     722: invokestatic  #248                // Method androidx/compose/runtime/ComposerKt.traceEventEnd:()V
+     725: goto          735
+     728: aload         13
+     730: invokeinterface #129,  1          // InterfaceMethod androidx/compose/runtime/Composer.skipToGroupEnd:()V
+     735: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+     738: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_84PZ_4c$lambda$7(top.yukonga.miuix.kmp.basic.DropdownEntry, java.lang.String, androidx.compose.ui.Modifier, top.yukonga.miuix.kmp.basic.BasicComponentColors, java.lang.String, top.yukonga.miuix.kmp.basic.BasicComponentColors, top.yukonga.miuix.kmp.basic.DropdownColors, kotlin.jvm.functions.Function2, kotlin.jvm.functions.Function2, androidx.compose.foundation.layout.PaddingValues, androidx.compose.ui.unit.Dp, boolean, boolean, boolean, boolean, kotlin.jvm.functions.Function1, int, int, int, androidx.compose.runtime.Composer, int);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_2
+       3: aload_3
+       4: aload         4
+       6: aload         5
+       8: aload         6
+      10: aload         7
+      12: aload         8
+      14: aload         9
+      16: aload         10
+      18: iload         11
+      20: iload         12
+      22: iload         13
+      24: iload         14
+      26: aload         15
+      28: aload         19
+      30: iload         16
+      32: iconst_1
+      33: ior
+      34: invokestatic  #645                // Method androidx/compose/runtime/RecomposeScopeImplKt.updateChangedFlags:(I)I
+      37: iload         17
+      39: invokestatic  #645                // Method androidx/compose/runtime/RecomposeScopeImplKt.updateChangedFlags:(I)I
+      42: iload         18
+      44: invokestatic  #245                // Method "OverlayDropdownPreference-84PZ-4c":(Ltop/yukonga/miuix/kmp/basic/DropdownEntry;Ljava/lang/String;Landroidx/compose/ui/Modifier;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ljava/lang/String;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ltop/yukonga/miuix/kmp/basic/DropdownColors;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/ui/unit/Dp;ZZZZLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;III)V
+      47: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+      50: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_84PZ_4c$lambda$12$0(androidx.compose.runtime.MutableState, androidx.compose.runtime.State, boolean);
+    Code:
+       0: aload_0
+       1: invokeinterface #472,  1          // InterfaceMethod androidx/compose/runtime/MutableState.getValue:()Ljava/lang/Object;
+       6: checkcast     #363                // class java/lang/Boolean
+       9: invokevirtual #475                // Method java/lang/Boolean.booleanValue:()Z
+      12: iload_2
+      13: if_icmpeq     53
+      16: aload_0
+      17: iload_2
+      18: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+      21: invokeinterface #670,  2          // InterfaceMethod androidx/compose/runtime/MutableState.setValue:(Ljava/lang/Object;)V
+      26: aload_1
+      27: invokeinterface #618,  1          // InterfaceMethod androidx/compose/runtime/State.getValue:()Ljava/lang/Object;
+      32: checkcast     #336                // class kotlin/jvm/functions/Function1
+      35: dup
+      36: ifnull        52
+      39: iload_2
+      40: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+      43: invokeinterface #632,  2          // InterfaceMethod kotlin/jvm/functions/Function1.invoke:(Ljava/lang/Object;)Ljava/lang/Object;
+      48: pop
+      49: goto          53
+      52: pop
+      53: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+      56: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_84PZ_4c$lambda$14$0(boolean, kotlin.jvm.functions.Function1, androidx.compose.runtime.MutableState, androidx.compose.runtime.MutableState, androidx.compose.runtime.State);
+    Code:
+       0: iload_0
+       1: ifeq          75
+       4: aload_1
+       5: aload_2
+       6: invokeinterface #472,  1          // InterfaceMethod androidx/compose/runtime/MutableState.getValue:()Ljava/lang/Object;
+      11: checkcast     #363                // class java/lang/Boolean
+      14: invokevirtual #475                // Method java/lang/Boolean.booleanValue:()Z
+      17: ifne          24
+      20: iconst_1
+      21: goto          25
+      24: iconst_0
+      25: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+      28: invokeinterface #632,  2          // InterfaceMethod kotlin/jvm/functions/Function1.invoke:(Ljava/lang/Object;)Ljava/lang/Object;
+      33: pop
+      34: aload_2
+      35: invokeinterface #472,  1          // InterfaceMethod androidx/compose/runtime/MutableState.getValue:()Ljava/lang/Object;
+      40: checkcast     #363                // class java/lang/Boolean
+      43: invokevirtual #475                // Method java/lang/Boolean.booleanValue:()Z
+      46: ifeq          75
+      49: aload_3
+      50: iconst_1
+      51: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+      54: invokeinterface #670,  2          // InterfaceMethod androidx/compose/runtime/MutableState.setValue:(Ljava/lang/Object;)V
+      59: aload         4
+      61: invokestatic  #839                // Method OverlayDropdownPreference_84PZ_4c$lambda$11:(Landroidx/compose/runtime/State;)Landroidx/compose/ui/hapticfeedback/HapticFeedback;
+      64: getstatic     #680                // Field androidx/compose/ui/hapticfeedback/HapticFeedbackType.Companion:Landroidx/compose/ui/hapticfeedback/HapticFeedbackType$Companion;
+      67: invokevirtual #685                // Method androidx/compose/ui/hapticfeedback/HapticFeedbackType$Companion."getContextClick-5zf0vsI":()I
+      70: invokeinterface #688,  2          // InterfaceMethod androidx/compose/ui/hapticfeedback/HapticFeedback."performHapticFeedback-CdsT49E":(I)V
+      75: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+      78: areturn
+
+  private static final java.lang.Iterable OverlayDropdownPreference_84PZ_4c$lambda$15$0$0(top.yukonga.miuix.kmp.basic.DropdownEntry);
+    Code:
+       0: aload_0
+       1: ldc_w         #843                // String group
+       4: invokestatic  #28                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #414                // Method top/yukonga/miuix/kmp/basic/DropdownEntry.getItems:()Ljava/util/List;
+      11: checkcast     #163                // class java/lang/Iterable
+      14: areturn
+
+  private static final boolean OverlayDropdownPreference_84PZ_4c$lambda$15$1$0(top.yukonga.miuix.kmp.basic.DropdownItem);
+    Code:
+       0: aload_0
+       1: ldc_w         #846                // String it
+       4: invokestatic  #28                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #712                // Method top/yukonga/miuix/kmp/basic/DropdownItem.getSelected:()Z
+      11: ireturn
+
+  private static final java.lang.String OverlayDropdownPreference_84PZ_4c$lambda$15$2$0(top.yukonga.miuix.kmp.basic.DropdownItem);
+    Code:
+       0: aload_0
+       1: ldc_w         #846                // String it
+       4: invokestatic  #28                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #716                // Method top/yukonga/miuix/kmp/basic/DropdownItem.getText:()Ljava/lang/String;
+      11: areturn
+
+  private static final boolean OverlayDropdownPreference_84PZ_4c$lambda$15$3$0(java.lang.String);
+    Code:
+       0: aload_0
+       1: ldc_w         #846                // String it
+       4: invokestatic  #28                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: checkcast     #718                // class java/lang/CharSequence
+      11: invokestatic  #856                // Method kotlin/text/StringsKt.isBlank:(Ljava/lang/CharSequence;)Z
+      14: ifne          21
+      17: iconst_1
+      18: goto          22
+      21: iconst_0
+      22: ireturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_84PZ_4c$lambda$15$5$0(kotlin.jvm.functions.Function1);
+    Code:
+       0: aload_0
+       1: iconst_0
+       2: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+       5: invokeinterface #632,  2          // InterfaceMethod kotlin/jvm/functions/Function1.invoke:(Ljava/lang/Object;)Ljava/lang/Object;
+      10: pop
+      11: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+      14: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_84PZ_4c$lambda$15$6$0(androidx.compose.runtime.MutableState);
+    Code:
+       0: aload_0
+       1: iconst_0
+       2: invokestatic  #367                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+       5: invokeinterface #670,  2          // InterfaceMethod androidx/compose/runtime/MutableState.setValue:(Ljava/lang/Object;)V
+      10: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+      13: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_84PZ_4c$lambda$15(java.util.List, boolean, boolean, long, androidx.compose.runtime.MutableState, androidx.compose.ui.unit.Dp, top.yukonga.miuix.kmp.basic.DropdownColors, boolean, boolean, kotlin.jvm.functions.Function1, androidx.compose.runtime.MutableState, androidx.compose.foundation.layout.RowScope, androidx.compose.runtime.Composer, int);
+    Code:
+       0: aload         12
+       2: ldc_w         #702                // String $this$BasicComponent
+       5: invokestatic  #28                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       8: aload         13
+      10: ldc_w         #862                // String C283@11307L24,284@11356L15,285@11393L11,286@11429L19,298@11930L80:OverlayDropdownPreference.kt#zbuo5c
+      13: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+      16: iload         14
+      18: istore        15
+      20: iload         14
+      22: bipush        6
+      24: iand
+      25: ifne          50
+      28: iload         15
+      30: aload         13
+      32: aload         12
+      34: invokeinterface #48,  2           // InterfaceMethod androidx/compose/runtime/Composer.changed:(Ljava/lang/Object;)Z
+      39: ifeq          46
+      42: iconst_4
+      43: goto          47
+      46: iconst_2
+      47: ior
+      48: istore        15
+      50: aload         13
+      52: iload         15
+      54: bipush        19
+      56: iand
+      57: bipush        18
+      59: if_icmpeq     66
+      62: iconst_1
+      63: goto          67
+      66: iconst_0
+      67: iload         15
+      69: iconst_1
+      70: iand
+      71: invokeinterface #81,  3           // InterfaceMethod androidx/compose/runtime/Composer.shouldExecute:(ZI)Z
+      76: ifeq          995
+      79: invokestatic  #135                // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+      82: ifeq          97
+      85: ldc_w         #584                // int -1010545176
+      88: iload         15
+      90: iconst_m1
+      91: ldc_w         #864                // String top.yukonga.miuix.kmp.preference.OverlayDropdownPreference.<anonymous> (OverlayDropdownPreference.kt:281)
+      94: invokestatic  #141                // Method androidx/compose/runtime/ComposerKt.traceEventStart:(IIILjava/lang/String;)V
+      97: aload_0
+      98: checkcast     #163                // class java/lang/Iterable
+     101: invokestatic  #868                // Method kotlin/collections/CollectionsKt.asSequence:(Ljava/lang/Iterable;)Lkotlin/sequences/Sequence;
+     104: aload         13
+     106: ldc_w         #869                // int -471301728
+     109: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+     111: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+     114: aload         13
+     116: astore        18
+     118: iconst_0
+     119: istore        19
+     121: iconst_0
+     122: istore        20
+     124: aload         18
+     126: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+     131: astore        21
+     133: iconst_0
+     134: istore        22
+     136: aload         21
+     138: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+     141: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+     144: if_acmpne     176
+     147: astore        25
+     149: iconst_0
+     150: istore        23
+     152: invokedynamic #876,  0            // InvokeDynamic #12:invoke:()Lkotlin/jvm/functions/Function1;
+     157: aload         25
+     159: swap
+     160: astore        23
+     162: aload         18
+     164: aload         23
+     166: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+     171: aload         23
+     173: goto          178
+     176: aload         21
+     178: nop
+     179: nop
+     180: checkcast     #336                // class kotlin/jvm/functions/Function1
+     183: astore        17
+     185: aload         13
+     187: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+     190: aload         17
+     192: invokestatic  #882                // Method kotlin/sequences/SequencesKt.flatMapIterable:(Lkotlin/sequences/Sequence;Lkotlin/jvm/functions/Function1;)Lkotlin/sequences/Sequence;
+     195: aload         13
+     197: ldc_w         #883                // int -471300169
+     200: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+     202: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+     205: aload         13
+     207: astore        18
+     209: iconst_0
+     210: istore        19
+     212: iconst_0
+     213: istore        20
+     215: aload         18
+     217: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+     222: astore        21
+     224: iconst_0
+     225: istore        22
+     227: aload         21
+     229: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+     232: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+     235: if_acmpne     267
+     238: astore        25
+     240: iconst_0
+     241: istore        23
+     243: invokedynamic #889,  0            // InvokeDynamic #13:invoke:()Lkotlin/jvm/functions/Function1;
+     248: aload         25
+     250: swap
+     251: astore        23
+     253: aload         18
+     255: aload         23
+     257: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+     262: aload         23
+     264: goto          269
+     267: aload         21
+     269: nop
+     270: nop
+     271: checkcast     #336                // class kotlin/jvm/functions/Function1
+     274: astore        17
+     276: aload         13
+     278: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+     281: aload         17
+     283: invokestatic  #892                // Method kotlin/sequences/SequencesKt.filter:(Lkotlin/sequences/Sequence;Lkotlin/jvm/functions/Function1;)Lkotlin/sequences/Sequence;
+     286: aload         13
+     288: ldc_w         #893                // int -471298989
+     291: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+     293: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+     296: aload         13
+     298: astore        18
+     300: iconst_0
+     301: istore        19
+     303: iconst_0
+     304: istore        20
+     306: aload         18
+     308: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+     313: astore        21
+     315: iconst_0
+     316: istore        22
+     318: aload         21
+     320: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+     323: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+     326: if_acmpne     358
+     329: astore        25
+     331: iconst_0
+     332: istore        23
+     334: invokedynamic #898,  0            // InvokeDynamic #14:invoke:()Lkotlin/jvm/functions/Function1;
+     339: aload         25
+     341: swap
+     342: astore        23
+     344: aload         18
+     346: aload         23
+     348: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+     353: aload         23
+     355: goto          360
+     358: aload         21
+     360: nop
+     361: nop
+     362: checkcast     #336                // class kotlin/jvm/functions/Function1
+     365: astore        17
+     367: aload         13
+     369: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+     372: aload         17
+     374: invokestatic  #901                // Method kotlin/sequences/SequencesKt.map:(Lkotlin/sequences/Sequence;Lkotlin/jvm/functions/Function1;)Lkotlin/sequences/Sequence;
+     377: aload         13
+     379: ldc_w         #902                // int -471297829
+     382: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+     384: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+     387: aload         13
+     389: astore        18
+     391: iconst_0
+     392: istore        19
+     394: iconst_0
+     395: istore        20
+     397: aload         18
+     399: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+     404: astore        21
+     406: iconst_0
+     407: istore        22
+     409: aload         21
+     411: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+     414: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+     417: if_acmpne     449
+     420: astore        25
+     422: iconst_0
+     423: istore        23
+     425: invokedynamic #908,  0            // InvokeDynamic #15:invoke:()Lkotlin/jvm/functions/Function1;
+     430: aload         25
+     432: swap
+     433: astore        23
+     435: aload         18
+     437: aload         23
+     439: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+     444: aload         23
+     446: goto          451
+     449: aload         21
+     451: nop
+     452: nop
+     453: checkcast     #336                // class kotlin/jvm/functions/Function1
+     456: astore        17
+     458: aload         13
+     460: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+     463: aload         17
+     465: invokestatic  #892                // Method kotlin/sequences/SequencesKt.filter:(Lkotlin/sequences/Sequence;Lkotlin/jvm/functions/Function1;)Lkotlin/sequences/Sequence;
+     468: ldc_w         #910                // String \n
+     471: checkcast     #718                // class java/lang/CharSequence
+     474: aconst_null
+     475: aconst_null
+     476: iconst_0
+     477: aconst_null
+     478: aconst_null
+     479: bipush        62
+     481: aconst_null
+     482: invokestatic  #914                // Method kotlin/sequences/SequencesKt.joinToString$default:(Lkotlin/sequences/Sequence;Ljava/lang/CharSequence;Ljava/lang/CharSequence;Ljava/lang/CharSequence;ILjava/lang/CharSequence;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/String;
+     485: checkcast     #718                // class java/lang/CharSequence
+     488: astore        17
+     490: aload         17
+     492: invokestatic  #856                // Method kotlin/text/StringsKt.isBlank:(Ljava/lang/CharSequence;)Z
+     495: ifeq          506
+     498: iconst_0
+     499: istore        18
+     501: aconst_null
+     502: nop
+     503: goto          508
+     506: aload         17
+     508: checkcast     #194                // class java/lang/String
+     511: astore        16
+     513: iload_1
+     514: ifeq          673
+     517: iload_2
+     518: ifeq          673
+     521: aload         16
+     523: checkcast     #718                // class java/lang/CharSequence
+     526: astore        17
+     528: aload         17
+     530: ifnull        541
+     533: aload         17
+     535: invokestatic  #856                // Method kotlin/text/StringsKt.isBlank:(Ljava/lang/CharSequence;)Z
+     538: ifeq          545
+     541: iconst_1
+     542: goto          546
+     545: iconst_0
+     546: ifne          673
+     549: aload         13
+     551: ldc_w         #915                // int -1725136997
+     554: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+     559: aload         13
+     561: ldc_w         #917                // String 293@11771L10,290@11616L287
+     564: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+     567: aload         16
+     569: astore        17
+     571: getstatic     #97                 // Field androidx/compose/ui/Modifier.Companion:Landroidx/compose/ui/Modifier$Companion;
+     574: checkcast     #93                 // class androidx/compose/ui/Modifier
+     577: fconst_0
+     578: fconst_0
+     579: bipush        8
+     581: istore        19
+     583: iconst_0
+     584: istore        20
+     586: iload         19
+     588: i2f
+     589: invokestatic  #728                // Method androidx/compose/ui/unit/Dp."constructor-impl":(F)F
+     592: fconst_0
+     593: bipush        11
+     595: aconst_null
+     596: invokestatic  #734                // Method androidx/compose/foundation/layout/PaddingKt."padding-qDBjuR0$default":(Landroidx/compose/ui/Modifier;FFFFILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+     599: astore        18
+     601: getstatic     #428                // Field top/yukonga/miuix/kmp/theme/MiuixTheme.INSTANCE:Ltop/yukonga/miuix/kmp/theme/MiuixTheme;
+     604: aload         13
+     606: bipush        6
+     608: invokevirtual #759                // Method top/yukonga/miuix/kmp/theme/MiuixTheme.getTextStyles:(Landroidx/compose/runtime/Composer;I)Ltop/yukonga/miuix/kmp/theme/TextStyles;
+     611: invokevirtual #765                // Method top/yukonga/miuix/kmp/theme/TextStyles.getBody2:()Landroidx/compose/ui/text/TextStyle;
+     614: invokevirtual #770                // Method androidx/compose/ui/text/TextStyle."getFontSize-XSAIIZE":()J
+     617: lstore        19
+     619: getstatic     #775                // Field androidx/compose/ui/text/style/TextAlign.Companion:Landroidx/compose/ui/text/style/TextAlign$Companion;
+     622: invokevirtual #780                // Method androidx/compose/ui/text/style/TextAlign$Companion."getEnd-e0LSkKk":()I
+     625: istore        21
+     627: aload         17
+     629: aload         18
+     631: lload_3
+     632: aconst_null
+     633: lload         19
+     635: aconst_null
+     636: aconst_null
+     637: aconst_null
+     638: lconst_0
+     639: aconst_null
+     640: iload         21
+     642: invokestatic  #783                // Method androidx/compose/ui/text/style/TextAlign."box-impl":(I)Landroidx/compose/ui/text/style/TextAlign;
+     645: lconst_0
+     646: iconst_0
+     647: iconst_0
+     648: iconst_0
+     649: iconst_0
+     650: aconst_null
+     651: aconst_null
+     652: aload         13
+     654: bipush        48
+     656: iconst_0
+     657: ldc_w         #784                // int 261096
+     660: invokestatic  #790                // Method top/yukonga/miuix/kmp/basic/TextKt."Text-Nvy7gAk":(Ljava/lang/String;Landroidx/compose/ui/Modifier;JLandroidx/compose/foundation/text/TextAutoSize;JLandroidx/compose/ui/text/font/FontStyle;Landroidx/compose/ui/text/font/FontWeight;Landroidx/compose/ui/text/font/FontFamily;JLandroidx/compose/ui/text/style/TextDecoration;Landroidx/compose/ui/text/style/TextAlign;JIZIILkotlin/jvm/functions/Function1;Landroidx/compose/ui/text/TextStyle;Landroidx/compose/runtime/Composer;III)V
+     663: aload         13
+     665: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+     670: goto          690
+     673: aload         13
+     675: ldc_w         #918                // int -1724847302
+     678: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+     683: aload         13
+     685: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+     690: aload         12
+     692: lload_3
+     693: aconst_null
+     694: aload         13
+     696: bipush        14
+     698: iload         15
+     700: iand
+     701: iconst_2
+     702: invokestatic  #798                // Method top/yukonga/miuix/kmp/basic/DropdownKt."DropdownArrowEndAction-3IgeMak":(Landroidx/compose/foundation/layout/RowScope;JLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+     705: iload_2
+     706: ifeq          966
+     709: aload         13
+     711: ldc_w         #919                // int -1724710127
+     714: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+     719: aload         13
+     721: ldc_w         #921                // String 305@12211L22,306@12275L28,302@12057L489
+     724: invokestatic  #44                 // Method androidx/compose/runtime/ComposerKt.sourceInformation:(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V
+     727: aload_0
+     728: aload         5
+     730: invokeinterface #472,  1          // InterfaceMethod androidx/compose/runtime/MutableState.getValue:()Ljava/lang/Object;
+     735: checkcast     #363                // class java/lang/Boolean
+     738: invokevirtual #475                // Method java/lang/Boolean.booleanValue:()Z
+     741: aload         13
+     743: ldc_w         #922                // int -471272802
+     746: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+     748: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+     751: aload         13
+     753: astore        18
+     755: iconst_0
+     756: istore        19
+     758: iconst_0
+     759: istore        20
+     761: aload         18
+     763: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+     768: astore        21
+     770: iconst_0
+     771: istore        22
+     773: aload         21
+     775: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+     778: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+     781: if_acmpne     822
+     784: istore        26
+     786: astore        25
+     788: iconst_0
+     789: istore        23
+     791: aload         10
+     793: invokedynamic #926,  0            // InvokeDynamic #16:invoke:(Lkotlin/jvm/functions/Function1;)Lkotlin/jvm/functions/Function0;
+     798: astore        27
+     800: aload         25
+     802: iload         26
+     804: aload         27
+     806: astore        24
+     808: aload         18
+     810: aload         24
+     812: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+     817: aload         24
+     819: goto          824
+     822: aload         21
+     824: nop
+     825: nop
+     826: checkcast     #458                // class kotlin/jvm/functions/Function0
+     829: astore        17
+     831: aload         13
+     833: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+     836: aload         17
+     838: aload         13
+     840: ldc_w         #927                // int -471270748
+     843: ldc           #144                // String CC(remember):OverlayDropdownPreference.kt#9igjgp
+     845: invokestatic  #148                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerStart:(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V
+     848: aload         13
+     850: astore        18
+     852: iconst_0
+     853: istore        19
+     855: iconst_0
+     856: istore        20
+     858: aload         18
+     860: invokeinterface #153,  1          // InterfaceMethod androidx/compose/runtime/Composer.rememberedValue:()Ljava/lang/Object;
+     865: astore        21
+     867: iconst_0
+     868: istore        22
+     870: aload         21
+     872: getstatic     #156                // Field androidx/compose/runtime/Composer.Companion:Landroidx/compose/runtime/Composer$Companion;
+     875: invokevirtual #161                // Method androidx/compose/runtime/Composer$Companion.getEmpty:()Ljava/lang/Object;
+     878: if_acmpne     923
+     881: astore        27
+     883: istore        26
+     885: astore        25
+     887: iconst_0
+     888: istore        23
+     890: aload         11
+     892: invokedynamic #931,  0            // InvokeDynamic #17:invoke:(Landroidx/compose/runtime/MutableState;)Lkotlin/jvm/functions/Function0;
+     897: astore        28
+     899: aload         25
+     901: iload         26
+     903: aload         27
+     905: aload         28
+     907: astore        24
+     909: aload         18
+     911: aload         24
+     913: invokeinterface #232,  2          // InterfaceMethod androidx/compose/runtime/Composer.updateRememberedValue:(Ljava/lang/Object;)V
+     918: aload         24
+     920: goto          925
+     923: aload         21
+     925: nop
+     926: nop
+     927: checkcast     #458                // class kotlin/jvm/functions/Function0
+     930: astore        17
+     932: aload         13
+     934: invokestatic  #236                // Method androidx/compose/runtime/ComposerKt.sourceInformationMarkerEnd:(Landroidx/compose/runtime/Composer;)V
+     937: aload         17
+     939: aload         6
+     941: aload         7
+     943: iload         8
+     945: iload         9
+     947: aload         13
+     949: sipush        3456
+     952: iconst_0
+     953: invokestatic  #934                // Method top/yukonga/miuix/kmp/popup/OverlayDropdownPopupKt."OverlayDropdownPopup-ROuykTE":(Ljava/util/List;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/unit/Dp;Ltop/yukonga/miuix/kmp/basic/DropdownColors;ZZLandroidx/compose/runtime/Composer;II)V
+     956: aload         13
+     958: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+     963: goto          983
+     966: aload         13
+     968: ldc_w         #935                // int -1724209446
+     971: invokeinterface #421,  2          // InterfaceMethod androidx/compose/runtime/Composer.startReplaceGroup:(I)V
+     976: aload         13
+     978: invokeinterface #441,  1          // InterfaceMethod androidx/compose/runtime/Composer.endReplaceGroup:()V
+     983: invokestatic  #135                // Method androidx/compose/runtime/ComposerKt.isTraceInProgress:()Z
+     986: ifeq          1002
+     989: invokestatic  #248                // Method androidx/compose/runtime/ComposerKt.traceEventEnd:()V
+     992: goto          1002
+     995: aload         13
+     997: invokeinterface #129,  1          // InterfaceMethod androidx/compose/runtime/Composer.skipToGroupEnd:()V
+    1002: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+    1005: areturn
+
+  private static final kotlin.Unit OverlayDropdownPreference_84PZ_4c$lambda$16(java.util.List, java.lang.String, androidx.compose.ui.Modifier, top.yukonga.miuix.kmp.basic.BasicComponentColors, java.lang.String, top.yukonga.miuix.kmp.basic.BasicComponentColors, top.yukonga.miuix.kmp.basic.DropdownColors, kotlin.jvm.functions.Function2, kotlin.jvm.functions.Function2, androidx.compose.foundation.layout.PaddingValues, androidx.compose.ui.unit.Dp, boolean, boolean, boolean, boolean, kotlin.jvm.functions.Function1, int, int, int, androidx.compose.runtime.Composer, int);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_2
+       3: aload_3
+       4: aload         4
+       6: aload         5
+       8: aload         6
+      10: aload         7
+      12: aload         8
+      14: aload         9
+      16: aload         10
+      18: iload         11
+      20: iload         12
+      22: iload         13
+      24: iload         14
+      26: aload         15
+      28: aload         19
+      30: iload         16
+      32: iconst_1
+      33: ior
+      34: invokestatic  #645                // Method androidx/compose/runtime/RecomposeScopeImplKt.updateChangedFlags:(I)I
+      37: iload         17
+      39: invokestatic  #645                // Method androidx/compose/runtime/RecomposeScopeImplKt.updateChangedFlags:(I)I
+      42: iload         18
+      44: invokestatic  #949                // Method "OverlayDropdownPreference-84PZ-4c":(Ljava/util/List;Ljava/lang/String;Landroidx/compose/ui/Modifier;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ljava/lang/String;Ltop/yukonga/miuix/kmp/basic/BasicComponentColors;Ltop/yukonga/miuix/kmp/basic/DropdownColors;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/ui/unit/Dp;ZZZZLkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;III)V
+      47: getstatic     #637                // Field kotlin/Unit.INSTANCE:Lkotlin/Unit;
+      50: areturn
+}
