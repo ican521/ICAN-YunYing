@@ -182,7 +182,6 @@ import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.BrandBlueDeep
-import com.ican.tvplay.ui.theme.ChipSelectedFillAlpha
 import com.ican.tvplay.ui.theme.BrandPink
 import com.ican.tvplay.ui.theme.DarkOnSurface
 import com.ican.tvplay.ui.theme.DarkOnSurfaceMuted
@@ -2123,9 +2122,9 @@ private fun LineSection(
                         pressEffect = false,
                     )
                     .background(
-                        // 与选集 EpisodeChip 选中态一致：主题蓝 40% 透明填充 + 白字
-                        if (selected) MiuixTheme.colorScheme.primary.copy(alpha = ChipSelectedFillAlpha)
-                        else MiuixTheme.colorScheme.secondaryVariant,
+                        // 与选集 EpisodeChip 选中态一致：primaryContainer 实心蓝 + 白字
+                        if (selected) MiuixTheme.colorScheme.primaryContainer
+                        else MiuixTheme.colorScheme.secondary,
                         shape,
                     )
                     .padding(12.dp),
@@ -2133,7 +2132,7 @@ private fun LineSection(
                 Text(
                     text = source.flag,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (selected) Color.White
+                    color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer
                     else MiuixTheme.colorScheme.onSecondaryVariant,
                     maxLines = 1,
                 )
@@ -3170,10 +3169,10 @@ private fun EpisodeChip(
             )
             // 选集列表自带选中态：整列表（含未选中项）统一不要按压/点击蒙层，选中色即反馈
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false, pressEffect = false)
-            // 选中：主题蓝 40% 透明填充 + 白字；未选中 secondaryVariant（浅 #F0F0F0 / 深 #434343）
+            // 选中：primaryContainer 实心蓝 + 白字；未选中 secondary（浅 #E6E6E6 / 深 #505050）
             .background(
-                if (selected) MiuixTheme.colorScheme.primary.copy(alpha = ChipSelectedFillAlpha)
-                else MiuixTheme.colorScheme.secondaryVariant,
+                if (selected) MiuixTheme.colorScheme.primaryContainer
+                else MiuixTheme.colorScheme.secondary,
                 shape,
             )
             .then(borderModifier)
@@ -3182,7 +3181,7 @@ private fun EpisodeChip(
         Text(
             text = title,
             style = MaterialTheme.typography.labelMedium,
-            color = if (selected) Color.White
+            color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer
             else MiuixTheme.colorScheme.onSecondaryVariant,
             maxLines = 1,
         )

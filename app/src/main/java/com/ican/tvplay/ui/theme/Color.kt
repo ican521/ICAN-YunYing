@@ -39,9 +39,6 @@ const val SelectionFillAlpha = 0.18f
 // 播放页选集选中态填充透明度：全屏侧边选集弹窗与竖屏「更多」弹窗共用，固定品牌蓝 25%
 const val EpisodeSelectedFillAlpha = 0.25f
 
-// 播放页线路/选集 chip 选中态填充透明度：主题蓝 40% 透明填充 + 白字，用于线路栏、单行选集栏、「更多」网格弹窗
-const val ChipSelectedFillAlpha = 0.40f
-
 // 海报卡片叠加层（首页/收藏/历史/搜索结果共用），保证各页海报视觉一致
 val PosterBadgeScrim = Color(0x66000000)   // 左上角站源/评分角标底
 val PosterBottomScrim = Color(0xE6000000)  // 底部标题渐变终点色
