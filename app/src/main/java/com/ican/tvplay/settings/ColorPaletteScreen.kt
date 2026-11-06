@@ -76,14 +76,14 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
     // 固定居中大标题顶栏 + 毛玻璃
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
+    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
     Scaffold(
         // 整窗底色（含状态栏 / 导航条区域）与设置页一致
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        containerColor = MaterialTheme.colorScheme.background,
+            .background(MiuixTheme.colorScheme.surface),
+        containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
             BlurredBar(backdrop) {
                 Box(
@@ -116,7 +116,7 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 // 页面底色与设置页一致（主题 background 的浅灰白），避免露出窗口纯白
-                .background(MaterialTheme.colorScheme.background)
+                .background(MiuixTheme.colorScheme.surface)
                 .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
         ) {
             val horizontal = pageHorizontalPadding()

@@ -176,10 +176,10 @@ fun SettingsScreen(
     // 固定居中大标题顶栏 + 毛玻璃（关闭毛玻璃时顶栏退化为页面背景色）
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
+    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
             BlurredBar(backdrop) {
                 Box(
@@ -272,7 +272,7 @@ fun SettingsScreen(
                             .padding(end = 6.dp)
                             .size(14.dp)
                             .background(
-                                if (themeColor == 0) MaterialTheme.colorScheme.primary else Color(themeColor),
+                                if (themeColor == 0) MiuixTheme.colorScheme.primary else Color(themeColor),
                                 CircleShape,
                             ),
                     )
@@ -560,7 +560,7 @@ private fun FavoriteSyncDialog(
                     modifier = Modifier
                         .clickable { viewModel.cycleSyncMode() }
                         .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha),
+                            MiuixTheme.colorScheme.primaryContainer,
                             RoundedCornerShape(percent = 50),
                         )
                         .padding(horizontal = 10.dp, vertical = 4.dp),
@@ -572,7 +572,7 @@ private fun FavoriteSyncDialog(
                             else -> "双向"
                         },
                         style = MaterialTheme.typography.labelMedium,
-                        color = MiuixTheme.colorScheme.primary,
+                        color = MiuixTheme.colorScheme.onPrimaryContainer,
                     )
                 }
                 Spacer(modifier = Modifier.width(Spacing.titleContentGap))
@@ -590,7 +590,7 @@ private fun FavoriteSyncDialog(
                     Icon(
                         imageVector = AppIcons.Refresh,
                         contentDescription = "重新扫描",
-                        tint = MaterialTheme.colorScheme.onSurface,
+                        tint = MiuixTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -667,7 +667,7 @@ private fun FavoriteSyncDialog(
                                         },
                                     )
                                     .background(
-                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        MiuixTheme.colorScheme.surfaceContainer,
                                         SquircleShape(Spacing.corner),
                                     )
                                     // 列表项内边距统一 16dp
@@ -678,7 +678,7 @@ private fun FavoriteSyncDialog(
                                 Icon(
                                     imageVector = if (device.type == 0) AppIcons.Tv else AppIcons.Phone,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = MiuixTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(24.dp),
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))

@@ -17,7 +17,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.MaterialTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 等待动画「弧长伸缩」：圆弧持续收缩 / 伸长（约 84° ↔ 220°）同时整圈旋转。
@@ -28,7 +28,7 @@ fun ArcStretchSpinner(
     modifier: Modifier = Modifier,
     size: Dp = 30.dp,
     strokeWidth: Dp = 2.5.dp,
-    color: Color = MaterialTheme.colorScheme.onSurface,
+    color: Color = MiuixTheme.colorScheme.onSurface,
 ) {
     val transition = rememberInfiniteTransition(label = "arcStretch")
     val rotation by transition.animateFloat(

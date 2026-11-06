@@ -187,7 +187,6 @@ import com.ican.tvplay.ui.theme.DarkOnSurfaceMuted
 import com.ican.tvplay.ui.theme.DarkSurfaceElevated
 import com.ican.tvplay.ui.theme.EpisodeSelectedFillAlpha
 import com.ican.tvplay.ui.theme.LocalDarkTheme
-import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import com.ican.tvplay.ui.theme.optionBorderColor
@@ -468,7 +467,7 @@ fun PlayerScreen(
     // HyperOS 画中画窗口是透明表面，透明与否由 window 背景决定（decorView 背景无效）。
     // 视频铺满全屏/画中画期间把 window 背景设成不透明黑色，任何未覆盖缝隙都显示黑色；
     // 退出后恢复主题根底色。
-    val themeWindowBg = MaterialTheme.colorScheme.background.toArgb()
+    val themeWindowBg = MiuixTheme.colorScheme.surface.toArgb()
     LaunchedEffect(videoPresent) {
         val window = activityWindow ?: return@LaunchedEffect
         window.setBackgroundDrawable(
@@ -1094,11 +1093,11 @@ fun PlayerScreen(
         // 点全屏时 landscapeFullscreen 在动画开始就置 true，若让它走下面的纯黑分支，
         // 横版布局未显式刷底色的空档（播放器上方/左侧、信息列底部与下方区块之间）
         // 会透出黑色，与刷白的区块拼成黑白块
-        MaterialTheme.colorScheme.background
+        MiuixTheme.colorScheme.surface
     } else if (inPip || pipExitHold || fullscreen || pendingFullscreen != null || landscapeFullscreen) {
         Color.Black
     } else {
-        MaterialTheme.colorScheme.background
+        MiuixTheme.colorScheme.surface
     }
     // 播放期间保持屏幕常亮（fongmi 同款：播放中 FLAG_KEEP_SCREEN_ON，暂停/退出恢复）
     val activity = context as? Activity
@@ -1683,7 +1682,7 @@ private fun LandscapePlayLayout(
                 }
                 // 浅色模式下全屏缩回小窗时，根 Box 残留黑底会透出到信息列，
                 // 此处显式覆盖主题背景，确保缩回后恢复浅色
-                .background(MaterialTheme.colorScheme.background)
+                .background(MiuixTheme.colorScheme.surface)
                 // 顶部不再额外留 12dp：标题文字顶部与小窗顶部对齐（横屏右侧信息列与小窗同锚 playerTop）
                 .padding(
                     start = com.ican.tvplay.ui.theme.Spacing.sectionSpacing,
@@ -1715,7 +1714,7 @@ private fun LandscapePlayLayout(
                 }
                 // 浅色模式下全屏缩回小窗时，根 Box 残留黑底会透出到下方区块，
                 // 此处显式覆盖主题背景，确保缩回后恢复浅色
-                .background(MaterialTheme.colorScheme.background)
+                .background(MiuixTheme.colorScheme.surface)
                 .verticalScroll(rememberScrollState())
                 // 水平边距下放到各 Section 内部（同竖屏信息流的结构性通栏），此处只保留顶部间距
                 .padding(top = com.ican.tvplay.ui.theme.Spacing.titleContentGap),
@@ -1943,7 +1942,7 @@ private fun VideoMetaSection(
                 Text(
                     text = remark,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
 
@@ -1951,7 +1950,7 @@ private fun VideoMetaSection(
             Text(
                 text = "站源：${v.sourceName.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
 
             // 年份/地区/类型各占一行（fongmi: other）
@@ -1959,21 +1958,21 @@ private fun VideoMetaSection(
                 Text(
                     text = "年份：${v.year}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             if (v.region.isNotBlank()) {
                 Text(
                     text = "地区：${v.region}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
             if (v.categoryName.isNotBlank()) {
                 Text(
                     text = "类型：${v.categoryName}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             }
         }
@@ -2045,7 +2044,7 @@ private fun FavoriteButton(v: Video) {
         Icon(
             imageVector = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
             contentDescription = if (isFav) "取消收藏" else "收藏",
-            tint = if (isFav) BrandPink else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (isFav) BrandPink else MiuixTheme.colorScheme.onSurfaceVariantSummary,
             // 26dp：心形图形约 20dp 视觉高，与标题（24sp）字面齐平；空心/实心共用同一尺寸
             modifier = Modifier.size(26.dp),
         )
@@ -2115,8 +2114,8 @@ private fun LineSection(
                     )
                     .background(
                         // 与选集 EpisodeChip 选中态完全一致：浅主色填充、无描边
-                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
-                        else MaterialTheme.colorScheme.surfaceVariant,
+                        if (selected) MiuixTheme.colorScheme.primaryContainer
+                        else MiuixTheme.colorScheme.surfaceContainer,
                         shape,
                     )
                     .padding(Spacing.dialogItemPadding),
@@ -2124,8 +2123,8 @@ private fun LineSection(
                 Text(
                     text = source.flag,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (selected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer
+                    else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     maxLines = 1,
                 )
             }
@@ -2406,8 +2405,8 @@ private fun EpisodeGridDialog(
                             Text(
                                 text = title,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (isSelected) MiuixTheme.colorScheme.primary
+                                else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
                         }
                     }
@@ -2498,7 +2497,7 @@ private fun DescriptionSection(v: Video, modifier: Modifier = Modifier) {
         Text(
             text = cleanDescription(v.description).ifBlank { "暂无简介" },
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
         )
     }
 }
@@ -3162,8 +3161,8 @@ private fun EpisodeChip(
             .background(
                 if (selected) {
                     if (showBorder) BrandBlueDeep.copy(alpha = EpisodeSelectedFillAlpha)
-                    else MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
-                } else MaterialTheme.colorScheme.surfaceVariant,
+                    else MiuixTheme.colorScheme.primaryContainer
+                } else MiuixTheme.colorScheme.surfaceContainer,
                 shape,
             )
             .then(borderModifier)
@@ -3172,8 +3171,8 @@ private fun EpisodeChip(
         Text(
             text = title,
             style = MaterialTheme.typography.labelMedium,
-            color = if (selected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer
+            else MiuixTheme.colorScheme.onSurfaceVariantSummary,
             maxLines = 1,
         )
     }
@@ -3437,8 +3436,8 @@ private fun <T> OptionDialog(
                                 indication = null,
                             ) { onSelect(opt) }
                             .background(
-                                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
-                                else MaterialTheme.colorScheme.surfaceVariant, shape,
+                                if (selected) MiuixTheme.colorScheme.primaryContainer
+                                else MiuixTheme.colorScheme.surfaceContainer, shape,
                             )
                             // 深色模式给每个选项描一圈（宽度/颜色走全局常量，与选集「更多」选项一致）
                             .then(
@@ -3448,8 +3447,8 @@ private fun <T> OptionDialog(
                             )
                             .padding(Spacing.dialogItemPadding),
                     ) {
-                        Text(label(opt), style = MaterialTheme.typography.bodyMedium, color = MiuixTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                        if (selected) Icon(AppIcons.Check, null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Text(label(opt), style = MaterialTheme.typography.bodyMedium, color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer else MiuixTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                        if (selected) Icon(AppIcons.Check, null, tint = MiuixTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -3801,7 +3800,7 @@ private fun SubInfoRow(label: String, value: String) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant, shape)
+            .background(MiuixTheme.colorScheme.surfaceContainer, shape)
             .then(
                 if (isDark) {
                     Modifier.border(Spacing.optionBorder, optionBorderColor(false), shape)
@@ -3813,7 +3812,7 @@ private fun SubInfoRow(label: String, value: String) {
         Text(
             value,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -3838,8 +3837,8 @@ private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color?
                 indication = null,
             ) { onClick() }
             .background(
-                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
-                else MaterialTheme.colorScheme.surfaceVariant, shape,
+                if (selected) MiuixTheme.colorScheme.primaryContainer
+                else MiuixTheme.colorScheme.surfaceContainer, shape,
             )
             // 深色模式给每个选项描一圈（与选集「更多」选项一致，全局常量）
             .then(
@@ -3849,8 +3848,8 @@ private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color?
             )
             .padding(Spacing.dialogItemPadding),
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MiuixTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-        if (selected) Icon(AppIcons.Check, null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer else MiuixTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+        if (selected) Icon(AppIcons.Check, null, tint = MiuixTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(18.dp))
     }
 }
 
@@ -4084,7 +4083,7 @@ private fun PlayerErrorScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MiuixTheme.colorScheme.surface)
             .statusBarsPadding(),
         contentAlignment = Alignment.Center,
     ) {
@@ -4096,7 +4095,7 @@ private fun PlayerErrorScreen(
             Icon(
                 imageVector = AppIcons.Close,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
+                tint = MiuixTheme.colorScheme.error,
                 modifier = Modifier.size(64.dp),
             )
             Text(
@@ -4108,14 +4107,14 @@ private fun PlayerErrorScreen(
                 text = playerError
                     ?: "未找到该视频（ID: $videoId），请返回重试或检查站源是否可用",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             Box(
                 modifier = Modifier
                     .padding(top = 12.dp)
                     .clip(RoundedCornerShape(percent = 50))
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(MiuixTheme.colorScheme.primary)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,

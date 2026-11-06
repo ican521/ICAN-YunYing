@@ -378,7 +378,7 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MiuixTheme.colorScheme.surface),
     ) {
         // 禁用分类 Tab 栏 + 内容 Pager 的边界 overscroll 回弹效果
         CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
@@ -537,7 +537,7 @@ fun HomeScreen(
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
+                    .background(MiuixTheme.colorScheme.surface),
             ) {
                 // 普通分类：列数由「设置-首页布局大小」驱动（收藏/历史页共用 videoGridColumns）：
                 // 手机（<600dp）小=3列/中=2列（大不开放），平板自适应最小卡宽：小≈7列、中≈5列、大≈3列
@@ -633,7 +633,7 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .background(
                         if (backdrop != null) Color.Transparent
-                        else MaterialTheme.colorScheme.background,
+                        else MiuixTheme.colorScheme.surface,
                     ),
             ) {
                 // 状态栏固定占位：不随折叠收起，收起后 Tab 行停在状态栏下缘而非屏幕最顶端
@@ -815,8 +815,8 @@ fun SitePickerDialog(
                                     glow = false,
                                 )
                                 .background(
-                                    if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
-                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                    if (isCurrent) MiuixTheme.colorScheme.primaryContainer
+                                    else MiuixTheme.colorScheme.surfaceContainer,
                                     shape,
                                 )
                                 // 项内边距：四边统一 16dp；上下项间距由 LazyColumn 的 8dp 负责
@@ -826,7 +826,7 @@ fun SitePickerDialog(
                                 Text(
                                     text = siteShortName(site.name, site.key),
                                     style = MaterialTheme.typography.titleSmall,
-                                    color = MiuixTheme.colorScheme.onSurface,
+                                    color = if (isCurrent) MiuixTheme.colorScheme.onPrimaryContainer else MiuixTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -853,7 +853,7 @@ fun SitePickerDialog(
                                 Icon(
                                     imageVector = AppIcons.Check,
                                     contentDescription = "当前站源",
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = MiuixTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
@@ -874,8 +874,8 @@ private fun SiteToggleIcon(
     desc: String,
     onClick: () -> Unit,
 ) {
-    val tint = if (enabled) MaterialTheme.colorScheme.primary
-    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (locked) 0.25f else 0.45f)
+    val tint = if (enabled) MiuixTheme.colorScheme.primary
+    else MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = if (locked) 0.25f else 0.45f)
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -988,7 +988,7 @@ private fun HomeTopBar(
             Icon(
                 imageVector = AppIcons.History,
                 contentDescription = "历史",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.size(22.dp),
             )
         }
@@ -1104,9 +1104,9 @@ private fun UnderlineTabRow(
                             fontSize = if (selected) 19.sp else 16.sp,
                             color = if (selected) {
                                 // 选中态用主题蓝（主色），未选中保持次要文字色
-                                MaterialTheme.colorScheme.primary
+                                MiuixTheme.colorScheme.primary
                             } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                                MiuixTheme.colorScheme.onSurfaceVariantSummary
                             },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -1156,7 +1156,7 @@ private fun DriveRowItem(
             .tvCardEffect(onClick = onClick, shape = SquircleShape(Spacing.corner), glow = false),
         insideMargin = PaddingValues(0.dp),
         colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            color = MiuixTheme.colorScheme.surfaceContainer,
         ),
     ) {
         Row(
@@ -1168,8 +1168,8 @@ private fun DriveRowItem(
             Icon(
                 imageVector = if (video.isFolder) AppIcons.Folder else AppIcons.Movie,
                 contentDescription = null,
-                tint = if (video.isFolder) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (video.isFolder) MiuixTheme.colorScheme.primary
+                else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.size(40.dp),
             )
             Spacer(Modifier.width(12.dp))

@@ -171,7 +171,7 @@ fun AppRoot() {
         }
 
         // 液态玻璃底栏的模糊内容源：先铺背景色再记录内容
-        val backgroundColor = MaterialTheme.colorScheme.background
+        val backgroundColor = MiuixTheme.colorScheme.surface
         val backdrop = rememberLayerBackdrop {
             drawRect(backgroundColor)
             drawContent()
@@ -203,7 +203,7 @@ fun AppRoot() {
         val videoPresent by Players.videoPresent.collectAsStateWithLifecycle()
         val rootBackground =
             if (pipTransition || videoPresent) androidx.compose.ui.graphics.Color.Black
-            else MaterialTheme.colorScheme.background
+            else MiuixTheme.colorScheme.surface
         val navCornerRadius = if (pipTransition) 0.dp else rememberNavSystemCornerRadius()
         Scaffold(
             containerColor = rootBackground,

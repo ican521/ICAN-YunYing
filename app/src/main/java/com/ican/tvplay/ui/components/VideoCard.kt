@@ -79,7 +79,7 @@ fun VideoCard(
             ),
         cornerRadius = corner,
         insideMargin = PaddingValues(0.dp),
-        colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
     ) {
         Box(
             modifier = Modifier

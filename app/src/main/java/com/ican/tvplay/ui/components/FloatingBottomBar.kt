@@ -90,6 +90,7 @@ import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.sensor.rememberDeviceTilt
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.shader.isRenderEffectSupported
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -224,10 +225,10 @@ fun FloatingBottomBar(
     // 用 App 内主题模式的实际深浅色状态，而非系统深浅色（App 内可独立切换浅色/深色）
     val isInDark = LocalDarkTheme.current
     val pillShape = remember { CircleShape }
-    val accentColor = MaterialTheme.colorScheme.primary
+    val accentColor = MiuixTheme.colorScheme.primary
     // 浅色模式关闭毛玻璃时：未选中图标文字用纯黑（对齐 KernelSU 浅色模式）
-    val tabContentColor = if (!isInDark && !isBlurEnabled) Color.Black else MaterialTheme.colorScheme.onSurface
-    val surfaceContainer = MaterialTheme.colorScheme.surfaceVariant
+    val tabContentColor = if (!isInDark && !isBlurEnabled) Color.Black else MiuixTheme.colorScheme.onSurface
+    val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
     // 深色模式关闭毛玻璃时：胶囊本体用不透明深灰 rgb(36,36,36)；
     // 浅色模式关闭毛玻璃时：胶囊本体纯白；毛玻璃开启保持半透明玻璃色
     val containerColor = when {
@@ -408,7 +409,7 @@ fun FloatingBottomBar(
                             colors = BlurColors(
                                 blendColors = listOf(
                                     BlendColorEntry(
-                                        color = MaterialTheme.colorScheme.background.copy(alpha = 0.87f),
+                                        color = MiuixTheme.colorScheme.surface.copy(alpha = 0.87f),
                                     ),
                                 ),
                             ),

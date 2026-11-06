@@ -85,7 +85,7 @@ fun UpdateScreen(
 
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
+    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
     fun play(item: FavoriteUpdateItem) {
         scope.launch {
@@ -109,7 +109,7 @@ fun UpdateScreen(
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
             BlurredBar(backdrop) {
                 Box(
@@ -398,8 +398,8 @@ private fun UpdateRow(
             colors = ButtonDefaults.textButtonColors(
                 color = Color.Transparent,
                 disabledColor = Color.Transparent,
-                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                textColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                disabledTextColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             ),
         )
     }

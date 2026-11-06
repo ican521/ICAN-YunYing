@@ -76,10 +76,10 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
 
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
+    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
             BlurredBar(backdrop) {
                 Box(

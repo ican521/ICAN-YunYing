@@ -107,10 +107,10 @@ fun FavoritesScreen(
     // 固定居中大标题顶栏 + 毛玻璃
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
+    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
             BlurredBar(backdrop) {
                 Box(
@@ -253,7 +253,7 @@ private fun UpdatesEntry(
                     Box(
                         modifier = Modifier
                             .size(22.dp)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape),
+                            .background(MiuixTheme.colorScheme.primary, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
@@ -298,7 +298,7 @@ private fun FavoriteCard(
                     pressColor = LightOnSurface,
                 ),
         insideMargin = PaddingValues(0.dp),
-        colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
     ) {
         Box(
             modifier = Modifier
@@ -408,10 +408,10 @@ fun HistoryScreen(
     // 固定居中大标题顶栏 + 毛玻璃
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MaterialTheme.colorScheme.background
+    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
             BlurredBar(backdrop) {
                 Box(
@@ -558,7 +558,7 @@ private fun HistoryCard(
                     pressColor = LightOnSurface,
                 ),
         insideMargin = PaddingValues(0.dp),
-        colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
     ) {
         Box(
             modifier = Modifier
@@ -675,7 +675,7 @@ private fun HistoryCard(
                             modifier = Modifier
                                 .fillMaxWidth(progress)
                                 .height(4.dp)
-                                .background(MaterialTheme.colorScheme.primary, CircleShape),
+                                .background(MiuixTheme.colorScheme.primary, CircleShape),
                         )
                     }
                 }

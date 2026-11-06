@@ -3,11 +3,11 @@ package com.ican.tvplay.ui.theme
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.getRoundedCorner
 
 /**
@@ -197,7 +197,7 @@ object Spacing {
  */
 @Composable
 fun optionBorderColor(selected: Boolean): Color = when {
-    selected -> MaterialTheme.colorScheme.primary
+    selected -> MiuixTheme.colorScheme.primary
     LocalDarkTheme.current -> Color.White.copy(alpha = 0.12f)
     else -> Color.Black.copy(alpha = 0.12f)
 }
