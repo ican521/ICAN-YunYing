@@ -196,7 +196,7 @@ fun SearchHomeScreen(
                             Text(
                                 text = "历史",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onBackground,
+                                color = MiuixTheme.colorScheme.onBackground,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             Spacer(Modifier.height(Spacing.titleContentGap))
@@ -213,7 +213,7 @@ fun SearchHomeScreen(
                         Text(
                             text = "推荐",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
+                            color = MiuixTheme.colorScheme.onBackground,
                         )
                         Spacer(Modifier.height(Spacing.titleContentGap))
                         val recommendWords = if (queryText.isBlank()) hotWords else suggestions
@@ -266,7 +266,7 @@ private fun WordFlowRow(
                 Text(
                     text = word,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onBackgroundVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

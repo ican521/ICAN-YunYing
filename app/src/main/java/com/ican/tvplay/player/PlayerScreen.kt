@@ -1916,7 +1916,7 @@ private fun VideoMetaSection(
                 text = v.title,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = MiuixTheme.colorScheme.onBackground,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -1943,7 +1943,7 @@ private fun VideoMetaSection(
                 Text(
                     text = remark,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onBackgroundVariant,
                 )
             }
 
@@ -1951,7 +1951,7 @@ private fun VideoMetaSection(
             Text(
                 text = "站源：${v.sourceName.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MiuixTheme.colorScheme.onBackgroundVariant,
             )
 
             // 年份/地区/类型各占一行（fongmi: other）
@@ -1959,21 +1959,21 @@ private fun VideoMetaSection(
                 Text(
                     text = "年份：${v.year}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onBackgroundVariant,
                 )
             }
             if (v.region.isNotBlank()) {
                 Text(
                     text = "地区：${v.region}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onBackgroundVariant,
                 )
             }
             if (v.categoryName.isNotBlank()) {
                 Text(
                     text = "类型：${v.categoryName}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onBackgroundVariant,
                 )
             }
         }
@@ -2088,7 +2088,7 @@ private fun LineSection(
             text = "线路",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = MiuixTheme.colorScheme.onBackground,
             modifier = Modifier.padding(horizontal = horizontalPadding),
         )
         Spacer(modifier = Modifier.height(Spacing.titleContentGap))
@@ -2154,12 +2154,12 @@ private fun EpisodeSection(
                 text = "选集",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = MiuixTheme.colorScheme.onBackground,
             )
             Text(
                 text = if (reversedEp) "倒序" else "正序",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = MiuixTheme.colorScheme.primary,
                 modifier = Modifier
                     .padding(start = 12.dp)
                     .clickable(
@@ -2171,7 +2171,7 @@ private fun EpisodeSection(
             Text(
                 text = "展开",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = MiuixTheme.colorScheme.primary,
                 modifier = Modifier.clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -2492,13 +2492,13 @@ private fun DescriptionSection(v: Video, modifier: Modifier = Modifier) {
             text = "简介",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = MiuixTheme.colorScheme.onBackground,
         )
         Spacer(modifier = Modifier.height(Spacing.titleContentGap))
         Text(
             text = cleanDescription(v.description).ifBlank { "暂无简介" },
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MiuixTheme.colorScheme.onBackgroundVariant,
         )
     }
 }
@@ -3448,8 +3448,8 @@ private fun <T> OptionDialog(
                             )
                             .padding(Spacing.dialogItemPadding),
                     ) {
-                        Text(label(opt), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                        if (selected) Icon(AppIcons.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Text(label(opt), style = MaterialTheme.typography.bodyMedium, color = MiuixTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                        if (selected) Icon(AppIcons.Check, null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -3809,11 +3809,11 @@ private fun SubInfoRow(label: String, value: String) {
             )
             .padding(Spacing.dialogItemPadding),
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MiuixTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
         Text(
             value,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MiuixTheme.colorScheme.onBackgroundVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -3849,8 +3849,8 @@ private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color?
             )
             .padding(Spacing.dialogItemPadding),
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-        if (selected) Icon(AppIcons.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MiuixTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+        if (selected) Icon(AppIcons.Check, null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
     }
 }
 
@@ -4102,13 +4102,13 @@ private fun PlayerErrorScreen(
             Text(
                 text = "视频加载失败",
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = MiuixTheme.colorScheme.onBackground,
             )
             Text(
                 text = playerError
                     ?: "未找到该视频（ID: $videoId），请返回重试或检查站源是否可用",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MiuixTheme.colorScheme.onBackgroundVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             Box(
@@ -4125,7 +4125,7 @@ private fun PlayerErrorScreen(
                 Text(
                     text = "返回",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = MiuixTheme.colorScheme.onPrimary,
                 )
             }
         }

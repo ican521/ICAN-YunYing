@@ -37,6 +37,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
 
@@ -171,7 +172,7 @@ private fun PosterTextFallback() {
         Text(
             text = "[空]",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MiuixTheme.colorScheme.onBackgroundVariant,
             textAlign = TextAlign.Center,
             maxLines = 1,
         )

@@ -782,7 +782,7 @@ fun SitePickerDialog(
                 Text(
                     text = "未获取到可用站点",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onBackgroundVariant,
                     modifier = Modifier.padding(horizontal = Spacing.dialogContentMargin),
                 )
             } else {
@@ -826,7 +826,7 @@ fun SitePickerDialog(
                                 Text(
                                     text = siteShortName(site.name, site.key),
                                     style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = MiuixTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -1177,7 +1177,7 @@ private fun DriveRowItem(
                 Text(
                     text = video.title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MiuixTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -1185,7 +1185,7 @@ private fun DriveRowItem(
                     Text(
                         text = video.rating,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MiuixTheme.colorScheme.onBackgroundVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 2.dp),

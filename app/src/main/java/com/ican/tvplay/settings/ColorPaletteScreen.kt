@@ -43,6 +43,7 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -102,7 +103,7 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
                         text = "主题色板",
                         modifier = Modifier.align(Alignment.Center),
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = MiuixTheme.colorScheme.onBackground,
                     )
                 }
             }

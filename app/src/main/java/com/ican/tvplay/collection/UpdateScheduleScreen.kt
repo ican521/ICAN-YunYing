@@ -101,7 +101,7 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
                         text = "更新提醒",
                         modifier = Modifier.align(Alignment.Center),
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = MiuixTheme.colorScheme.onBackground,
                     )
                 }
             }
@@ -127,7 +127,7 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
                             Text(
                                 text = "还没有收藏的视频",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MiuixTheme.colorScheme.onBackgroundVariant,
                             )
                         }
                     }

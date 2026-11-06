@@ -60,6 +60,7 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.TvPlayApplication
 import com.ican.tvplay.data.BACKGROUND_PIP
@@ -192,7 +193,7 @@ fun SettingsScreen(
                     Text(
                         text = "设置",
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = MiuixTheme.colorScheme.onBackground,
                     )
                 }
             }
@@ -467,7 +468,7 @@ private fun InfoRow(label: String, value: String) {
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MiuixTheme.colorScheme.onBackgroundVariant,
             )
         },
     )
@@ -571,7 +572,7 @@ private fun FavoriteSyncDialog(
                             else -> "双向"
                         },
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MiuixTheme.colorScheme.primary,
                     )
                 }
                 Spacer(modifier = Modifier.width(Spacing.titleContentGap))
@@ -607,13 +608,13 @@ private fun FavoriteSyncDialog(
                         ArcStretchSpinner(
                             size = 20.dp,
                             strokeWidth = 1.5.dp,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MiuixTheme.colorScheme.primary,
                         )
                         Spacer(modifier = Modifier.width(Spacing.titleContentGap))
                         Text(
                             "正在扫描局域网设备…",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MiuixTheme.colorScheme.onBackgroundVariant,
                         )
                     }
                 }
@@ -621,7 +622,7 @@ private fun FavoriteSyncDialog(
                     Text(
                         "未发现设备，请确保其他设备已打开本应用",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MiuixTheme.colorScheme.onBackgroundVariant,
                         modifier = Modifier.padding(vertical = 24.dp),
                     )
                 }
@@ -685,14 +686,14 @@ private fun FavoriteSyncDialog(
                                     Text(
                                         text = device.name,
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface,
+                                        color = MiuixTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                     Text(
                                         text = device.ip,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = MiuixTheme.colorScheme.onBackgroundVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )

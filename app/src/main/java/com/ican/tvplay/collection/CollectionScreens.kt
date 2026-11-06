@@ -52,6 +52,7 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
 import com.ican.tvplay.ui.components.PosterImage
@@ -122,7 +123,7 @@ fun FavoritesScreen(
                     Text(
                         text = "我的收藏",
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = MiuixTheme.colorScheme.onBackground,
                     )
                 }
             }
@@ -258,7 +259,7 @@ private fun UpdatesEntry(
                 Text(
                     text = "追番更新",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = MiuixTheme.colorScheme.onBackground,
                 )
                 Text(
                     text = when {
@@ -267,7 +268,7 @@ private fun UpdatesEntry(
                         else -> "有 $total 部已更新未看"
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onBackgroundVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -282,7 +283,7 @@ private fun UpdatesEntry(
                     Text(
                         text = "$total",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = MiuixTheme.colorScheme.onPrimary,
                         maxLines = 1,
                     )
                 }
@@ -450,7 +451,7 @@ fun HistoryScreen(
                     Text(
                         text = "播放历史",
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = MiuixTheme.colorScheme.onBackground,
                     )
                 }
             }

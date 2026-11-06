@@ -63,6 +63,7 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 追番更新页：收藏页入口进入。
@@ -127,7 +128,7 @@ fun UpdateScreen(
                         text = "追番更新",
                         modifier = Modifier.align(Alignment.Center),
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = MiuixTheme.colorScheme.onBackground,
                     )
                 }
             }
@@ -201,7 +202,7 @@ fun UpdateScreen(
                                 Text(
                                     text = if (checking) "正在检测收藏剧集更新…" else "暂无更新，先收藏几部剧吧",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = MiuixTheme.colorScheme.onBackgroundVariant,
                                 )
                             }
                         }
@@ -299,13 +300,13 @@ private fun SectionTitle(text: String, count: Int, modifier: Modifier = Modifier
         Text(
             text = text,
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = MiuixTheme.colorScheme.onBackground,
         )
         Spacer(Modifier.width(8.dp))
         Text(
             text = "$count 部",
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MiuixTheme.colorScheme.onBackgroundVariant,
         )
     }
 }
@@ -360,14 +361,14 @@ private fun UpdateRow(
             Text(
                 text = item.favorite.title,
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = MiuixTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = "已更至 第${item.totalEpisodes}集",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MiuixTheme.colorScheme.onBackgroundVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -375,7 +376,7 @@ private fun UpdateRow(
                 // 「已看到」+ 当前看到那一集的视频标题（取自历史记录），没有历史时退回集数
                 text = "已看到 ${item.seenEpisodeTitle()}",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MiuixTheme.colorScheme.onBackgroundVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -383,7 +384,7 @@ private fun UpdateRow(
                 text = item.favorite.sourceName.ifBlank { "来源" },
                 // 与上面两行统一字号（bodySmall 12sp）
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MiuixTheme.colorScheme.onBackgroundVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -447,20 +448,20 @@ private fun PopupUpdateRow(
             Text(
                 text = item.favorite.title,
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = MiuixTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = "已更至 第${item.totalEpisodes}集",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MiuixTheme.colorScheme.onBackgroundVariant,
                 maxLines = 1,
             )
             Text(
                 text = "已看到 ${item.seenEpisodeTitle()}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MiuixTheme.colorScheme.onBackgroundVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.ican.tvplay.ui.theme.Spacing
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 空页面占位：上方颜文字、下方「空空如也」。
@@ -29,7 +30,7 @@ fun EmptyState(modifier: Modifier = Modifier) {
         ) {
             Text(
                 text = "¯\\_(ツ)_/¯",
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
+                color = MiuixTheme.colorScheme.onBackgroundVariant.copy(alpha = 0.82f),
                 fontSize = 24.sp,
                 lineHeight = 30.sp,
                 textAlign = TextAlign.Center,
@@ -37,7 +38,7 @@ fun EmptyState(modifier: Modifier = Modifier) {
             Text(
                 text = "空空如也",
                 modifier = Modifier.padding(top = Spacing.titleContentGap),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
+                color = MiuixTheme.colorScheme.onBackgroundVariant.copy(alpha = 0.82f),
                 fontSize = 18.sp,
                 lineHeight = 24.sp,
                 textAlign = TextAlign.Center,
