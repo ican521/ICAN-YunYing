@@ -2118,7 +2118,7 @@ private fun LineSection(
                         else MiuixTheme.colorScheme.surfaceContainer,
                         shape,
                     )
-                    .padding(8.dp),
+                    .padding(12.dp),
             ) {
                 Text(
                     text = source.flag,
@@ -2241,6 +2241,7 @@ private fun EpisodeSection(
                     title = ep.title,
                     selected = idx == episodeIndex,
                     onClick = { onEpisodeSelect(idx) },
+                    enforceMinHeight = false,
                 )
             }
         }
@@ -3137,6 +3138,7 @@ private fun EpisodeChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     showBorder: Boolean = false,
+    enforceMinHeight: Boolean = true,
 ) {
     val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
     // 描边：仅"更多"弹窗（showBorder=true）且仅深色模式；浅色模式选中/未选中一律不描边。
@@ -3151,10 +3153,11 @@ private fun EpisodeChip(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            // 高度随内容撑开（四边 16dp 内边距 + 单行文字），并兜底到 episodeChipHeight：
-            // 与选集网格的分页高度换算（rowsPerPage）严格一致，否则文字行高不足 48dp 时
-            // 网格视口会多出不可见余量，表现为弹窗底部间距比左右大
-            .defaultMinSize(minWidth = 40.dp, minHeight = Spacing.episodeChipHeight)
+            // 展开网格弹窗兜底到 episodeChipHeight（与分页换算一致）；单行横滑选集栏不约束高度
+            .defaultMinSize(
+                minWidth = 40.dp,
+                minHeight = if (enforceMinHeight) Spacing.episodeChipHeight else 0.dp,
+            )
             // 选集列表自带选中态：整列表（含未选中项）统一不要按压/点击蒙层，选中色即反馈
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false, pressEffect = false)
             // "更多"弹窗选中填充对齐全屏选集弹窗（BrandBlueDeep 25%）；选集栏用全局选中填充透明度
@@ -3166,7 +3169,7 @@ private fun EpisodeChip(
                 shape,
             )
             .then(borderModifier)
-            .padding(8.dp),
+            .padding(12.dp),
     ) {
         Text(
             text = title,
