@@ -87,6 +87,8 @@ class TvPlayApplication : Application(), SingletonImageLoader.Factory {
         debugSeedJob = appScope.launch {
             runCatching { com.ican.tvplay.data.DebugUpdateSeed.runOnceIfNeeded(this@TvPlayApplication, container) }
                 .onFailure { android.util.Log.e("DebugUpdateSeed", "seed fail", it) }
+            runCatching { com.ican.tvplay.data.DebugUpdateReseed.runOnceIfNeeded(this@TvPlayApplication, container) }
+                .onFailure { android.util.Log.e("DebugUpdateReseed", "reseed fail", it) }
         }
     }
 
