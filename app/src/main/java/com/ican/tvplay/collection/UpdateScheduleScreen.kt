@@ -13,7 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +53,21 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
     val viewModel = appViewModel { com.ican.tvplay.ui.UpdatesViewModel(this) }
     val favorites by viewModel.scheduleFavorites.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+
+    // 进入页面时排一次序：已配置星期的排前面，未配置的排后面；
+    // 记录下顺序后不再重排，避免页面内改星期时当前行突然跳走
+    val orderIds = remember { mutableStateListOf<String>() }
+    LaunchedEffect(favorites) {
+        val ids = favorites.map { it.videoId }
+        if (orderIds.isEmpty()) {
+            orderIds.addAll(favorites.sortedBy { it.updateWeekday == 0 }.map { it.videoId })
+        } else if (orderIds.any { it !in ids }) {
+            orderIds.removeAll { it !in ids }
+        }
+    }
+    val favoritesById = favorites.associateBy { it.videoId }
+    val orderedFavorites = orderIds.mapNotNull { favoritesById[it] } +
+        favorites.filter { it.videoId !in orderIds }
 
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
@@ -111,7 +129,7 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
                 } else {
                     item {
                         Card(modifier = Modifier.fillMaxWidth()) {
-                            favorites.forEachIndexed { index, favorite ->
+                            orderedFavorites.forEachIndexed { index, favorite ->
                                 if (index > 0) {
                                     // 分隔线左右各缩 16dp，与卡片内容边距一致
                                     HorizontalDivider(
