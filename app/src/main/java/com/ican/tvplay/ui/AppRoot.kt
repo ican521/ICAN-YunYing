@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -162,6 +163,9 @@ fun AppRoot() {
             val todayItems = updatesViewModel.startupTodayUpdates()
             if (todayItems.isNotEmpty()) {
                 updatePopupItems = todayItems
+                // 先让弹窗以 show=false 完成首次组合，再显示：
+                // 若首次组合就是 show=true，miuix 会跳过进入/退出动画
+                withFrameNanos { }
                 showUpdatePopup = true
                 updatesViewModel.markPopupShown()
             }
