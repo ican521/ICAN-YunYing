@@ -51,7 +51,7 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
 import com.ican.tvplay.ui.components.PosterImage
@@ -367,7 +367,7 @@ private fun FavoriteCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = MiuixIcons.Delete,
+                        imageVector = MiuixIcons.Demibold.Close,
                         contentDescription = "删除",
                         tint = Color.White,
                         modifier = Modifier.size(14.dp),
@@ -622,7 +622,7 @@ private fun HistoryCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = MiuixIcons.Delete,
+                        imageVector = MiuixIcons.Demibold.Close,
                         contentDescription = "删除",
                         tint = Color.White,
                         modifier = Modifier.size(14.dp),
