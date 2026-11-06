@@ -274,7 +274,7 @@ fun FloatingBottomBar(
             .coerceIn(0, tabsCount - 1)
     }
 
-    val dampedDragAnimation = remember(animationScope, tabsCount, density, isLtr) {
+    val dampedDragAnimation = remember(animationScope, tabsCount, density, isLtr, isBlurEnabled) {
         DampedDragAnimation(
             animationScope = animationScope,
             initialValue = selectedIndex.toFloat(),
@@ -282,6 +282,9 @@ fun FloatingBottomBar(
             visibilityThreshold = 0.001f,
             initialScale = 1f,
             pressedScale = 78f / 56f,
+            // 液态玻璃模式保持按下即触发；普通/毛玻璃模式只在长按超过阈值后才给按压缩小
+            delayPressUntilLongPress = !isBlurEnabled,
+            pressOnActivate = isBlurEnabled,
             canDrag = { offset ->
                 offset.x in 0f..totalWidthPx
             },
