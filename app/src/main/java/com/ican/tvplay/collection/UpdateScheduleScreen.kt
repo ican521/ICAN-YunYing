@@ -60,7 +60,12 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
     LaunchedEffect(favorites) {
         val ids = favorites.map { it.videoId }
         if (orderIds.isEmpty()) {
-            orderIds.addAll(favorites.sortedBy { it.updateWeekday == 0 }.map { it.videoId })
+            orderIds.addAll(
+                favorites
+                    // 已配置的按周一→周日排前面，未配置的排最后
+                    .sortedBy { if (it.updateWeekday == 0) 8 else it.updateWeekday }
+                    .map { it.videoId },
+            )
         } else if (orderIds.any { it !in ids }) {
             orderIds.removeAll { it !in ids }
         }
