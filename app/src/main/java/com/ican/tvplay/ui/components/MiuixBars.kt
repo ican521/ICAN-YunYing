@@ -12,7 +12,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.MaterialTheme
 import com.ican.tvplay.ui.theme.Spacing
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InputField
@@ -39,8 +38,8 @@ val LocalEnableTopBarBlur = staticCompositionLocalOf { true }
 @Composable
 fun rememberBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
     if (!enableBlur || !isRenderEffectSupported()) return null
-    // 基色用项目 background（深色纯黑），不用 miuix surface（深灰），保证深色下毛玻璃与全局底色一致
-    val surfaceColor = MaterialTheme.colorScheme.background
+    // 基色用 miuix surface（浅色 #F7F7F7 / 深色 #000000），与项目背景色一致，保证深色下毛玻璃与全局底色一致
+    val surfaceColor = MiuixTheme.colorScheme.surface
     return rememberLayerBackdrop {
         drawRect(surfaceColor)
         drawContent()
@@ -65,7 +64,7 @@ fun BlurredBar(
                 blurRadius = 25f,
                 colors = BlurColors(
                     blendColors = listOf(
-                        BlendColorEntry(color = MaterialTheme.colorScheme.background.copy(alpha = 0.87f)),
+                        BlendColorEntry(color = MiuixTheme.colorScheme.surface.copy(alpha = 0.87f)),
                     ),
                 ),
             )
@@ -108,7 +107,7 @@ fun MiuixBackButton(
         Icon(
             imageVector = MiuixIcons.Regular.ChevronBackward,
             contentDescription = "返回",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier.size(iconSize),
         )
     }

@@ -24,9 +24,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.MaterialTheme
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import top.yukonga.miuix.kmp.interfaces.HoldDownInteraction
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.MiuixIndication
 
 /**
@@ -121,12 +121,12 @@ fun Modifier.tvCardEffect(
         frozenAt = if (freezeScale) animatedScale else null
     }
 
-    val accent = MaterialTheme.colorScheme.primary
+    val accent = MiuixTheme.colorScheme.primary
     val isDark = LocalDarkTheme.current
 
     // KernelSU 同款按压特效：miuix 库 MiuixIndication，蒙层色默认取主题文字色（深浅色模式自动适配）；
     // pressColor 显式指定时用指定色（视频卡片固定浅黑，深色模式与浅色表现一致）
-    val pressIndicationColor = pressColor ?: MaterialTheme.colorScheme.onSurface
+    val pressIndicationColor = pressColor ?: MiuixTheme.colorScheme.onSurface
     val pressIndication = remember(pressIndicationColor) { MiuixIndication(color = pressIndicationColor) }
     // 深色模式补强：弹窗展开期间暗遮罩（60% 黑）会把 MiuixIndication 的 10% 白蒙层压到不可见，
     // 保持态再叠一层同色 20% 蒙层（仅深色），保证「弹窗存活期卡片持续按压变色」肉眼可见

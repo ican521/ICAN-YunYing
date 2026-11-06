@@ -415,7 +415,7 @@ private fun CrossSourceVideoCard(
                 pressColor = LightOnSurface,
             ),
         insideMargin = androidx.compose.foundation.layout.PaddingValues(0.dp),
-        colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
     ) {
         Box(
             modifier = Modifier
