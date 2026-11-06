@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,6 +58,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -142,7 +144,7 @@ fun UpdateScreen(
                     top = innerPadding.calculateTopPadding(),
                     bottom = Spacing.bottomBarInset,
                 ),
-                verticalArrangement = Arrangement.spacedBy(Spacing.updateCardGap),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
             ) {
                     item {
                         Card(modifier = Modifier.fillMaxWidth()) {
@@ -159,53 +161,27 @@ fun UpdateScreen(
                         }
                     }
 
-                    // 标题与第一条同属一个 item：标题底部到底部卡片的间距只保留
-                    // titleContentGap(12dp)，不会再被 spacedBy(sectionSpacing) 叠加 16dp
+                    // 每个板块整体一张大卡片（与设置页一致的连体列表）：标题在卡片内，
+                    // 条目之间用分隔线相连，点击仅显示按压蒙层、不做缩放
                     if (today.isNotEmpty()) {
-                        itemsIndexed(
-                            today,
-                            key = { _, item -> item.favorite.videoId },
-                            contentType = { _, _ -> "update" },
-                        ) { index, item ->
-                            Column(
-                                // 卡片间距改为 12dp 后，这里补 4dp 使板块之间的间距仍为 sectionSpacing(16dp)
-                                modifier = if (index == 0) {
-                                    Modifier.padding(top = Spacing.sectionSpacing - Spacing.updateCardGap)
-                                } else {
-                                    Modifier
-                                },
-                            ) {
-                                if (index == 0) SectionTitle("今日更新", today.size)
-                                UpdateRow(
-                                    item = item,
-                                    onClick = { play(item) },
-                                    onMarkRead = { viewModel.markRead(item.favorite.videoId) },
-                                )
-                            }
+                        item {
+                            UpdateSectionCard(
+                                title = "今日更新",
+                                items = today,
+                                onPlay = { play(it) },
+                                onMarkRead = { viewModel.markRead(it.favorite.videoId) },
+                            )
                         }
                     }
 
                     if (pending.isNotEmpty()) {
-                        itemsIndexed(
-                            pending,
-                            key = { _, item -> item.favorite.videoId },
-                            contentType = { _, _ -> "update" },
-                        ) { index, item ->
-                            Column(
-                                // 同上：首条上方补 4dp，保证与上一板块的间距为 16dp
-                                modifier = if (index == 0) {
-                                    Modifier.padding(top = Spacing.sectionSpacing - Spacing.updateCardGap)
-                                } else {
-                                    Modifier
-                                },
-                            ) {
-                                if (index == 0) SectionTitle("待看更新", pending.size)
-                                UpdateRow(
-                                    item = item,
-                                    onClick = { play(item) },
-                                    onMarkRead = { viewModel.markRead(item.favorite.videoId) },
-                                )
-                            }
+                        item {
+                            UpdateSectionCard(
+                                title = "待看更新",
+                                items = pending,
+                                onPlay = { play(it) },
+                                onMarkRead = { viewModel.markRead(it.favorite.videoId) },
+                            )
                         }
                     }
 
@@ -275,10 +251,40 @@ fun UpdatePopupDialog(
     }
 }
 
+/** 板块大卡片：卡片内「标题 + 连体条目列表」（与设置页一致，条目之间不画分隔线） */
 @Composable
-private fun SectionTitle(text: String, count: Int) {
+private fun UpdateSectionCard(
+    title: String,
+    items: List<FavoriteUpdateItem>,
+    onPlay: (FavoriteUpdateItem) -> Unit,
+    onMarkRead: (FavoriteUpdateItem) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(0.dp)) {
+        SectionTitle(
+            text = title,
+            count = items.size,
+            modifier = Modifier.padding(
+                start = Spacing.dialogItemPadding,
+                end = Spacing.dialogItemPadding,
+                top = Spacing.dialogItemPadding,
+            ),
+        )
+        items.forEach { item ->
+            UpdateRow(
+                item = item,
+                onClick = { onPlay(item) },
+                onMarkRead = { onMarkRead(item) },
+            )
+        }
+        // 卡片底部留白，与顶部 16dp 内边距在视觉上平衡
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String, count: Int, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.titleContentGap),
+        modifier = modifier.fillMaxWidth().padding(bottom = Spacing.titleContentGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -295,95 +301,88 @@ private fun SectionTitle(text: String, count: Int) {
     }
 }
 
-/** 更新条目：海报 + 标题 + 更新进度 + 单部「已看」 */
+/** 更新条目：板块大卡片内的一行（海报 + 标题 + 更新进度 + 单部「已看」） */
 @Composable
 private fun UpdateRow(
     item: FavoriteUpdateItem,
     onClick: () -> Unit,
     onMarkRead: () -> Unit,
 ) {
-    val isDark = LocalDarkTheme.current
-    Card(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
+            // 与设置页条目一致：连体行按压只显示 miuix 蒙层，不做缩放
             .tvCardEffect(
                 onClick = onClick,
-                // 卡片圆角与预览海报一致
-                shape = SquircleShape(Spacing.updateCardCorner),
-                focusedScale = 1.03f,
+                shape = RectangleShape,
+                focusedScale = 1f,
                 glow = false,
+            )
+            // 左右与卡片内边距一致；上下 8dp 让相邻条目之间保持 16dp，看起来是连体列表
+            .padding(
+                start = Spacing.dialogItemPadding,
+                end = Spacing.dialogItemPadding,
+                top = 8.dp,
+                bottom = 8.dp,
             ),
-        cornerRadius = Spacing.updateCardCorner,
-        insideMargin = PaddingValues(0.dp),
-        // 浅色主题去掉卡片背景（直接透出页面底色）；深色主题沿用 miuix 默认背景
-        colors = if (isDark) {
-            CardDefaults.defaultColors()
-        } else {
-            CardDefaults.defaultColors(color = Color.Transparent)
-        },
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            // 海报与文字贴卡片最左；上下不留白，卡片高度与海报（76dp）一致
-            modifier = Modifier.fillMaxWidth().padding(end = Spacing.dialogItemPadding),
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
+            modifier = Modifier
+                .size(width = 56.dp, height = 76.dp)
+                .clip(SquircleShape(Spacing.updateCardCorner)),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(width = 56.dp, height = 76.dp)
-                    .clip(SquircleShape(Spacing.updateCardCorner)),
-            ) {
-                PosterImage(
-                    title = item.favorite.title,
-                    cover = item.favorite.cover,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            // 海报右侧 4 行：标题贴海报顶部、站源贴海报底部，中间两行分别是「更新至 x 集」
-            // 和「当前看到那一集的视频标题」，整列高度与海报一致
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(76.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = item.favorite.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = "已更至 第${item.totalEpisodes}集",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    // 「已看到」+ 当前看到那一集的视频标题（取自历史记录），没有历史时退回集数
-                    text = "已看到 ${item.seenEpisodeTitle()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = item.favorite.sourceName.ifBlank { "来源" },
-                    // 与上面两行统一字号（bodySmall 12sp）
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            TextButton(
-                text = "已看",
-                onClick = onMarkRead,
+            PosterImage(
+                title = item.favorite.title,
+                cover = item.favorite.cover,
+                modifier = Modifier.fillMaxSize(),
             )
         }
+        Spacer(Modifier.width(12.dp))
+        // 海报右侧 4 行：标题贴海报顶部、站源贴海报底部，中间两行分别是「更新至 x 集」
+        // 和「当前看到那一集的视频标题」，整列高度与海报一致
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .height(76.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = item.favorite.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "已更至 第${item.totalEpisodes}集",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                // 「已看到」+ 当前看到那一集的视频标题（取自历史记录），没有历史时退回集数
+                text = "已看到 ${item.seenEpisodeTitle()}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = item.favorite.sourceName.ifBlank { "来源" },
+                // 与上面两行统一字号（bodySmall 12sp）
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        TextButton(
+            text = "已看",
+            onClick = onMarkRead,
+        )
     }
 }
 
