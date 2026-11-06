@@ -101,6 +101,9 @@ object Spacing {
     /** 追番更新页条目卡片之间的间距（卡片高度贴内容，间距比常规板块略紧） */
     val updateCardGap = 12.dp
 
+    /** 追番更新页条目卡片与其预览海报的统一圆角（连续曲率） */
+    val updateCardCorner = 10.dp
+
     /** 海报叠加层（角标 / 编辑删除钮）距海报边缘的外边距 */
     val posterOverlayMargin = 8.dp
 

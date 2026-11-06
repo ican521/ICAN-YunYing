@@ -308,10 +308,12 @@ private fun UpdateRow(
             .fillMaxWidth()
             .tvCardEffect(
                 onClick = onClick,
-                shape = SquircleShape(Spacing.corner),
+                // 卡片圆角与预览海报一致
+                shape = SquircleShape(Spacing.updateCardCorner),
                 focusedScale = 1.03f,
                 glow = false,
             ),
+        cornerRadius = Spacing.updateCardCorner,
         insideMargin = PaddingValues(0.dp),
         // 浅色主题去掉卡片背景（直接透出页面底色）；深色主题沿用 miuix 默认背景
         colors = if (isDark) {
@@ -328,7 +330,7 @@ private fun UpdateRow(
             Box(
                 modifier = Modifier
                     .size(width = 56.dp, height = 76.dp)
-                    .clip(SquircleShape(10.dp)),
+                    .clip(SquircleShape(Spacing.updateCardCorner)),
             ) {
                 PosterImage(
                     title = item.favorite.title,
