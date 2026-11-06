@@ -1894,14 +1894,14 @@ private fun PreviewPlayerArea(
 
 /**
  * 影片基础信息区块（竖屏信息流 / 横屏右侧信息列共用）：
- * 标题+收藏 / 更新备注 / 站源 / 年份·地区·类型
+ * 标题+收藏 / 更新胶囊（主题色锚点） / 站源·年份·地区·类型（紧凑单行）
  */
 @Composable
 private fun VideoMetaSection(
     v: Video,
     lineFlag: String,
     modifier: Modifier = Modifier,
-    itemSpacing: Dp = 6.dp,
+    itemSpacing: Dp = 10.dp,
     // 标题行 → 下方信息行的间距：竖屏补 8dp（收藏钮缩 32dp 后需恢复呼吸感）；
     // 横屏 0（横屏标题顶部需与小窗顶对齐，仅标题下方要呼吸感，由 metaTopPadding 提供）
     metaTopPadding: Dp = 0.dp,
@@ -1930,52 +1930,47 @@ private fun VideoMetaSection(
             Spacer(modifier = Modifier.height(metaTopPadding))
         }
 
-        // 更新备注/站源/年份/地区/类型：信息行之间保持行内密度 itemSpacing
-        Column(verticalArrangement = Arrangement.spacedBy(itemSpacing)) {
-            // 更新备注（fongmi: remark）
-            val eps = v.playSources.firstOrNull()?.episodes ?: v.episodes
-            val remark = when {
-                eps.isEmpty() -> ""
-                eps.last().title.contains("完结") -> "已完结"
-                else -> "更新至第${eps.size}集"
-            }
-            if (remark.isNotBlank()) {
+        // 更新备注（主题色胶囊，作为 meta 区块唯一视觉锚点）
+        val eps = v.playSources.firstOrNull()?.episodes ?: v.episodes
+        val remark = when {
+            eps.isEmpty() -> ""
+            eps.last().title.contains("完结") -> "已完结"
+            else -> "更新至第${eps.size}集"
+        }
+        if (remark.isNotBlank()) {
+            Spacer(modifier = Modifier.height(itemSpacing))
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.primary)
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            ) {
                 Text(
                     text = remark,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimary,
                 )
             }
+        }
 
-            // 站源（fongmi: site）
+        // 站源·年份·地区·类型：紧凑单行排列，减少垂直占用
+        val metaParts = buildList {
+            val sourceName = v.sourceName.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")
+            if (sourceName.isNotBlank()) add(sourceName)
+            if (v.year > 0) add(v.year.toString())
+            if (v.region.isNotBlank()) add(v.region)
+            if (v.categoryName.isNotBlank()) add(v.categoryName)
+        }
+        if (metaParts.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "站源：${v.sourceName.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")}",
-                style = MaterialTheme.typography.bodyMedium,
+                text = metaParts.joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-
-            // 年份/地区/类型各占一行（fongmi: other）
-            if (v.year > 0) {
-                Text(
-                    text = "年份：${v.year}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (v.region.isNotBlank()) {
-                Text(
-                    text = "地区：${v.region}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (v.categoryName.isNotBlank()) {
-                Text(
-                    text = "类型：${v.categoryName}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
     }
 }
@@ -2582,8 +2577,6 @@ private fun FullscreenPlayLayout(
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
     var showEpisodes by remember { mutableStateOf(false) }
-    // 视频信息弹窗（仿 fongmi InfoDialog：标题/请求头/播放地址，可复制链接分享）
-    var showInfo by remember { mutableStateOf(false) }
     // 选集或字幕设置侧栏打开期间抑制全部播放手势
     val sideSheetOpen = showEpisodes || subtitleSettingsOpen
     // fongmi 同款手势反馈浮层：拖动 seek 预览目标 / 长按倍速提示
@@ -2820,7 +2813,6 @@ private fun FullscreenPlayLayout(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     )
-                    PlainTopBtn(AppIcons.Info, "视频信息") { showInfo = true }
                     PlainTopBtn(AppIcons.Cast, "投屏") { }
                 }
 
@@ -3047,16 +3039,6 @@ private fun FullscreenPlayLayout(
             onSettings = { showText = false; onOpenSubtitleSettings() },
             onDismiss = { showText = false },
             selectedBorderColor = BrandBlueDeep,
-        )
-        // 视频信息（仿 fongmi InfoDialog）：标题 / 播放地址 / 请求头，可复制链接与分享
-        PlayerInfoDialog(
-            show = showInfo,
-            info = Players.externalPlayInfo(),
-            title = listOfNotNull(
-                current?.title?.takeIf { it.isNotBlank() },
-                "第${episodeIndex + 1}集",
-            ).joinToString(" · "),
-            onDismiss = { showInfo = false },
         )
     }
 }
@@ -3467,126 +3449,6 @@ private fun <T> OptionDialog(
                 }
             }
         }
-    }
-}
-
-/**
- * 视频信息弹窗（仿 fongmi InfoDialog）：展示当前解析到的真实播放地址与请求头，
- * 支持复制链接、分享；该地址为解析后的直链（不经过本地代理），可直接粘贴到浏览器播放。
- */
-@Composable
-private fun PlayerInfoDialog(
-    show: Boolean,
-    info: Players.ExternalPlayInfo?,
-    title: String,
-    onDismiss: () -> Unit,
-) {
-    val context = LocalContext.current
-    val maxDialogHeight = with(LocalConfiguration.current) { (screenHeightDp * 0.6f).dp }
-    val url = info?.url.orEmpty()
-    val headerText = info?.headers.orEmpty().entries.joinToString("\n") { "${it.key}: ${it.value}" }
-
-    OverlayDialog(
-        show = show,
-        // 同 OptionDialog：标题自绘，边距由内容区自控
-        title = null,
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        renderInRootScaffold = true,
-        largeScreen = false,
-        onDismissRequest = onDismiss,
-        outsideMargin = DpSize(Spacing.dialogContentMargin, 0.dp),
-        insideMargin = DpSize(0.dp, 0.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = maxDialogHeight),
-        ) {
-            Text(
-                text = "视频信息",
-                style = MaterialTheme.typography.titleLarge,
-                color = MiuixTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = Spacing.dialogTitleGap),
-            )
-            Spacer(modifier = Modifier.height(Spacing.dialogTitleGap))
-            Column(
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .padding(horizontal = Spacing.dialogContentMargin)
-                    .verticalScroll(rememberScrollState())
-                    .padding(bottom = Spacing.dialogContentMargin),
-                verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
-            ) {
-                InfoField("标题", title.ifBlank { "未知" })
-                InfoField("播放地址", url.ifBlank { "暂无播放地址（本地文件或尚未解析完成）" })
-                InfoField("请求头", headerText.ifBlank { "无" })
-                Text(
-                    text = "复制地址后可粘贴到浏览器直接播放；部分站点需要带上请求头。",
-                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.dialogButtonGap),
-                    modifier = Modifier.padding(top = 4.dp),
-                ) {
-                    TextButton(
-                        text = "复制链接",
-                        onClick = {
-                            if (url.isBlank()) {
-                                Toast.makeText(context, "暂无播放地址", Toast.LENGTH_SHORT).show()
-                            } else {
-                                context.getSystemService(ClipboardManager::class.java)
-                                    ?.setPrimaryClip(ClipData.newPlainText("视频地址", url))
-                                Toast.makeText(context, "已复制链接", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(
-                        text = "分享",
-                        onClick = {
-                            if (url.isNotBlank()) {
-                                val send = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, url)
-                                    putExtra(Intent.EXTRA_SUBJECT, title)
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                context.startActivity(Intent.createChooser(send, "分享视频地址"))
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** 信息弹窗单行字段：小号标签 + 自动换行的值（圆角浅底，随弹窗内容一起滚动） */
-@Composable
-private fun InfoField(label: String, value: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant, SquircleShape(Spacing.corner))
-            .padding(Spacing.dialogItemPadding),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
     }
 }
 
