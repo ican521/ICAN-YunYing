@@ -62,6 +62,7 @@ import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.EmptyState
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
+import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
@@ -408,6 +409,7 @@ private fun FavoriteCard(
 @Composable
 fun HistoryScreen(
     onPlay: (videoId: String, episodeIndex: Int, flag: String, preInit: Boolean) -> Unit,
+    onBack: () -> Unit = {},
 ) {
     val viewModel = appViewModel { CollectionViewModel(this) }
     val histories by viewModel.histories.collectAsStateWithLifecycle()
@@ -441,6 +443,10 @@ fun HistoryScreen(
                         .height(Spacing.centeredTopBarHeight),
                     contentAlignment = Alignment.Center,
                 ) {
+                    Box(modifier = Modifier.align(Alignment.CenterStart).padding(start = pageHorizontalPadding())) {
+                        // 返回箭头不画圆形底色，尺寸/图标与其他页返回键一致（48dp 按钮 + 20dp 图标）
+                        MiuixBackButton(onClick = onBack, showBackground = false)
+                    }
                     Text(
                         text = "播放历史",
                         style = MaterialTheme.typography.titleLarge,
