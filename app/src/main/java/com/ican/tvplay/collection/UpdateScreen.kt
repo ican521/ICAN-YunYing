@@ -54,7 +54,6 @@ import com.ican.tvplay.ui.theme.SquircleShape
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -281,10 +280,10 @@ private fun UpdateRow(
                 glow = false,
             ),
         insideMargin = PaddingValues(0.dp),
-        colors = CardDefaults.defaultColors(color = MaterialTheme.colorScheme.surfaceVariant),
+        // 与上方「重新检查 / 全部标记已读」卡片一致：miuix 默认 surfaceContainer（浅色主题为纯白）
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.dialogItemPadding),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
