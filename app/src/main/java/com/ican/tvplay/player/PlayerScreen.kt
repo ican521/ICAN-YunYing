@@ -1943,7 +1943,7 @@ private fun VideoMetaSection(
                 Text(
                     text = remark,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MiuixTheme.colorScheme.onBackgroundVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -1951,7 +1951,7 @@ private fun VideoMetaSection(
             Text(
                 text = "站源：${v.sourceName.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MiuixTheme.colorScheme.onBackgroundVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             // 年份/地区/类型各占一行（fongmi: other）
@@ -1959,21 +1959,21 @@ private fun VideoMetaSection(
                 Text(
                     text = "年份：${v.year}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MiuixTheme.colorScheme.onBackgroundVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (v.region.isNotBlank()) {
                 Text(
                     text = "地区：${v.region}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MiuixTheme.colorScheme.onBackgroundVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (v.categoryName.isNotBlank()) {
                 Text(
                     text = "类型：${v.categoryName}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MiuixTheme.colorScheme.onBackgroundVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -2498,7 +2498,7 @@ private fun DescriptionSection(v: Video, modifier: Modifier = Modifier) {
         Text(
             text = cleanDescription(v.description).ifBlank { "暂无简介" },
             style = MaterialTheme.typography.bodyMedium,
-            color = MiuixTheme.colorScheme.onBackgroundVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -3813,7 +3813,7 @@ private fun SubInfoRow(label: String, value: String) {
         Text(
             value,
             style = MaterialTheme.typography.bodyMedium,
-            color = MiuixTheme.colorScheme.onBackgroundVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -4108,7 +4108,7 @@ private fun PlayerErrorScreen(
                 text = playerError
                     ?: "未找到该视频（ID: $videoId），请返回重试或检查站源是否可用",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MiuixTheme.colorScheme.onBackgroundVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             Box(
