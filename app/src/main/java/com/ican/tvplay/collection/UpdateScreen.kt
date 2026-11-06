@@ -320,12 +320,13 @@ private fun UpdateRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            // 与设置页条目一致：连体行按压只显示 miuix 蒙层，不做缩放
+            // 连体行仅保留点击，不显示任何按压蒙层/缩放（按压反馈只留给右侧「已看」按钮）
             .tvCardEffect(
                 onClick = onClick,
                 shape = RectangleShape,
                 focusedScale = 1f,
                 glow = false,
+                pressEffect = false,
             )
             // 左右与卡片内边距一致；上下 8dp 让相邻条目之间保持 16dp，看起来是连体列表
             .padding(
@@ -388,9 +389,17 @@ private fun UpdateRow(
             )
         }
         Spacer(Modifier.width(8.dp))
+        // 每行重复的次级操作：去掉灰底胶囊，改成透明底文字按钮，避免按钮盖过更新信息；
+        // 按压时的 miuix 蒙层/缩放由 TextButton 自带，保留
         TextButton(
             text = "已看",
             onClick = onMarkRead,
+            colors = ButtonDefaults.textButtonColors(
+                color = Color.Transparent,
+                disabledColor = Color.Transparent,
+                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
         )
     }
 }
