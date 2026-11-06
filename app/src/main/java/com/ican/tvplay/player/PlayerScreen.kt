@@ -53,6 +53,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -1489,10 +1490,18 @@ private fun PortraitPlayLayout(
     // 竖屏预览小窗跟随视频比例（fongmi onVideoSizeChanged → PlayerView.aspectRatio 同款）：
     // 宽占满、高 = 宽 / 视频宽高比；视频为竖屏（宽高比<1）时高度封顶并横向收缩居中，避免把详情信息流顶飞。
     // 平板横屏走 LandscapePlayLayout（固定 38% 宽 16:9），不进入此布局，天然不随视频比例调整。
-    BoxWithConstraints(
+    // 状态栏占位区：与视频区统一黑底（沉浸式），避免返回动画中浅色 surface 被转场压暗成灰色横条。
+    // 用独立黑条承载状态栏高度，而不给视频占位容器加背景——否则不透明背景会盖住底层常驻的 PlayerView 画面
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .statusBarsPadding(),
+            .windowInsetsTopHeight(WindowInsets.statusBars)
+            .background(Color.Black),
+    )
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth(),
     ) {
         val ratio = playerState.videoAspectRatio.takeIf { it > 0f } ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
         // 可用宽高（px，statusBarsPadding 之后）；高度封顶比例防止竖屏视频占满整屏
@@ -2113,9 +2122,9 @@ private fun LineSection(
                         pressEffect = false,
                     )
                     .background(
-                        // 与选集 EpisodeChip 选中态完全一致：浅主色填充、无描边
-                        if (selected) MiuixTheme.colorScheme.primaryContainer
-                        else MiuixTheme.colorScheme.surfaceContainer,
+                        // 与选集 EpisodeChip 选中态一致：tertiaryContainer 浅蓝底
+                        if (selected) MiuixTheme.colorScheme.tertiaryContainer
+                        else MiuixTheme.colorScheme.secondaryVariant,
                         shape,
                     )
                     .padding(12.dp),
@@ -2123,8 +2132,8 @@ private fun LineSection(
                 Text(
                     text = source.flag,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer
-                    else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    color = if (selected) MiuixTheme.colorScheme.onTertiaryContainer
+                    else MiuixTheme.colorScheme.onSecondaryVariant,
                     maxLines = 1,
                 )
             }
@@ -3160,14 +3169,10 @@ private fun EpisodeChip(
             )
             // 选集列表自带选中态：整列表（含未选中项）统一不要按压/点击蒙层，选中色即反馈
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false, pressEffect = false)
-            // "更多"弹窗选中填充对齐全屏选集弹窗（BrandBlueDeep 25%）；选集栏用全局选中填充透明度
-            // "更多"弹窗未选中底色固定 #F0F0F0（深浅色模式一致）；单行选集栏用 surfaceContainer
+            // 方案 A：选中 tertiaryContainer 浅蓝底；未选中 secondaryVariant（浅 #F0F0F0 / 深 #434343）
             .background(
-                if (selected) {
-                    if (showBorder) BrandBlueDeep.copy(alpha = EpisodeSelectedFillAlpha)
-                    else MiuixTheme.colorScheme.primaryContainer
-                } else if (showBorder) Color(0xFFF0F0F0)
-                else MiuixTheme.colorScheme.surfaceContainer,
+                if (selected) MiuixTheme.colorScheme.tertiaryContainer
+                else MiuixTheme.colorScheme.secondaryVariant,
                 shape,
             )
             .then(borderModifier)
@@ -3176,8 +3181,8 @@ private fun EpisodeChip(
         Text(
             text = title,
             style = MaterialTheme.typography.labelMedium,
-            color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer
-            else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            color = if (selected) MiuixTheme.colorScheme.onTertiaryContainer
+            else MiuixTheme.colorScheme.onSecondaryVariant,
             maxLines = 1,
         )
     }
