@@ -258,7 +258,7 @@ private fun WordFlowRow(
                         focusedScale = 1.05f,
                         glow = false,
                     )
-                    .background(MiuixTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(percent = 50))
+                    .background(MiuixTheme.colorScheme.surfaceContainer, RoundedCornerShape(percent = 50))
                     .height(Spacing.chipHeight)
                     .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.Center,

@@ -296,14 +296,14 @@ private fun SiteSourceChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    // 未选中底色：仅浅色模式用 miuix surfaceContainerHigh（KernelSU 搜索栏同款 #E8E8E8），
+    // 未选中底色：浅色模式用 miuix surfaceContainer（纯白，与设置页卡片一致），
     // 深色模式保持项目 DarkSurfaceVariant（#242424 全局板块色）不变
     val bg = if (selected) {
         MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
     } else if (com.ican.tvplay.ui.theme.LocalDarkTheme.current) {
         MaterialTheme.colorScheme.surfaceVariant
     } else {
-        MiuixTheme.colorScheme.surfaceContainerHigh
+        MiuixTheme.colorScheme.surfaceContainer
     }
     val fg = if (selected) MaterialTheme.colorScheme.primary
     else MiuixTheme.colorScheme.onSurfaceVariantSummary
