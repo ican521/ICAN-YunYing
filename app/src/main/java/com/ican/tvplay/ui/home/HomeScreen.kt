@@ -988,7 +988,7 @@ private fun HomeTopBar(
             Icon(
                 imageVector = AppIcons.History,
                 contentDescription = "历史",
-                tint = MiuixTheme.colorScheme.onSurfaceContainerHigh,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(22.dp),
             )
         }
