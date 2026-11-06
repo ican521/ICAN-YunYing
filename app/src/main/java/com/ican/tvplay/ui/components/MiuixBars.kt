@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import com.ican.tvplay.ui.theme.Spacing
@@ -82,11 +83,13 @@ fun BlurredBar(
  * 同款按压缩放），保证全局顶栏按钮形态统一。
  *
  * @param showBackground 为 false 时不绘制圆形底色，仅保留箭头图标（追番更新页等要求纯箭头）
+ * @param iconSize 箭头图标尺寸，默认 24dp；搜索页等与搜索栏并排的场景可传更小值收敛视觉
  */
 @Composable
 fun MiuixBackButton(
     onClick: () -> Unit,
     showBackground: Boolean = true,
+    iconSize: Dp = 24.dp,
 ) {
     Box(
         contentAlignment = Alignment.Center,
@@ -106,7 +109,7 @@ fun MiuixBackButton(
             imageVector = MiuixIcons.Regular.ChevronBackward,
             contentDescription = "返回",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(24.dp),
+            modifier = Modifier.size(iconSize),
         )
     }
 }
