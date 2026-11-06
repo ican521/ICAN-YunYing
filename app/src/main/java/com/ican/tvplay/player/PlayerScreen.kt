@@ -2118,7 +2118,7 @@ private fun LineSection(
                         else MiuixTheme.colorScheme.surfaceContainer,
                         shape,
                     )
-                    .padding(Spacing.dialogItemPadding),
+                    .padding(8.dp),
             ) {
                 Text(
                     text = source.flag,
@@ -3166,7 +3166,7 @@ private fun EpisodeChip(
                 shape,
             )
             .then(borderModifier)
-            .padding(Spacing.dialogItemPadding),
+            .padding(8.dp),
     ) {
         Text(
             text = title,
