@@ -142,7 +142,8 @@ fun UpdateScreen(
                     start = pageHorizontalPadding(),
                     end = pageHorizontalPadding(),
                     top = innerPadding.calculateTopPadding(),
-                    bottom = Spacing.bottomBarInset,
+                    // 本页没有悬浮底栏，底部只留常规内容留白（16dp）
+                    bottom = Spacing.contentBottomInset,
                 ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
             ) {
