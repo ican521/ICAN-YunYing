@@ -43,8 +43,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
@@ -296,11 +298,12 @@ private fun SiteSourceChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val isDark = com.ican.tvplay.ui.theme.LocalDarkTheme.current
     // 未选中底色：浅色模式用 miuix surfaceContainer（纯白，与设置页卡片一致），
     // 深色模式保持项目 DarkSurfaceVariant（#242424 全局板块色）不变
     val bg = if (selected) {
         MaterialTheme.colorScheme.primary.copy(alpha = SelectionFillAlpha)
-    } else if (com.ican.tvplay.ui.theme.LocalDarkTheme.current) {
+    } else if (isDark) {
         MaterialTheme.colorScheme.surfaceVariant
     } else {
         MiuixTheme.colorScheme.surfaceContainer
@@ -327,6 +330,15 @@ private fun SiteSourceChip(
                 focusedScale = 1.05f,
                 glow = false,
                 pressEffect = false,
+            )
+            .then(
+                // 浅色模式加一圈淡阴影，与底栏阴影同款（radius 10dp、黑 10%）；深色模式不加
+                if (!isDark) {
+                    Modifier.dropShadow(
+                        shape = shape,
+                        shadow = Shadow(radius = 10.dp, color = Color.Black, alpha = 0.1f),
+                    )
+                } else Modifier,
             )
             .background(bg, shape)
             .height(Spacing.chipHeight)

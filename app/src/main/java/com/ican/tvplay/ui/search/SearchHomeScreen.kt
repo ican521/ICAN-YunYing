@@ -31,7 +31,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,6 +55,7 @@ import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
+import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.Spacing
 
 /**
@@ -248,17 +251,25 @@ private fun WordFlowRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.searchChipGap),
         verticalArrangement = Arrangement.spacedBy(Spacing.searchChipGap),
     ) {
+        val isDark = LocalDarkTheme.current
+        val chipShape = RoundedCornerShape(percent = 50)
         words.forEach { word ->
             Box(
                 modifier = Modifier
                     .tvCardEffect(
                         onClick = { onWordClick(word) },
                         onLongClick = onWordLongClick?.let { { it(word) } },
-                        shape = RoundedCornerShape(percent = 50),
+                        shape = chipShape,
                         focusedScale = 1.05f,
                         glow = false,
                     )
-                    .background(MiuixTheme.colorScheme.surfaceContainer, RoundedCornerShape(percent = 50))
+                    .then(
+                        if (isDark) Modifier else Modifier.dropShadow(
+                            shape = chipShape,
+                            shadow = Shadow(radius = 10.dp, color = Color.Black, alpha = 0.1f),
+                        ),
+                    )
+                    .background(MiuixTheme.colorScheme.surfaceContainer, chipShape)
                     .height(Spacing.chipHeight)
                     .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.Center,
