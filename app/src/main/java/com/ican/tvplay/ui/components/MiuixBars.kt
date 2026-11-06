@@ -103,7 +103,7 @@ fun MiuixBackButton(
             ),
     ) {
         Icon(
-            imageVector = MiuixIcons.Normal.Back,
+            imageVector = MiuixIcons.Demibold.Back,
             contentDescription = "返回",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(24.dp),

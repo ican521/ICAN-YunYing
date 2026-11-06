@@ -66,7 +66,7 @@ object AppIcons {
             "M12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z",
     )
 
-    val Back: ImageVector = MiuixIcons.Normal.Back
+    val Back: ImageVector = MiuixIcons.Demibold.Back
 
     val Play: ImageVector = vector("play", "M8 5v14l11-7z")
 
