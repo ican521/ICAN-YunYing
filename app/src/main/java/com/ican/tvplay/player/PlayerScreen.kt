@@ -53,7 +53,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -459,22 +458,15 @@ fun PlayerScreen(
     LaunchedEffect(inPip, pipExitHold, fullscreen, pendingFullscreen) {
         Players.setVideoPresent(videoPresent)
     }
-    // 画中画窗口在 HyperOS 上是透明表面（fongmi 同样透明，但它内容铺满 100%）：
-    // 应用内容只要没稳定铺满整个窗口，底部缝隙就会透过透明窗口露出浅色桌面/白线。
-    // 设 decorView.setBackgroundColor 不影响 HyperOS 画中画窗口的表面透明与否——
-    // 决定它的是 window 背景。视频铺满全屏/画中画期间把 window 背景设成不透明黑色，
-    // 任何未覆盖缝隙都显示黑色；退出后恢复原窗口背景。
     val activityWindow = (context as? Activity)?.window
     // HyperOS 画中画窗口是透明表面，透明与否由 window 背景决定（decorView 背景无效）。
-    // 视频铺满全屏/画中画期间把 window 背景设成不透明黑色，任何未覆盖缝隙都显示黑色；
-    // 退出后恢复主题根底色。
+    // 沉浸式：竖屏视频顶到屏幕顶，返回转场页面右移时 SurfaceView 顶部对齐滞后缺一块，
+    // 透出窗口背景。播放页期间 window 背景始终黑色，缝隙融入视频（fongmi 详情页一体黑同款）；
+    // 页面本体由根 Box 主题底色铺满不受影响，退出后恢复主题根底色。
     val themeWindowBg = MiuixTheme.colorScheme.surface.toArgb()
-    LaunchedEffect(videoPresent) {
-        val window = activityWindow ?: return@LaunchedEffect
-        window.setBackgroundDrawable(
-            android.graphics.drawable.ColorDrawable(
-                if (videoPresent) android.graphics.Color.BLACK else themeWindowBg,
-            ),
+    LaunchedEffect(Unit) {
+        activityWindow?.setBackgroundDrawable(
+            android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
         )
     }
     DisposableEffect(Unit) {
@@ -917,7 +909,8 @@ fun PlayerScreen(
     // 进入全屏后的旋转等待期（pendingFullscreen）也要收起系统栏，否则旋转动画中顶部/底部
     // 会露出浅色状态栏/导航栏，看着像视频头尾由白色渐变成黑色
     val immersive = fullscreen || landscapeFullscreen || landZooming || pendingFullscreen != null
-    LaunchedEffect(immersive) {
+    val darkTheme = LocalDarkTheme.current
+    LaunchedEffect(immersive, isLandscape, darkTheme) {
         Players.isFullscreen = immersive
         val activity = context as? Activity ?: return@LaunchedEffect
         val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
@@ -928,13 +921,19 @@ fun PlayerScreen(
         } else {
             controller.show(WindowInsetsCompat.Type.systemBars())
         }
+        // 竖屏视频顶到屏幕顶（沉浸式）：状态栏图标浮在视频上，强制白色；
+        // 横屏小窗在状态栏下方、状态栏区仍是主题底色，图标颜色随主题
+        controller.isAppearanceLightStatusBars = isLandscape && !darkTheme
     }
 
     // 页面销毁时恢复状态栏（防止全屏中直接退出后状态栏缺失）
     DisposableEffect(Unit) {
         onDispose {
             (context as? Activity)?.window?.let { w ->
-                WindowCompat.getInsetsController(w, w.decorView).show(WindowInsetsCompat.Type.systemBars())
+                val controller = WindowCompat.getInsetsController(w, w.decorView)
+                controller.show(WindowInsetsCompat.Type.systemBars())
+                // 恢复主题状态栏图标色（播放页竖屏沉浸式强制了白色图标）
+                controller.isAppearanceLightStatusBars = !darkTheme
             }
         }
     }
@@ -1133,7 +1132,8 @@ fun PlayerScreen(
         // 宽占满、高=宽/视频宽高比；视频为竖屏（宽高比<1）时高度封顶并横向收缩居中。
         // PlayerView 必须与覆盖层同比例——否则宽银幕源会在固定 16:9 容器里留上下黑边、控制层与画面错位
         val videoRatio = playerState.videoAspectRatio.takeIf { it > 0f } ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
-        val portraitPreviewMaxH = (screenH - statusBarTop) * VERTICAL_PREVIEW_MAX_HEIGHT_FRACTION
+        // 沉浸式：视频顶到屏幕顶，可用高度即全屏高（fongmi 详情页同款，状态栏图标浮在视频上）
+        val portraitPreviewMaxH = screenH * VERTICAL_PREVIEW_MAX_HEIGHT_FRACTION
         val portraitPreviewH = (screenW / videoRatio).coerceAtMost(portraitPreviewMaxH)
         val portraitPreviewW = (portraitPreviewH * videoRatio).coerceAtMost(screenW)
         // 视频比例就绪时小窗高宽平滑过渡（否则从默认 16:9 跳到实际比例会瞬间跳变）
@@ -1238,10 +1238,9 @@ fun PlayerScreen(
                         .background(Color.Black)
                 else ->
                     Modifier
-                        // 竖屏小窗跟随视频比例（fongmi PlayerView.aspectRatio 同款）：顶部对齐，横向收缩时居中，
-                        // 与 PortraitPlayLayout 覆盖层像素对齐（否则宽银幕源 16:9 留黑边 + 控制层错位）
+                        // 竖屏小窗跟随视频比例（fongmi PlayerView.aspectRatio 同款）：顶到屏幕顶（沉浸式），
+                        // 横向收缩时居中，与 PortraitPlayLayout 覆盖层像素对齐（否则宽银幕源 16:9 留黑边 + 控制层错位）
                         .fillMaxWidth()
-                        .statusBarsPadding()
                         .offset { IntOffset(((screenW - animatedPreviewW) / 2f).roundToPx(), 0) }
                         .width(animatedPreviewW)
                         .height(animatedPreviewH)
@@ -1490,21 +1489,13 @@ private fun PortraitPlayLayout(
     // 竖屏预览小窗跟随视频比例（fongmi onVideoSizeChanged → PlayerView.aspectRatio 同款）：
     // 宽占满、高 = 宽 / 视频宽高比；视频为竖屏（宽高比<1）时高度封顶并横向收缩居中，避免把详情信息流顶飞。
     // 平板横屏走 LandscapePlayLayout（固定 38% 宽 16:9），不进入此布局，天然不随视频比例调整。
-    // 状态栏占位区：与视频区统一黑底（沉浸式），避免返回动画中浅色 surface 被转场压暗成灰色横条。
-    // 用独立黑条承载状态栏高度，而不给视频占位容器加背景——否则不透明背景会盖住底层常驻的 PlayerView 画面
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .windowInsetsTopHeight(WindowInsets.statusBars)
-            .background(Color.Black),
-    )
-
+    // 沉浸式：视频区顶到屏幕顶（fongmi 详情页同款，状态栏图标浮在视频上），无独立状态栏占位区
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth(),
     ) {
         val ratio = playerState.videoAspectRatio.takeIf { it > 0f } ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
-        // 可用宽高（px，statusBarsPadding 之后）；高度封顶比例防止竖屏视频占满整屏
+        // 可用宽高（px，从屏幕顶开始）；高度封顶比例防止竖屏视频占满整屏
         val availW = constraints.maxWidth
         val availH = constraints.maxHeight
         val maxH = (availH * VERTICAL_PREVIEW_MAX_HEIGHT_FRACTION).roundToInt()
@@ -1519,6 +1510,7 @@ private fun PortraitPlayLayout(
                     .align(Alignment.Center)
                     .width(w)
                     .height(h),
+                statusBarInset = true,
                 playerState = playerState,
                 showLoading = false,
                 controlsVisible = controlsVisible,
@@ -1765,6 +1757,8 @@ private fun Modifier.animatedSize(width: State<Dp>, height: State<Dp>): Modifier
 @Composable
 private fun PreviewPlayerArea(
     modifier: Modifier,
+    /** 竖屏沉浸式（视频顶到屏幕顶）时顶栏避让状态栏；横屏小窗在状态栏下方，传 false */
+    statusBarInset: Boolean = false,
     playerState: Players.PlayerState,
     /** 详情未就绪时强制显示转圈（fongmi 进页面即 showProgress），就绪后跟播放器 buffering 状态 */
     showLoading: Boolean = false,
@@ -1861,6 +1855,8 @@ private fun PreviewPlayerArea(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
+                        // 沉浸式竖屏：视频顶到屏幕顶，顶栏避让状态栏（状态栏图标浮在视频上）
+                        .then(if (statusBarInset) Modifier.statusBarsPadding() else Modifier)
                         .padding(start = 4.dp, end = 4.dp, top = 4.dp),
                 ) {
                     PlainTopBtn(AppIcons.Back, "返回") { onBack() }
