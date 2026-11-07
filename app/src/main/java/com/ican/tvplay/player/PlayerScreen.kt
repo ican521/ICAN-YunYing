@@ -19,7 +19,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
@@ -1479,16 +1478,11 @@ private fun PortraitPlayLayout(
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
 
-    // 退场渐变黑：返回转场期间视频层（SurfaceView）与页面存在纵向错位，
-    // 视频顶部会露出一条透出上一页的浅色缝。退场开始即把视频区渐隐为纯黑（页面自身黑底兜住），
-    // 缝隙被黑盖掉；返回手势中途取消时自动渐变回视频画面。
+    // 返回一开始立即变黑：返回转场期间视频层（SurfaceView）与页面存在纵向错位，
+    // 视频顶部会露出一条透出上一页的浅色缝。进入退场状态即刻把视频区盖成纯黑（页面自身黑底兜住），
+    // 缝隙被黑盖掉；返回手势中途取消时自动恢复视频画面。
     val navScope = LocalNavTransitionScope.current
     val exiting = navScope.role == NavRole.Outgoing
-    val previewExitBlack = animateFloatAsState(
-        targetValue = if (exiting) 1f else 0f,
-        animationSpec = tween(durationMillis = 180),
-        label = "previewExitBlack",
-    )
 
     // 单一 Column 根：NavHost 目的地容器会给多个顶层子元素传播 fill 约束，
     // 多顶层发射会让底部标签栏被拉伸成全屏、白色背景盖住视频区（"纯白底+只有按钮"的根因）
@@ -1543,7 +1537,7 @@ private fun PortraitPlayLayout(
                 onEnterFullscreen = onEnterFullscreen,
                 onSeekDragChange = onSeekDragChange,
             )
-            // 退场遮罩：只在本页退场时覆盖视频区（含视频顶部与状态栏黑块的交界），渐变到纯黑
+            // 退场遮罩：本页退场时立即把视频区（含视频顶部与状态栏黑块的交界）盖成纯黑
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -1551,8 +1545,7 @@ private fun PortraitPlayLayout(
                     .height(h)
                     .drawWithContent {
                         drawContent()
-                        val alpha = previewExitBlack.value
-                        if (alpha > 0f) drawRect(Color.Black, alpha = alpha)
+                        if (exiting) drawRect(Color.Black)
                     },
             )
         }
