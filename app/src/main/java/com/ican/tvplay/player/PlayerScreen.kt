@@ -187,7 +187,6 @@ import com.ican.tvplay.ui.theme.EpisodeSelectedFillAlpha
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
-import com.ican.tvplay.ui.theme.optionBorderColor
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
@@ -3012,9 +3011,9 @@ private fun FullscreenPlayLayout(
                 else -> Players.Kernel.entries.firstOrNull { it.label == label }?.let(onEngineChange)
             }
             showEngine = false
-        }, selectedBorderColor = BrandBlueDeep) { showEngine = false }
-        OptionDialog(showSpeed, "倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }, selectedBorderColor = BrandBlueDeep) { showSpeed = false }
-        OptionDialog(showBuffer, "缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }, selectedBorderColor = BrandBlueDeep) { showBuffer = false }
+        }) { showEngine = false }
+        OptionDialog(showSpeed, "倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
+        OptionDialog(showBuffer, "缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
         if (showEpisodes) {
             EpisodeSideSheet(
                 episodes = lineEpisodes,
@@ -3026,7 +3025,7 @@ private fun FullscreenPlayLayout(
                 onDismiss = { showEpisodes = false },
             )
         }
-        OptionDialog(showAudio, "音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }, selectedBorderColor = BrandBlueDeep) { showAudio = false }
+        OptionDialog(showAudio, "音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }) { showAudio = false }
         SubtitleDialog(
             show = showText,
             tracks = playerState.textTracks,
@@ -3035,7 +3034,6 @@ private fun FullscreenPlayLayout(
             onAddSubtitle = { showText = false; onAddSubtitle() },
             onSettings = { showText = false; onOpenSubtitleSettings() },
             onDismiss = { showText = false },
-            selectedBorderColor = BrandBlueDeep,
         )
     }
 }
@@ -3352,15 +3350,10 @@ private fun MiniLargeBtn(icon: ImageVector, desc: String, onClick: () -> Unit, i
 private fun <T> OptionDialog(
     show: Boolean, title: String, options: List<T>, current: T?, label: (T) -> String,
     onSelect: (T) -> Unit,
-    // 选中态描边色：默认走主题色（竖屏/横屏小窗与选集 chip 一致）；
-    // 全屏传入选集侧边栏同款 BrandBlueDeep，保证全屏功能弹窗与选集选中描边同色
-    selectedBorderColor: Color? = null,
     onDismiss: () -> Unit,
 ) {
     // 选项过多（倍速档位/音轨）时限高可滚动，避免超出屏幕被裁、末项露出半截边缘
     val maxDialogHeight = with(LocalConfiguration.current) { (screenHeightDp * 0.65f).dp }
-    // 深色模式才给选项描边（浅色底与选项底色对比已足够）
-    val isDark = LocalDarkTheme.current
     // 与设置页「站源设置」同款：miuix OverlayDialog 底部呼出（滑入滑出 + 遮罩由库处理）
     OverlayDialog(
         show = show,
@@ -3404,11 +3397,6 @@ private fun <T> OptionDialog(
                 options.forEach { opt ->
                     val selected = opt == current
                     val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
-                    val borderColor = when {
-                        !isDark -> null
-                        selected && selectedBorderColor != null -> selectedBorderColor
-                        else -> optionBorderColor(selected)
-                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -3417,19 +3405,14 @@ private fun <T> OptionDialog(
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                 indication = null,
                             ) { onSelect(opt) }
+                            // 与线路/选集 chip 一致：选中 primaryContainer 实心蓝 + 白字；未选中 secondary 灰底，无描边
                             .background(
                                 if (selected) MiuixTheme.colorScheme.primaryContainer
-                                else MiuixTheme.colorScheme.surfaceContainer, shape,
-                            )
-                            // 深色模式给每个选项描一圈（宽度/颜色走全局常量，与选集「更多」选项一致）
-                            .then(
-                                if (borderColor != null) {
-                                    Modifier.border(Spacing.optionBorder, borderColor, shape)
-                                } else Modifier,
+                                else MiuixTheme.colorScheme.secondary, shape,
                             )
                             .padding(Spacing.dialogItemPadding),
                     ) {
-                        Text(label(opt), style = MaterialTheme.typography.bodyMedium, color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer else MiuixTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                        Text(label(opt), style = MaterialTheme.typography.bodyMedium, color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer else MiuixTheme.colorScheme.onSecondaryVariant, modifier = Modifier.weight(1f))
                         if (selected) Icon(AppIcons.Check, null, tint = MiuixTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(18.dp))
                     }
                 }
@@ -3443,8 +3426,6 @@ private fun SubtitleDialog(
     show: Boolean, tracks: List<Players.TrackOption>, textDisabled: Boolean,
     onSelect: (Players.TrackOption) -> Unit,
     onAddSubtitle: () -> Unit, onSettings: () -> Unit, onDismiss: () -> Unit,
-    // 同 OptionDialog：全屏传入选集侧边栏同款蓝，选中描边与选集同色
-    selectedBorderColor: Color? = null,
 ) {
     // 与设置页「站源设置」同款：miuix OverlayDialog 底部呼出
     // 标题自绘 + insideMargin 归零（同 OptionDialog）：消除库默认 24dp 内边距造成的底部背景遮挡条
@@ -3485,9 +3466,9 @@ private fun SubtitleDialog(
                     .padding(bottom = Spacing.dialogContentMargin),
                 verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
             ) {
-                tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected, selectedBorderColor) { onSelect(t) } }
-                SubRow("添加字幕", false, selectedBorderColor) { onAddSubtitle() }
-                SubRow("字幕设置", false, selectedBorderColor) { onSettings() }
+                tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected) { onSelect(t) } }
+                SubRow("添加字幕", false) { onAddSubtitle() }
+                SubRow("字幕设置", false) { onSettings() }
             }
         }
     }
@@ -3777,17 +3758,11 @@ private fun OffsetStepButton(text: String, onClick: () -> Unit) {
 @Composable
 private fun SubInfoRow(label: String, value: String) {
     val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
-    val isDark = LocalDarkTheme.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .background(MiuixTheme.colorScheme.surfaceContainer, shape)
-            .then(
-                if (isDark) {
-                    Modifier.border(Spacing.optionBorder, optionBorderColor(false), shape)
-                } else Modifier,
-            )
             .padding(Spacing.dialogItemPadding),
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MiuixTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
@@ -3802,14 +3777,8 @@ private fun SubInfoRow(label: String, value: String) {
 }
 
 @Composable
-private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color? = null, onClick: () -> Unit) {
+private fun SubRow(label: String, selected: Boolean, onClick: () -> Unit) {
     val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
-    val isDark = LocalDarkTheme.current
-    val borderColor = when {
-        !isDark -> null
-        selected && selectedBorderColor != null -> selectedBorderColor
-        else -> optionBorderColor(selected)
-    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -3818,19 +3787,14 @@ private fun SubRow(label: String, selected: Boolean, selectedBorderColor: Color?
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                 indication = null,
             ) { onClick() }
+            // 与线路/选集 chip 一致：选中 primaryContainer 实心蓝 + 白字；未选中 secondary 灰底，无描边
             .background(
                 if (selected) MiuixTheme.colorScheme.primaryContainer
-                else MiuixTheme.colorScheme.surfaceContainer, shape,
-            )
-            // 深色模式给每个选项描一圈（与选集「更多」选项一致，全局常量）
-            .then(
-                if (borderColor != null) {
-                    Modifier.border(Spacing.optionBorder, borderColor, shape)
-                } else Modifier,
+                else MiuixTheme.colorScheme.secondary, shape,
             )
             .padding(Spacing.dialogItemPadding),
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer else MiuixTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer else MiuixTheme.colorScheme.onSecondaryVariant, modifier = Modifier.weight(1f))
         if (selected) Icon(AppIcons.Check, null, tint = MiuixTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(18.dp))
     }
 }
