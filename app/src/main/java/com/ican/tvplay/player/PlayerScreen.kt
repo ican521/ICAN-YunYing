@@ -1478,11 +1478,10 @@ private fun PortraitPlayLayout(
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
 
-    // 返回一开始立即变黑：返回转场期间视频层（SurfaceView）与页面存在纵向错位，
-    // 视频顶部会露出一条透出上一页的浅色缝。进入退场状态即刻把视频区盖成纯黑（页面自身黑底兜住），
-    // 缝隙被黑盖掉；返回手势中途取消时自动恢复视频画面。
+    // 返回（含预测性返回手势拖动过程中）立即变黑：SurfaceView 与页面存在纵向错位，
+    // 视频顶部会露出透出上一页的浅色缝。只要本页处于任何退出进度（relativeDepth < 0，
+    // 包括预测性返回手势拖动、提交退场），就把视频区盖成纯黑；松手取消退出时自动恢复画面。
     val navScope = LocalNavTransitionScope.current
-    val exiting = navScope.role == NavRole.Outgoing
 
     // 单一 Column 根：NavHost 目的地容器会给多个顶层子元素传播 fill 约束，
     // 多顶层发射会让底部标签栏被拉伸成全屏、白色背景盖住视频区（"纯白底+只有按钮"的根因）
@@ -1537,7 +1536,9 @@ private fun PortraitPlayLayout(
                 onEnterFullscreen = onEnterFullscreen,
                 onSeekDragChange = onSeekDragChange,
             )
-            // 退场遮罩：本页退场时立即把视频区（含视频顶部与状态栏黑块的交界）盖成纯黑
+            // 退场遮罩：本页处于任何退出进度时立即把视频区盖成纯黑。
+            // 不能用 role == Outgoing——预测性返回手势（边缘拖动预览）过程中 role 仍是 Top，
+            // 但 relativeDepth 已为负；放 drawWithContent 里读 snapshot state 只触发重绘不触发重组。
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -1545,7 +1546,7 @@ private fun PortraitPlayLayout(
                     .height(h)
                     .drawWithContent {
                         drawContent()
-                        if (exiting) drawRect(Color.Black)
+                        if (navScope.relativeDepth < 0f) drawRect(Color.Black)
                     },
             )
         }
