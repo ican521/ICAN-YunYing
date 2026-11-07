@@ -36,6 +36,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
@@ -133,14 +134,27 @@ class PlayerActivity : ComponentActivity(), PlayerHost {
                     CompositionLocalProvider(
                         LocalContentColor provides MiuixTheme.colorScheme.onBackground,
                     ) {
-                        PlayerScreen(
-                            videoId = videoId,
-                            startEpisode = episodeIndex,
-                            startFlag = flag,
-                            preInitialized = preInit,
-                            forceStart = forceStart,
-                            onBack = { finish() },
-                        )
+                        // miuix 根 Scaffold（与 AppRoot 同款）：播放页的 OptionDialog/字幕弹窗等
+                        // OverlayDialog 均为 renderInRootScaffold=true，必须渲染在根 Scaffold
+                        // 的弹窗宿主层，没有根 Scaffold 时弹窗静默不显示
+                        val pipTransition by Players.pipTransition.collectAsStateWithLifecycle()
+                        val videoPresent by Players.videoPresent.collectAsStateWithLifecycle()
+                        val rootBackground =
+                            if (pipTransition || videoPresent) androidx.compose.ui.graphics.Color.Black
+                            else MiuixTheme.colorScheme.surface
+                        Scaffold(
+                            containerColor = rootBackground,
+                            contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+                        ) {
+                            PlayerScreen(
+                                videoId = videoId,
+                                startEpisode = episodeIndex,
+                                startFlag = flag,
+                                preInitialized = preInit,
+                                forceStart = forceStart,
+                                onBack = { finish() },
+                            )
+                        }
                     }
                 }
             }
