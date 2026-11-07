@@ -41,15 +41,4 @@ sealed interface Route : NavKey, Parcelable {
     @Parcelize
     @Serializable
     data object UpdateSchedule : Route
-
-    @Parcelize
-    @Serializable
-    data class Player(
-        val videoId: String,
-        val episodeIndex: Int,
-        val flag: String = "",
-        val preInit: Boolean = false,
-        /** 强制从指定集开播（追番更新入口）：不再被历史记录覆盖到上次观看集 */
-        val forceStart: Boolean = false,
-    ) : Route
 }

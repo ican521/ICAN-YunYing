@@ -27,7 +27,6 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -150,8 +149,6 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.nav.core.LocalNavTransitionScope
-import top.yukonga.miuix.kmp.nav.transition.NavRole
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
@@ -380,7 +377,7 @@ fun PlayerScreen(
                         "videoRect=${rect.width()}x${rect.height()}@${rect.left},${rect.top}",
                     )
                 }
-                (context as? com.ican.tvplay.MainActivity)?.syncPipSourceRect(rect)
+                (context as? PlayerHost)?.syncPipSourceRect(rect)
             }
         }
     }
@@ -953,23 +950,10 @@ fun PlayerScreen(
         onDispose { Players.uiExitNavigator = null }
     }
 
-    // 返回转场（含系统手势预测返回）一开始就暂停：转场期间视频若继续按片源帧率（约 25fps）出帧，
-    // 会把整页转场观感拉低到 25fps；先让画面静止，转场即可按屏幕刷新率满帧播放。
-    // 用导航转场作用域判断「本页正在退场」，返回键/边缘手势/页面返回按钮三种返回方式都能覆盖。
-    val navTransitionScope = LocalNavTransitionScope.current
-    var pausedForExit by remember { mutableStateOf(false) }
-    LaunchedEffect(navTransitionScope) {
-        snapshotFlow { navTransitionScope.role }.collect { role ->
-            if (role == NavRole.Outgoing && backgroundMode != BACKGROUND_ON) {
-                pausedForExit = true
-                Players.onPause()
-            } else if (pausedForExit) {
-                // 预测返回手势中途取消时本页仍是 Top，恢复播放，避免取消返回后画面停在暂停态
-                pausedForExit = false
-                Players.onResume()
-            }
-        }
-    }
+    // 返回前先暂停：独立 Activity 退场时视频若继续按片源帧率（约 25fps）出帧，
+    // 会让系统窗口转场观感被拉低到 25fps；暂停后转场按屏幕刷新率播放。
+    // 后台续播模式不暂停，否则退出后会打断「后台播放」。
+
 
     // Surface 生命周期
     DisposableEffect(Unit) {
@@ -1478,11 +1462,6 @@ private fun PortraitPlayLayout(
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
 
-    // 返回（含预测性返回手势拖动过程中）立即变黑：SurfaceView 与页面存在纵向错位，
-    // 视频顶部会露出透出上一页的浅色缝。只要本页处于任何退出进度（relativeDepth < 0，
-    // 包括预测性返回手势拖动、提交退场），就把视频区盖成纯黑；松手取消退出时自动恢复画面。
-    val navScope = LocalNavTransitionScope.current
-
     // 单一 Column 根：NavHost 目的地容器会给多个顶层子元素传播 fill 约束，
     // 多顶层发射会让底部标签栏被拉伸成全屏、白色背景盖住视频区（"纯白底+只有按钮"的根因）
     Column(
@@ -1535,19 +1514,6 @@ private fun PortraitPlayLayout(
                 onNext = onNext,
                 onEnterFullscreen = onEnterFullscreen,
                 onSeekDragChange = onSeekDragChange,
-            )
-            // 退场遮罩：本页处于任何退出进度时立即把视频区盖成纯黑。
-            // 不能用 role == Outgoing——预测性返回手势（边缘拖动预览）过程中 role 仍是 Top，
-            // 但 relativeDepth 已为负；放 drawWithContent 里读 snapshot state 只触发重绘不触发重组。
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .width(w)
-                    .height(h)
-                    .drawWithContent {
-                        drawContent()
-                        if (navScope.relativeDepth < 0f) drawRect(Color.Black)
-                    },
             )
         }
     }
@@ -2505,9 +2471,9 @@ private fun cleanDescription(raw: String): String {
     return text.replace(Regex("^免费分享[\\s\\u3000]*"), "").trim()
 }
 
-/** 退出全屏/离开播放页后恢复屏幕方向：小屏手机锁回竖屏（禁用自动横向），平板恢复系统自由方向 */
+/** 退出全屏/离开播放页后恢复屏幕方向：统一由播放页宿主 Activity 决定 */
 private fun Activity?.restoreDefaultOrientation() {
-    (this as? com.ican.tvplay.MainActivity)?.restoreDefaultOrientation()
+    (this as? PlayerHost)?.restoreDefaultOrientation()
 }
 
 /** 简介区块：直接全部显示，不折叠、不可点击 */

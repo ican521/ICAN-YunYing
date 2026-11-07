@@ -67,6 +67,16 @@
             </intent-filter>
         </activity>
 
+        <!-- 播放页独立 Activity（fongmi 同款结构）：不参与主页导航转场，避免 SurfaceView 错位 -->
+        <activity
+            android:name=".player.PlayerActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:supportsPictureInPicture="true"
+            android:theme="@style/Theme.TvPlay"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- 播放保活前台服务（设置开关控制，仅播放期间存在） -->
         <service
             android:name=".player.core.PlaybackService"
