@@ -71,6 +71,7 @@
         <activity
             android:name=".player.PlayerActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
+            android:enableOnBackInvokedCallback="true"
             android:exported="false"
             android:launchMode="singleTop"
             android:supportsPictureInPicture="true"
