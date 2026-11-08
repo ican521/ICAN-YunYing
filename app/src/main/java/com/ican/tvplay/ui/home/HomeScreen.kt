@@ -114,7 +114,6 @@ import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
@@ -752,15 +751,13 @@ fun SitePickerDialog(
     onToggleChangeable: (TvBoxSite) -> Unit = {},
     toggleVersion: Int = 0,
 ) {
-    // 深色模式下选项与弹窗底同色（铺平列表）；浅色保持 surfaceContainer 卡片块
-    val isDark = LocalDarkTheme.current
     OverlayDialog(
         show = show,
         // 标题自绘 + insideMargin 归零：与全屏播放页底部功能弹窗一致，
         // 列表可一直显示/滚动到弹窗最底缘，不再被 miuix 默认 24dp 内边距留出空白带
         title = null,
-        // 弹窗底色与设置页保持一致（miuix surface：#000000 / #F7F7F7），列表项仍用 surfaceContainer
-        backgroundColor = MiuixTheme.colorScheme.surface,
+        // 弹窗底色与设置页导入配置弹窗一致（miuix surfaceContainer：深 #242424 / 浅 #FFFFFF）
+        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
         // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
         renderInRootScaffold = true,
         // 三边统一 16dp：底部 = max(16dp, 系统导航栏高度)，跨设备自适应
@@ -819,12 +816,10 @@ fun SitePickerDialog(
                                     glow = false,
                                 )
                                 .background(
-                                    // 当前项高亮；深色未选中项与弹窗底同色（铺平列表），浅色保持卡片块
-                                    when {
-                                        isCurrent -> MiuixTheme.colorScheme.primaryContainer
-                                        isDark -> MiuixTheme.colorScheme.surface
-                                        else -> MiuixTheme.colorScheme.surfaceContainer
-                                    },
+                                    // 当前项高亮；未选中项 = secondaryVariant（与导入配置弹窗取消按钮同色：
+                                    // 深 #434343 / 浅 #F0F0F0，与弹窗底形成分层）
+                                    if (isCurrent) MiuixTheme.colorScheme.primaryContainer
+                                    else MiuixTheme.colorScheme.secondaryVariant,
                                     shape,
                                 )
                                 // 项内边距：四边统一 16dp；上下项间距由 LazyColumn 的 8dp 负责
