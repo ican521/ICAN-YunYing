@@ -27,11 +27,9 @@ import com.ican.tvplay.data.BACKGROUND_PIP
 import com.ican.tvplay.player.core.PlaybackService
 import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.ui.appContainer
-import com.ican.tvplay.ui.theme.DarkSurfaceVariant
-import com.ican.tvplay.ui.theme.LightSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
-import com.ican.tvplay.ui.theme.PopupScrim
 import com.ican.tvplay.ui.theme.TvPlayTheme
+import com.ican.tvplay.ui.theme.appMiuixColors
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -39,8 +37,6 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.theme.darkColorScheme
-import top.yukonga.miuix.kmp.theme.lightColorScheme
 
 /**
  * 播放页宿主能力：PlayerScreen 通过 `context as? PlayerHost` 反向调用。
@@ -125,11 +121,7 @@ class PlayerActivity : ComponentActivity(), PlayerHost {
             TvPlayTheme(themeMode = themeMode, themeColor = themeColor) {
                 val isDark = LocalDarkTheme.current
                 MiuixTheme(
-                    colors = if (isDark) {
-                        darkColorScheme(surfaceContainer = DarkSurfaceVariant, windowDimming = PopupScrim)
-                    } else {
-                        lightColorScheme(surfaceContainer = LightSurface, windowDimming = PopupScrim)
-                    },
+                    colors = appMiuixColors(themeColor, isDark),
                 ) {
                     CompositionLocalProvider(
                         LocalContentColor provides MiuixTheme.colorScheme.onBackground,

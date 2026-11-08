@@ -58,18 +58,14 @@ import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.ui.search.SearchHomeScreen
 import com.ican.tvplay.ui.settings.ColorPaletteScreen
 import com.ican.tvplay.ui.settings.SettingsScreen
-import com.ican.tvplay.ui.theme.DarkSurfaceVariant
-import com.ican.tvplay.ui.theme.LightSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
-import com.ican.tvplay.ui.theme.PopupScrim
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.TvPlayTheme
+import com.ican.tvplay.ui.theme.appMiuixColors
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.theme.darkColorScheme
-import top.yukonga.miuix.kmp.theme.lightColorScheme
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
@@ -115,15 +111,11 @@ fun AppRoot() {
         themeColor = themeColor,
     ) {
         // miuix 主题：为 KernelSU 同款组件提供色板。
-        // 覆写两项：surfaceContainer（miuix Card/弹窗容器色，深色对齐全局板块色 #242424）、
-        // windowDimming（弹窗遮罩，统一引用全局 PopupScrim：黑色 40%，不随主题变化）。
+        // 表面色固定（surfaceContainer 深色 #242424 / 浅色 #FFFFFF，windowDimming 固定 PopupScrim）；
+        // 强调色系（primary 家族）随主题色板种子色派生，换色即时生效。
         val isDark = LocalDarkTheme.current
         MiuixTheme(
-            colors = if (isDark) {
-                darkColorScheme(surfaceContainer = DarkSurfaceVariant, windowDimming = PopupScrim)
-            } else {
-                lightColorScheme(surfaceContainer = LightSurface, windowDimming = PopupScrim)
-            },
+            colors = appMiuixColors(themeColor, isDark),
         ) {
         // miuix-nav 导航（照搬 KernelSU MainActivity：NavDisplay + 圆角裁剪 + 边缘滑动返回）
         val navigator = rememberNavigator(Route.Main)
