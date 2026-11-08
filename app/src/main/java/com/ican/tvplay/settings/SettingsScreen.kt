@@ -468,7 +468,7 @@ private fun InfoRow(label: String, value: String) {
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
             )
         },
     )
