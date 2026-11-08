@@ -114,6 +114,7 @@ import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
@@ -751,6 +752,8 @@ fun SitePickerDialog(
     onToggleChangeable: (TvBoxSite) -> Unit = {},
     toggleVersion: Int = 0,
 ) {
+    // 深色模式下选项与弹窗底同色（铺平列表）；浅色保持 surfaceContainer 卡片块
+    val isDark = LocalDarkTheme.current
     OverlayDialog(
         show = show,
         // 标题自绘 + insideMargin 归零：与全屏播放页底部功能弹窗一致，
@@ -816,8 +819,12 @@ fun SitePickerDialog(
                                     glow = false,
                                 )
                                 .background(
-                                    if (isCurrent) MiuixTheme.colorScheme.primaryContainer
-                                    else MiuixTheme.colorScheme.surfaceContainer,
+                                    // 当前项高亮；深色未选中项与弹窗底同色（铺平列表），浅色保持卡片块
+                                    when {
+                                        isCurrent -> MiuixTheme.colorScheme.primaryContainer
+                                        isDark -> MiuixTheme.colorScheme.surface
+                                        else -> MiuixTheme.colorScheme.surfaceContainer
+                                    },
                                     shape,
                                 )
                                 // 项内边距：四边统一 16dp；上下项间距由 LazyColumn 的 8dp 负责
