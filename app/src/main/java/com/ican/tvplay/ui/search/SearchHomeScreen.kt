@@ -190,15 +190,25 @@ fun SearchHomeScreen(
                         .padding(top = innerPadding.calculateTopPadding()),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
                 ) {
-                    // 上半部分：历史（无历史整块隐藏；长按单个词删除）
+                    // 上半部分：历史（无历史整块隐藏；长按单个词删除，标题右侧给轻量提示）
                     if (history.isNotEmpty()) {
                         Column {
-                            Text(
-                                text = "历史",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MiuixTheme.colorScheme.onSurface,
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                            )
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "历史",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MiuixTheme.colorScheme.onSurface,
+                                )
+                                Spacer(Modifier.weight(1f))
+                                Text(
+                                    text = "长按可删除",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                )
+                            }
                             Spacer(Modifier.height(Spacing.titleContentGap))
                             WordFlowRow(
                                 words = history.asReversed(),
