@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
@@ -268,14 +269,16 @@ private fun UpdatesEntry(
             },
             endActions = {
                 if (total > 0) {
+                    // 最小 22×22：1~2 位数字保持正圆；超过 99 显示 99+，宽度自适应撑成胶囊
                     Box(
                         modifier = Modifier
-                            .size(22.dp)
-                            .background(MiuixTheme.colorScheme.primary, CircleShape),
+                            .sizeIn(minWidth = 22.dp, minHeight = 22.dp)
+                            .background(MiuixTheme.colorScheme.primary, CircleShape)
+                            .padding(horizontal = 4.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = "$total",
+                            text = if (total > 99) "99+" else "$total",
                             style = MaterialTheme.typography.labelSmall,
                             color = MiuixTheme.colorScheme.onPrimary,
                             maxLines = 1,
