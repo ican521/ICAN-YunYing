@@ -236,8 +236,8 @@ fun FloatingBottomBar(
         isBlurEnabled -> surfaceContainer.copy(0.4f)
         else -> Color.White
     }
-    // 关闭毛玻璃时指示器：浅色为 #E1ECFE（KernelSU 浅色模式同款视觉），深色用主题色 15% 透明
-    val plainIndicatorColor = if (isInDark) accentColor.copy(alpha = 0.15f) else Color(0xFFE1ECFE)
+    // 关闭毛玻璃时指示器：浅/深色统一用主题色 15% 透明（浅色叠在白底上约等于原 #E1ECFE 的观感，且跟随色板）
+    val plainIndicatorColor = accentColor.copy(alpha = 0.15f)
 
     // 底部普通毛玻璃（与顶栏同款 textureBlur）：仅在液态玻璃关闭、设备支持 RenderEffect 时生效
     val frostedActive = isFrostedBlur && !isBlurEnabled && isRenderEffectSupported()

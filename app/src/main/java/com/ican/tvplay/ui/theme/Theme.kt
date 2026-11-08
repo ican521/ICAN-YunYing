@@ -102,7 +102,9 @@ fun appMiuixColors(themeColor: Int, isDark: Boolean): Colors {
         }
     }
     val seed = Color(themeColor)
-    val onSeed = if (seed.luminance() > 0.5f) Color.Black else Color.White
+    // 取黑/白中对比更高的一方：亮度 0.179 是两条对比曲线的交点，中亮度色（如 #2196F3）
+    // 用黑字约 7.6:1，比按 0.5 阈值取白字的约 2.9:1 可读性更好
+    val onSeed = if (seed.luminance() > 0.179f) Color.Black else Color.White
     return if (isDark) {
         miuixDarkColorScheme(
             primary = seed,

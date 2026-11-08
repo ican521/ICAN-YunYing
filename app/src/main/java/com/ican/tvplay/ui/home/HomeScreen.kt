@@ -816,9 +816,9 @@ fun SitePickerDialog(
                                     glow = false,
                                 )
                                 .background(
-                                    // 当前项高亮；未选中项 = secondaryVariant（与导入配置弹窗取消按钮同色：
-                                    // 深 #434343 / 浅 #F0F0F0，与弹窗底形成分层）
-                                    if (isCurrent) MiuixTheme.colorScheme.primaryContainer
+                                    // 当前项高亮用主题色 primary（与搜索页站源胶囊选中态一致，对比度高于 primaryContainer）；
+                                    // 未选中项 = secondaryVariant（与导入配置弹窗取消按钮同色：深 #434343 / 浅 #F0F0F0，与弹窗底形成分层）
+                                    if (isCurrent) MiuixTheme.colorScheme.primary
                                     else MiuixTheme.colorScheme.secondaryVariant,
                                     shape,
                                 )
@@ -829,7 +829,7 @@ fun SitePickerDialog(
                                 Text(
                                     text = siteShortName(site.name, site.key),
                                     style = MaterialTheme.typography.titleSmall,
-                                    color = if (isCurrent) MiuixTheme.colorScheme.onPrimaryContainer else MiuixTheme.colorScheme.onSurface,
+                                    color = if (isCurrent) MiuixTheme.colorScheme.onPrimary else MiuixTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -858,8 +858,8 @@ fun SitePickerDialog(
                                 Icon(
                                     imageVector = AppIcons.Check,
                                     contentDescription = "当前站源",
-                                    // 蓝底上统一白色系
-                                    tint = MiuixTheme.colorScheme.onPrimaryContainer,
+                                    // 主题色底上用 onPrimary（按亮度自适应黑/白）
+                                    tint = MiuixTheme.colorScheme.onPrimary,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
@@ -872,7 +872,7 @@ fun SitePickerDialog(
 }
 
 /** 站源行内小开关图标：开=主题色，关/锁定=灰色；锁定时不响应点击。
- *  [selected] = 所在行为当前选中项（蓝底）：图标基色换白色，启用=白100%，未启用/锁定用透明度区分 */
+ *  [selected] = 所在行为当前选中项（主题色底）：图标基色换 onPrimary（黑/白自适应），未启用/锁定用透明度区分 */
 @Composable
 private fun SiteToggleIcon(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -883,8 +883,8 @@ private fun SiteToggleIcon(
     onClick: () -> Unit,
 ) {
     val tint = when {
-        selected && enabled -> MiuixTheme.colorScheme.onPrimaryContainer
-        selected -> MiuixTheme.colorScheme.onPrimaryContainer.copy(alpha = if (locked) 0.25f else 0.45f)
+        selected && enabled -> MiuixTheme.colorScheme.onPrimary
+        selected -> MiuixTheme.colorScheme.onPrimary.copy(alpha = if (locked) 0.25f else 0.45f)
         enabled -> MiuixTheme.colorScheme.primary
         else -> MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = if (locked) 0.25f else 0.45f)
     }

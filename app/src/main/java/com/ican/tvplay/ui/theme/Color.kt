@@ -25,7 +25,8 @@ val DarkScrim = Color(0xCC07070D)
 // 浅色主题
 val LightBackground = Color(0xFFF7F7F7)
 val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFE6E8F1)
+// 中性浅灰，与 miuix light surfaceContainerHigh 对齐（旧企划的蓝紫 #E6E8F1 已废弃）
+val LightSurfaceVariant = Color(0xFFE8E8E8)
 val LightOnSurface = Color(0xFF15161D)
 val LightOnSurfaceMuted = Color(0xFF5C5E6E)
 val LightGlassTint = Color(0x66FFFFFF)
@@ -33,10 +34,10 @@ val LightGlassTintStrong = Color(0x99FFFFFF)
 val LightScrim = Color(0xB3101018)
 
 // 选中项填充透明度（全 App 统一）：主题色叠加在选项底色上的选中高亮，禁止各页面再写 0.15/0.16/0.2 之类的魔法数。
-// 唯一例外是播放页选集选中态（品牌蓝 25%），见 [EpisodeSelectedFillAlpha]。
+// 唯一例外是播放页选集选中态（主题色 25%），见 [EpisodeSelectedFillAlpha]。
 const val SelectionFillAlpha = 0.18f
 
-// 播放页选集选中态填充透明度：全屏侧边选集弹窗与竖屏「更多」弹窗共用，固定品牌蓝 25%
+// 播放页选集选中态填充透明度：全屏侧边选集弹窗与竖屏「更多」弹窗共用，主题色 25%
 const val EpisodeSelectedFillAlpha = 0.25f
 
 // 海报卡片叠加层（首页/收藏/历史/搜索结果共用），保证各页海报视觉一致
