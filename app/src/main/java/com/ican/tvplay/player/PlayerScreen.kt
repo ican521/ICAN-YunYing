@@ -1107,11 +1107,15 @@ fun PlayerScreen(
         val screenH = maxHeight
         // 状态栏高度：横屏小窗的顶部起点。不能只在首次组合时 remember：
         // 横屏进入播放页的首帧 inset 可能为 0（系统“隐藏→恢复”的瞬时态），
-        // 记住 0 会让小窗永久贴住屏幕顶边。这里持续监听，只采用最近一次非 0 的真实高度：
-        // 进全屏隐藏状态栏（inset 归零）时保留上次值，缩回终点仍贴合状态栏下方、不跳变
+        // 记住 0 会让小窗永久贴住屏幕顶边。这里持续监听，只采用最近一次非 0 的真实高度。
+        // 但只在稳定小窗状态采集：全屏/缩放动画期间系统栏在隐藏与恢复之间过渡，
+        // inset 会经过中间值，若此时写回会让 animTop 目标变化，缩回小窗时整块横屏布局上窜。
         val statusBarInsets = WindowInsets.statusBars
         var statusBarTop by remember { mutableStateOf(0.dp) }
-        LaunchedEffect(density) {
+        val insetsSettled = !fullscreen && !landscapeFullscreen && !landZooming &&
+            pendingFullscreen == null
+        LaunchedEffect(density, insetsSettled) {
+            if (!insetsSettled) return@LaunchedEffect
             snapshotFlow { statusBarInsets.getTop(density) }
                 .collect { px -> if (px > 0) statusBarTop = with(density) { px.toDp() } }
         }
