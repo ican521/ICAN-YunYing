@@ -839,6 +839,7 @@ fun SitePickerDialog(
                                 icon = AppIcons.Search,
                                 enabled = searchOn,
                                 locked = site.searchable == 0,
+                                selected = isCurrent,
                                 desc = if (searchOn) "关闭该源搜索" else "开启该源搜索",
                                 onClick = { onToggleSearchable(site) },
                             )
@@ -848,6 +849,7 @@ fun SitePickerDialog(
                                 icon = AppIcons.Loop,
                                 enabled = changeOn,
                                 locked = site.changeable == 0,
+                                selected = isCurrent,
                                 desc = if (changeOn) "关闭自动换源" else "开启自动换源",
                                 onClick = { onToggleChangeable(site) },
                             )
@@ -856,7 +858,8 @@ fun SitePickerDialog(
                                 Icon(
                                     imageVector = AppIcons.Check,
                                     contentDescription = "当前站源",
-                                    tint = MiuixTheme.colorScheme.primary,
+                                    // 蓝底上统一白色系
+                                    tint = MiuixTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
@@ -868,17 +871,23 @@ fun SitePickerDialog(
     }
 }
 
-/** 站源行内小开关图标：开=主题色，关/锁定=灰色；锁定时不响应点击 */
+/** 站源行内小开关图标：开=主题色，关/锁定=灰色；锁定时不响应点击。
+ *  [selected] = 所在行为当前选中项（蓝底）：图标基色换白色，启用=白100%，未启用/锁定用透明度区分 */
 @Composable
 private fun SiteToggleIcon(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     enabled: Boolean,
     locked: Boolean,
+    selected: Boolean,
     desc: String,
     onClick: () -> Unit,
 ) {
-    val tint = if (enabled) MiuixTheme.colorScheme.primary
-    else MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = if (locked) 0.25f else 0.45f)
+    val tint = when {
+        selected && enabled -> MiuixTheme.colorScheme.onPrimaryContainer
+        selected -> MiuixTheme.colorScheme.onPrimaryContainer.copy(alpha = if (locked) 0.25f else 0.45f)
+        enabled -> MiuixTheme.colorScheme.primary
+        else -> MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = if (locked) 0.25f else 0.45f)
+    }
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
