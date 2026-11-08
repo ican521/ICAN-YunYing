@@ -300,7 +300,7 @@ fun SettingsScreen(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 SwitchPreference(
                     title = "预测性返回",
-                    summary = "侧滑返回时预览返回效果",
+                    summary = "侧滑返回时预览返回效果（播放页不生效）",
                     checked = enablePredictiveBack,
                     onCheckedChange = { enabled ->
                         // KernelSU 同款：反射立即应用 + recreate 当前 Activity 重新注册返回回调，无需重启 App
@@ -468,7 +468,7 @@ private fun InfoRow(label: String, value: String) {
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MiuixTheme.colorScheme.onBackgroundVariant,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
         },
     )
@@ -614,7 +614,7 @@ private fun FavoriteSyncDialog(
                         Text(
                             "正在扫描局域网设备…",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MiuixTheme.colorScheme.onBackgroundVariant,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                     }
                 }
@@ -622,7 +622,7 @@ private fun FavoriteSyncDialog(
                     Text(
                         "未发现设备，请确保其他设备已打开本应用",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MiuixTheme.colorScheme.onBackgroundVariant,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         modifier = Modifier.padding(vertical = 24.dp),
                     )
                 }
@@ -693,7 +693,7 @@ private fun FavoriteSyncDialog(
                                     Text(
                                         text = device.ip,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MiuixTheme.colorScheme.onBackgroundVariant,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )

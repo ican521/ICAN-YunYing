@@ -786,7 +786,7 @@ fun SitePickerDialog(
                 Text(
                     text = "未获取到可用站点",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MiuixTheme.colorScheme.onBackgroundVariant,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.padding(horizontal = Spacing.dialogContentMargin),
                 )
             } else {
@@ -1193,7 +1193,7 @@ private fun DriveRowItem(
                     Text(
                         text = video.rating,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MiuixTheme.colorScheme.onBackgroundVariant,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 2.dp),

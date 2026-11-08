@@ -127,7 +127,7 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
                             Text(
                                 text = "还没有收藏的视频",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MiuixTheme.colorScheme.onBackgroundVariant,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
                         }
                     }

@@ -30,7 +30,7 @@ fun EmptyState(modifier: Modifier = Modifier) {
         ) {
             Text(
                 text = "¯\\_(ツ)_/¯",
-                color = MiuixTheme.colorScheme.onBackgroundVariant.copy(alpha = 0.82f),
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.82f),
                 fontSize = 24.sp,
                 lineHeight = 30.sp,
                 textAlign = TextAlign.Center,
@@ -38,7 +38,7 @@ fun EmptyState(modifier: Modifier = Modifier) {
             Text(
                 text = "空空如也",
                 modifier = Modifier.padding(top = Spacing.titleContentGap),
-                color = MiuixTheme.colorScheme.onBackgroundVariant.copy(alpha = 0.82f),
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.82f),
                 fontSize = 18.sp,
                 lineHeight = 24.sp,
                 textAlign = TextAlign.Center,

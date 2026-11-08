@@ -172,7 +172,7 @@ private fun PosterTextFallback() {
         Text(
             text = "[空]",
             style = MaterialTheme.typography.bodySmall,
-            color = MiuixTheme.colorScheme.onBackgroundVariant,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             textAlign = TextAlign.Center,
             maxLines = 1,
         )
