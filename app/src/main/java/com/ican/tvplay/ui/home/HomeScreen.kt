@@ -756,7 +756,8 @@ fun SitePickerDialog(
         // 标题自绘 + insideMargin 归零：与全屏播放页底部功能弹窗一致，
         // 列表可一直显示/滚动到弹窗最底缘，不再被 miuix 默认 24dp 内边距留出空白带
         title = null,
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        // 弹窗底色与设置页保持一致（miuix surface：#000000 / #F7F7F7），列表项仍用 surfaceContainer
+        backgroundColor = MiuixTheme.colorScheme.surface,
         // 渲染到 AppRoot 根宿主：弹窗+遮罩层级高于底栏
         renderInRootScaffold = true,
         // 三边统一 16dp：底部 = max(16dp, 系统导航栏高度)，跨设备自适应
