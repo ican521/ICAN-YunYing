@@ -296,15 +296,15 @@ private fun SiteSourceChip(
     onClick: () -> Unit,
 ) {
     // 统一使用 MiuixTheme.colorScheme：
-    // 选中态用 primaryContainer（实心蓝底）+ onPrimaryContainer（白字），符合 Miuix 容器/文本配对规范；
-    // 未选中态用 surfaceContainer（表面容器）+ onSurfaceContainerVariant（表面容器上次级文本）。
+    // 选中态用 primaryContainer（实心主题色底）+ onPrimaryContainer（按亮度自适应的黑/白字）；
+    // 未选中态用 surfaceContainer（表面容器）+ onSurfaceContainer（容器上的正文色，保证可读性）。
     val bg = if (selected) {
         MiuixTheme.colorScheme.primaryContainer
     } else {
         MiuixTheme.colorScheme.surfaceContainer
     }
     val fg = if (selected) MiuixTheme.colorScheme.onPrimaryContainer
-    else MiuixTheme.colorScheme.onSurfaceContainerVariant
+    else MiuixTheme.colorScheme.onSurfaceContainer
     val shape = RoundedCornerShape(percent = 50)
 
     // 固定宽度：所有胶囊等宽，不因名字长短变化；无水平外边距，左缘与返回圆钮（页面边距 16dp）精确对齐。

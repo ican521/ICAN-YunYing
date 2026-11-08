@@ -267,7 +267,8 @@ private fun WordFlowRow(
                 Text(
                     text = word,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MiuixTheme.colorScheme.onSurfaceContainerVariant,
+                    // 容器上的正文色（浅 #000 / 深 #E6FFFFFF），比 variant（#959595 / #737373）可读性高
+                    color = MiuixTheme.colorScheme.onSurfaceContainer,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
