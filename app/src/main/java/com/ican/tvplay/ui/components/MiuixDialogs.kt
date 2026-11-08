@@ -197,8 +197,9 @@ fun MiuixConfirmDialog(
                 onClick = onConfirm,
                 modifier = Modifier.weight(1f),
                 colors = if (danger) {
+                    // #D32F2F + 白字约 4.58:1，达到 WCAG AA（原 #FF5C5C 约 3.9:1）
                     ButtonDefaults.textButtonColorsPrimary(
-                        color = Color(0xFFFF5C5C),
+                        color = Color(0xFFD32F2F),
                         textColor = Color.White,
                     )
                 } else {
