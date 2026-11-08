@@ -69,7 +69,6 @@ fun seedLightScheme(seed: Color) = lightColorScheme(
     onBackground = LightOnSurface,
     surface = LightSurface,
     onSurface = LightOnSurface,
-    surfaceVariant = LightSurfaceVariant,
     onSurfaceVariant = LightOnSurfaceMuted,
     scrim = LightScrim,
 )

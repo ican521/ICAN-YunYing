@@ -47,7 +47,6 @@ private val TvLightColors = lightColorScheme(
     onBackground = LightOnSurface,
     surface = LightSurface,
     onSurface = LightOnSurface,
-    surfaceVariant = LightSurfaceVariant,
     onSurfaceVariant = LightOnSurfaceMuted,
     scrim = LightScrim,
 )

@@ -25,8 +25,6 @@ val DarkScrim = Color(0xCC07070D)
 // 浅色主题
 val LightBackground = Color(0xFFF7F7F7)
 val LightSurface = Color(0xFFFFFFFF)
-// 中性浅灰，与 miuix light surfaceContainerHigh 对齐（旧企划的蓝紫 #E6E8F1 已废弃）
-val LightSurfaceVariant = Color(0xFFE8E8E8)
 val LightOnSurface = Color(0xFF15161D)
 val LightOnSurfaceMuted = Color(0xFF5C5E6E)
 val LightGlassTint = Color(0x66FFFFFF)
