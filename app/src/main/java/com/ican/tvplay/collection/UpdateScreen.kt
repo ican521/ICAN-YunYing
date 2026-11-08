@@ -26,8 +26,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,6 +86,15 @@ fun UpdateScreen(
     val checking by viewModel.checking.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val hasUpdates = today.isNotEmpty() || pending.isNotEmpty()
+    // 手动检测的结果反馈：点「重新检查」后等 checking 由 true → false 再提示完成
+    var awaitCheckFeedback by remember { mutableStateOf(false) }
+    LaunchedEffect(checking) {
+        if (awaitCheckFeedback && !checking) {
+            awaitCheckFeedback = false
+            android.widget.Toast.makeText(context, "更新检测完成", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val blurActive = backdrop != null
@@ -154,12 +167,24 @@ fun UpdateScreen(
                             ArrowPreference(
                                 title = "重新检查",
                                 summary = if (checking) "正在检测收藏剧集更新…" else "手动检测全部收藏的最新集数",
-                                onClick = { viewModel.manualCheck() },
+                                enabled = !checking,
+                                onClick = {
+                                    awaitCheckFeedback = true
+                                    viewModel.manualCheck()
+                                },
                             )
                             ArrowPreference(
                                 title = "全部标记已读",
                                 summary = "把当前所有更新标记为已看",
-                                onClick = { viewModel.markAllRead() },
+                                enabled = hasUpdates,
+                                onClick = {
+                                    viewModel.markAllRead()
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "已全部标记为已看",
+                                        android.widget.Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
                             )
                             ArrowPreference(
                                 title = "配置更新提醒",
