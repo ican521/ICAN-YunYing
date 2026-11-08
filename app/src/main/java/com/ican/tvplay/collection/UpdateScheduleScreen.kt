@@ -124,9 +124,9 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
                         Card(modifier = Modifier.fillMaxWidth()) {
                             orderedFavorites.forEachIndexed { index, favorite ->
                                 if (index > 0) {
-                                    // 分隔线左右各缩 16dp，与卡片内容边距一致
+                                    // 分隔线左右缩进与卡片内容边距一致（16dp）
                                     HorizontalDivider(
-                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                        modifier = Modifier.padding(horizontal = Spacing.pageHorizontal),
                                     )
                                 }
                                 ScheduleRow(
