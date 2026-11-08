@@ -135,7 +135,24 @@ fun FavoritesScreen(
     ) { innerPadding ->
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             if (favorites.isEmpty()) {
-                EmptyState()
+                // 空收藏时「追番更新」入口仍常驻（否则入口会随空态一起消失）
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = innerPadding.calculateTopPadding())
+                        .padding(horizontal = pageHorizontalPadding()),
+                ) {
+                    UpdatesEntry(
+                        todayCount = todayUpdates.size,
+                        pendingCount = pendingUpdates.size,
+                        onClick = onUpdatesClick,
+                    )
+                    EmptyState(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(bottom = Spacing.bottomBarInset),
+                    )
+                }
             } else {
                 LazyVerticalGrid(
                     columns = videoGridColumns(homeLayoutSize),
