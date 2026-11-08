@@ -62,6 +62,7 @@ import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
+import com.ican.tvplay.BuildConfig
 import com.ican.tvplay.TvPlayApplication
 import com.ican.tvplay.data.BACKGROUND_PIP
 import com.ican.tvplay.data.HomeLayoutSize
@@ -410,7 +411,7 @@ fun SettingsScreen(
         item {
         Card(modifier = Modifier.fillMaxWidth()) {
             InfoRow("应用名称", "ICAN云影")
-            InfoRow("版本", "1.0.0")
+            InfoRow("版本", BuildConfig.VERSION_NAME)
         }
         }
         }
