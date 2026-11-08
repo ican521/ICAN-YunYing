@@ -2107,7 +2107,7 @@ private fun LineSection(
                     .background(
                         // 与选集 EpisodeChip 选中态一致：primaryContainer 实心蓝 + 白字
                         if (selected) MiuixTheme.colorScheme.primaryContainer
-                        else MiuixTheme.colorScheme.secondary,
+                        else MiuixTheme.colorScheme.secondaryVariant,
                         shape,
                     )
                     .padding(12.dp),
@@ -3140,10 +3140,10 @@ private fun EpisodeChip(
             )
             // 选集列表自带选中态：整列表（含未选中项）统一不要按压/点击蒙层，选中色即反馈
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false, pressEffect = false)
-            // 选中：primaryContainer 实心蓝 + 白字；未选中 secondary（浅 #E6E6E6 / 深 #505050）
+            // 选中：primaryContainer 实心蓝 + 白字；未选中 secondaryVariant（浅 #F0F0F0 / 深 #434343）
             .background(
                 if (selected) MiuixTheme.colorScheme.primaryContainer
-                else MiuixTheme.colorScheme.secondary,
+                else MiuixTheme.colorScheme.secondaryVariant,
                 shape,
             )
             .padding(12.dp),
@@ -3405,10 +3405,10 @@ private fun <T> OptionDialog(
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                 indication = null,
                             ) { onSelect(opt) }
-                            // 与线路/选集 chip 一致：选中 primaryContainer 实心蓝 + 白字；未选中 secondary 灰底，无描边
+                            // 与线路/选集 chip 一致：选中 primaryContainer 实心蓝 + 白字；未选中 secondaryVariant 灰底，无描边
                             .background(
                                 if (selected) MiuixTheme.colorScheme.primaryContainer
-                                else MiuixTheme.colorScheme.secondary, shape,
+                                else MiuixTheme.colorScheme.secondaryVariant, shape,
                             )
                             .padding(Spacing.dialogItemPadding),
                     ) {
@@ -3787,10 +3787,10 @@ private fun SubRow(label: String, selected: Boolean, onClick: () -> Unit) {
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                 indication = null,
             ) { onClick() }
-            // 与线路/选集 chip 一致：选中 primaryContainer 实心蓝 + 白字；未选中 secondary 灰底，无描边
+            // 与线路/选集 chip 一致：选中 primaryContainer 实心蓝 + 白字；未选中 secondaryVariant 灰底，无描边
             .background(
                 if (selected) MiuixTheme.colorScheme.primaryContainer
-                else MiuixTheme.colorScheme.secondary, shape,
+                else MiuixTheme.colorScheme.secondaryVariant, shape,
             )
             .padding(Spacing.dialogItemPadding),
     ) {
