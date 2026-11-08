@@ -1105,11 +1105,15 @@ fun PlayerScreen(
         val density = LocalDensity.current
         val screenW = maxWidth
         val screenH = maxHeight
-        // 状态栏高度：取进入页面时的固定值。放大后系统会隐藏状态栏，实时 inset 会归零，
-        // 若用实时值会导致缩回终点 y=0、收敛恢复状态栏时画面跳一下
+        // 状态栏高度：横屏小窗的顶部起点。不能只在首次组合时 remember：
+        // 横屏进入播放页的首帧 inset 可能为 0（系统“隐藏→恢复”的瞬时态），
+        // 记住 0 会让小窗永久贴住屏幕顶边。这里持续监听，只采用最近一次非 0 的真实高度：
+        // 进全屏隐藏状态栏（inset 归零）时保留上次值，缩回终点仍贴合状态栏下方、不跳变
         val statusBarInsets = WindowInsets.statusBars
-        val statusBarTop = remember(density) {
-            with(density) { statusBarInsets.getTop(this).toDp() }
+        var statusBarTop by remember { mutableStateOf(0.dp) }
+        LaunchedEffect(density) {
+            snapshotFlow { statusBarInsets.getTop(density) }
+                .collect { px -> if (px > 0) statusBarTop = with(density) { px.toDp() } }
         }
         // 竖屏详情页小窗动态比例（fongmi PlayerView.aspectRatio 同款）：PlayerView 与 PortraitPlayLayout 覆盖层共用，
         // 宽占满、高=宽/视频宽高比；视频为竖屏（宽高比<1）时高度封顶并横向收缩居中。
