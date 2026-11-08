@@ -116,6 +116,12 @@ object Spacing {
     /** 海报底部标题层内边距（垂直） */
     val posterTitlePaddingV = 6.dp
 
+    /** 海报标签行（标题上方胶囊）与上方内容的间距 */
+    val posterTagRowTopGap = 4.dp
+
+    /** 海报标签行下压微调：让「标签→标题」与「标题→卡片底边」视觉间距一致 */
+    val posterTagRowOffsetY = 1.dp
+
     /**
      * 搜索结果页专属网格间距：卡片横向、卡片纵向、左侧站源列表与卡片网格之间的间距统一用本值。
      * 搜索页内容密度高（左站源列表 + 右网格），间距独立于 [cardGapH]/[cardGapV]，不随主网格调整。

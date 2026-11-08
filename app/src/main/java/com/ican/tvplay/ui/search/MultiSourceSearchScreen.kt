@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
@@ -42,16 +40,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -67,17 +60,13 @@ import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.EmptyState
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
-import com.ican.tvplay.ui.components.PosterImage
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
-import com.ican.tvplay.ui.theme.LightOnSurface
-import com.ican.tvplay.ui.theme.PosterBadgeScrim
-import com.ican.tvplay.ui.theme.PosterTitleScrim
+import com.ican.tvplay.ui.components.VideoCard
 import com.ican.tvplay.ui.theme.Spacing
-import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -219,9 +208,8 @@ fun MultiSourceSearchResults(
                         ) { index, dv ->
                             // 真实卡片按站源胶囊同款节奏逐个渐显；滑回屏幕不再重播
                             RevealedFade(visible = "card_$index" in revealedCards) {
-                                CrossSourceVideoCard(
+                                VideoCard(
                                     video = dv.video,
-                                    siteName = dv.siteName,
                                     onClick = {
                                         // fongmi 同款：action 卡片直接执行 jar action → Toast 返回 msg
                                         if (dv.video.action.isNotBlank()) {
@@ -234,6 +222,10 @@ fun MultiSourceSearchResults(
                                             handlePlayClick(vm, dv.video, dv.siteKey, onPlay)
                                         }
                                     },
+                                    width = null,
+                                    showRating = false,
+                                    topStartBadge = dv.siteName.ifBlank { dv.video.categoryName.ifBlank { "来源" } },
+                                    tagLine = buildVideoStatus(dv.video).second.take(3).joinToString(" ").ifEmpty { null },
                                 )
                             }
                         }
@@ -390,116 +382,3 @@ private fun buildVideoStatus(video: Video): Pair<String, List<String>> {
     return mainStatus to tags.distinct()
 }
 
-@Composable
-private fun CrossSourceVideoCard(
-    video: Video,
-    siteName: String,
-    onClick: () -> Unit,
-) {
-    val (_, tags) = buildVideoStatus(video)
-
-    Card(
-        modifier = Modifier
-            // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
-            .pressable(
-                interactionSource = null,
-                indication = SinkFeedback(),
-                delay = null,
-            )
-            .tvCardEffect(
-                onClick = onClick,
-                shape = SquircleShape(Spacing.corner),
-                focusedScale = 1.03f,
-                glow = false,
-                // 按压蒙层固定浅色模式同款浅黑：深色模式与浅色表现一致
-                pressColor = LightOnSurface,
-            ),
-        insideMargin = androidx.compose.foundation.layout.PaddingValues(0.dp),
-        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(3f / 4f),
-        ) {
-            PosterImage(
-                title = video.title,
-                cover = video.cover,
-                modifier = Modifier.fillMaxSize(),
-            )
-
-            // 左上角：站源标签（黑底「已完结/更新至」状态胶囊已按需求移除）
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(Spacing.posterOverlayMargin)
-                    .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                    .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
-            ) {
-                Text(
-                    text = siteName.ifBlank { video.categoryName.ifBlank { "来源" } },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
-            // 底部渐变只铺在标题这一块，标签胶囊移到渐变层之上，不被渐变阴影盖住
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth(),
-            ) {
-                // 标签行（全部标签文字合并进同一个胶囊，省空间）
-                if (tags.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            // 往下压 1dp：让「标签→标题」视觉间距（约 8–9dp）
-                            // 接近「标题→卡片底边」的约 10dp
-                            .offset(y = 1.dp)
-                            // 左边距 8dp：与左上角站源胶囊的 8dp 对齐
-                            .padding(start = Spacing.posterOverlayMargin, end = Spacing.posterOverlayMargin, top = 4.dp)
-                            .background(
-                                PosterBadgeScrim,
-                                RoundedCornerShape(percent = 50),
-                            )
-                            .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
-                    ) {
-                        Text(
-                            text = tags.take(3).joinToString(" "),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, PosterTitleScrim),
-                            ),
-                        )
-                        // 高度不变（上下各 6dp），纯黑 80% → 全透明渐变
-                        .padding(
-                            start = Spacing.posterTitlePaddingH,
-                            end = Spacing.posterTitlePaddingH,
-                            bottom = Spacing.posterTitlePaddingV,
-                            top = Spacing.posterTitlePaddingV,
-                        ),
-                ) {
-                    Text(
-                        text = video.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-    }
-}

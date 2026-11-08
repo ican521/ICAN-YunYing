@@ -2,10 +2,12 @@ package com.ican.tvplay.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,7 +44,7 @@ import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
 
 /**
- * 首页 / 搜索 / 收藏复用的视频卡片（海报 + 评分角标 + 标题）。
+ * 首页 / 搜索 / 收藏复用的视频卡片（海报 + 角标 + 标题）。
  *
  * 容器为 miuix Card（insideMargin=0，16dp 统一圆角：API 33+ 为 squircle shader 裁剪，
  * 低版本自动回退 RoundedCornerShape；底色由 Card colors 提供，兼作海报加载占位色）。
@@ -51,19 +53,27 @@ import top.yukonga.miuix.kmp.utils.pressable
  * - [pressable] + SinkFeedback：按压形变（缩放 0.94，spring(0.8f, 600f)，delay=null 立即下沉）。
  *   必须放在外层：缩放绘制作用于其后的全部内容，按压蒙层才跟随卡片一起缩小；
  * - [tvCardEffect]：焦点放大/发光描边 + MiuixIndication 按压蒙层（无水波纹）+ 遥控器点击。
+ *
+ * @param width 固定宽度；传 null 不限宽（跨站源搜索结果网格内撑满单元格）
+ * @param showRating 是否显示右上角评分胶囊（跨站源搜索结果不显示）
+ * @param topStartBadge 左上角胶囊文字（跨站源搜索结果传站源名）；null 不显示
+ * @param tagLine 标题上方的标签行文字（跨站源搜索结果传更新状态/备注）；null 不显示
  */
 @Composable
 fun VideoCard(
     video: Video,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    width: Dp = 148.dp,
+    width: Dp? = 148.dp,
+    showRating: Boolean = true,
+    topStartBadge: String? = null,
+    tagLine: String? = null,
 ) {
     // 全局统一 16dp 连续曲率角（SquircleShape，与 miuix Card/弹窗同曲线风格，全 API 生效）
     val corner = Spacing.corner
     Card(
         modifier = modifier
-            .width(width)
+            .then(if (width != null) Modifier.width(width) else Modifier)
             .pressable(
                 interactionSource = null,
                 indication = SinkFeedback(),
@@ -92,34 +102,83 @@ fun VideoCard(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 底部渐变 + 标题（高度不变：标题上下各 6dp；渐变从底部 80% 黑到顶部全透明）
-            Box(
+            // 左上角：站源/来源胶囊（跨站源搜索结果用）
+            if (topStartBadge != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(Spacing.posterOverlayMargin)
+                        .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
+                        .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
+                ) {
+                    Text(
+                        text = topStartBadge,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            // 底部：可选标签行 + 渐变标题（高度不变：标题上下各 6dp；渐变从底部 80% 黑到顶部全透明）
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, PosterTitleScrim),
-                        ),
-                    )
-                    // 底部留 6dp：文字行盒本身在字形下方还有约 4dp 余量，6+4 才和左侧 10dp 视觉一致
-                    .padding(
-                        start = Spacing.posterTitlePaddingH,
-                        end = Spacing.posterTitlePaddingH,
-                        bottom = Spacing.posterTitlePaddingV,
-                        top = Spacing.posterTitlePaddingV,
-                    ),
+                    .align(Alignment.BottomCenter),
             ) {
-                Text(
-                    text = video.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                // 标签行（跨站源搜索结果用：全部标签文字合并进同一个胶囊，省空间）
+                if (tagLine != null) {
+                    Box(
+                        modifier = Modifier
+                            // 往下压 1dp：让「标签→标题」视觉间距（约 8–9dp）接近「标题→卡片底边」的约 10dp
+                            .offset(y = Spacing.posterTagRowOffsetY)
+                            // 左右边距与左上角胶囊的 8dp 对齐
+                            .padding(
+                                start = Spacing.posterOverlayMargin,
+                                end = Spacing.posterOverlayMargin,
+                                top = Spacing.posterTagRowTopGap,
+                            )
+                            .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
+                            .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
+                    ) {
+                        Text(
+                            text = tagLine,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, PosterTitleScrim),
+                            ),
+                        )
+                        // 底部留 6dp：文字行盒本身在字形下方还有约 4dp 余量，6+4 才和左侧 10dp 视觉一致
+                        .padding(
+                            start = Spacing.posterTitlePaddingH,
+                            end = Spacing.posterTitlePaddingH,
+                            bottom = Spacing.posterTitlePaddingV,
+                            top = Spacing.posterTitlePaddingV,
+                        ),
+                ) {
+                    Text(
+                        text = video.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
 
             // 右上角：评分胶囊
+            if (showRating) {
             Text(
                 text = video.rating,
                 style = MaterialTheme.typography.labelSmall,
@@ -130,6 +189,7 @@ fun VideoCard(
                     .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
                     .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
             )
+            }
         }
     }
 }
