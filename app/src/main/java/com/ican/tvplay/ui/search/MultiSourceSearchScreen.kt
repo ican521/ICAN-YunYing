@@ -202,7 +202,7 @@ fun MultiSourceSearchResults(
 
                 if (displayVideos.isEmpty()) {
                     // 搜索结束仍无结果 → 空状态；加载中保持空白，等卡片直接渐显
-                    if (!loading) EmptyState()
+                    if (!loading) EmptyState(text = "没有找到相关影片，换个关键词或站源试试")
                 } else {
                     LazyVerticalGrid(
                         columns = columns,

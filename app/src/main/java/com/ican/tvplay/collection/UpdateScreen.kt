@@ -48,6 +48,7 @@ import com.ican.tvplay.data.FavoriteUpdateItem
 import com.ican.tvplay.ui.UpdatesViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
+import com.ican.tvplay.ui.components.EmptyState
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixBottomSheetDialog
@@ -218,20 +219,34 @@ fun UpdateScreen(
                         }
                     }
 
-                    if (today.isEmpty() && pending.isEmpty()) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(top = 64.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = if (checking) "正在检测收藏剧集更新…" else "暂无更新，先收藏几部剧吧",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                )
-                            }
-                        }
+            }
+            // 无更新时在列表上层居中显示空态（顶部操作卡片仍可点击）
+            if (today.isEmpty() && pending.isEmpty()) {
+                if (checking) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(
+                                top = innerPadding.calculateTopPadding(),
+                                bottom = Spacing.contentBottomInset,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "正在检测收藏剧集更新…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
                     }
+                } else {
+                    EmptyState(
+                        text = "暂无更新，先收藏几部剧吧",
+                        modifier = Modifier.padding(
+                            top = innerPadding.calculateTopPadding(),
+                            bottom = Spacing.contentBottomInset,
+                        ),
+                    )
+                }
             }
         }
     }

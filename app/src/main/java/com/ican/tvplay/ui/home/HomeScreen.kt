@@ -621,6 +621,7 @@ fun HomeScreen(
                 // 分类无内容 / 加载失败：给出空态与重试入口（避免纯白屏）
                 if (!pageLoading && pageVideos.value.isEmpty()) {
                     EmptyState(
+                        text = "这个分类还没有内容，换个分类或重新加载试试",
                         modifier = Modifier.padding(
                             top = with(density) { topBarHeightPx.toDp() },
                             bottom = contentPadding.calculateBottomPadding(),

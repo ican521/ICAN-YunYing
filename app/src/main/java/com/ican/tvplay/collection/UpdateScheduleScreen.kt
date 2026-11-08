@@ -28,6 +28,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.BlurredBar
+import com.ican.tvplay.ui.components.EmptyState
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
@@ -118,20 +119,7 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
                 ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
             ) {
-                if (favorites.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(top = 64.dp, bottom = 64.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "还没有收藏的视频",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            )
-                        }
-                    }
-                } else {
+                if (favorites.isNotEmpty()) {
                     item {
                         Card(modifier = Modifier.fillMaxWidth()) {
                             orderedFavorites.forEachIndexed { index, favorite ->
@@ -154,6 +142,15 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
                         }
                     }
                 }
+            }
+            if (favorites.isEmpty()) {
+                EmptyState(
+                    text = "还没有收藏的视频",
+                    modifier = Modifier.padding(
+                        top = innerPadding.calculateTopPadding(),
+                        bottom = Spacing.contentBottomInset,
+                    ),
+                )
             }
         }
     }

@@ -148,6 +148,7 @@ fun FavoritesScreen(
                         onClick = onUpdatesClick,
                     )
                     EmptyState(
+                        text = "还没有收藏的视频，去首页收藏喜欢的影片吧",
                         modifier = Modifier
                             .weight(1f)
                             .padding(bottom = Spacing.bottomBarInset),
@@ -457,7 +458,7 @@ fun HistoryScreen(
     ) { innerPadding ->
         Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
             if (histories.isEmpty()) {
-                EmptyState()
+                EmptyState(text = "还没有观看记录，看过的影片会出现在这里")
             } else {
                 LazyVerticalGrid(
                     columns = videoGridColumns(homeLayoutSize),
