@@ -91,6 +91,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
@@ -105,6 +106,7 @@ import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.ArcStretchSpinner
+import com.ican.tvplay.ui.components.EmptyState
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
@@ -438,6 +440,10 @@ fun HomeScreen(
             var pageLoading by remember(page, pageCategory?.id, currentSiteKey, folderStack.value) {
                 mutableStateOf(true)
             }
+            // 空态「重新加载」的触发计数：自增后重跑下方加载 LaunchedEffect
+            var reloadToken by remember(page, pageCategory?.id, currentSiteKey) {
+                mutableStateOf(0)
+            }
             LaunchedEffect(pageVideos.value, animateNewCards) {
                 // 非首次加载（分类 Tab 切换）不留动画：直接标记全部已显示
                 if (!animateNewCards) {
@@ -457,7 +463,7 @@ fun HomeScreen(
                     }
             }
             // 首次进入该页、分类变化、切站源或进出子目录时触发加载
-            LaunchedEffect(pageCategory?.id, currentSiteKey, folderStack.value) {
+            LaunchedEffect(pageCategory?.id, currentSiteKey, folderStack.value, reloadToken) {
                 if (pageCategory == null) {
                     pageLoading = false
                     return@LaunchedEffect
@@ -611,6 +617,21 @@ fun HomeScreen(
                             )
                         }
                     }
+                }
+                // 分类无内容 / 加载失败：给出空态与重试入口（避免纯白屏）
+                if (!pageLoading && pageVideos.value.isEmpty()) {
+                    EmptyState(
+                        modifier = Modifier.padding(
+                            top = with(density) { topBarHeightPx.toDp() },
+                            bottom = contentPadding.calculateBottomPadding(),
+                        ),
+                        action = {
+                            TextButton(
+                                text = "重新加载",
+                                onClick = { reloadToken++ },
+                            )
+                        },
+                    )
                 }
                 // 等待动画：一直显示到第一张卡片淡入完成（pageLoading 会在首卡淡入结束后才关闭）
                 if (pageLoading) {

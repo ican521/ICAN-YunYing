@@ -20,9 +20,13 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * 空页面占位：上方颜文字、下方「空空如也」。
  * 两行放在同一 Column 并以 [Alignment.CenterHorizontally] 对齐，
  * 保证四个字在颜文字正下方居中（而不是跟着左缘对齐）。
+ * [action] 可选：在文案下方追加一个操作入口（如「重新加载」）。
  */
 @Composable
-fun EmptyState(modifier: Modifier = Modifier) {
+fun EmptyState(
+    modifier: Modifier = Modifier,
+    action: (@Composable () -> Unit)? = null,
+) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -43,6 +47,11 @@ fun EmptyState(modifier: Modifier = Modifier) {
                 lineHeight = 24.sp,
                 textAlign = TextAlign.Center,
             )
+            if (action != null) {
+                Box(modifier = Modifier.padding(top = Spacing.sectionSpacing)) {
+                    action()
+                }
+            }
         }
     }
 }
