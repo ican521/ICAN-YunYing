@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import com.ican.tvplay.ui.theme.Spacing
@@ -32,6 +33,9 @@ fun EmptyState(
                 fontSize = 18.sp,
                 lineHeight = 24.sp,
                 textAlign = TextAlign.Center,
+                // 空态文案统一保持单行
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             if (action != null) {
                 Box(modifier = Modifier.padding(top = Spacing.sectionSpacing)) {

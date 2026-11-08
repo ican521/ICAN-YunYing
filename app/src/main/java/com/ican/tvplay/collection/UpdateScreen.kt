@@ -240,7 +240,7 @@ fun UpdateScreen(
                     }
                 } else {
                     EmptyState(
-                        text = "暂无更新，先收藏几部剧吧",
+                        text = "暂无更新",
                         modifier = Modifier.padding(
                             top = innerPadding.calculateTopPadding(),
                             bottom = Spacing.contentBottomInset,
