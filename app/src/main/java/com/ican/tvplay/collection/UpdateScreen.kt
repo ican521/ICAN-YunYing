@@ -459,8 +459,8 @@ private fun PopupUpdateRow(
             .fillMaxWidth()
             .tvCardEffect(
                 onClick = onClick,
-                // 与条目内预览小图的圆角保持一致
-                shape = SquircleShape(8.dp),
+                // 与条目内预览小图的圆角保持一致（Spacing.updateCardCorner = 10dp）
+                shape = SquircleShape(Spacing.updateCardCorner),
                 focusedScale = 1.03f,
                 glow = false,
             ),
@@ -469,7 +469,7 @@ private fun PopupUpdateRow(
         Box(
             modifier = Modifier
                 .size(width = 56.dp, height = 76.dp)
-                .clip(SquircleShape(8.dp)),
+                .clip(SquircleShape(Spacing.updateCardCorner)),
         ) {
             PosterImage(
                 title = item.favorite.title,
