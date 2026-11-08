@@ -75,6 +75,7 @@ import com.ican.tvplay.ui.components.ArcStretchSpinner
 import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBottomSheetDialog
+import com.ican.tvplay.ui.components.MiuixConfirmDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
@@ -112,6 +113,8 @@ fun SettingsScreen(
     var showSiteDialog by remember { mutableStateOf(false) }
     // 收藏同步弹窗（从收藏页迁移：局域网设备列表 + 双向/上传/下载模式）
     var showSyncDialog by remember { mutableStateOf(false) }
+    // 恢复数据前先暂存文件，二次确认后再执行（恢复会清空并覆盖当前收藏/历史）
+    var pendingRestoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var siteList by remember { mutableStateOf<List<TvBoxSite>>(emptyList()) }
     LaunchedEffect(showSiteDialog) {
         if (showSiteDialog) siteList = viewModel.listSites()
@@ -137,20 +140,8 @@ fun SettingsScreen(
     val restoreLauncher = rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        uri?.let {
-            scope.launch {
-                val ok = com.ican.tvplay.data.BackupManager.restore(context, it)
-                if (ok) {
-                    // fongmi 同款：恢复成功后立即重载配置与设置，无需重启 APP
-                    viewModel.applyRestoredBackup()
-                }
-                Toast.makeText(
-                    context,
-                    if (ok) "恢复成功" else "恢复失败",
-                    Toast.LENGTH_LONG,
-                ).show()
-            }
-        }
+        // 不立即恢复：先弹二次确认，避免误选文件直接清空收藏/历史
+        uri?.let { pendingRestoreUri = it }
     }
 
     // Android 13+ 需要运行时通知权限，后台播放的通知栏控制才能显示
@@ -457,6 +448,34 @@ fun SettingsScreen(
     FavoriteSyncDialog(
         show = showSyncDialog,
         onDismiss = { showSyncDialog = false },
+    )
+
+    // 恢复数据二次确认：确认后才清空并覆盖当前数据
+    MiuixConfirmDialog(
+        show = pendingRestoreUri != null,
+        title = "恢复数据",
+        content = "将用备份文件覆盖当前的设置、收藏和历史，原有数据会被清空且无法恢复。",
+        confirmText = "恢复",
+        danger = true,
+        onConfirm = {
+            val uri = pendingRestoreUri
+            pendingRestoreUri = null
+            if (uri != null) {
+                scope.launch {
+                    val ok = com.ican.tvplay.data.BackupManager.restore(context, uri)
+                    if (ok) {
+                        // fongmi 同款：恢复成功后立即重载配置与设置，无需重启 APP
+                        viewModel.applyRestoredBackup()
+                    }
+                    Toast.makeText(
+                        context,
+                        if (ok) "恢复成功" else "恢复失败",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+        },
+        onDismiss = { pendingRestoreUri = null },
     )
 }
 
