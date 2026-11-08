@@ -5,9 +5,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -15,9 +15,7 @@ import androidx.tv.material3.MaterialTheme as TvMaterialTheme
 import androidx.tv.material3.darkColorScheme
 import androidx.tv.material3.lightColorScheme
 import com.ican.tvplay.data.ThemeMode
-import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.Colors
-import top.yukonga.miuix.kmp.theme.ThemeController
 import top.yukonga.miuix.kmp.theme.darkColorScheme as miuixDarkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme as miuixLightColorScheme
 
@@ -91,8 +89,8 @@ fun TvPlayTheme(
 
 /**
  * miuix 主题色板：表面色固定为项目既定值（surfaceContainer 深色 #242424 / 浅色 #FFFFFF，
- * windowDimming 固定 PopupScrim）；主题色板非 0 时由 miuix 的 ThemeController 按种子色派生，
- * 只取强调色系（primary 家族），其余表面色保持项目规范，换色即时生效。
+ * windowDimming 固定 PopupScrim）；主题色板非 0 时强调色系直接取色板原色（不做 tonal 派生，
+ * 避免黄色被映射成橄榄黄等偏色），文字色按亮度自动取黑/白保证可读，换色即时生效。
  */
 @Composable
 fun appMiuixColors(themeColor: Int, isDark: Boolean): Colors {
@@ -103,34 +101,27 @@ fun appMiuixColors(themeColor: Int, isDark: Boolean): Colors {
             miuixLightColorScheme(surfaceContainer = LightSurface, windowDimming = PopupScrim)
         }
     }
-    // 注意：ColorSchemeMode 的 Light/Dark 只返回固定色板、会忽略 keyColor；
-    // 按种子色派生必须用 MonetLight / MonetDark 模式
-    val controller = remember(themeColor, isDark) {
-        ThemeController(
-            colorSchemeMode = if (isDark) ColorSchemeMode.MonetDark else ColorSchemeMode.MonetLight,
-            keyColor = Color(themeColor),
-        )
-    }
-    val seedColors = controller.currentColors()
+    val seed = Color(themeColor)
+    val onSeed = if (seed.luminance() > 0.5f) Color.Black else Color.White
     return if (isDark) {
         miuixDarkColorScheme(
-            primary = seedColors.primary,
-            onPrimary = seedColors.onPrimary,
-            primaryVariant = seedColors.primaryVariant,
-            onPrimaryVariant = seedColors.onPrimaryVariant,
-            primaryContainer = seedColors.primaryContainer,
-            onPrimaryContainer = seedColors.onPrimaryContainer,
+            primary = seed,
+            onPrimary = onSeed,
+            primaryVariant = seed,
+            onPrimaryVariant = onSeed,
+            primaryContainer = seed,
+            onPrimaryContainer = onSeed,
             surfaceContainer = DarkSurfaceVariant,
             windowDimming = PopupScrim,
         )
     } else {
         miuixLightColorScheme(
-            primary = seedColors.primary,
-            onPrimary = seedColors.onPrimary,
-            primaryVariant = seedColors.primaryVariant,
-            onPrimaryVariant = seedColors.onPrimaryVariant,
-            primaryContainer = seedColors.primaryContainer,
-            onPrimaryContainer = seedColors.onPrimaryContainer,
+            primary = seed,
+            onPrimary = onSeed,
+            primaryVariant = seed,
+            onPrimaryVariant = onSeed,
+            primaryContainer = seed,
+            onPrimaryContainer = onSeed,
             surfaceContainer = LightSurface,
             windowDimming = PopupScrim,
         )
