@@ -31,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
@@ -54,7 +53,6 @@ import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
-import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.Spacing
 
 /**
@@ -250,13 +248,10 @@ private fun WordFlowRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.searchChipGap),
         verticalArrangement = Arrangement.spacedBy(Spacing.searchChipGap),
     ) {
-        val isDark = LocalDarkTheme.current
         val chipShape = RoundedCornerShape(percent = 50)
         words.forEach { word ->
             Box(
                 modifier = Modifier
-                    // 浅色模式下 chip 外圈投影：从胶囊边缘向四周小范围扩散
-                    .then(if (isDark) Modifier else Modifier.shadow(elevation = 4.dp, shape = chipShape, clip = false))
                     .tvCardEffect(
                         onClick = { onWordClick(word) },
                         onLongClick = onWordLongClick?.let { { it(word) } },
