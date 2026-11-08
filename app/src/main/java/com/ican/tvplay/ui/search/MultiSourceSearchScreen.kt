@@ -297,14 +297,14 @@ private fun SiteSourceChip(
 ) {
     // 统一使用 MiuixTheme.colorScheme：
     // 选中态用 primaryContainer（实心蓝底）+ onPrimaryContainer（白字），符合 Miuix 容器/文本配对规范；
-    // 未选中态用 surfaceContainer（表面容器）+ onSurfaceVariantSummary（次级摘要文本）。
+    // 未选中态用 surfaceContainer（表面容器）+ onSurfaceContainerVariant（表面容器上次级文本）。
     val bg = if (selected) {
         MiuixTheme.colorScheme.primaryContainer
     } else {
         MiuixTheme.colorScheme.surfaceContainer
     }
     val fg = if (selected) MiuixTheme.colorScheme.onPrimaryContainer
-    else MiuixTheme.colorScheme.onSurfaceVariantSummary
+    else MiuixTheme.colorScheme.onSurfaceContainerVariant
     val shape = RoundedCornerShape(percent = 50)
 
     // 固定宽度：所有胶囊等宽，不因名字长短变化；无水平外边距，左缘与返回圆钮（页面边距 16dp）精确对齐。
