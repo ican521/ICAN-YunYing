@@ -101,6 +101,13 @@ import kotlin.math.sin
 
 val LocalFloatingBottomBarTabScale = staticCompositionLocalOf { { 1f } }
 
+/**
+ * 普通模式（非液态玻璃）下选中项底层内容应使用的颜色。
+ * 上层还会再叠一遍主题色的选中内容，底层若仍用黑色，黄色等亮色选中的抗锯齿边缘会压暗成黑边；
+ * 值不为 null 时选中项底层直接用同一个主题色，两层颜色一致即无黑边。
+ */
+private val LocalFloatingBottomBarSelectedColor = staticCompositionLocalOf<Color?> { null }
+
 private val iosIndicatorSpecular: Highlight = Highlight(
     width = 1.dp,
     alpha = 1f,
@@ -178,36 +185,45 @@ fun RowScope.FloatingBottomBarItem(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val scale = LocalFloatingBottomBarTabScale.current
-    Column(
-        modifier
-            .semantics(mergeDescendants = true) {
-                this.selected = selected
-                role = Role.Tab
-                onClick {
-                    onClick()
-                    true
+    val accentSelectedColor = LocalFloatingBottomBarSelectedColor.current
+    // 普通模式下选中项底层与上层选中副本同色，避免亮色（如黄色）边缘的抗锯齿黑边
+    val contentColor = if (selected && accentSelectedColor != null) {
+        accentSelectedColor
+    } else {
+        LocalContentColor.current
+    }
+    CompositionLocalProvider(LocalContentColor provides contentColor) {
+        Column(
+            modifier
+                .semantics(mergeDescendants = true) {
+                    this.selected = selected
+                    role = Role.Tab
+                    onClick {
+                        onClick()
+                        true
+                    }
                 }
-            }
-            .onKeyEvent { event ->
-                val activationKey = event.key == Key.Enter ||
-                        event.key == Key.NumPadEnter || event.key == Key.Spacebar
-                if (activationKey) {
-                    if (event.type == KeyEventType.KeyUp) onClick()
-                    true
-                } else false
-            }
-            .focusable()
-            .fillMaxHeight()
-            .weight(1f)
-            .graphicsLayer {
-                val scale = scale()
-                scaleX = scale
-                scaleY = scale
-            },
-        verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        content = content
-    )
+                .onKeyEvent { event ->
+                    val activationKey = event.key == Key.Enter ||
+                            event.key == Key.NumPadEnter || event.key == Key.Spacebar
+                    if (activationKey) {
+                        if (event.type == KeyEventType.KeyUp) onClick()
+                        true
+                    } else false
+                }
+                .focusable()
+                .fillMaxHeight()
+                .weight(1f)
+                .graphicsLayer {
+                    val scale = scale()
+                    scaleX = scale
+                    scaleY = scale
+                },
+            verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            content = content
+        )
+    }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -427,7 +443,11 @@ fun FloatingBottomBar(
                 .padding(Spacing.bottomBarInnerPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CompositionLocalProvider(LocalContentColor provides tabContentColor) {
+            CompositionLocalProvider(
+                LocalContentColor provides tabContentColor,
+                // 普通模式：底层选中项也用主题色，避免上层主题色副本压在黑色内容上叠出黑边
+                LocalFloatingBottomBarSelectedColor provides if (isBlurEnabled) null else accentColor,
+            ) {
                 content(::activateTab)
             }
         }
