@@ -42,8 +42,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
@@ -427,27 +431,32 @@ fun FloatingBottomBar(
                 .then(dampedDragAnimation.modifier)
                 .height(Spacing.bottomBarHeight)
                 .padding(Spacing.bottomBarInnerPadding)
-                // 普通模式：指示器矩形窗口内不画底层内容（只由上层主题色副本绘制），
-                // 两块裁切互不重叠，避免同形内容叠色时亮色（如黄色）抗锯齿边缘压暗成黑边
+                // 普通模式：底层内容按「胶囊以外」的区域裁切，与上层主题色副本（裁到胶囊内）互补，
+                // 两块互不重叠，既不会叠色黑边，分界线也跟随胶囊曲边，不会出现竖直直切
                 .then(
                     if (isBlurEnabled) {
                         Modifier
                     } else {
                         Modifier.drawWithContent {
-                            val windowStart = if (isLtr) {
-                                dampedDragAnimation.value * tabWidthPx
+                            if (tabWidthPx <= 0f) {
+                                this@drawWithContent.drawContent()
                             } else {
-                                -dampedDragAnimation.value * tabWidthPx
-                            }
-                            val windowEnd = windowStart + tabWidthPx
-                            if (windowStart > 0f) {
-                                clipRect(0f, 0f, windowStart, size.height) {
-                                    this@drawWithContent.drawContent()
+                                val windowStart = if (isLtr) {
+                                    dampedDragAnimation.value * tabWidthPx
+                                } else {
+                                    size.width - dampedDragAnimation.value * tabWidthPx - tabWidthPx
                                 }
-                            }
-                            val tailStart = windowEnd.coerceAtLeast(0f)
-                            if (tailStart < size.width) {
-                                clipRect(tailStart, 0f, size.width, size.height) {
+                                val pill = Path().apply {
+                                    addOutline(
+                                        pillShape.createOutline(
+                                            Size(tabWidthPx, size.height),
+                                            layoutDirection,
+                                            this@drawWithContent,
+                                        )
+                                    )
+                                    translate(Offset(windowStart, 0f))
+                                }
+                                clipPath(pill, ClipOp.Difference) {
                                     this@drawWithContent.drawContent()
                                 }
                             }
