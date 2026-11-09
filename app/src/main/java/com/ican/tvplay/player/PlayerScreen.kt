@@ -1248,9 +1248,11 @@ fun PlayerScreen(
                 fullscreen ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
-                // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
-                // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感
-                pendingFullscreen != null ->
+                // 旋转挂起期且窗口已是横屏：直接铺满，详情列已隐藏（覆盖层 pending 分支 -> Unit），
+                // 避免"小窗旋转后瞬间放大"的叠加感。
+                // 仍处于竖屏的那一帧保持小窗原位（走下面的竖屏分支），只把根底压黑：
+                // 若这里也铺满，会看到小窗先跳到屏幕正中再旋转放大
+                pendingFullscreen != null && isLandscape ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
@@ -1276,7 +1278,12 @@ fun PlayerScreen(
                         // 竖屏小窗跟随视频比例（fongmi PlayerView.aspectRatio 同款）：顶部对齐，横向收缩时居中，
                         // 与 PortraitPlayLayout 覆盖层像素对齐（否则宽银幕源 16:9 留黑边 + 控制层错位）
                         .fillMaxWidth()
-                        .statusBarsPadding()
+                        // 旋转过渡期系统栏已隐藏，inset 归零会让小窗上跳；
+                        // 此时改用组合期固定的状态栏高度，保证过渡帧与小窗位置像素一致
+                        .then(
+                            if (pendingFullscreen != null) Modifier.padding(top = statusBarTop)
+                            else Modifier.statusBarsPadding()
+                        )
                         .offset { IntOffset(((screenW - animatedPreviewW) / 2f).roundToPx(), 0) }
                         .width(animatedPreviewW)
                         .height(animatedPreviewH)
@@ -2066,7 +2073,7 @@ private fun FavoriteButton(v: Video) {
                 targetValue = 1f,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
+                    stiffness = Spring.StiffnessLow,
                 ),
             )
         } else {
@@ -2170,7 +2177,7 @@ private fun FavoriteBloom(beat: Int) {
         animate(
             initialValue = 0f,
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 750, easing = LinearEasing),
+            animationSpec = tween(durationMillis = 550, easing = LinearEasing),
         ) { value, _ -> ringProgress = value }
     }
 
@@ -2195,7 +2202,7 @@ private fun FavoriteBloom(beat: Int) {
             modifier = Modifier
                 .requiredSize(48.dp)
                 .drawBehind {
-                    val maxR = 22.dp.toPx()
+                    val maxR = 24.dp.toPx()
                     val p = ringProgress
                     val outerR = p * maxR
                     // 镂空从 p=0.3 开始出现，到 p=1 时孔径达外径的 70%
@@ -2203,10 +2210,10 @@ private fun FavoriteBloom(beat: Int) {
                     val holeR = holeT * maxR * 0.70f
                     val stroke = (outerR - holeR).coerceAtLeast(0f)
                     val centerR = (outerR + holeR) / 2f
-                    val alpha = (1f - p * 0.85f).coerceIn(0f, 1f)
+                    val alpha = (1f - p * 0.8f).coerceIn(0f, 1f)
                     if (stroke > 0f) {
                         drawCircle(
-                            color = Color.White.copy(alpha = alpha * 0.9f),
+                            color = BrandPink.copy(alpha = alpha),
                             radius = centerR,
                             style = Stroke(width = stroke),
                         )
