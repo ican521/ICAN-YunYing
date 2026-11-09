@@ -19,6 +19,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
@@ -1457,6 +1458,16 @@ fun PlayerScreen(
                 statusBarInset = !(fullscreen || landscapeFullscreen || isLandscape),
                 onDismiss = { showSubtitleSettings = false },
             )
+        }
+
+        // 进全屏旋转过渡：整页压暗（对齐 B 站：旋转时页面变暗，视觉主体只剩小窗在倒下）
+        val rotateDim by animateFloatAsState(
+            targetValue = if (pendingFullscreen == true) 0.55f else 0f,
+            animationSpec = tween(120),
+            label = "rotateDim",
+        )
+        if (rotateDim > 0.001f) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = rotateDim)))
         }
     }
 }
