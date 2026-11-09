@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- fongmi 同款：PlayerSetting.getRender() 默认 RENDER_SURFACE，即用 SurfaceView。
-     SurfaceView 画面由系统合成器独立缩放，画中画双击放大退出时无 TextureView
-     的"旧帧留在左上角"残帧问题（fongmi 实测无此问题）。 -->
+<!-- TextureView 渲染：画面作为普通 View 参与合成，横屏小窗↔全屏缩放时与布局同步，
+     不会像 SurfaceView（独立图层、位置/尺寸更新滞后一帧）那样出现画面跳动。
+     对齐 TVBoxOS-Mobile / DKVideoPlayer 的默认做法（默认即 TextureRenderView）。 -->
 <androidx.media3.ui.PlayerView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/player_view"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#FF000000"
-    app:surface_type="surface_view"
+    app:surface_type="texture_view"
     app:use_controller="false"
     app:keep_content_on_player_reset="false" />
