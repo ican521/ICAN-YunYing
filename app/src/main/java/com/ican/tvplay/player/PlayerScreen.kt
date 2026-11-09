@@ -1236,26 +1236,12 @@ fun PlayerScreen(
                 fullscreen ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
-                // 旋转挂起期间（详情列已隐藏，when 分支 pendingFullscreen==true -> Unit）：
-                // 仍竖屏时保持顶部小窗的位置与尺寸，让系统整窗旋转动画从视频左上角起手展开
-                //（对齐 B 站观感；若先铺满竖屏整屏，旋转锚点会变成屏幕中心，观感不对）。
-                // 已在横屏的挂起（退出全屏等待转回竖屏）继续铺满，避免缩成小窗
-                pendingFullscreen != null -> if (isLandscape) {
+                // 旋转挂起期间：直接铺满整屏（详情列已隐藏，when 分支 pendingFullscreen==true -> Unit）。
+                // 铺满是为了让系统旋转动画的起点就是「黑底 + 接近整屏的视频」——
+                // 若保持小窗尺寸，旋转时视频会绕屏幕中心转，观感与 B 站不一致
+                pendingFullscreen != null ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
-                } else {
-                    Modifier
-                        .fillMaxWidth()
-                        .offset {
-                            IntOffset(
-                                ((screenW - animatedPreviewW) / 2f).roundToPx(),
-                                statusBarTop.roundToPx(),
-                            )
-                        }
-                        .width(animatedPreviewW)
-                        .height(animatedPreviewH)
-                        .background(Color.Black)
-                }
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
@@ -1434,9 +1420,16 @@ fun PlayerScreen(
                             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                         controller.hide(WindowInsetsCompat.Type.systemBars())
                     }
-                    (context as? Activity)?.requestedOrientation =
-                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    // 先让「黑底 + 铺满视频」这一帧真正绘制出来，再请求旋转：
+                    // 系统旋转动画会截取当前窗口画面，若同一帧就请求旋转，
+                    // 截到的仍是带信息流的整页，旋转时会整页一起转、视频缩在中间
                     pendingFullscreen = true
+                    val targetActivity = context as? Activity
+                    scope.launch {
+                        delay(32)
+                        targetActivity?.requestedOrientation =
+                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    }
                 }
             },
             onLockToggle = { locked = true; controlsVisible = false },
