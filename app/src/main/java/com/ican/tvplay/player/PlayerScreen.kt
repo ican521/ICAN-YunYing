@@ -1229,7 +1229,12 @@ fun PlayerScreen(
                 view.setBackgroundColor(android.graphics.Color.BLACK)
                 if (view.player !== Players.player) Players.bindPlayerView(view)
             },
-            modifier = when {
+            modifier = Modifier
+                // 进全屏旋转过渡：把视频提到最上层，旋转压暗遮罩只盖住详情页，
+                // 让系统旋转时视觉主体只剩「亮的预览小窗」，其余信息流几乎全黑
+                .zIndex(if (pendingFullscreen == true && !isLandscape) 2f else 0f)
+                .then(
+            when {
                 // 画中画（含退出过渡）：铺满整个（已被系统缩小的）Activity 窗口
                 inPip || pipExitHold -> Modifier.fillMaxSize().background(Color.Black)
                 // 全屏（手机旋转 / 平板横屏）：无条件铺满，fongmi MATCH_PARENT 同款。
@@ -1272,6 +1277,7 @@ fun PlayerScreen(
                         .height(animatedPreviewH)
                         .background(Color.Black)
             },
+                ),
         )
         // 诊断日志：仅 debug 构建保留（release 自动剔除）
         val branchName = when {
@@ -1460,9 +1466,10 @@ fun PlayerScreen(
             )
         }
 
-        // 进全屏旋转过渡：整页压暗（对齐 B 站：旋转时页面变暗，视觉主体只剩小窗在倒下）
+        // 进全屏旋转过渡：详情页压到接近全黑（视频已提到上层不受影响），
+        // 系统旋转时视觉上只剩预览小窗在倒下，对齐 B 站观感
         val rotateDim by animateFloatAsState(
-            targetValue = if (pendingFullscreen == true) 0.55f else 0f,
+            targetValue = if (pendingFullscreen == true) 0.92f else 0f,
             animationSpec = tween(120),
             label = "rotateDim",
         )
