@@ -357,7 +357,9 @@ fun PlayerScreen(
     // 避免自绘旋转与系统旋转叠加成两段
     var selfRotateActive by remember { mutableStateOf(false) }
     val selfRotateP = remember { Animatable(0f) }
-    LaunchedEffect(isLandscape) {
+    LaunchedEffect(isLandscape, pendingFullscreen) {
+        // JUMPCUT 下 Configuration 变化可能早于 pendingFullscreen 赋值（系统旋转动画不再提供缓冲），
+        // 因此两个 key 都要监听；已是目标方向就直接收尾，避免卡在自绘过渡态
         when {
             // 旋转进入/退出全屏后都保持纯净画面，工具栏由用户单击唤出
             pendingFullscreen == true && isLandscape -> {
@@ -1285,7 +1287,8 @@ fun PlayerScreen(
                 // 画中画（含退出过渡）：铺满整个（已被系统缩小的）Activity 窗口
                 inPip || pipExitHold -> Modifier.fillMaxSize().background(Color.Black)
                 // 手机竖屏→横屏自绘过渡：小窗绕自身中心边转边放大到横屏全屏位置
-                selfRotateActive -> Modifier
+                // （窗口一旦已是横屏就当过渡结束，避免用竖屏几何在横屏里渲染）
+                selfRotateActive && !isLandscape -> Modifier
                     .offset {
                         IntOffset(
                             selfRotLeft.value.roundToPx(),
@@ -1366,7 +1369,7 @@ fun PlayerScreen(
         // 画中画（含退出过渡）：只保留最底层视频，不挂任何覆盖层/信息流
         inPip || pipExitHold -> Unit
         // 自绘旋转过渡：只显示视频本身（详情页已随过渡淡出）
-        selfRotateActive -> Unit
+        selfRotateActive && !isLandscape -> Unit
         fullscreen -> {
         FullscreenPlayLayout(
             current = current,
