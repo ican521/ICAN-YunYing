@@ -15,10 +15,16 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
@@ -26,6 +32,7 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
@@ -78,6 +85,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -115,6 +123,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -131,6 +140,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
@@ -2018,17 +2028,45 @@ private fun VideoMetaSection(
     }
 }
 
-/** 标题行收藏按钮（竖屏/横屏共用）：裸图标无圆形底色，48dp 点击热区与原圆钮一致，
- * 已收藏心形粉色，点击切换收藏并携带站源信息 */
+/** 标题行收藏按钮（竖屏/横屏共用）：裸图标无圆形底色，32dp 点击热区，
+ * 已收藏心形粉色，点击切换收藏并携带站源信息。
+ * 动画（移植自 React Like 组件）：收藏时心形先消失再弹簧回弹（过冲放大），
+ * 同时迸射绽放粒子；取消收藏时心形轻微收缩再恢复。 */
 @Composable
 private fun FavoriteButton(v: Video) {
     val container = appContainer()
     val scope = rememberCoroutineScope()
     var isFav by remember { mutableStateOf(false) }
+    // 每次收藏自增，作为粒子动画重播的 key
+    var beat by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(v.id) {
         isFav = container.favoriteDao.isFavorite(v.id)
     }
+
+    // 心形弹出动画：收藏时 snap 到 0 再弹簧回弹（过冲），取消收藏时轻微收缩再恢复
+    val heartScale = remember { Animatable(1f) }
+    var firstHeart by remember { mutableStateOf(true) }
+    LaunchedEffect(isFav) {
+        if (firstHeart) {
+            firstHeart = false
+            return@LaunchedEffect
+        }
+        if (isFav) {
+            heartScale.snapTo(0f)
+            heartScale.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            )
+        } else {
+            heartScale.animateTo(0.82f, tween(durationMillis = 70))
+            heartScale.animateTo(1f, tween(durationMillis = 120))
+        }
+    }
+    val scale = heartScale.value
 
     Box(
         contentAlignment = Alignment.Center,
@@ -2042,6 +2080,7 @@ private fun FavoriteButton(v: Video) {
                 onClick = {
                     val newFav = !isFav
                     isFav = newFav
+                    if (newFav) beat++
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         if (newFav) {
                             // 记录视频所在站源：点击收藏时按此站源拉详情并播放
@@ -2080,12 +2119,140 @@ private fun FavoriteButton(v: Video) {
                 },
             ),
     ) {
+        // 绽放粒子层（仅收藏态挂载，key=beat 确保每次收藏重播一次）
+        if (isFav) {
+            FavoriteBloom(beat = beat)
+        }
         Icon(
             imageVector = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
             contentDescription = if (isFav) "取消收藏" else "收藏",
             tint = if (isFav) BrandPink else MiuixTheme.colorScheme.onSurfaceVariantSummary,
             // 26dp：心形图形约 20dp 视觉高，与标题（24sp）字面齐平；空心/实心共用同一尺寸
-            modifier = Modifier.size(26.dp),
+            modifier = Modifier
+                .size(26.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                },
+        )
+    }
+}
+
+/** 绽放粒子：圆盘从中心放大并镂空成环，7 对彩色圆点沿环向外迸射，末段渐隐。
+ * 每次 [beat] 变化重播一次。移植自 React Like 组件 Bloom 效果。 */
+@Composable
+private fun FavoriteBloom(beat: Int) {
+    val density = LocalDensity.current
+    // 7 种固定颜色，与 React 版本一致
+    val colors = remember {
+        listOf(
+            Color(0xFFf48ea7),
+            Color(0xFFcc8ef5),
+            Color(0xFF8ce8c3),
+            Color(0xFF91d2fa),
+            Color(0xFFf5a524),
+            Color(0xFFe5484d),
+            Color(0xFF9fc7fa),
+        )
+    }
+    // 环动画进度（圆盘放大→镂空成环→渐隐）
+    var ringProgress by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(beat) {
+        ringProgress = 0f
+        animate(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 750, easing = LinearEasing),
+        ) { value, _ -> ringProgress = value }
+    }
+
+    // 7 条辐条，每条 2 粒（颜色 k 与 k+3），沿辐条方向向外飞
+    val spokes = remember {
+        (0 until 7).flatMap { k ->
+            val angle = k * (2.0 * Math.PI / 7.0) - Math.PI / 2.0
+            listOf(
+                BloomDotSpec(angle, colors[k % colors.size], 0L),
+                BloomDotSpec(angle, colors[(k + 3) % colors.size], 35L),
+            )
+        }
+    }
+
+    Box(
+        modifier = Modifier.size(48.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        // 绽放环：实心圆盘放大，中心镂空成环，整体渐隐
+        // 容器 48dp、环最大半径 22dp，确保环在心形（26dp）外围绽放不被遮挡
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .drawBehind {
+                    val maxR = 22.dp.toPx()
+                    val p = ringProgress
+                    val outerR = p * maxR
+                    // 镂空从 p=0.3 开始出现，到 p=1 时孔径达外径的 70%
+                    val holeT = ((p - 0.3f) / 0.7f).coerceIn(0f, 1f)
+                    val holeR = holeT * maxR * 0.70f
+                    val stroke = (outerR - holeR).coerceAtLeast(0f)
+                    val centerR = (outerR + holeR) / 2f
+                    val alpha = (1f - p * 0.85f).coerceIn(0f, 1f)
+                    if (stroke > 0f) {
+                        drawCircle(
+                            color = Color.White.copy(alpha = alpha * 0.9f),
+                            radius = centerR,
+                            style = Stroke(width = stroke),
+                        )
+                    }
+                },
+        )
+        // 彩点
+        spokes.forEach { spec ->
+            BloomDot(spec, beat, density)
+        }
+    }
+}
+
+private data class BloomDotSpec(
+    val angle: Double, // 弧度，辐条方向
+    val color: Color,
+    val delay: Long,   // ms，发射延迟
+)
+
+@Composable
+private fun BloomDot(spec: BloomDotSpec, beat: Int, density: Density) {
+    var progress by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(beat) {
+        progress = 0f
+        delay(spec.delay)
+        animate(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 800, easing = LinearEasing),
+        ) { value, _ -> progress = value }
+    }
+
+    val t = progress
+    // 沿辐条方向匀速外扩
+    val dist = t * 26f // dp，从中心飞到约 26dp
+    val x = (Math.cos(spec.angle) * dist).toFloat()
+    val y = (Math.sin(spec.angle) * dist).toFloat()
+    // 末段渐隐
+    val alpha = (1f - ((t - 0.5f) / 0.5f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
+    val dotScale = 1f - t * 0.3f
+
+    with(density) {
+        Box(
+            modifier = Modifier
+                .size(4.dp)
+                .graphicsLayer {
+                    translationX = x.dp.toPx()
+                    translationY = y.dp.toPx()
+                    this.alpha = alpha
+                    scaleX = dotScale
+                    scaleY = dotScale
+                }
+                .background(spec.color, CircleShape),
         )
     }
 }
