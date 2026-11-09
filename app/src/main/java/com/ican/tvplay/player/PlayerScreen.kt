@@ -19,7 +19,12 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
@@ -79,6 +84,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -132,6 +138,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
@@ -2033,17 +2040,45 @@ private fun VideoMetaSection(
     }
 }
 
-/** 标题行收藏按钮（竖屏/横屏共用）：裸图标无圆形底色，48dp 点击热区与原圆钮一致，
- * 已收藏心形粉色，点击切换收藏并携带站源信息 */
+/** 标题行收藏按钮（竖屏/横屏共用）：裸图标无圆形底色，32dp 点击热区，
+ * 已收藏心形粉色，点击切换收藏并携带站源信息。
+ * 动画（移植自 React Like 组件）：收藏时心形先消失再弹簧回弹（过冲放大），
+ * 同时迸射 12 粒彩色烟花粒子；取消收藏时心形轻微收缩再恢复。 */
 @Composable
 private fun FavoriteButton(v: Video) {
     val container = appContainer()
     val scope = rememberCoroutineScope()
     var isFav by remember { mutableStateOf(false) }
+    // 每次收藏自增，作为烟花动画重播的 key
+    var beat by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(v.id) {
         isFav = container.favoriteDao.isFavorite(v.id)
     }
+
+    // 心形弹出动画：收藏时 snap 到 0 再弹簧回弹（过冲），取消收藏时轻微收缩再恢复
+    val heartScale = remember { Animatable(1f) }
+    var firstHeart by remember { mutableStateOf(true) }
+    LaunchedEffect(isFav) {
+        if (firstHeart) {
+            firstHeart = false
+            return@LaunchedEffect
+        }
+        if (isFav) {
+            heartScale.snapTo(0f)
+            heartScale.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            )
+        } else {
+            heartScale.animateTo(0.82f, tween(durationMillis = 70))
+            heartScale.animateTo(1f, tween(durationMillis = 120))
+        }
+    }
+    val scale = heartScale.value
 
     Box(
         contentAlignment = Alignment.Center,
@@ -2057,6 +2092,7 @@ private fun FavoriteButton(v: Video) {
                 onClick = {
                     val newFav = !isFav
                     isFav = newFav
+                    if (newFav) beat++
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         if (newFav) {
                             // 记录视频所在站源：点击收藏时按此站源拉详情并播放
@@ -2095,14 +2131,118 @@ private fun FavoriteButton(v: Video) {
                 },
             ),
     ) {
+        // 烟花粒子层（仅收藏态挂载，key=beat 确保每次收藏重播一次）
+        if (isFav) {
+            FavoriteFirework(beat = beat)
+        }
         Icon(
             imageVector = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
             contentDescription = if (isFav) "取消收藏" else "收藏",
             tint = if (isFav) BrandPink else MiuixTheme.colorScheme.onSurfaceVariantSummary,
             // 26dp：心形图形约 20dp 视觉高，与标题（24sp）字面齐平；空心/实心共用同一尺寸
-            modifier = Modifier.size(26.dp),
+            modifier = Modifier
+                .size(26.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                },
         )
     }
+}
+
+/** 烟花粒子：12 粒彩色圆点从中心向外上方抛出后下落（抛物线），末段渐隐。
+ * 每次 [beat] 变化重播一次。移植自 React Like 组件 Firework 效果。 */
+@Composable
+private fun FavoriteFirework(beat: Int) {
+    val density = LocalDensity.current
+    // 7 种固定颜色，与 React 版本一致
+    val colors = remember {
+        listOf(
+            Color(0xFFf48ea7),
+            Color(0xFFcc8ef5),
+            Color(0xFF8ce8c3),
+            Color(0xFF91d2fa),
+            Color(0xFFf5a524),
+            Color(0xFFe5484d),
+            Color(0xFF9fc7fa),
+        )
+    }
+    // 12 个粒子的固定参数（角度/速度/延迟），确定性无随机，对齐 React 实现
+    val particles = remember {
+        val fly = 0.5f // burst=50 → fly=0.5
+        (0 until 12).map { k ->
+            val a = -Math.PI / 2.0 + (k / 11.0 - 0.5) * Math.PI * 1.25
+            val v = 22.0 + fly * 22.0 + jit(k, 7) * 10.0
+            FireworkParticle(
+                dx = (Math.cos(a) * v).toFloat(),
+                dy = (Math.sin(a) * v).toFloat(),
+                delay = (jit(k, 8) * 60.0).toLong(),
+                color = colors[k % colors.size],
+            )
+        }
+    }
+
+    Box(
+        modifier = Modifier.size(26.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        particles.forEach { p ->
+            FireworkDot(p, beat, density)
+        }
+    }
+}
+
+private data class FireworkParticle(
+    val dx: Float,   // dp，水平位移（右为正）
+    val dy: Float,   // dp，垂直位移峰值（负为向上）
+    val delay: Long, // ms，发射延迟
+    val color: Color,
+)
+
+@Composable
+private fun FireworkDot(p: FireworkParticle, beat: Int, density: Density) {
+    var progress by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(beat) {
+        progress = 0f
+        delay(p.delay)
+        // progress 线性 0→1：x 匀速外扩，y 走抛物线（先升到峰值再落回）
+        animate(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 600, easing = LinearEasing),
+        ) { value, _ -> progress = value }
+    }
+
+    val t = progress
+    val x = p.dx * t
+    // 抛物线：t=0 与 t=1 时 y=0，t=0.5 时取峰值 p.dy（向上）
+    val parabola = 1f - (2f * t - 1f) * (2f * t - 1f)
+    val y = p.dy * parabola
+    // 末段快速淡出
+    val alpha = (1f - t * t).coerceIn(0f, 1f)
+    val dotScale = 1f - t * 0.3f
+
+    with(density) {
+        Box(
+            modifier = Modifier
+                .size(4.dp)
+                .graphicsLayer {
+                    translationX = x.dp.toPx()
+                    translationY = y.dp.toPx()
+                    this.alpha = alpha
+                    scaleX = dotScale
+                    scaleY = dotScale
+                }
+                .background(p.color, CircleShape),
+        )
+    }
+}
+
+/** 确定性伪随机（与 React 版 jit 同款），保证多实例行为一致 */
+private fun jit(k: Int, seed: Int): Float {
+    val x = Math.sin(k * 12.9898 + seed * 78.233) * 43758.5453
+    return (x - Math.floor(x)).toFloat()
 }
 
 /** 线路区块（fongmi: detail_flag）：横向滚动 chips */
