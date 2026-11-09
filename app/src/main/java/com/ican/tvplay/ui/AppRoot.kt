@@ -3,7 +3,6 @@ package com.ican.tvplay.ui
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -327,7 +326,9 @@ fun AppRoot() {
             // 底部悬浮液态玻璃导航：仅一级页面（Main）显示
             AnimatedVisibility(
                 visible = navigator.current() is Route.Main,
-                enter = fadeIn() + slideInVertically { it / 2 },
+                // 进场不加 fadeIn：淡入会把底栏合成到带 alpha 的离屏层，超出边界的模糊阴影被裁掉，
+                // 导致动画结束后阴影才「弹」出来；只保留上滑
+                enter = slideInVertically { it / 2 },
                 exit = fadeOut() + slideOutVertically { it / 2 },
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
