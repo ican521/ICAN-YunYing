@@ -1291,13 +1291,14 @@ fun PlayerScreen(
                 .zIndex(if (pendingFullscreen != null && !isLandscape) 2f else 0f),
         )
         // 旋转过渡帧：竖屏阶段把原竖屏页整体压暗（视频层 zIndex 更高，保持原亮度）。
-        // 这样系统旋转截到的是「暗页面 + 亮小窗」，既不会让整页白底跟着转，也不会让详情页突然消失
+        // 压暗程度只到「暗但仍能看清整页轮廓」：压太黑会变成"顶部小窗 + 其余全黑"的黑屏帧，很突兀；
+        // 这一层同时保证系统旋转截到的不是浅色白底页
         if (pendingFullscreen != null && !isLandscape) {
             Box(
                 Modifier
                     .fillMaxSize()
                     .zIndex(1f)
-                    .background(Color.Black.copy(alpha = 0.92f))
+                    .background(Color.Black.copy(alpha = 0.62f))
             )
         }
         // 诊断日志：仅 debug 构建保留（release 自动剔除）
