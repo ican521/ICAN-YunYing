@@ -3,10 +3,9 @@ package com.ican.tvplay.ui.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
@@ -20,11 +19,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -64,9 +61,13 @@ import com.ican.tvplay.ui.theme.CheckScrim
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.keyColorOptions
 
+/** 色点直径与列间距（列按屏幕宽度自适应排布） */
+private val ColorDotSize = 52.dp
+private val ColumnGap = 16.dp
+
 /**
  * 主题色板页（照搬 KernelSU 设置逻辑，UI 用项目 tv 风格重写）。
- * 第一项为「默认」（品牌蓝），其后为 15 个种子色；点击即时全局生效。
+ * 第一项为「默认」（品牌蓝），其后为按色系分组的 27 个种子色；点击即时全局生效。
  */
 @Composable
 fun ColorPaletteScreen(onBack: () -> Unit) {
@@ -120,74 +121,57 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
                 .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
         ) {
             val horizontal = pageHorizontalPadding()
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = horizontal, end = horizontal),
-                contentPadding = PaddingValues(
-                    top = innerPadding.calculateTopPadding(),
-                    bottom = Spacing.contentBottomInset,
-                ),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
-            ) {
-                // 第一行：默认色 + 前 3 个色
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        ColorButton(
-                            selected = themeColor == 0,
-                            onClick = { viewModel.setThemeColor(0) },
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.linearGradient(
-                                            listOf(BrandBlue, BrandBlueDeep, BrandTeal, BrandViolet),
-                                        ),
-                                    ),
-                            )
-                        }
-                        keyColorOptions.take(3).forEach { colorInt ->
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                // 列数按可用宽度自适应：每列一个 52dp 色点 + 16dp 列间距，至少 4 列
+                val columns = ((maxWidth - horizontal * 2 + ColumnGap) / (ColorDotSize + ColumnGap))
+                    .toInt()
+                    .coerceAtLeast(4)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(columns),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = horizontal, end = horizontal),
+                    contentPadding = PaddingValues(
+                        top = innerPadding.calculateTopPadding(),
+                        bottom = Spacing.contentBottomInset,
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(ColumnGap),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sectionSpacing),
+                ) {
+                    // 第一格：默认色
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             ColorButton(
-                                selected = themeColor == colorInt,
-                                onClick = { viewModel.setThemeColor(colorInt) },
+                                selected = themeColor == 0,
+                                onClick = { viewModel.setThemeColor(0) },
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(52.dp)
+                                        .size(ColorDotSize)
                                         .clip(CircleShape)
-                                        .background(Color(colorInt)),
+                                        .background(
+                                            Brush.linearGradient(
+                                                listOf(BrandBlue, BrandBlueDeep, BrandTeal, BrandViolet),
+                                            ),
+                                        ),
                                 )
                             }
                         }
                     }
-                }
-                // 剩余行：每 4 个一行
-                items(keyColorOptions.drop(3).chunked(4)) { rowColors ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        rowColors.forEach { colorInt ->
+                    // 其余：按色系分组排列，每行数量随屏幕宽度变化
+                    items(keyColorOptions) { colorInt ->
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             ColorButton(
                                 selected = themeColor == colorInt,
                                 onClick = { viewModel.setThemeColor(colorInt) },
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(52.dp)
+                                        .size(ColorDotSize)
                                         .clip(CircleShape)
                                         .background(Color(colorInt)),
                                 )
                             }
-                        }
-                        // 补空保持对齐
-                        repeat(4 - rowColors.size) {
-                            Spacer(modifier = Modifier.size(52.dp))
                         }
                     }
                 }
@@ -219,7 +203,7 @@ private fun ColorButton(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(ColorDotSize)
                     .clip(CircleShape)
                     .background(CheckScrim),
             ) {
