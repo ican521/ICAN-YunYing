@@ -1420,16 +1420,11 @@ fun PlayerScreen(
                             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                         controller.hide(WindowInsetsCompat.Type.systemBars())
                     }
-                    // 先让「黑底 + 铺满视频」这一帧真正绘制出来，再请求旋转：
-                    // 系统旋转动画会截取当前窗口画面，若同一帧就请求旋转，
-                    // 截到的仍是带信息流的整页，旋转时会整页一起转、视频缩在中间
+                    // 与请求旋转同帧生效：不额外等待，避免竖屏里出现「小窗已居中放大、还没开始转」
+                    // 的可见停留（系统旋转动画本身会接管这一段过渡）
                     pendingFullscreen = true
-                    val targetActivity = context as? Activity
-                    scope.launch {
-                        delay(32)
-                        targetActivity?.requestedOrientation =
-                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                    }
+                    (context as? Activity)?.requestedOrientation =
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                 }
             },
             onLockToggle = { locked = true; controlsVisible = false },
