@@ -1246,11 +1246,9 @@ fun PlayerScreen(
                 fullscreen ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
-                // 旋转挂起期且窗口已是横屏：直接铺满，详情列已隐藏（覆盖层 pending 分支 -> Unit），
-                // 避免"小窗旋转后瞬间放大"的叠加感。
-                // 仍处于竖屏的那一帧保持小窗原位（走下面的竖屏分支），只把根底压黑：
-                // 若这里也铺满，会看到小窗先跳到屏幕正中再旋转放大
-                pendingFullscreen != null && isLandscape ->
+                // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
+                // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感
+                pendingFullscreen != null ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
@@ -1276,31 +1274,13 @@ fun PlayerScreen(
                         // 竖屏小窗跟随视频比例（fongmi PlayerView.aspectRatio 同款）：顶部对齐，横向收缩时居中，
                         // 与 PortraitPlayLayout 覆盖层像素对齐（否则宽银幕源 16:9 留黑边 + 控制层错位）
                         .fillMaxWidth()
-                        // 旋转过渡期系统栏已隐藏，inset 归零会让小窗上跳；
-                        // 此时改用组合期固定的状态栏高度，保证过渡帧与小窗位置像素一致
-                        .then(
-                            if (pendingFullscreen != null) Modifier.padding(top = statusBarTop)
-                            else Modifier.statusBarsPadding()
-                        )
+                        .statusBarsPadding()
                         .offset { IntOffset(((screenW - animatedPreviewW) / 2f).roundToPx(), 0) }
                         .width(animatedPreviewW)
                         .height(animatedPreviewH)
                         .background(Color.Black)
-            }
-                // 旋转过渡帧里视频要压在压暗遮罩之上，保持原有亮度
-                .zIndex(if (pendingFullscreen != null && !isLandscape) 2f else 0f),
+            },
         )
-        // 旋转过渡帧：竖屏阶段把原竖屏页整体压暗（视频层 zIndex 更高，保持原亮度）。
-        // 压暗程度只到「暗但仍能看清整页轮廓」：压太黑会变成"顶部小窗 + 其余全黑"的黑屏帧，很突兀；
-        // 这一层同时保证系统旋转截到的不是浅色白底页
-        if (pendingFullscreen != null && !isLandscape) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .zIndex(1f)
-                    .background(Color.Black.copy(alpha = 0.62f))
-            )
-        }
         // 诊断日志：仅 debug 构建保留（release 自动剔除）
         val branchName = when {
             inPip -> "pip"
@@ -1368,9 +1348,8 @@ fun PlayerScreen(
             subtitleSettingsOpen = showSubtitleSettings,
         )
         }
-        // 进全屏旋转过渡期：横屏窗口下不渲染任何非全屏布局；
-        // 仍处于竖屏的那一帧保留原竖屏布局（由下方遮罩压暗），避免详情页突然消失的跳变
-        pendingFullscreen == true && isLandscape -> Unit
+        // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
+        pendingFullscreen == true -> Unit
         else -> if (pendingFullscreen == null && isLandscape) {
             // 自然横屏（平板）：fongmi activity_detail_land 横版布局，
             // 信息列/下方区块锚定动画中的播放器边界，随缩放一起滑出滑入（ChangeBounds 效果）
@@ -1450,28 +1429,10 @@ fun PlayerScreen(
                             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                         controller.hide(WindowInsetsCompat.Type.systemBars())
                     }
-                    // 先切到「压暗 + 亮小窗」过渡帧，等这一帧真正绘出后再请求系统旋转。
-                    // 用 OnPreDraw + post 精确卡在“本帧绘制完成”这一刻（约一帧）；
-                    // 直接用 withFrameNanos 在本窗口没有待绘制帧时会被推迟到下一个 vsync，体感像卡了一秒
+                    // 双击即请求系统旋转，不做任何过渡帧/压暗/等待：由系统整窗旋转动画直接接管
+                    (context as? Activity)?.requestedOrientation =
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     pendingFullscreen = true
-                    val decor = activityWindow?.decorView
-                    if (decor != null) {
-                        decor.viewTreeObserver.addOnPreDrawListener(
-                            object : android.view.ViewTreeObserver.OnPreDrawListener {
-                                override fun onPreDraw(): Boolean {
-                                    decor.viewTreeObserver.removeOnPreDrawListener(this)
-                                    decor.post {
-                                        (context as? Activity)?.requestedOrientation =
-                                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                                    }
-                                    return true
-                                }
-                            }
-                        )
-                    } else {
-                        (context as? Activity)?.requestedOrientation =
-                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                    }
                 }
             },
             onLockToggle = { locked = true; controlsVisible = false },
@@ -2235,11 +2196,19 @@ private fun BloomDot(spec: BloomDotSpec, beat: Int, density: Density) {
     }
 
     val t = progress
-    // 沿辐条方向匀速外扩
-    val dist = t * 26f // dp，从中心飞到约 26dp
+    // 分段飞行：前段快速抵达爱心边缘（对应爱心过冲峰值时刻），后段缓慢向外扩散
+    // 爱心峰值约在 360ms（StiffnessLow + MediumBouncy），粒子总时长 800ms
+    val peakRatio = 0.45f   // t=0.45 时粒子抵达爱心边缘
+    val edgeDist = 15f      // dp，爱心峰值时的边缘半径（26dp 心形 × 过冲 ~1.15）
+    val maxDist = 26f       // dp，最终扩散距离
+    val dist = if (t < peakRatio) {
+        (t / peakRatio) * edgeDist
+    } else {
+        edgeDist + ((t - peakRatio) / (1f - peakRatio)) * (maxDist - edgeDist)
+    }
     val x = (Math.cos(spec.angle) * dist).toFloat()
     val y = (Math.sin(spec.angle) * dist).toFloat()
-    // 末段渐隐
+    // 后半段渐隐
     val alpha = (1f - ((t - 0.5f) / 0.5f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
     val dotScale = 1f - t * 0.3f
 
