@@ -910,9 +910,10 @@ fun PlayerScreen(
     }
 
     // 全屏/放大动画期间自动收起状态栏，缩回小窗收敛后恢复（旋转请求在挂起触发处先行发出）；
-    // 进入全屏后的旋转等待期（pendingFullscreen）也要收起系统栏，否则旋转动画中顶部/底部
-    // 会露出浅色状态栏/导航栏，看着像视频头尾由白色渐变成黑色
-    val immersive = fullscreen || landscapeFullscreen || landZooming || pendingFullscreen != null
+    // 退出全屏等待转回竖屏期间也要收起系统栏，否则旋转动画中顶部/底部会露出浅色黑边；
+    // 进入全屏的旋转等待期不收起：这段旋转的是「竖屏详情页快照」，隐藏系统栏会让页面重排、
+    // 快照错位（B 站旋转时整页含状态栏一起转）
+    val immersive = fullscreen || landscapeFullscreen || landZooming || pendingFullscreen == false
     LaunchedEffect(immersive) {
         Players.isFullscreen = immersive
         val activity = context as? Activity ?: return@LaunchedEffect
@@ -1236,10 +1237,9 @@ fun PlayerScreen(
                 fullscreen ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
-                // 旋转挂起期间：直接铺满整屏（详情列已隐藏，when 分支 pendingFullscreen==true -> Unit）。
-                // 铺满是为了让系统旋转动画的起点就是「黑底 + 接近整屏的视频」——
-                // 若保持小窗尺寸，旋转时视频会绕屏幕中心转，观感与 B 站不一致
-                pendingFullscreen != null ->
+                // 退出全屏、等待系统转回竖屏期间：保持铺满，避免先缩成小窗再旋转
+                // （进入全屏方向不在这里处理：竖屏小窗保持原样，整页一起交给系统旋转动画）
+                pendingFullscreen == false ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
@@ -1339,8 +1339,11 @@ fun PlayerScreen(
             subtitleSettingsOpen = showSubtitleSettings,
         )
         }
-        // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
-        pendingFullscreen == true -> Unit
+        // 退出全屏旋转过渡期：仅黑底，保持横屏全屏画面直到系统转回竖屏
+        pendingFullscreen == false -> Unit
+        // 进入全屏旋转过渡期：竖屏详情页（含顶部小窗）原样渲染，整页一起被系统旋转；
+        // 旋转刚完成、还没切到全屏布局的一瞬保持黑底，避免平板横版布局闪现
+        pendingFullscreen == true && isLandscape -> Unit
         else -> if (pendingFullscreen == null && isLandscape) {
             // 自然横屏（平板）：fongmi activity_detail_land 横版布局，
             // 信息列/下方区块锚定动画中的播放器边界，随缩放一起滑出滑入（ChangeBounds 效果）
@@ -1405,23 +1408,14 @@ fun PlayerScreen(
                     landscapeFullscreen = true
                     fullscreen = true
                 } else {
-                    // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
+                    // 请求横屏后由系统整窗旋转动画完成过渡：旋转期间竖屏详情页（顶部小窗 +
+                    // 下方信息流）原样保留，整页一起被系统旋转，对齐 B 站观感；
+                    // 旋转完成（Configuration 变化）后再切全屏布局
                     landscapeFullscreen = false
-                    // 请求旋转前同步把窗口底色和根底色切黑（系统栏同步隐藏并切浅色图标）
                     Players.setVideoPresent(true)
                     activityWindow?.setBackgroundDrawable(
                         android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
                     )
-                    activityWindow?.let { w ->
-                        val controller = WindowCompat.getInsetsController(w, w.decorView)
-                        controller.isAppearanceLightStatusBars = false
-                        controller.isAppearanceLightNavigationBars = false
-                        controller.systemBarsBehavior =
-                            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                        controller.hide(WindowInsetsCompat.Type.systemBars())
-                    }
-                    // 与请求旋转同帧生效：不额外等待，避免竖屏里出现「小窗已居中放大、还没开始转」
-                    // 的可见停留（系统旋转动画本身会接管这一段过渡）
                     pendingFullscreen = true
                     (context as? Activity)?.requestedOrientation =
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
