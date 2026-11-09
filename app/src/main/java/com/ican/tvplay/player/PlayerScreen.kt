@@ -1160,31 +1160,23 @@ fun PlayerScreen(
         val animatedPreviewH by animateDpAsState(portraitPreviewH, tween(250), label = "portraitPreviewH")
         val animatedPreviewW by animateDpAsState(portraitPreviewW, tween(250), label = "portraitPreviewW")
 
-        // 自绘旋转过渡几何：起点=竖屏小窗（0°），终点=横屏全屏视频尺寸；rotationZ=90° 后
-        // 视觉上正好落在竖屏窗口中央（横屏画面在竖屏窗口中的投影）。全部在布局阶段读取
-        val selfRotateTargetW = screenW * videoRatio
-        val selfRotateTargetH = screenW
-        val selfRotW = remember(selfRotateTargetW, animatedPreviewW) {
-            derivedStateOf {
-                animatedPreviewW +
-                    (selfRotateTargetW - animatedPreviewW) * selfRotateP.value
-            }
+        // 自绘旋转过渡几何：布局尺寸恒定为「横屏全屏视频」尺寸，只用缩放/旋转/位移做过渡。
+        // 不可在动画中改变容器尺寸——尺寸随父约束被压回会让视频被二次压缩、只占屏幕一部分
+        val selfRotW = screenW * videoRatio
+        val selfRotH = screenW
+        val selfRotStartScale = screenW / selfRotW
+        val selfRotLeft = remember(selfRotW) {
+            derivedStateOf { screenW / 2f - selfRotW / 2f }
         }
-        val selfRotH = remember(selfRotateTargetH, animatedPreviewH) {
+        val selfRotTop = remember(selfRotH, statusBarTop) {
             derivedStateOf {
-                animatedPreviewH +
-                    (selfRotateTargetH - animatedPreviewH) * selfRotateP.value
-            }
-        }
-        val selfRotLeft = remember(screenW) {
-            derivedStateOf { screenW / 2f - selfRotW.value / 2f }
-        }
-        val selfRotTop = remember(screenH, statusBarTop, animatedPreviewH) {
-            derivedStateOf {
-                val startCenterY = statusBarTop + animatedPreviewH / 2f
+                val startCenterY = statusBarTop + selfRotH * selfRotStartScale / 2f
                 val cy = startCenterY + (screenH / 2f - startCenterY) * selfRotateP.value
-                cy - selfRotH.value / 2f
+                cy - selfRotH / 2f
             }
+        }
+        val selfRotScale = remember(selfRotStartScale) {
+            derivedStateOf { selfRotStartScale + (1f - selfRotStartScale) * selfRotateP.value }
         }
         val selfRotAngle = remember { derivedStateOf { 90f * selfRotateP.value } }
 
@@ -1298,6 +1290,9 @@ fun PlayerScreen(
                     .animatedSize(selfRotW, selfRotH)
                     .graphicsLayer {
                         rotationZ = selfRotAngle.value
+                        val s = selfRotScale.value
+                        scaleX = s
+                        scaleY = s
                         shape = SquircleShape(deviceCorner * (1f - selfRotateP.value))
                         clip = true
                         compositingStrategy = CompositingStrategy.Offscreen
@@ -2297,21 +2292,22 @@ private fun FireworkDot(p: FireworkParticle, beat: Int, density: Density) {
     LaunchedEffect(beat) {
         progress = 0f
         delay(p.delay)
-        // progress 线性 0→1：x 匀速外扩，y 走抛物线（先升到峰值再落回）
+        // progress 线性 0→1：x 匀速外扩，y 走抛物线（先升后落，末段落到中心以下）
         animate(
             initialValue = 0f,
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 600, easing = LinearEasing),
+            animationSpec = tween(durationMillis = 850, easing = LinearEasing),
         ) { value, _ -> progress = value }
     }
 
     val t = progress
     val x = p.dx * t
-    // 抛物线：t=0 与 t=1 时 y=0，t=0.5 时取峰值 p.dy（向上）
-    val parabola = 1f - (2f * t - 1f) * (2f * t - 1f)
-    val y = p.dy * parabola
-    // 末段快速淡出
-    val alpha = (1f - t * t).coerceIn(0f, 1f)
+    // 抛物线：峰值在 t=0.45，t=1 时落到中心以下（约半倍峰值距离），模拟重力下落
+    val peakT = 0.45f
+    val yNorm = t * (2f * peakT - t) / (peakT * peakT)
+    val y = p.dy * yNorm
+    // 前半段保持不透明，后半段下落时渐隐
+    val alpha = (1f - ((t - 0.5f) / 0.5f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
     val dotScale = 1f - t * 0.3f
 
     with(density) {
