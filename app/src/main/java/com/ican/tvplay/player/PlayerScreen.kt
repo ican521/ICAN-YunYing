@@ -113,6 +113,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -1234,12 +1235,12 @@ fun PlayerScreen(
                 // PiP 退出放大期间可能拿到中间态尺寸，Surface 与系统动画窗口错位跳变
                 fullscreen ->
                     Modifier.fillMaxSize().background(Color.Black)
-                        .clip(RoundedCornerShape(deviceCorner))
+                        .clip(SquircleShape(deviceCorner))
                 // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
                 // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感
                 pendingFullscreen != null ->
                     Modifier.fillMaxSize().background(Color.Black)
-                        .clip(RoundedCornerShape(deviceCorner))
+                        .clip(SquircleShape(deviceCorner))
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
@@ -1251,8 +1252,11 @@ fun PlayerScreen(
                         .offset { IntOffset(animLeft.value.roundToPx(), animTop.value.roundToPx()) }
                         .animatedSize(animWidth, animHeight)
                         .graphicsLayer {
-                            shape = RoundedCornerShape(animCorner.value)
+                            shape = SquircleShape(animCorner.value)
                             clip = true
+                            // 离屏合成：圆角边缘只做一次抗锯齿，避免视频层与覆盖层边缘各自的
+                            // 半透明像素叠出弧线黑边
+                            compositingStrategy = CompositingStrategy.Offscreen
                         }
                         .background(Color.Black)
                 else ->
@@ -1688,8 +1692,9 @@ private fun LandscapePlayLayout(
                 .offset { IntOffset(playerLeft.value.roundToPx(), playerTop.value.roundToPx()) }
                 .animatedSize(playerWidth, playerHeight)
                 .graphicsLayer {
-                    shape = RoundedCornerShape(playerCorner.value)
+                    shape = SquircleShape(playerCorner.value)
                     clip = true
+                    compositingStrategy = CompositingStrategy.Offscreen
                 },
             playerState = playerState,
             showLoading = false,
