@@ -1172,6 +1172,23 @@ fun PlayerScreen(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "animLeft",
         ) { expanded -> if (expanded) 0.dp else pageHorizontal }
+        // 设备屏幕物理圆角（全屏时视频四角与屏幕边角贴合）；取不到（非圆角屏/低版本）时退回 16dp
+        val deviceCorner = remember {
+            val radiusPx = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (context as? Activity)?.display
+                    ?.getRoundedCorner(android.view.RoundedCorner.POSITION_TOP_LEFT)
+                    ?.radius ?: 0
+            } else {
+                0
+            }
+            if (radiusPx > 0) with(density) { radiusPx.toDp() } else Spacing.corner
+        }
+        // 圆角随放大/缩回同步插值：小窗 16dp → 全屏=设备屏幕圆角，
+        // 这样放大最后一帧与全屏布局的圆角完全一致，切换时不跳变
+        val animCorner = expandTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "animCorner",
+        ) { expanded -> if (expanded) deviceCorner else Spacing.corner }
 
         // 动画收敛后处理：放大结束挂全屏布局（纯净画面起手）；
         // 缩回期间横版布局全程渲染，信息列/下方区块锚定视频边缘跟随滑入滑出（fongmi ChangeBounds）
@@ -1215,22 +1232,28 @@ fun PlayerScreen(
                 // 全屏（手机旋转 / 平板横屏）：无条件铺满，fongmi MATCH_PARENT 同款。
                 // 平板横屏全屏稳态若走下面 isLandscape 定尺寸分支（宽高取自 Configuration），
                 // PiP 退出放大期间可能拿到中间态尺寸，Surface 与系统动画窗口错位跳变
-                fullscreen -> Modifier.fillMaxSize().background(Color.Black)
+                fullscreen ->
+                    Modifier.fillMaxSize().background(Color.Black)
+                        .clip(RoundedCornerShape(deviceCorner))
                 // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
                 // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感
                 pendingFullscreen != null ->
                     Modifier.fillMaxSize().background(Color.Black)
+                        .clip(RoundedCornerShape(deviceCorner))
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
-                // 视频面保持方角 + 纯黑底（fongmi activity_detail_land 的 400dp×225dp 纯黑 FrameLayout 同款）：
-                // SurfaceView 无法被 Compose 裁剪，只能靠遮罩盖角；而 FIT 模式信箱黑(#000)与页面底色有色差，
-                // 遮罩无论多精确都会在四角露出"黑边"。方角 + 黑底后信箱黑与底色同色，黑边彻底不存在
+                // 圆角：换 TextureView 后视频参与 View 合成，可由 graphicsLayer 直接裁剪；
+                // 小窗 16dp，放大过程中与窗口同步插值到设备屏幕圆角
                 isLandscape ->
                     Modifier
                         // 动画值全部在布局/绘制阶段的 lambda 内读取：放大/缩回动画期间本分支不触发逐帧重组
                         .offset { IntOffset(animLeft.value.roundToPx(), animTop.value.roundToPx()) }
                         .animatedSize(animWidth, animHeight)
+                        .graphicsLayer {
+                            shape = RoundedCornerShape(animCorner.value)
+                            clip = true
+                        }
                         .background(Color.Black)
                 else ->
                     Modifier
@@ -1330,6 +1353,7 @@ fun PlayerScreen(
                 playerLeft = animLeft,
                 playerWidth = animWidth,
                 playerHeight = animHeight,
+                playerCorner = animCorner,
                 smallPlayerWidth = screenW * LAND_PLAYER_WIDTH_FRACTION,
                 screenWidth = screenW,
                 screenHeight = screenH,
@@ -1640,6 +1664,7 @@ private fun LandscapePlayLayout(
     playerLeft: State<Dp>,
     playerWidth: State<Dp>,
     playerHeight: State<Dp>,
+    playerCorner: State<Dp>,
     smallPlayerWidth: Dp,
     screenWidth: Dp,
     screenHeight: Dp,
@@ -1656,12 +1681,16 @@ private fun LandscapePlayLayout(
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // 播放器覆盖层：与底层常驻 PlayerView 同位同尺寸（尺寸由根 AndroidView 动画值驱动）
-        // 不再裁圆角：视频面是方角（fongmi 同款），控制层若单独裁圆角，
-        // 底部渐变条的方角反而会露在圆角缺口里形成浅灰色直角块
+        // 圆角与视频面同步（同一个 animCorner）：若只裁视频不裁控制层，
+        // 底部渐变条的方角会露在圆角缺口里形成浅灰色直角块
         PreviewPlayerArea(
             modifier = Modifier
                 .offset { IntOffset(playerLeft.value.roundToPx(), playerTop.value.roundToPx()) }
-                .animatedSize(playerWidth, playerHeight),
+                .animatedSize(playerWidth, playerHeight)
+                .graphicsLayer {
+                    shape = RoundedCornerShape(playerCorner.value)
+                    clip = true
+                },
             playerState = playerState,
             showLoading = false,
             controlsVisible = controlsVisible,
