@@ -15,7 +15,6 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
@@ -76,7 +75,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -344,31 +342,15 @@ fun PlayerScreen(
     // 缩放会话令牌：每次进入/退出全屏自增，作为收敛监听 LaunchedEffect 的 key，
     // 避免协程体内把 landZooming 置 false 导致自身被取消、渐显逻辑丢失
     var landZoomToken by remember { mutableIntStateOf(0) }
-    // 竖屏双击小窗→全屏的过渡相位：先在竖屏坐标内把视频平滑放大到铺满，
-    // 再交给系统整窗旋转 90°（退出时反向：系统先转回竖屏，再平滑缩回小窗）。
-    // 0=静止 1=进全屏放大中 2=退全屏缩回中
-    var portraitZoomPhase by remember { mutableIntStateOf(0) }
-    val portraitZoomP = remember { Animatable(0f) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
             // 旋转进入/退出全屏后都保持纯净画面，工具栏由用户单击唤出
             pendingFullscreen == true && isLandscape -> {
                 fullscreen = true; pendingFullscreen = null; controlsVisible = false
-                // 系统旋转到位：竖屏内的放大过渡已由全屏铺满接手，复位进度
-                portraitZoomPhase = 0
-                portraitZoomP.snapTo(0f)
             }
             pendingFullscreen == false && !isLandscape -> {
                 fullscreen = false; pendingFullscreen = null; controlsVisible = false
-                // 系统已转回竖屏：把整屏画面平滑缩回小窗（与进入时的放大对称）
-                portraitZoomPhase = 2
-                portraitZoomP.snapTo(1f)
-                portraitZoomP.animateTo(
-                    0f,
-                    tween(PORTRAIT_ZOOM_DURATION_MS, easing = FastOutSlowInEasing),
-                )
-                portraitZoomPhase = 0
             }
         }
     }
@@ -469,9 +451,8 @@ fun PlayerScreen(
     // 视频铺满全屏/画中画（含过渡期）时上报给 AppRoot：根底色保持黑色。
     // 仅靠 pipTransition（进出过渡）覆盖不到稳态全屏——全屏下窗口底部最后约 1px
     // 仍由根底色绘制，浅色主题会露出一条白色细线。
-    val videoPresent = inPip || pipExitHold || fullscreen || pendingFullscreen != null ||
-        portraitZoomPhase != 0
-    LaunchedEffect(inPip, pipExitHold, fullscreen, pendingFullscreen, portraitZoomPhase) {
+    val videoPresent = inPip || pipExitHold || fullscreen || pendingFullscreen != null
+    LaunchedEffect(inPip, pipExitHold, fullscreen, pendingFullscreen) {
         Players.setVideoPresent(videoPresent)
     }
     // 画中画窗口在 HyperOS 上是透明表面（fongmi 同样透明，但它内容铺满 100%）：
@@ -931,8 +912,7 @@ fun PlayerScreen(
     // 全屏/放大动画期间自动收起状态栏，缩回小窗收敛后恢复（旋转请求在挂起触发处先行发出）；
     // 进入全屏后的旋转等待期（pendingFullscreen）也要收起系统栏，否则旋转动画中顶部/底部
     // 会露出浅色状态栏/导航栏，看着像视频头尾由白色渐变成黑色
-    val immersive = fullscreen || landscapeFullscreen || landZooming || pendingFullscreen != null ||
-        portraitZoomPhase != 0
+    val immersive = fullscreen || landscapeFullscreen || landZooming || pendingFullscreen != null
     LaunchedEffect(immersive) {
         Players.isFullscreen = immersive
         val activity = context as? Activity ?: return@LaunchedEffect
@@ -1028,8 +1008,6 @@ fun PlayerScreen(
         // 锁定状态下屏蔽返回（对齐 fongmi isLock() 拦截语义），
         // 系统侧滑/返回键不退出全屏、不退出页面，解锁后恢复
         if (locked) return
-        // 竖屏小窗↔全屏缩放过渡进行中：忽略返回，避免动画中途退出页面
-        if (portraitZoomPhase != 0) return
         if (fullscreen) {
             if (landscapeFullscreen) {
                 // 平板横屏直进的全屏：立即卸载全屏覆盖层，PlayerView 执行缩回动画，
@@ -1040,8 +1018,7 @@ fun PlayerScreen(
                 landZooming = true
                 landZoomToken++
             } else {
-                // 先请求竖屏旋转，转回竖屏后再把整屏画面平滑缩回小窗
-                portraitZoomPhase = 2
+                // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
                 (context as? Activity).restoreDefaultOrientation()
                 pendingFullscreen = false
             }
@@ -1058,7 +1035,7 @@ fun PlayerScreen(
     }
     // 仅在页面需要自己处理返回时拦截（退全屏 / 缩放动画中忽略）；
     // 竖屏小窗状态下不拦截，交还 NavDisplay → 预测返回动画 + 边缘滑动返回生效
-    BackHandler(enabled = fullscreen || landZooming || portraitZoomPhase != 0) { handleBack() }
+    BackHandler(enabled = fullscreen || landZooming) { handleBack() }
 
     // PiP 画中画：系统会把整个 Activity 窗口直接缩小，因此不切换视图子树
     // （同一个 PlayerView 跨 AndroidView 节点 reparent 有崩溃风险），
@@ -1101,8 +1078,7 @@ fun PlayerScreen(
         // 横版布局未显式刷底色的空档（播放器上方/左侧、信息列底部与下方区块之间）
         // 会透出黑色，与刷白的区块拼成黑白块
         MiuixTheme.colorScheme.surface
-    } else if (inPip || pipExitHold || fullscreen || pendingFullscreen != null || landscapeFullscreen ||
-        portraitZoomPhase == 1) {
+    } else if (inPip || pipExitHold || fullscreen || pendingFullscreen != null || landscapeFullscreen) {
         Color.Black
     } else {
         MiuixTheme.colorScheme.surface
@@ -1160,19 +1136,6 @@ fun PlayerScreen(
         // 视频比例就绪时小窗高宽平滑过渡（否则从默认 16:9 跳到实际比例会瞬间跳变）
         val animatedPreviewH by animateDpAsState(portraitPreviewH, tween(250), label = "portraitPreviewH")
         val animatedPreviewW by animateDpAsState(portraitPreviewW, tween(250), label = "portraitPreviewW")
-
-        // 竖屏「小窗 → 铺满」插值尺寸：只在当前小窗与整屏之间线性插值。
-        // 与横屏放大同思路，动画值只在布局/绘制阶段读取，过渡期间不触发逐帧重组
-        val portraitZoomW = remember(animatedPreviewW, screenW) {
-            derivedStateOf {
-                animatedPreviewW + (screenW - animatedPreviewW) * portraitZoomP.value
-            }
-        }
-        val portraitZoomH = remember(animatedPreviewH, screenH) {
-            derivedStateOf {
-                animatedPreviewH + (screenH - animatedPreviewH) * portraitZoomP.value
-            }
-        }
 
         // 横屏小窗↔全屏放大/缩回过渡：宽/高/顶部偏移连续插值，
         // PlayerView 全程不重建，只有画面在放大，不挂任何控制层
@@ -1278,28 +1241,6 @@ fun PlayerScreen(
                 pendingFullscreen != null ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
-                // 竖屏双击小窗→全屏：先在竖屏坐标内把视频从当前位置平滑放大到铺满
-                //（上沿从状态栏下方收到 0、宽高取自小窗与整屏的插值），
-                // 放大结束再交给系统整窗旋转 90°；退出时由同一分支反向缩回小窗
-                portraitZoomPhase != 0 && !isLandscape ->
-                    Modifier
-                        .offset {
-                            val w = portraitZoomW.value
-                            IntOffset(
-                                ((screenW - w) / 2f).roundToPx(),
-                                (statusBarTop * (1f - portraitZoomP.value)).roundToPx(),
-                            )
-                        }
-                        .animatedSize(portraitZoomW, portraitZoomH)
-                        .graphicsLayer {
-                            // 圆角随放大同步收敛到设备屏幕圆角，交接给全屏时无跳变
-                            shape = SquircleShape(
-                                Spacing.corner + (deviceCorner - Spacing.corner) * portraitZoomP.value,
-                            )
-                            clip = true
-                            compositingStrategy = CompositingStrategy.Offscreen
-                        }
-                        .background(Color.Black)
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
@@ -1336,7 +1277,6 @@ fun PlayerScreen(
             pipExitHold -> "pipHold"
             fullscreen -> "full"
             pendingFullscreen != null -> "pending"
-            portraitZoomPhase != 0 -> "portraitZoom"
             isLandscape -> "land"
             else -> "portrait"
         }
@@ -1354,8 +1294,6 @@ fun PlayerScreen(
         when {
         // 画中画（含退出过渡）：只保留最底层视频，不挂任何覆盖层/信息流
         inPip || pipExitHold -> Unit
-        // 竖屏小窗↔全屏的放大/缩回过渡：全程只渲染纯视频，不挂任何覆盖层/信息流
-        portraitZoomPhase != 0 -> Unit
         fullscreen -> {
         FullscreenPlayLayout(
             current = current,
@@ -1466,8 +1404,7 @@ fun PlayerScreen(
                     landscapeFullscreen = true
                     fullscreen = true
                 } else {
-                    // 先在竖屏坐标内把小窗平滑放大到铺满，放大完成后才请求系统横屏，
-                    // 由系统整窗旋转 90°（状态栏手势/触控/画中画都保持系统原生行为）
+                    // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
                     landscapeFullscreen = false
                     // 请求旋转前同步把窗口底色和根底色切黑（系统栏同步隐藏并切浅色图标）
                     Players.setVideoPresent(true)
@@ -1482,18 +1419,9 @@ fun PlayerScreen(
                             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                         controller.hide(WindowInsetsCompat.Type.systemBars())
                     }
-                    val targetActivity = context as? Activity
-                    portraitZoomPhase = 1
-                    scope.launch {
-                        portraitZoomP.snapTo(0f)
-                        portraitZoomP.animateTo(
-                            1f,
-                            tween(PORTRAIT_ZOOM_DURATION_MS, easing = FastOutSlowInEasing),
-                        )
-                        targetActivity?.requestedOrientation =
-                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                        pendingFullscreen = true
-                    }
+                    (context as? Activity)?.requestedOrientation =
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    pendingFullscreen = true
                 }
             },
             onLockToggle = { locked = true; controlsVisible = false },
@@ -1541,9 +1469,6 @@ fun PlayerScreen(
 /** 竖屏顶部预览小窗高度的封顶比例（相对状态栏下方可用高度）：视频为竖屏（宽高比<1）时高度封顶并横向收缩居中，
  *  避免 9:16 等竖屏片源把整屏占满、压掉详情信息流（fongmi 竖屏详情小窗也限制在可用区域内的同款思路） */
 private const val VERTICAL_PREVIEW_MAX_HEIGHT_FRACTION = 0.6f
-
-/** 竖屏双击小窗→全屏：「小窗先放大铺满」的过渡时长，随后由系统整窗旋转 90° */
-private const val PORTRAIT_ZOOM_DURATION_MS = 220
 
 @Composable
 private fun PortraitPlayLayout(
