@@ -55,6 +55,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -114,6 +115,7 @@ import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.State
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -1429,9 +1431,15 @@ fun PlayerScreen(
                             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                         controller.hide(WindowInsetsCompat.Type.systemBars())
                     }
-                    (context as? Activity)?.requestedOrientation =
-                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    // 先切到「黑底 + 纯视频」过渡帧，等这一帧真正绘出后再请求系统旋转。
+                    // 否则系统截取的是旋转前的白色详情页，旋转 crossfade 里详情页白底会跟着转，
+                    // 全屏画面之外的顶部/底部会露出白色
                     pendingFullscreen = true
+                    scope.launch {
+                        withFrameNanos { }
+                        (context as? Activity)?.requestedOrientation =
+                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    }
                 }
             },
             onLockToggle = { locked = true; controlsVisible = false },
@@ -2178,14 +2186,14 @@ private fun FavoriteBloom(beat: Int) {
     }
 
     Box(
-        modifier = Modifier.size(48.dp),
+        modifier = Modifier.requiredSize(48.dp),
         contentAlignment = Alignment.Center,
     ) {
         // 绽放环：实心圆盘放大，中心镂空成环，整体渐隐
         // 容器 48dp、环最大半径 22dp，确保环在心形（26dp）外围绽放不被遮挡
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .requiredSize(48.dp)
                 .drawBehind {
                     val maxR = 22.dp.toPx()
                     val p = ringProgress
