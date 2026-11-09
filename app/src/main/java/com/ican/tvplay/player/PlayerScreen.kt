@@ -32,7 +32,6 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
@@ -125,7 +124,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -1288,8 +1286,20 @@ fun PlayerScreen(
                         .width(animatedPreviewW)
                         .height(animatedPreviewH)
                         .background(Color.Black)
-            },
+            }
+                // 旋转过渡帧里视频要压在压暗遮罩之上，保持原有亮度
+                .zIndex(if (pendingFullscreen != null && !isLandscape) 2f else 0f),
         )
+        // 旋转过渡帧：竖屏阶段把原竖屏页整体压暗（视频层 zIndex 更高，保持原亮度）。
+        // 这样系统旋转截到的是「暗页面 + 亮小窗」，既不会让整页白底跟着转，也不会让详情页突然消失
+        if (pendingFullscreen != null && !isLandscape) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .zIndex(1f)
+                    .background(Color.Black.copy(alpha = 0.92f))
+            )
+        }
         // 诊断日志：仅 debug 构建保留（release 自动剔除）
         val branchName = when {
             inPip -> "pip"
@@ -1357,8 +1367,9 @@ fun PlayerScreen(
             subtitleSettingsOpen = showSubtitleSettings,
         )
         }
-        // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
-        pendingFullscreen == true -> Unit
+        // 进全屏旋转过渡期：横屏窗口下不渲染任何非全屏布局；
+        // 仍处于竖屏的那一帧保留原竖屏布局（由下方遮罩压暗），避免详情页突然消失的跳变
+        pendingFullscreen == true && isLandscape -> Unit
         else -> if (pendingFullscreen == null && isLandscape) {
             // 自然横屏（平板）：fongmi activity_detail_land 横版布局，
             // 信息列/下方区块锚定动画中的播放器边界，随缩放一起滑出滑入（ChangeBounds 效果）
@@ -2052,8 +2063,8 @@ private fun FavoriteButton(v: Video) {
     val container = appContainer()
     val scope = rememberCoroutineScope()
     var isFav by remember { mutableStateOf(false) }
-    // 每次收藏自增，作为粒子动画重播的 key
-    var beat by remember { mutableIntStateOf(0) }
+    // 每次点击收藏自增，作为粒子动画重播的 key；初始 -1 表示页面加载时不播动画
+    var beat by remember { mutableIntStateOf(-1) }
 
     LaunchedEffect(v.id) {
         isFav = container.favoriteDao.isFavorite(v.id)
@@ -2061,26 +2072,6 @@ private fun FavoriteButton(v: Video) {
 
     // 心形弹出动画：收藏时 snap 到 0 再弹簧回弹（过冲），取消收藏时轻微收缩再恢复
     val heartScale = remember { Animatable(1f) }
-    var firstHeart by remember { mutableStateOf(true) }
-    LaunchedEffect(isFav) {
-        if (firstHeart) {
-            firstHeart = false
-            return@LaunchedEffect
-        }
-        if (isFav) {
-            heartScale.snapTo(0f)
-            heartScale.animateTo(
-                targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow,
-                ),
-            )
-        } else {
-            heartScale.animateTo(0.82f, tween(durationMillis = 70))
-            heartScale.animateTo(1f, tween(durationMillis = 120))
-        }
-    }
     val scale = heartScale.value
 
     Box(
@@ -2096,6 +2087,22 @@ private fun FavoriteButton(v: Video) {
                     val newFav = !isFav
                     isFav = newFav
                     if (newFav) beat++
+                    // 心形动画仅在点击时触发
+                    scope.launch {
+                        if (newFav) {
+                            heartScale.snapTo(0f)
+                            heartScale.animateTo(
+                                targetValue = 1f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessLow,
+                                ),
+                            )
+                        } else {
+                            heartScale.animateTo(0.82f, tween(durationMillis = 70))
+                            heartScale.animateTo(1f, tween(durationMillis = 120))
+                        }
+                    }
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         if (newFav) {
                             // 记录视频所在站源：点击收藏时按此站源拉详情并播放
@@ -2134,8 +2141,8 @@ private fun FavoriteButton(v: Video) {
                 },
             ),
     ) {
-        // 绽放粒子层（仅收藏态挂载，key=beat 确保每次收藏重播一次）
-        if (isFav) {
+        // 绽放粒子层（仅点击收藏后挂载，beat=-1 时页面加载不播）
+        if (isFav && beat >= 0) {
             FavoriteBloom(beat = beat)
         }
         Icon(
@@ -2153,8 +2160,8 @@ private fun FavoriteButton(v: Video) {
     }
 }
 
-/** 绽放粒子：圆盘从中心放大并镂空成环，7 对彩色圆点沿环向外迸射，末段渐隐。
- * 每次 [beat] 变化重播一次。移植自 React Like 组件 Bloom 效果。 */
+/** 绽放粒子：7 对彩色圆点沿辐条方向向外迸射，末段渐隐。
+ * 每次 [beat] 变化重播一次。移植自 React Like 组件 Bloom 效果（已移除绽放环）。 */
 @Composable
 private fun FavoriteBloom(beat: Int) {
     val density = LocalDensity.current
@@ -2169,16 +2176,6 @@ private fun FavoriteBloom(beat: Int) {
             Color(0xFFe5484d),
             Color(0xFF9fc7fa),
         )
-    }
-    // 环动画进度（圆盘放大→镂空成环→渐隐）
-    var ringProgress by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(beat) {
-        ringProgress = 0f
-        animate(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = 550, easing = LinearEasing),
-        ) { value, _ -> ringProgress = value }
     }
 
     // 7 条辐条，每条 2 粒（颜色 k 与 k+3），沿辐条方向向外飞
@@ -2196,30 +2193,6 @@ private fun FavoriteBloom(beat: Int) {
         modifier = Modifier.requiredSize(48.dp),
         contentAlignment = Alignment.Center,
     ) {
-        // 绽放环：实心圆盘放大，中心镂空成环，整体渐隐
-        // 容器 48dp、环最大半径 22dp，确保环在心形（26dp）外围绽放不被遮挡
-        Box(
-            modifier = Modifier
-                .requiredSize(48.dp)
-                .drawBehind {
-                    val maxR = 24.dp.toPx()
-                    val p = ringProgress
-                    val outerR = p * maxR
-                    // 镂空从 p=0.3 开始出现，到 p=1 时孔径达外径的 70%
-                    val holeT = ((p - 0.3f) / 0.7f).coerceIn(0f, 1f)
-                    val holeR = holeT * maxR * 0.70f
-                    val stroke = (outerR - holeR).coerceAtLeast(0f)
-                    val centerR = (outerR + holeR) / 2f
-                    val alpha = (1f - p * 0.8f).coerceIn(0f, 1f)
-                    if (stroke > 0f) {
-                        drawCircle(
-                            color = BrandPink.copy(alpha = alpha),
-                            radius = centerR,
-                            style = Stroke(width = stroke),
-                        )
-                    }
-                },
-        )
         // 彩点
         spokes.forEach { spec ->
             BloomDot(spec, beat, density)
