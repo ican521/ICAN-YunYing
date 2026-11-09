@@ -1449,12 +1449,25 @@ fun PlayerScreen(
                             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                         controller.hide(WindowInsetsCompat.Type.systemBars())
                     }
-                    // 先切到「黑底 + 纯视频」过渡帧，等这一帧真正绘出后再请求系统旋转。
-                    // 否则系统截取的是旋转前的白色详情页，旋转 crossfade 里详情页白底会跟着转，
-                    // 全屏画面之外的顶部/底部会露出白色
+                    // 先切到「压暗 + 亮小窗」过渡帧，等这一帧真正绘出后再请求系统旋转。
+                    // 用 OnPreDraw + post 精确卡在“本帧绘制完成”这一刻（约一帧）；
+                    // 直接用 withFrameNanos 在本窗口没有待绘制帧时会被推迟到下一个 vsync，体感像卡了一秒
                     pendingFullscreen = true
-                    scope.launch {
-                        withFrameNanos { }
+                    val decor = activityWindow?.decorView
+                    if (decor != null) {
+                        decor.viewTreeObserver.addOnPreDrawListener(
+                            object : android.view.ViewTreeObserver.OnPreDrawListener {
+                                override fun onPreDraw(): Boolean {
+                                    decor.viewTreeObserver.removeOnPreDrawListener(this)
+                                    decor.post {
+                                        (context as? Activity)?.requestedOrientation =
+                                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                    }
+                                    return true
+                                }
+                            }
+                        )
+                    } else {
                         (context as? Activity)?.requestedOrientation =
                             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     }
