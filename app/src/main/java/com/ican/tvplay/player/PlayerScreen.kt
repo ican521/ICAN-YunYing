@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -1366,8 +1367,9 @@ fun PlayerScreen(
         val portraitSim = !fullscreen && portraitFullscreen
         Box(
             modifier = if (portraitSim) {
+                // 必须用 requiredSize：宽=屏高会超出父约束，用 size 会被压回竖屏宽度后再旋转，整页错位
                 Modifier
-                    .size(screenH, screenW)
+                    .requiredSize(screenH, screenW)
                     .align(Alignment.Center)
                     .graphicsLayer { rotationZ = 90f }
             } else {
