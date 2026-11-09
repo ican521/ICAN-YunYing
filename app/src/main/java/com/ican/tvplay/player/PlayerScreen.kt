@@ -32,6 +32,7 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
@@ -123,6 +124,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -2220,7 +2222,7 @@ private fun FavoriteButton(v: Video) {
     ) {
         // 烟花粒子层（仅收藏态挂载，key=beat 确保每次收藏重播一次）
         if (isFav) {
-            FavoriteFirework(beat = beat)
+            FavoriteBloom(beat = beat)
         }
         Icon(
             imageVector = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
@@ -2237,10 +2239,10 @@ private fun FavoriteButton(v: Video) {
     }
 }
 
-/** 烟花粒子：12 粒彩色圆点从中心向外上方抛出后下落（抛物线），末段渐隐。
- * 每次 [beat] 变化重播一次。移植自 React Like 组件 Firework 效果。 */
+/** 绽放粒子：圆盘从中心放大并镂空成环，7 对彩色圆点沿环向外迸射，末段渐隐。
+ * 每次 [beat] 变化重播一次。移植自 React Like 组件 Bloom 效果。 */
 @Composable
-private fun FavoriteFirework(beat: Int) {
+private fun FavoriteBloom(beat: Int) {
     val density = LocalDensity.current
     // 7 种固定颜色，与 React 版本一致
     val colors = remember {
@@ -2254,17 +2256,24 @@ private fun FavoriteFirework(beat: Int) {
             Color(0xFF9fc7fa),
         )
     }
-    // 12 个粒子的固定参数（角度/速度/延迟），确定性无随机，对齐 React 实现
-    val particles = remember {
-        val fly = 0.5f // burst=50 → fly=0.5
-        (0 until 12).map { k ->
-            val a = -Math.PI / 2.0 + (k / 11.0 - 0.5) * Math.PI * 1.25
-            val v = 22.0 + fly * 22.0 + jit(k, 7) * 10.0
-            FireworkParticle(
-                dx = (Math.cos(a) * v).toFloat(),
-                dy = (Math.sin(a) * v).toFloat(),
-                delay = (jit(k, 8) * 60.0).toLong(),
-                color = colors[k % colors.size],
+    // 环动画进度（圆盘放大→镂空成环→渐隐）
+    var ringProgress by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(beat) {
+        ringProgress = 0f
+        animate(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 750, easing = LinearEasing),
+        ) { value, _ -> ringProgress = value }
+    }
+
+    // 7 条辐条，每条 2 粒（颜色 k 与 k+3），沿辐条方向向外飞
+    val spokes = remember {
+        (0 until 7).flatMap { k ->
+            val angle = k * (2.0 * Math.PI / 7.0) - Math.PI / 2.0
+            listOf(
+                BloomDotSpec(angle, colors[k % colors.size], 0L),
+                BloomDotSpec(angle, colors[(k + 3) % colors.size], 35L),
             )
         }
     }
@@ -2273,41 +2282,62 @@ private fun FavoriteFirework(beat: Int) {
         modifier = Modifier.size(26.dp),
         contentAlignment = Alignment.Center,
     ) {
-        particles.forEach { p ->
-            FireworkDot(p, beat, density)
+        // 绽放环：实心圆盘放大，中心镂空成环，整体渐隐
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .drawBehind {
+                    val maxR = 13.dp.toPx()
+                    val p = ringProgress
+                    val outerR = p * maxR
+                    // 镂空从 p=0.3 开始出现，到 p=1 时孔径达外径的 72%
+                    val holeT = ((p - 0.3f) / 0.7f).coerceIn(0f, 1f)
+                    val holeR = holeT * maxR * 0.72f
+                    val stroke = (outerR - holeR).coerceAtLeast(0f)
+                    val centerR = (outerR + holeR) / 2f
+                    val alpha = (1f - p).coerceIn(0f, 1f)
+                    if (stroke > 0f) {
+                        drawCircle(
+                            color = BrandPink.copy(alpha = alpha),
+                            radius = centerR,
+                            style = Stroke(width = stroke),
+                        )
+                    }
+                },
+        )
+        // 彩点
+        spokes.forEach { spec ->
+            BloomDot(spec, beat, density)
         }
     }
 }
 
-private data class FireworkParticle(
-    val dx: Float,   // dp，水平位移（右为正）
-    val dy: Float,   // dp，垂直位移峰值（负为向上）
-    val delay: Long, // ms，发射延迟
+private data class BloomDotSpec(
+    val angle: Double, // 弧度，辐条方向
     val color: Color,
+    val delay: Long,   // ms，发射延迟
 )
 
 @Composable
-private fun FireworkDot(p: FireworkParticle, beat: Int, density: Density) {
+private fun BloomDot(spec: BloomDotSpec, beat: Int, density: Density) {
     var progress by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(beat) {
         progress = 0f
-        delay(p.delay)
-        // progress 线性 0→1：x 匀速外扩，y 走抛物线（先升后落，末段落到中心以下）
+        delay(spec.delay)
         animate(
             initialValue = 0f,
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 850, easing = LinearEasing),
+            animationSpec = tween(durationMillis = 800, easing = LinearEasing),
         ) { value, _ -> progress = value }
     }
 
     val t = progress
-    val x = p.dx * t
-    // 抛物线：峰值在 t=0.45，t=1 时落到中心以下（约半倍峰值距离），模拟重力下落
-    val peakT = 0.45f
-    val yNorm = t * (2f * peakT - t) / (peakT * peakT)
-    val y = p.dy * yNorm
-    // 前半段保持不透明，后半段下落时渐隐
+    // 沿辐条方向匀速外扩
+    val dist = t * 18f // dp，从中心飞到约 18dp
+    val x = (Math.cos(spec.angle) * dist).toFloat()
+    val y = (Math.sin(spec.angle) * dist).toFloat()
+    // 末段渐隐
     val alpha = (1f - ((t - 0.5f) / 0.5f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
     val dotScale = 1f - t * 0.3f
 
@@ -2322,15 +2352,9 @@ private fun FireworkDot(p: FireworkParticle, beat: Int, density: Density) {
                     scaleX = dotScale
                     scaleY = dotScale
                 }
-                .background(p.color, CircleShape),
+                .background(spec.color, CircleShape),
         )
     }
-}
-
-/** 确定性伪随机（与 React 版 jit 同款），保证多实例行为一致 */
-private fun jit(k: Int, seed: Int): Float {
-    val x = Math.sin(k * 12.9898 + seed * 78.233) * 43758.5453
-    return (x - Math.floor(x)).toFloat()
 }
 
 /** 线路区块（fongmi: detail_flag）：横向滚动 chips */
