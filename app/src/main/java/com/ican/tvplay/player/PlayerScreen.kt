@@ -19,12 +19,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
@@ -32,7 +26,6 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
@@ -55,7 +48,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -84,10 +76,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -124,7 +114,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -142,7 +131,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
@@ -355,24 +343,11 @@ fun PlayerScreen(
     // 避免协程体内把 landZooming 置 false 导致自身被取消、渐显逻辑丢失
     var landZoomToken by remember { mutableIntStateOf(0) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    // 手机竖屏→横屏全屏：自绘「小窗倒下 + 放大」过渡（selfRotateP: 0→1）。
-    // 过渡结束后用 ROTATION_ANIMATION_JUMP 直接切系统横屏，不播系统 90° 旋转动画，
-    // 避免自绘旋转与系统旋转叠加成两段
-    var selfRotateActive by remember { mutableStateOf(false) }
-    val selfRotateP = remember { Animatable(0f) }
-    LaunchedEffect(isLandscape, pendingFullscreen) {
-        // JUMPCUT 下 Configuration 变化可能早于 pendingFullscreen 赋值（系统旋转动画不再提供缓冲），
-        // 因此两个 key 都要监听；已是目标方向就直接收尾，避免卡在自绘过渡态
+    LaunchedEffect(isLandscape) {
         when {
             // 旋转进入/退出全屏后都保持纯净画面，工具栏由用户单击唤出
             pendingFullscreen == true && isLandscape -> {
                 fullscreen = true; pendingFullscreen = null; controlsVisible = false
-                // 自绘过渡收尾：窗口已是横屏，内容交回正常布局，并恢复系统默认旋转动画
-                if (selfRotateActive) {
-                    selfRotateActive = false
-                    scope.launch { selfRotateP.snapTo(0f) }
-                    restoreRotationAnimation(context as? Activity)
-                }
             }
             pendingFullscreen == false && !isLandscape -> {
                 fullscreen = false; pendingFullscreen = null; controlsVisible = false
@@ -935,10 +910,9 @@ fun PlayerScreen(
     }
 
     // 全屏/放大动画期间自动收起状态栏，缩回小窗收敛后恢复（旋转请求在挂起触发处先行发出）；
-    // 退出全屏等待转回竖屏期间也要收起系统栏，否则旋转动画中顶部/底部会露出浅色黑边；
-    // 进入全屏的旋转等待期不收起：这段旋转的是「竖屏详情页快照」，隐藏系统栏会让页面重排、
-    // 快照错位（B 站旋转时整页含状态栏一起转）
-    val immersive = fullscreen || landscapeFullscreen || landZooming || pendingFullscreen == false
+    // 进入全屏后的旋转等待期（pendingFullscreen）也要收起系统栏，否则旋转动画中顶部/底部
+    // 会露出浅色状态栏/导航栏，看着像视频头尾由白色渐变成黑色
+    val immersive = fullscreen || landscapeFullscreen || landZooming || pendingFullscreen != null
     LaunchedEffect(immersive) {
         Players.isFullscreen = immersive
         val activity = context as? Activity ?: return@LaunchedEffect
@@ -1163,26 +1137,6 @@ fun PlayerScreen(
         val animatedPreviewH by animateDpAsState(portraitPreviewH, tween(250), label = "portraitPreviewH")
         val animatedPreviewW by animateDpAsState(portraitPreviewW, tween(250), label = "portraitPreviewW")
 
-        // 自绘旋转过渡几何：布局尺寸恒定为「横屏全屏视频」尺寸，只用缩放/旋转/位移做过渡。
-        // 不可在动画中改变容器尺寸——尺寸随父约束被压回会让视频被二次压缩、只占屏幕一部分
-        val selfRotW = screenW * videoRatio
-        val selfRotH = screenW
-        val selfRotStartScale = screenW / selfRotW
-        val selfRotLeft = remember(selfRotW) {
-            derivedStateOf { screenW / 2f - selfRotW / 2f }
-        }
-        val selfRotTop = remember(selfRotH, statusBarTop) {
-            derivedStateOf {
-                val startCenterY = statusBarTop + selfRotH * selfRotStartScale / 2f
-                val cy = startCenterY + (screenH / 2f - startCenterY) * selfRotateP.value
-                cy - selfRotH / 2f
-            }
-        }
-        val selfRotScale = remember(selfRotStartScale) {
-            derivedStateOf { selfRotStartScale + (1f - selfRotStartScale) * selfRotateP.value }
-        }
-        val selfRotAngle = remember { derivedStateOf { 90f * selfRotateP.value } }
-
         // 横屏小窗↔全屏放大/缩回过渡：宽/高/顶部偏移连续插值，
         // PlayerView 全程不重建，只有画面在放大，不挂任何控制层
         // 五个动画值保留为 State<Dp>（不委托）：使用方全部在布局/绘制阶段 lambda 内读取，
@@ -1273,43 +1227,18 @@ fun PlayerScreen(
                 view.setBackgroundColor(android.graphics.Color.BLACK)
                 if (view.player !== Players.player) Players.bindPlayerView(view)
             },
-            modifier = Modifier
-                // 进全屏旋转过渡：把视频提到最上层，旋转压暗遮罩只盖住详情页，
-                // 让系统旋转时视觉主体只剩「亮的预览小窗」，其余信息流几乎全黑
-                .zIndex(if (pendingFullscreen == true && !isLandscape) 2f else 0f)
-                .then(
-            when {
+            modifier = when {
                 // 画中画（含退出过渡）：铺满整个（已被系统缩小的）Activity 窗口
                 inPip || pipExitHold -> Modifier.fillMaxSize().background(Color.Black)
-                // 手机竖屏→横屏自绘过渡：小窗绕自身中心边转边放大到横屏全屏位置
-                // （窗口一旦已是横屏就当过渡结束，避免用竖屏几何在横屏里渲染）
-                selfRotateActive && !isLandscape -> Modifier
-                    .offset {
-                        IntOffset(
-                            selfRotLeft.value.roundToPx(),
-                            selfRotTop.value.roundToPx(),
-                        )
-                    }
-                    .requiredSize(selfRotW, selfRotH)
-                    .graphicsLayer {
-                        rotationZ = selfRotAngle.value
-                        val s = selfRotScale.value
-                        scaleX = s
-                        scaleY = s
-                        shape = SquircleShape(deviceCorner * (1f - selfRotateP.value))
-                        clip = true
-                        compositingStrategy = CompositingStrategy.Offscreen
-                    }
-                    .background(Color.Black)
                 // 全屏（手机旋转 / 平板横屏）：无条件铺满，fongmi MATCH_PARENT 同款。
                 // 平板横屏全屏稳态若走下面 isLandscape 定尺寸分支（宽高取自 Configuration），
                 // PiP 退出放大期间可能拿到中间态尺寸，Surface 与系统动画窗口错位跳变
                 fullscreen ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
-                // 退出全屏、等待系统转回竖屏期间：保持铺满，避免先缩成小窗再旋转
-                // （进入全屏方向不在这里处理：竖屏小窗保持原样，整页一起交给系统旋转动画）
-                pendingFullscreen == false ->
+                // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
+                // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感
+                pendingFullscreen != null ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
@@ -1341,7 +1270,6 @@ fun PlayerScreen(
                         .height(animatedPreviewH)
                         .background(Color.Black)
             },
-                ),
         )
         // 诊断日志：仅 debug 构建保留（release 自动剔除）
         val branchName = when {
@@ -1366,8 +1294,6 @@ fun PlayerScreen(
         when {
         // 画中画（含退出过渡）：只保留最底层视频，不挂任何覆盖层/信息流
         inPip || pipExitHold -> Unit
-        // 自绘旋转过渡：只显示视频本身（详情页已随过渡淡出）
-        selfRotateActive && !isLandscape -> Unit
         fullscreen -> {
         FullscreenPlayLayout(
             current = current,
@@ -1412,11 +1338,8 @@ fun PlayerScreen(
             subtitleSettingsOpen = showSubtitleSettings,
         )
         }
-        // 退出全屏旋转过渡期：仅黑底，保持横屏全屏画面直到系统转回竖屏
-        pendingFullscreen == false -> Unit
-        // 进入全屏旋转过渡期：竖屏详情页（含顶部小窗）原样渲染，整页一起被系统旋转；
-        // 旋转刚完成、还没切到全屏布局的一瞬保持黑底，避免平板横版布局闪现
-        pendingFullscreen == true && isLandscape -> Unit
+        // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
+        pendingFullscreen == true -> Unit
         else -> if (pendingFullscreen == null && isLandscape) {
             // 自然横屏（平板）：fongmi activity_detail_land 横版布局，
             // 信息列/下方区块锚定动画中的播放器边界，随缩放一起滑出滑入（ChangeBounds 效果）
@@ -1481,26 +1404,24 @@ fun PlayerScreen(
                     landscapeFullscreen = true
                     fullscreen = true
                 } else {
-                    // 自绘「小窗倒下 + 放大」过渡（约 300ms），结束后直接切系统横屏、
-                    // 并且用 ROTATION_ANIMATION_JUMP 跳过系统 90° 旋转动画
+                    // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
                     landscapeFullscreen = false
+                    // 请求旋转前同步把窗口底色和根底色切黑（系统栏同步隐藏并切浅色图标）
                     Players.setVideoPresent(true)
                     activityWindow?.setBackgroundDrawable(
                         android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
                     )
-                    selfRotateActive = true
-                    scope.launch {
-                        selfRotateP.snapTo(0f)
-                        selfRotateP.animateTo(
-                            1f,
-                            tween(SELF_ROTATE_DURATION_MS, easing = FastOutSlowInEasing),
-                        )
-                        val activity = context as? Activity
-                        applyRotationJump(activity)
-                        activity?.requestedOrientation =
-                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                        pendingFullscreen = true
+                    activityWindow?.let { w ->
+                        val controller = WindowCompat.getInsetsController(w, w.decorView)
+                        controller.isAppearanceLightStatusBars = false
+                        controller.isAppearanceLightNavigationBars = false
+                        controller.systemBarsBehavior =
+                            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        controller.hide(WindowInsetsCompat.Type.systemBars())
                     }
+                    (context as? Activity)?.requestedOrientation =
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    pendingFullscreen = true
                 }
             },
             onLockToggle = { locked = true; controlsVisible = false },
@@ -1539,17 +1460,6 @@ fun PlayerScreen(
                 statusBarInset = !(fullscreen || landscapeFullscreen || isLandscape),
                 onDismiss = { showSubtitleSettings = false },
             )
-        }
-
-        // 进全屏旋转过渡：详情页压到接近全黑（视频已提到上层不受影响），
-        // 系统旋转时视觉上只剩预览小窗在倒下，对齐 B 站观感
-        val rotateDim by animateFloatAsState(
-            targetValue = if (pendingFullscreen == true) 0.92f else 0f,
-            animationSpec = tween(120),
-            label = "rotateDim",
-        )
-        if (rotateDim > 0.001f) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = rotateDim)))
         }
     }
 }
@@ -1725,27 +1635,6 @@ private const val LAND_PLAYER_WIDTH_FRACTION = 0.38f
 
 /** 横屏小窗↔全屏放大/缩回动画时长（对齐 fongmi ChangeBounds 150ms） */
 private const val LAND_ZOOM_DURATION_MS = 150
-
-/** 手机竖屏→横屏全屏的自绘旋转过渡时长 */
-private const val SELF_ROTATE_DURATION_MS = 300
-
-/** 跳过系统整窗旋转动画（API 32+）：requestedOrientation 立即生效，避免与自绘旋转叠加 */
-private fun applyRotationJump(activity: Activity?) {
-    if (activity == null || Build.VERSION.SDK_INT < 32) return
-    val window = activity.window ?: return
-    val attrs = window.attributes
-    attrs.rotationAnimation = android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_JUMPCUT
-    window.attributes = attrs
-}
-
-/** 恢复系统默认旋转动画（自绘过渡结束后调用，保证后续退出全屏仍有系统动画） */
-private fun restoreRotationAnimation(activity: Activity?) {
-    if (activity == null || Build.VERSION.SDK_INT < 32) return
-    val window = activity.window ?: return
-    val attrs = window.attributes
-    attrs.rotationAnimation = android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_ROTATE
-    window.attributes = attrs
-}
 
 /** 外挂字幕文件选择器的 MIME 过滤：覆盖 srt/ass/ssa/vtt/ttml，以及文件管理器把字幕标成 octet-stream 的情况 */
 private val SUBTITLE_MIME_TYPES = arrayOf(
@@ -2129,45 +2018,17 @@ private fun VideoMetaSection(
     }
 }
 
-/** 标题行收藏按钮（竖屏/横屏共用）：裸图标无圆形底色，32dp 点击热区，
- * 已收藏心形粉色，点击切换收藏并携带站源信息。
- * 动画（移植自 React Like 组件）：收藏时心形先消失再弹簧回弹（过冲放大），
- * 同时迸射 12 粒彩色烟花粒子；取消收藏时心形轻微收缩再恢复。 */
+/** 标题行收藏按钮（竖屏/横屏共用）：裸图标无圆形底色，48dp 点击热区与原圆钮一致，
+ * 已收藏心形粉色，点击切换收藏并携带站源信息 */
 @Composable
 private fun FavoriteButton(v: Video) {
     val container = appContainer()
     val scope = rememberCoroutineScope()
     var isFav by remember { mutableStateOf(false) }
-    // 每次收藏自增，作为烟花动画重播的 key
-    var beat by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(v.id) {
         isFav = container.favoriteDao.isFavorite(v.id)
     }
-
-    // 心形弹出动画：收藏时 snap 到 0 再弹簧回弹（过冲），取消收藏时轻微收缩再恢复
-    val heartScale = remember { Animatable(1f) }
-    var firstHeart by remember { mutableStateOf(true) }
-    LaunchedEffect(isFav) {
-        if (firstHeart) {
-            firstHeart = false
-            return@LaunchedEffect
-        }
-        if (isFav) {
-            heartScale.snapTo(0f)
-            heartScale.animateTo(
-                targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            )
-        } else {
-            heartScale.animateTo(0.82f, tween(durationMillis = 70))
-            heartScale.animateTo(1f, tween(durationMillis = 120))
-        }
-    }
-    val scale = heartScale.value
 
     Box(
         contentAlignment = Alignment.Center,
@@ -2181,7 +2042,6 @@ private fun FavoriteButton(v: Video) {
                 onClick = {
                     val newFav = !isFav
                     isFav = newFav
-                    if (newFav) beat++
                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         if (newFav) {
                             // 记录视频所在站源：点击收藏时按此站源拉详情并播放
@@ -2220,139 +2080,12 @@ private fun FavoriteButton(v: Video) {
                 },
             ),
     ) {
-        // 烟花粒子层（仅收藏态挂载，key=beat 确保每次收藏重播一次）
-        if (isFav) {
-            FavoriteBloom(beat = beat)
-        }
         Icon(
             imageVector = if (isFav) AppIcons.Favorite else AppIcons.FavoriteBorder,
             contentDescription = if (isFav) "取消收藏" else "收藏",
             tint = if (isFav) BrandPink else MiuixTheme.colorScheme.onSurfaceVariantSummary,
             // 26dp：心形图形约 20dp 视觉高，与标题（24sp）字面齐平；空心/实心共用同一尺寸
-            modifier = Modifier
-                .size(26.dp)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                },
-        )
-    }
-}
-
-/** 绽放粒子：圆盘从中心放大并镂空成环，7 对彩色圆点沿环向外迸射，末段渐隐。
- * 每次 [beat] 变化重播一次。移植自 React Like 组件 Bloom 效果。 */
-@Composable
-private fun FavoriteBloom(beat: Int) {
-    val density = LocalDensity.current
-    // 7 种固定颜色，与 React 版本一致
-    val colors = remember {
-        listOf(
-            Color(0xFFf48ea7),
-            Color(0xFFcc8ef5),
-            Color(0xFF8ce8c3),
-            Color(0xFF91d2fa),
-            Color(0xFFf5a524),
-            Color(0xFFe5484d),
-            Color(0xFF9fc7fa),
-        )
-    }
-    // 环动画进度（圆盘放大→镂空成环→渐隐）
-    var ringProgress by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(beat) {
-        ringProgress = 0f
-        animate(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = 750, easing = LinearEasing),
-        ) { value, _ -> ringProgress = value }
-    }
-
-    // 7 条辐条，每条 2 粒（颜色 k 与 k+3），沿辐条方向向外飞
-    val spokes = remember {
-        (0 until 7).flatMap { k ->
-            val angle = k * (2.0 * Math.PI / 7.0) - Math.PI / 2.0
-            listOf(
-                BloomDotSpec(angle, colors[k % colors.size], 0L),
-                BloomDotSpec(angle, colors[(k + 3) % colors.size], 35L),
-            )
-        }
-    }
-
-    Box(
-        modifier = Modifier.size(26.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        // 绽放环：实心圆盘放大，中心镂空成环，整体渐隐
-        Box(
-            modifier = Modifier
-                .size(26.dp)
-                .drawBehind {
-                    val maxR = 13.dp.toPx()
-                    val p = ringProgress
-                    val outerR = p * maxR
-                    // 镂空从 p=0.3 开始出现，到 p=1 时孔径达外径的 72%
-                    val holeT = ((p - 0.3f) / 0.7f).coerceIn(0f, 1f)
-                    val holeR = holeT * maxR * 0.72f
-                    val stroke = (outerR - holeR).coerceAtLeast(0f)
-                    val centerR = (outerR + holeR) / 2f
-                    val alpha = (1f - p).coerceIn(0f, 1f)
-                    if (stroke > 0f) {
-                        drawCircle(
-                            color = BrandPink.copy(alpha = alpha),
-                            radius = centerR,
-                            style = Stroke(width = stroke),
-                        )
-                    }
-                },
-        )
-        // 彩点
-        spokes.forEach { spec ->
-            BloomDot(spec, beat, density)
-        }
-    }
-}
-
-private data class BloomDotSpec(
-    val angle: Double, // 弧度，辐条方向
-    val color: Color,
-    val delay: Long,   // ms，发射延迟
-)
-
-@Composable
-private fun BloomDot(spec: BloomDotSpec, beat: Int, density: Density) {
-    var progress by remember { mutableFloatStateOf(0f) }
-
-    LaunchedEffect(beat) {
-        progress = 0f
-        delay(spec.delay)
-        animate(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = 800, easing = LinearEasing),
-        ) { value, _ -> progress = value }
-    }
-
-    val t = progress
-    // 沿辐条方向匀速外扩
-    val dist = t * 18f // dp，从中心飞到约 18dp
-    val x = (Math.cos(spec.angle) * dist).toFloat()
-    val y = (Math.sin(spec.angle) * dist).toFloat()
-    // 末段渐隐
-    val alpha = (1f - ((t - 0.5f) / 0.5f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
-    val dotScale = 1f - t * 0.3f
-
-    with(density) {
-        Box(
-            modifier = Modifier
-                .size(4.dp)
-                .graphicsLayer {
-                    translationX = x.dp.toPx()
-                    translationY = y.dp.toPx()
-                    this.alpha = alpha
-                    scaleX = dotScale
-                    scaleY = dotScale
-                }
-                .background(spec.color, CircleShape),
+            modifier = Modifier.size(26.dp),
         )
     }
 }
