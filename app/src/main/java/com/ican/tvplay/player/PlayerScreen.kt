@@ -82,6 +82,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -351,11 +352,22 @@ fun PlayerScreen(
     // 避免协程体内把 landZooming 置 false 导致自身被取消、渐显逻辑丢失
     var landZoomToken by remember { mutableIntStateOf(0) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // 手机竖屏→横屏全屏：自绘「小窗倒下 + 放大」过渡（selfRotateP: 0→1）。
+    // 过渡结束后用 ROTATION_ANIMATION_JUMP 直接切系统横屏，不播系统 90° 旋转动画，
+    // 避免自绘旋转与系统旋转叠加成两段
+    var selfRotateActive by remember { mutableStateOf(false) }
+    val selfRotateP = remember { Animatable(0f) }
     LaunchedEffect(isLandscape) {
         when {
             // 旋转进入/退出全屏后都保持纯净画面，工具栏由用户单击唤出
             pendingFullscreen == true && isLandscape -> {
                 fullscreen = true; pendingFullscreen = null; controlsVisible = false
+                // 自绘过渡收尾：窗口已是横屏，内容交回正常布局，并恢复系统默认旋转动画
+                if (selfRotateActive) {
+                    selfRotateActive = false
+                    scope.launch { selfRotateP.snapTo(0f) }
+                    restoreRotationAnimation(context as? Activity)
+                }
             }
             pendingFullscreen == false && !isLandscape -> {
                 fullscreen = false; pendingFullscreen = null; controlsVisible = false
@@ -1146,6 +1158,34 @@ fun PlayerScreen(
         val animatedPreviewH by animateDpAsState(portraitPreviewH, tween(250), label = "portraitPreviewH")
         val animatedPreviewW by animateDpAsState(portraitPreviewW, tween(250), label = "portraitPreviewW")
 
+        // 自绘旋转过渡几何：起点=竖屏小窗（0°），终点=横屏全屏视频尺寸；rotationZ=90° 后
+        // 视觉上正好落在竖屏窗口中央（横屏画面在竖屏窗口中的投影）。全部在布局阶段读取
+        val selfRotateTargetW = screenW * videoRatio
+        val selfRotateTargetH = screenW
+        val selfRotW = remember(selfRotateTargetW, animatedPreviewW) {
+            derivedStateOf {
+                animatedPreviewW +
+                    (selfRotateTargetW - animatedPreviewW) * selfRotateP.value
+            }
+        }
+        val selfRotH = remember(selfRotateTargetH, animatedPreviewH) {
+            derivedStateOf {
+                animatedPreviewH +
+                    (selfRotateTargetH - animatedPreviewH) * selfRotateP.value
+            }
+        }
+        val selfRotLeft = remember(screenW) {
+            derivedStateOf { screenW / 2f - selfRotW.value / 2f }
+        }
+        val selfRotTop = remember(screenH, statusBarTop, animatedPreviewH) {
+            derivedStateOf {
+                val startCenterY = statusBarTop + animatedPreviewH / 2f
+                val cy = startCenterY + (screenH / 2f - startCenterY) * selfRotateP.value
+                cy - selfRotH.value / 2f
+            }
+        }
+        val selfRotAngle = remember { derivedStateOf { 90f * selfRotateP.value } }
+
         // 横屏小窗↔全屏放大/缩回过渡：宽/高/顶部偏移连续插值，
         // PlayerView 全程不重建，只有画面在放大，不挂任何控制层
         // 五个动画值保留为 State<Dp>（不委托）：使用方全部在布局/绘制阶段 lambda 内读取，
@@ -1244,6 +1284,22 @@ fun PlayerScreen(
             when {
                 // 画中画（含退出过渡）：铺满整个（已被系统缩小的）Activity 窗口
                 inPip || pipExitHold -> Modifier.fillMaxSize().background(Color.Black)
+                // 手机竖屏→横屏自绘过渡：小窗绕自身中心边转边放大到横屏全屏位置
+                selfRotateActive -> Modifier
+                    .offset {
+                        IntOffset(
+                            selfRotLeft.value.roundToPx(),
+                            selfRotTop.value.roundToPx(),
+                        )
+                    }
+                    .animatedSize(selfRotW, selfRotH)
+                    .graphicsLayer {
+                        rotationZ = selfRotAngle.value
+                        shape = SquircleShape(deviceCorner * (1f - selfRotateP.value))
+                        clip = true
+                        compositingStrategy = CompositingStrategy.Offscreen
+                    }
+                    .background(Color.Black)
                 // 全屏（手机旋转 / 平板横屏）：无条件铺满，fongmi MATCH_PARENT 同款。
                 // 平板横屏全屏稳态若走下面 isLandscape 定尺寸分支（宽高取自 Configuration），
                 // PiP 退出放大期间可能拿到中间态尺寸，Surface 与系统动画窗口错位跳变
@@ -1309,6 +1365,8 @@ fun PlayerScreen(
         when {
         // 画中画（含退出过渡）：只保留最底层视频，不挂任何覆盖层/信息流
         inPip || pipExitHold -> Unit
+        // 自绘旋转过渡：只显示视频本身（详情页已随过渡淡出）
+        selfRotateActive -> Unit
         fullscreen -> {
         FullscreenPlayLayout(
             current = current,
@@ -1422,17 +1480,26 @@ fun PlayerScreen(
                     landscapeFullscreen = true
                     fullscreen = true
                 } else {
-                    // 请求横屏后由系统整窗旋转动画完成过渡：旋转期间竖屏详情页（顶部小窗 +
-                    // 下方信息流）原样保留，整页一起被系统旋转，对齐 B 站观感；
-                    // 旋转完成（Configuration 变化）后再切全屏布局
+                    // 自绘「小窗倒下 + 放大」过渡（约 300ms），结束后直接切系统横屏、
+                    // 并且用 ROTATION_ANIMATION_JUMP 跳过系统 90° 旋转动画
                     landscapeFullscreen = false
                     Players.setVideoPresent(true)
                     activityWindow?.setBackgroundDrawable(
                         android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
                     )
-                    pendingFullscreen = true
-                    (context as? Activity)?.requestedOrientation =
-                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    selfRotateActive = true
+                    scope.launch {
+                        selfRotateP.snapTo(0f)
+                        selfRotateP.animateTo(
+                            1f,
+                            tween(SELF_ROTATE_DURATION_MS, easing = FastOutSlowInEasing),
+                        )
+                        val activity = context as? Activity
+                        applyRotationJump(activity)
+                        activity?.requestedOrientation =
+                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        pendingFullscreen = true
+                    }
                 }
             },
             onLockToggle = { locked = true; controlsVisible = false },
@@ -1657,6 +1724,27 @@ private const val LAND_PLAYER_WIDTH_FRACTION = 0.38f
 
 /** 横屏小窗↔全屏放大/缩回动画时长（对齐 fongmi ChangeBounds 150ms） */
 private const val LAND_ZOOM_DURATION_MS = 150
+
+/** 手机竖屏→横屏全屏的自绘旋转过渡时长 */
+private const val SELF_ROTATE_DURATION_MS = 300
+
+/** 跳过系统整窗旋转动画（API 32+）：requestedOrientation 立即生效，避免与自绘旋转叠加 */
+private fun applyRotationJump(activity: Activity?) {
+    if (activity == null || Build.VERSION.SDK_INT < 32) return
+    val window = activity.window ?: return
+    val attrs = window.attributes
+    attrs.rotationAnimation = android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_JUMPCUT
+    window.attributes = attrs
+}
+
+/** 恢复系统默认旋转动画（自绘过渡结束后调用，保证后续退出全屏仍有系统动画） */
+private fun restoreRotationAnimation(activity: Activity?) {
+    if (activity == null || Build.VERSION.SDK_INT < 32) return
+    val window = activity.window ?: return
+    val attrs = window.attributes
+    attrs.rotationAnimation = android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_ROTATE
+    window.attributes = attrs
+}
 
 /** 外挂字幕文件选择器的 MIME 过滤：覆盖 srt/ass/ssa/vtt/ttml，以及文件管理器把字幕标成 octet-stream 的情况 */
 private val SUBTITLE_MIME_TYPES = arrayOf(
