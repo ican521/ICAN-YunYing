@@ -1236,11 +1236,26 @@ fun PlayerScreen(
                 fullscreen ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
-                // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
-                // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感
-                pendingFullscreen != null ->
+                // 旋转挂起期间（详情列已隐藏，when 分支 pendingFullscreen==true -> Unit）：
+                // 仍竖屏时保持顶部小窗的位置与尺寸，让系统整窗旋转动画从视频左上角起手展开
+                //（对齐 B 站观感；若先铺满竖屏整屏，旋转锚点会变成屏幕中心，观感不对）。
+                // 已在横屏的挂起（退出全屏等待转回竖屏）继续铺满，避免缩成小窗
+                pendingFullscreen != null -> if (isLandscape) {
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .offset {
+                            IntOffset(
+                                ((screenW - animatedPreviewW) / 2f).roundToPx(),
+                                statusBarTop.roundToPx(),
+                            )
+                        }
+                        .width(animatedPreviewW)
+                        .height(animatedPreviewH)
+                        .background(Color.Black)
+                }
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
