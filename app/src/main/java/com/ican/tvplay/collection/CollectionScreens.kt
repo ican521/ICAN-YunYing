@@ -24,17 +24,22 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -80,6 +85,7 @@ import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -406,6 +412,15 @@ private fun FavoriteCard(
     }
 }
 
+/** 历史卡片逐个渐显：相邻卡片启动间隔（毫秒），与首页首次加载一致 */
+private const val HISTORY_CARD_FADE_STAGGER_MILLIS = 60L
+
+/** 历史卡片错峰索引上限：超出的卡片不再累加延迟 */
+private const val HISTORY_CARD_FADE_MAX_STAGGER_INDEX = 6
+
+/** 单张历史卡片淡入时长（毫秒），与首页一致 */
+private const val HISTORY_CARD_FADE_IN_MILLIS = 200
+
 @Composable
 fun HistoryScreen(
     onPlay: (videoId: String, episodeIndex: Int, flag: String, preInit: Boolean) -> Unit,
@@ -421,6 +436,22 @@ fun HistoryScreen(
     var editMode by remember { mutableStateOf(false) }
     // 清空确认弹窗
     var showConfirm by remember { mutableStateOf(false) }
+    // 已渐显的卡片索引：与首页首次加载同款错峰逐个淡入
+    var revealedCards by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    LaunchedEffect(histories) {
+        if (histories.isEmpty()) return@LaunchedEffect
+        val base = System.currentTimeMillis()
+        histories.indices
+            .filter { it !in revealedCards }
+            .forEachIndexed { idx, index ->
+                // 前若干张错峰，其后同批一起出现；用绝对时间计算，避免逐个累加
+                val wait = base +
+                    idx.coerceAtMost(HISTORY_CARD_FADE_MAX_STAGGER_INDEX) * HISTORY_CARD_FADE_STAGGER_MILLIS -
+                    System.currentTimeMillis()
+                if (wait > 0) delay(wait)
+                revealedCards = revealedCards + index
+            }
+    }
 
     // 编辑模式下按返回 = 取消编辑（留在页面）；清空弹窗打开时返回由弹窗自行消费，
     // 非编辑模式不拦截，保持原有返回上一页行为
@@ -476,10 +507,18 @@ fun HistoryScreen(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
                     verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                 ) {
-                items(histories, key = { it.videoId }, contentType = { "history" }) { history ->
+                itemsIndexed(histories, key = { _, it -> it.videoId }, contentType = { _, _ -> "history" }) { index, history ->
+                    // 逐个渐显：alpha 只挂在卡片自身的 modifier 上，不新增布局层，尺寸/位置/间距不变
+                    val cardAlpha by animateFloatAsState(
+                        targetValue = if (index !in revealedCards) 0f else 1f,
+                        animationSpec = tween(HISTORY_CARD_FADE_IN_MILLIS),
+                        label = "historyCardFade",
+                    )
                     HistoryCard(
                         history = history,
                         editMode = editMode,
+                        revealed = index in revealedCards,
+                        modifier = Modifier.alpha(cardAlpha),
                         onClick = {
                             // 编辑模式下点卡片本体不响应，仅右上角叉号可删除
                             if (!editMode) {
@@ -552,6 +591,8 @@ fun HistoryScreen(
 private fun HistoryCard(
     history: HistoryEntity,
     editMode: Boolean,
+    revealed: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onDelete: () -> Unit,
     onLongClick: () -> Unit,
@@ -562,7 +603,7 @@ private fun HistoryCard(
         0f
     }
     Card(
-        modifier = Modifier
+        modifier = modifier
             // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
             .pressable(
                 interactionSource = null,
@@ -588,7 +629,9 @@ private fun HistoryCard(
         ) {
             PosterImage(
                 title = history.title,
-                cover = history.cover,
+                // 错峰渐显轮到该卡片时才真正加载海报：把首屏 20 张海报的解码摊到错峰窗口内，
+                // 避免进入页面首帧同时解码全部封面造成掉帧（未轮到时显示 Card 自带底色）
+                cover = if (revealed) history.cover else null,
                 modifier = Modifier.fillMaxSize(),
             )
 
