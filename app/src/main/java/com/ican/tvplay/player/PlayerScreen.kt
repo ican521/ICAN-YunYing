@@ -1248,10 +1248,11 @@ fun PlayerScreen(
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
                 // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
-                // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感
+                // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感。
+                // 这里不叠加 clip：旋转过渡只有 200~300ms，四角都是黑底看不出圆角差异，
+                // 省掉一次离屏图层合成（interop TextureView 上这笔开销不小，双击后更跟手）
                 pendingFullscreen != null ->
                     Modifier.fillMaxSize().background(Color.Black)
-                        .clip(SquircleShape(deviceCorner))
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
@@ -1417,11 +1418,10 @@ fun PlayerScreen(
                 } else {
                     // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
                     landscapeFullscreen = false
-                    // 请求旋转前同步把窗口底色和根底色切黑（系统栏同步隐藏并切浅色图标）
+                    // 请求旋转前同步把根底色切黑（系统栏同步隐藏并切浅色图标）。
+                    // 窗口背景不再重复设置：Players.setVideoPresent(true) 已触发上方 LaunchedEffect
+                    // 把 window 背景切成黑色，这里再新建 ColorDrawable 重设会多一次全窗口重绘。
                     Players.setVideoPresent(true)
-                    activityWindow?.setBackgroundDrawable(
-                        android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
-                    )
                     activityWindow?.let { w ->
                         val controller = WindowCompat.getInsetsController(w, w.decorView)
                         controller.isAppearanceLightStatusBars = false
