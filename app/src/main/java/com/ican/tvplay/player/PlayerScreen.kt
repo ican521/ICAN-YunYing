@@ -23,6 +23,7 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
@@ -31,6 +32,7 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
@@ -82,10 +84,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -123,6 +124,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -351,13 +353,6 @@ fun PlayerScreen(
     // 缩放会话令牌：每次进入/退出全屏自增，作为收敛监听 LaunchedEffect 的 key，
     // 避免协程体内把 landZooming 置 false 导致自身被取消、渐显逻辑丢失
     var landZoomToken by remember { mutableIntStateOf(0) }
-    // 竖屏双击小窗进全屏：真·B 站式「视频自转 90° + 边转边放大」，不改 Activity 方向。
-    // 若仍请求横屏，系统会再转一次 90°，两次旋转叠加会「转过去又转回来」
-    var portraitFullscreen by remember { mutableStateOf(false) }
-    // 旋转动画进行中（进/出全屏）：期间只渲染纯视频，不挂控制层与信息流
-    var portraitRotating by remember { mutableStateOf(false) }
-    // 0 = 顶部小窗未旋转，1 = 旋转 90° 铺满竖屏（视觉等价横屏全屏）
-    val portraitRotate = remember { Animatable(0f) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
@@ -467,9 +462,8 @@ fun PlayerScreen(
     // 视频铺满全屏/画中画（含过渡期）时上报给 AppRoot：根底色保持黑色。
     // 仅靠 pipTransition（进出过渡）覆盖不到稳态全屏——全屏下窗口底部最后约 1px
     // 仍由根底色绘制，浅色主题会露出一条白色细线。
-    val videoPresent =
-        inPip || pipExitHold || fullscreen || pendingFullscreen != null || portraitFullscreen || portraitRotating
-    LaunchedEffect(inPip, pipExitHold, fullscreen, pendingFullscreen, portraitFullscreen, portraitRotating) {
+    val videoPresent = inPip || pipExitHold || fullscreen || pendingFullscreen != null
+    LaunchedEffect(inPip, pipExitHold, fullscreen, pendingFullscreen) {
         Players.setVideoPresent(videoPresent)
     }
     // 画中画窗口在 HyperOS 上是透明表面（fongmi 同样透明，但它内容铺满 100%）：
@@ -929,8 +923,7 @@ fun PlayerScreen(
     // 全屏/放大动画期间自动收起状态栏，缩回小窗收敛后恢复（旋转请求在挂起触发处先行发出）；
     // 进入全屏后的旋转等待期（pendingFullscreen）也要收起系统栏，否则旋转动画中顶部/底部
     // 会露出浅色状态栏/导航栏，看着像视频头尾由白色渐变成黑色
-    val immersive = fullscreen || landscapeFullscreen || landZooming || pendingFullscreen != null ||
-        portraitFullscreen || portraitRotating
+    val immersive = fullscreen || landscapeFullscreen || landZooming || pendingFullscreen != null
     LaunchedEffect(immersive) {
         Players.isFullscreen = immersive
         val activity = context as? Activity ?: return@LaunchedEffect
@@ -1026,24 +1019,6 @@ fun PlayerScreen(
         // 锁定状态下屏蔽返回（对齐 fongmi isLock() 拦截语义），
         // 系统侧滑/返回键不退出全屏、不退出页面，解锁后恢复
         if (locked) return
-        // 竖屏模拟全屏（双击小窗自转 90° 进入）：反向旋转缩回顶部小窗，
-        // 期间只渲染纯视频，与进全屏完全对称；动画中再次返回直接忽略
-        if (portraitFullscreen || portraitRotating) {
-            if (portraitRotating) return
-            portraitFullscreen = false
-            controlsVisible = false
-            portraitRotating = true
-            scope.launch {
-                portraitRotate.animateTo(
-                    0f,
-                    tween(PORTRAIT_ROTATE_DURATION_MS, easing = FastOutSlowInEasing),
-                )
-                portraitRotating = false
-                // 缩回小窗后再解除竖屏锁定（与进全屏对称）
-                (context as? Activity).restoreDefaultOrientation()
-            }
-            return
-        }
         if (fullscreen) {
             if (landscapeFullscreen) {
                 // 平板横屏直进的全屏：立即卸载全屏覆盖层，PlayerView 执行缩回动画，
@@ -1071,7 +1046,7 @@ fun PlayerScreen(
     }
     // 仅在页面需要自己处理返回时拦截（退全屏 / 缩放动画中忽略）；
     // 竖屏小窗状态下不拦截，交还 NavDisplay → 预测返回动画 + 边缘滑动返回生效
-    BackHandler(enabled = fullscreen || landZooming || portraitFullscreen || portraitRotating) { handleBack() }
+    BackHandler(enabled = fullscreen || landZooming) { handleBack() }
 
     // PiP 画中画：系统会把整个 Activity 窗口直接缩小，因此不切换视图子树
     // （同一个 PlayerView 跨 AndroidView 节点 reparent 有崩溃风险），
@@ -1114,9 +1089,7 @@ fun PlayerScreen(
         // 横版布局未显式刷底色的空档（播放器上方/左侧、信息列底部与下方区块之间）
         // 会透出黑色，与刷白的区块拼成黑白块
         MiuixTheme.colorScheme.surface
-    } else if (inPip || pipExitHold || fullscreen || pendingFullscreen != null || landscapeFullscreen ||
-        portraitFullscreen || portraitRotating
-    ) {
+    } else if (inPip || pipExitHold || fullscreen || pendingFullscreen != null || landscapeFullscreen) {
         Color.Black
     } else {
         MiuixTheme.colorScheme.surface
@@ -1174,18 +1147,6 @@ fun PlayerScreen(
         // 视频比例就绪时小窗高宽平滑过渡（否则从默认 16:9 跳到实际比例会瞬间跳变）
         val animatedPreviewH by animateDpAsState(portraitPreviewH, tween(250), label = "portraitPreviewH")
         val animatedPreviewW by animateDpAsState(portraitPreviewW, tween(250), label = "portraitPreviewW")
-
-        // 竖屏双击小窗进全屏：视频边转边放大。进度 0→1 时尺寸从顶部小窗插值到
-        // 「宽=屏高、高=屏宽」（旋转 90° 后正好铺满竖屏），中心点从小窗中心插值到屏幕中心。
-        // 保留为 State<Dp>，使用方均在布局/绘制阶段读取，动画期间不逐帧重组
-        val rotateStartW = portraitPreviewW
-        val rotateStartH = portraitPreviewH
-        val portraitRotateW = remember(rotateStartW, screenH) {
-            derivedStateOf { rotateStartW + (screenH - rotateStartW) * portraitRotate.value }
-        }
-        val portraitRotateH = remember(rotateStartH, screenW) {
-            derivedStateOf { rotateStartH + (screenW - rotateStartH) * portraitRotate.value }
-        }
 
         // 横屏小窗↔全屏放大/缩回过渡：宽/高/顶部偏移连续插值，
         // PlayerView 全程不重建，只有画面在放大，不挂任何控制层
@@ -1291,29 +1252,6 @@ fun PlayerScreen(
                 pendingFullscreen != null ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
-                // 竖屏双击小窗进全屏：视频自转 90° 并边转边放大（真·B 站式）。
-                // 不改 Activity 方向，所以不会和系统整窗翻转叠成「转过去又转回来」
-                portraitFullscreen || portraitRotating ->
-                    Modifier
-                        .offset {
-                            val w = portraitRotateW.value
-                            val h = portraitRotateH.value
-                            val startCenterY = rotateStartH.toPx() / 2f
-                            val centerY = startCenterY +
-                                (screenH.toPx() / 2f - startCenterY) * portraitRotate.value
-                            IntOffset(
-                                ((screenW - w) / 2f).roundToPx(),
-                                (centerY - h.toPx() / 2f).roundToInt(),
-                            )
-                        }
-                        .animatedSize(portraitRotateW, portraitRotateH)
-                        .graphicsLayer {
-                            rotationZ = 90f * portraitRotate.value
-                            shape = SquircleShape(deviceCorner)
-                            clip = portraitRotate.value > 0.01f
-                            compositingStrategy = CompositingStrategy.Offscreen
-                        }
-                        .background(Color.Black)
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
@@ -1367,21 +1305,7 @@ fun PlayerScreen(
         when {
         // 画中画（含退出过渡）：只保留最底层视频，不挂任何覆盖层/信息流
         inPip || pipExitHold -> Unit
-        fullscreen || portraitFullscreen -> {
-        // 竖屏模拟全屏（双击小窗自转 90° 后）：整套横屏控制层宽高互换后整体转 90°，
-        // 对用户呈现为横向全屏 UI；真正的 Activity 始终停留在竖屏，不会二次翻转
-        val portraitSim = !fullscreen && portraitFullscreen
-        Box(
-            modifier = if (portraitSim) {
-                // 必须用 requiredSize：宽=屏高会超出父约束，用 size 会被压回竖屏宽度后再旋转，整页错位
-                Modifier
-                    .requiredSize(screenH, screenW)
-                    .align(Alignment.Center)
-                    .graphicsLayer { rotationZ = 90f }
-            } else {
-                Modifier.fillMaxSize()
-            },
-        ) {
+        fullscreen -> {
         FullscreenPlayLayout(
             current = current,
             episodeIndex = episodeIndex,
@@ -1425,9 +1349,6 @@ fun PlayerScreen(
             subtitleSettingsOpen = showSubtitleSettings,
         )
         }
-        }
-        // 竖屏自转进全屏的旋转动画期间：只保留最底层视频，不挂任何覆盖层/信息流
-        portraitRotating -> Unit
         // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
         pendingFullscreen == true -> Unit
         else -> if (pendingFullscreen == null && isLandscape) {
@@ -1494,11 +1415,9 @@ fun PlayerScreen(
                     landscapeFullscreen = true
                     fullscreen = true
                 } else {
-                    // 竖屏手机：不改 Activity 方向（否则系统会再转一次），
-                    // 直接在竖屏窗口里把视频自转 90° 并边转边放大，
-                    // 动画收敛后再挂「横屏全屏」控制层（整体转 90° 后呈现给用户即横向全屏）
+                    // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
                     landscapeFullscreen = false
-                    // 同步把窗口底色和根底色切黑（系统栏同步隐藏并切浅色图标）
+                    // 请求旋转前同步把窗口底色和根底色切黑（系统栏同步隐藏并切浅色图标）
                     Players.setVideoPresent(true)
                     activityWindow?.setBackgroundDrawable(
                         android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
@@ -1511,21 +1430,9 @@ fun PlayerScreen(
                             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                         controller.hide(WindowInsetsCompat.Type.systemBars())
                     }
-                    if (!portraitRotating && !portraitFullscreen) {
-                        // 锁竖屏：模拟全屏期间窗口必须保持竖屏，否则用户把手机横过来时
-                        // 系统会再转一次窗口，和我们的 90° 旋转叠加
-                        (context as? Activity)?.requestedOrientation =
-                            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                        portraitRotating = true
-                        scope.launch {
-                            portraitRotate.animateTo(
-                                1f,
-                                tween(PORTRAIT_ROTATE_DURATION_MS, easing = FastOutSlowInEasing),
-                            )
-                            portraitFullscreen = true
-                            portraitRotating = false
-                        }
-                    }
+                    (context as? Activity)?.requestedOrientation =
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    pendingFullscreen = true
                 }
             },
             onLockToggle = { locked = true; controlsVisible = false },
@@ -1739,8 +1646,6 @@ private const val LAND_PLAYER_WIDTH_FRACTION = 0.38f
 
 /** 横屏小窗↔全屏放大/缩回动画时长（对齐 fongmi ChangeBounds 150ms） */
 private const val LAND_ZOOM_DURATION_MS = 150
-// 竖屏双击小窗进/出全屏：视频自转 90° 并边转边放大的时长
-private const val PORTRAIT_ROTATE_DURATION_MS = 320
 
 /** 外挂字幕文件选择器的 MIME 过滤：覆盖 srt/ass/ssa/vtt/ttml，以及文件管理器把字幕标成 octet-stream 的情况 */
 private val SUBTITLE_MIME_TYPES = arrayOf(
@@ -2303,7 +2208,7 @@ private fun BloomDot(spec: BloomDotSpec, beat: Int, density: Density) {
     }
     val x = (Math.cos(spec.angle) * dist).toFloat()
     val y = (Math.sin(spec.angle) * dist).toFloat()
-    // 后半段渐隐
+    // 末段渐隐
     val alpha = (1f - ((t - 0.5f) / 0.5f).coerceIn(0f, 1f)).coerceIn(0f, 1f)
     val dotScale = 1f - t * 0.3f
 
