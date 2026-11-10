@@ -461,8 +461,10 @@ private fun PopupUpdateRow(
                 onClick = onClick,
                 // 与条目内预览小图的圆角保持一致（Spacing.updateCardCorner = 10dp）
                 shape = SquircleShape(Spacing.updateCardCorner),
-                focusedScale = 1.03f,
+                // 弹窗内的卡片只保留点击，不做缩放/按压蒙层
+                focusedScale = 1f,
                 glow = false,
+                pressEffect = false,
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
