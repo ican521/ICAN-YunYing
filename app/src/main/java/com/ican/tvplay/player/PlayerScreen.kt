@@ -1422,6 +1422,10 @@ fun PlayerScreen(
                     // 窗口背景不再重复设置：Players.setVideoPresent(true) 已触发上方 LaunchedEffect
                     // 把 window 背景切成黑色，这里再新建 ColorDrawable 重设会多一次全窗口重绘。
                     Players.setVideoPresent(true)
+                    // 旋转请求尽早发出：它是唯一无法避免的系统调用，先发出去让系统并行处理旋转，
+                    // 后面的系统栏隐藏与 UI 重组与它并行，缩短双击到旋转启动的等待
+                    (context as? Activity)?.requestedOrientation =
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     activityWindow?.let { w ->
                         val controller = WindowCompat.getInsetsController(w, w.decorView)
                         controller.isAppearanceLightStatusBars = false
@@ -1430,8 +1434,6 @@ fun PlayerScreen(
                             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                         controller.hide(WindowInsetsCompat.Type.systemBars())
                     }
-                    (context as? Activity)?.requestedOrientation =
-                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     pendingFullscreen = true
                 }
             },
