@@ -30,6 +30,7 @@ import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
@@ -362,6 +363,41 @@ fun PlayerScreen(
     var phonePrevW by remember { mutableStateOf(0.dp) }
     var phonePrevH by remember { mutableStateOf(0.dp) }
     var phonePrevTop by remember { mutableStateOf(0.dp) }
+    // 落地遮罩 + 显示实际方向：窗口尺寸先切成横屏、显示旋转后 1~2 帧才提交，
+    // 这段错帧里横屏画面会被画在竖屏显示的左上角，必须先把视频层藏起来
+    var phoneLandingVeil by remember { mutableStateOf(false) }
+    var displayLandscape by remember { mutableStateOf(false) }
+    DisposableEffect(Unit) {
+        val dm = context.getSystemService(android.content.Context.DISPLAY_SERVICE)
+            as? android.hardware.display.DisplayManager
+        val display = dm?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+        fun rotationIsLandscape(): Boolean =
+            display?.rotation == android.view.Surface.ROTATION_90 ||
+                display?.rotation == android.view.Surface.ROTATION_270
+        displayLandscape = rotationIsLandscape()
+        val listener = object : android.hardware.display.DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) = Unit
+            override fun onDisplayRemoved(displayId: Int) = Unit
+            override fun onDisplayChanged(displayId: Int) {
+                displayLandscape = rotationIsLandscape()
+            }
+        }
+        dm?.registerDisplayListener(
+            listener,
+            android.os.Handler(android.os.Looper.getMainLooper()),
+        )
+        onDispose { dm?.unregisterDisplayListener(listener) }
+    }
+    LaunchedEffect(displayLandscape, phoneLandingVeil) {
+        if (displayLandscape && phoneLandingVeil) phoneLandingVeil = false
+    }
+    // 兜底撤罩：万一没收到显示旋转回调，也不能一直黑着
+    LaunchedEffect(phoneLandingVeil) {
+        if (phoneLandingVeil) {
+            delay(800)
+            phoneLandingVeil = false
+        }
+    }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
@@ -389,10 +425,11 @@ fun PlayerScreen(
                 1f,
                 tween(PHONE_FLIP_DURATION_MS, easing = FastOutSlowInEasing),
             )
-            // 动画已落定：末帧就是"横屏全屏画面转 90°"的样子，这里恢复系统旋转动画再请求横屏。
-            // 系统整屏旋转只是把这幅已经转倒的画面转正，不会引入叠影；
-            // 且系统用旋转快照盖住窗口重排的中转帧，避免短暂露出"横屏内容塞进竖屏"的错帧
-            restoreWindowRotationAnimation(context as? Activity)
+            // 动画已落定：JUMPCUT 瞬切窗口方向（不要系统那层 90° 旋转，否则和自绘倒下叠成两段动作）。
+            // 先把视频层遮住：窗口尺寸会比显示旋转早 1~2 帧切成横屏，这几帧里横屏画面会被画到
+            // 竖屏显示的左上角（观感"画面向上窜一下"），等显示真转到横屏再撤罩
+            phoneLandingVeil = true
+            applyJumpcutRotationAnimation(context as? Activity)
             (context as? Activity)?.requestedOrientation =
                 ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             pendingFullscreen = true
@@ -1292,6 +1329,7 @@ fun PlayerScreen(
                 fullscreen ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
+                        .hiddenByLandingVeil(phoneLandingVeil)
                 // 手机进全屏自绘过渡：竖屏内把小窗"倒下"（旋转 90°）并放大到铺满整屏，
                 // 末帧形状 = 横屏全屏画面旋转 90° 后的样子，落定后才请求窗口旋转。
                 // 条件里带上"动画已结束、窗口还没转到横屏"的那一帧（progress=1），保持末帧几何不闪跳
@@ -1316,6 +1354,7 @@ fun PlayerScreen(
                 pendingFullscreen != null ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
+                        .hiddenByLandingVeil(phoneLandingVeil)
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
@@ -1724,6 +1763,15 @@ private const val PHONE_FLIP_DURATION_MS = 280
 /** 自绘"小窗倒下"的角度（正值=顺时针）：末帧形状 = 横屏全屏画面旋转 90° 后的样子 */
 private const val PHONE_FLIP_DEGREES = 90f
 
+/** 系统窗口旋转动画切 JUMPCUT（API 30+）：瞬切横屏，跳过系统自带的"旧页截图旋转 + 新页淡入" */
+private fun applyJumpcutRotationAnimation(activity: Activity?) {
+    if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+    val attrs = activity.window.attributes
+    attrs.rotationAnimation =
+        android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_JUMPCUT
+    activity.window.attributes = attrs
+}
+
 /** 恢复系统默认旋转动画，避免影响后续（如退全屏回竖屏）的旋转 */
 private fun restoreWindowRotationAnimation(activity: Activity?) {
     if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
@@ -1732,6 +1780,14 @@ private fun restoreWindowRotationAnimation(activity: Activity?) {
         android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_ROTATE
     activity.window.attributes = attrs
 }
+
+/**
+ * 进全屏落地的错帧遮挡：窗口尺寸比显示旋转早 1~2 帧变成横屏，这几帧里横屏画面会被
+ * 画在竖屏显示的左上角（观感"画面向上窜一下"），[hidden] 为 true 时把视频层整块隐去，
+ * 露出根底纯黑，等显示真转到横屏后再显示。
+ */
+private fun Modifier.hiddenByLandingVeil(hidden: Boolean): Modifier =
+    if (hidden) this.alpha(0f) else this
 
 /** 外挂字幕文件选择器的 MIME 过滤：覆盖 srt/ass/ssa/vtt/ttml，以及文件管理器把字幕标成 octet-stream 的情况 */
 private val SUBTITLE_MIME_TYPES = arrayOf(
