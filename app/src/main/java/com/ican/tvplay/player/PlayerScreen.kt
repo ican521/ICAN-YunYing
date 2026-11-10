@@ -352,47 +352,38 @@ fun PlayerScreen(
     // 缩放会话令牌：每次进入/退出全屏自增，作为收敛监听 LaunchedEffect 的 key，
     // 避免协程体内把 landZooming 置 false 导致自身被取消、渐显逻辑丢失
     var landZoomToken by remember { mutableIntStateOf(0) }
-    // 手机进全屏自绘过渡：JUMPCUT 瞬切横屏后，把"倒下"的小窗转正 + 放大到铺满，
-    // 复刻 B 站"只有预览小窗倒下"的观感（系统整窗旋转的叠影/中心放大无法避开，只能自绘）
+    // 手机进全屏自绘过渡（分层旋转）：先在竖屏里把预览小窗"倒下"（旋转 90°）并放大到铺满，
+    // 动画落定后再 JUMPCUT 瞬切横屏，切完直接就是正向全屏画面。
+    // 视频节点动画先于窗口旋转，全程只有一个坐标系在动，不会出现系统整窗旋转的叠影
     var phoneFlip by remember { mutableStateOf(false) }
     var phoneFlipToken by remember { mutableIntStateOf(0) }
     val phoneFlipProgress = remember { Animatable(0f) }
-    // 竖屏小窗几何快照：横屏后 screenW/screenH 已是横屏值，动画起点必须用竖屏时的真实值
+    // 竖屏小窗几何快照：动画起点用点击时的真实小窗位置
     var phonePrevW by remember { mutableStateOf(0.dp) }
     var phonePrevH by remember { mutableStateOf(0.dp) }
     var phonePrevTop by remember { mutableStateOf(0.dp) }
-    // 自绘过渡的"倒下"方向：跟随系统实际旋转方向，保证首帧与旋转后的竖屏页同位
-    var phoneFlipFromRight by remember { mutableStateOf(false) }
     // JUMPCUT 需要 API 30+；低版本没有"跳过系统旋转动画"的能力，退回系统整窗旋转
     val phoneFlipSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
-            // 旋转进入/退出全屏后都保持纯净画面，工具栏由用户单击唤出
+            // 竖屏自绘动画已落定并 JUMPCUT 瞬切到横屏：这里只把布局切成全屏。
+            // 画面在切换前已经铺满且转正，切完即正向全屏，不叠任何系统旋转动画
             pendingFullscreen == true && isLandscape -> {
-                if (phoneFlipSupported) {
-                    // 窗口已被 JUMPCUT 瞬切到横屏：启动自绘"小窗倒下"过渡，全屏布局等过渡跑完再挂。
-                    // 注意这里不能马上恢复系统旋转动画：系统旋转动画由 WMS 在配置变化之后才结算，
-                    // 提前恢复会让本次旋转又叠上系统自带的截图旋转/淡入（"叠影"来源）。
-                    // JUMPCUT 一直保留到退出全屏/离开播放页时再恢复。
-                    val displayRotation = (context.getSystemService(android.content.Context.WINDOW_SERVICE)
+                if (com.ican.tvplay.BuildConfig.DEBUG) {
+                    val rotation = (context.getSystemService(android.content.Context.WINDOW_SERVICE)
                         as? android.view.WindowManager)?.defaultDisplay?.rotation
-                    phoneFlipFromRight =
-                        (displayRotation ?: android.view.Surface.ROTATION_270) ==
-                            android.view.Surface.ROTATION_90
-                    phoneFlip = true
-                    phoneFlipToken++
-                } else {
-                    fullscreen = true; pendingFullscreen = null; controlsVisible = false
+                    android.util.Log.i("PhoneFlip", "landed rotation=$rotation")
                 }
+                fullscreen = true; pendingFullscreen = null; controlsVisible = false
             }
             pendingFullscreen == false && !isLandscape -> {
                 fullscreen = false; pendingFullscreen = null; controlsVisible = false
             }
         }
     }
-    // 手机进全屏自绘过渡：小窗"倒下"态（±90°）→ 转正并放大到铺满，跑完才切全屏布局。
-    // 末帧几何与全屏分支完全一致，切换那一帧不会跳变
+    // 手机进全屏自绘过渡：竖屏内小窗"倒下"（旋转 90°）并放大到铺满整屏。
+    // 末帧形状 = 横屏全屏画面旋转 90° 后的样子，所以紧接着 JUMPCUT 切横屏不跳变
     LaunchedEffect(phoneFlipToken) {
         if (phoneFlip) {
             phoneFlipProgress.snapTo(0f)
@@ -400,10 +391,13 @@ fun PlayerScreen(
                 1f,
                 tween(PHONE_FLIP_DURATION_MS, easing = FastOutSlowInEasing),
             )
+            // 动画已落定：先瞬切窗口方向，再把布局切到全屏；
+            // 期间不恢复系统旋转动画，避免 WMS 结算时又叠一层截图旋转/淡入
+            applyJumpcutRotationAnimation(context as? Activity)
+            (context as? Activity)?.requestedOrientation =
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            pendingFullscreen = true
             phoneFlip = false
-            fullscreen = true
-            pendingFullscreen = null
-            controlsVisible = false
         }
     }
 
@@ -1062,8 +1056,9 @@ fun PlayerScreen(
         // 锁定状态下屏蔽返回（对齐 fongmi isLock() 拦截语义），
         // 系统侧滑/返回键不退出全屏、不退出页面，解锁后恢复
         if (locked) return
-        // 手机进全屏自绘过渡进行中忽略返回，避免过渡没跑完就退出全屏/退出页面
-        if (phoneFlip) return
+        // 手机进全屏过渡（竖屏自绘倒下 / 已请求旋转未到位）期间忽略返回，
+        // 避免过渡没跑完就退出全屏/退出页面
+        if (phoneFlip || pendingFullscreen == true) return
         if (fullscreen) {
             if (landscapeFullscreen) {
                 // 平板横屏直进的全屏：立即卸载全屏覆盖层，PlayerView 执行缩回动画，
@@ -1093,7 +1088,9 @@ fun PlayerScreen(
     }
     // 仅在页面需要自己处理返回时拦截（退全屏 / 缩放动画中忽略）；
     // 竖屏小窗状态下不拦截，交还 NavDisplay → 预测返回动画 + 边缘滑动返回生效
-    BackHandler(enabled = fullscreen || landZooming || phoneFlip) { handleBack() }
+    BackHandler(enabled = fullscreen || landZooming || phoneFlip || pendingFullscreen == true) {
+        handleBack()
+    }
 
     // PiP 画中画：系统会把整个 Activity 窗口直接缩小，因此不切换视图子树
     // （同一个 PlayerView 跨 AndroidView 节点 reparent 有崩溃风险），
@@ -1136,7 +1133,9 @@ fun PlayerScreen(
         // 横版布局未显式刷底色的空档（播放器上方/左侧、信息列底部与下方区块之间）
         // 会透出黑色，与刷白的区块拼成黑白块
         MiuixTheme.colorScheme.surface
-    } else if (inPip || pipExitHold || fullscreen || pendingFullscreen != null || landscapeFullscreen) {
+    } else if (inPip || pipExitHold || fullscreen || phoneFlip || pendingFullscreen != null ||
+        landscapeFullscreen
+    ) {
         Color.Black
     } else {
         MiuixTheme.colorScheme.surface
@@ -1294,36 +1293,28 @@ fun PlayerScreen(
                 fullscreen ->
                     Modifier.fillMaxSize().background(Color.Black)
                         .clip(SquircleShape(deviceCorner))
-                // 手机进全屏自绘过渡：起点=竖屏小窗随窗口转 90° 后"倒下"的等价矩形，
-                // 终点=铺满全屏。全程只有横屏一个坐标系，尺寸/位置/角度同时插值，
-                // 末帧与 fullscreen 分支像素一致，因此切布局那一帧不跳变。
-                // 条件里带上"刚瞬切到横屏、动画还没启动"的那一帧（progress=0），
-                // 否则会先闪一帧铺满的画面再跳回小窗
-                phoneFlip || (pendingFullscreen == true && isLandscape && phoneFlipSupported) ->
+                // 手机进全屏自绘过渡：竖屏内把小窗"倒下"（旋转 90°）并放大到铺满整屏，
+                // 末帧形状 = 横屏全屏画面旋转 90° 后的样子，落定后才 JUMPCUT 切横屏。
+                // 条件里带上"动画已结束、切横屏还没到"的那一帧（progress=1），保持末帧几何不闪跳
+                phoneFlip || (pendingFullscreen == true && !isLandscape && phoneFlipSupported) ->
                     Modifier
-                        .phoneFlipGeometry(
+                        .phonePortraitFlipGeometry(
                             progress = phoneFlipProgress,
-                            fromRight = phoneFlipFromRight,
-                            startVisualLeft =
-                                if (phoneFlipFromRight) {
-                                    screenW - phonePrevTop - phonePrevH
-                                } else {
-                                    phonePrevTop
-                                },
+                            startLeft = (screenW - phonePrevW) / 2f,
+                            startTop = phonePrevTop,
                             startW = phonePrevW,
                             startH = phonePrevH,
-                            endW = screenW,
-                            endH = screenH,
+                            endW = screenH,
+                            endH = screenW,
+                            endTranslateX = screenW,
+                            endTranslateY = 0.dp,
                             startCorner = Spacing.corner,
                             endCorner = deviceCorner,
+                            degrees = PHONE_FLIP_DEGREES,
                         )
                         .background(Color.Black)
-                // 退出全屏旋转回竖屏期间：保持铺满，避免横屏全屏画面先缩回小窗再转
-                pendingFullscreen == false ->
-                    Modifier.fillMaxSize().background(Color.Black)
-                        .clip(SquircleShape(deviceCorner))
-                // 进全屏请求已发出、窗口还没切到横屏的那一两帧：小窗原位不动（旋转前画面不重组）
-                pendingFullscreen == true ->
+                // 低版本（无 JUMPCUT）：沿用原逻辑，旋转前小窗原位不动
+                pendingFullscreen == true && !isLandscape ->
                     Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
@@ -1331,6 +1322,10 @@ fun PlayerScreen(
                         .width(animatedPreviewW)
                         .height(animatedPreviewH)
                         .background(Color.Black)
+                // 进全屏旋转过渡期 / 退全屏旋转回竖屏期间：保持铺满，避免画面先缩回小窗再转
+                pendingFullscreen != null ->
+                    Modifier.fillMaxSize().background(Color.Black)
+                        .clip(SquircleShape(deviceCorner))
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
@@ -1429,9 +1424,9 @@ fun PlayerScreen(
             subtitleSettingsOpen = showSubtitleSettings,
         )
         }
-        // 进全屏旋转过渡期：横屏后（自绘翻转中）不渲染任何覆盖层，只留最底层视频；
-        // 竖屏等待旋转的那一两帧继续显示竖屏页，避免出现黑帧
-        pendingFullscreen == true && isLandscape -> Unit
+        // 进全屏过渡期（竖屏自绘倒下 → 落定后瞬切横屏）：全程不渲染任何覆盖层，只留最底层视频；
+        // 退全屏（pending=false）保持原行为，继续显示竖屏页等待旋转
+        phoneFlip || pendingFullscreen == true -> Unit
         else -> if (pendingFullscreen == null && isLandscape) {
             // 自然横屏（平板）：fongmi activity_detail_land 横版布局，
             // 信息列/下方区块锚定动画中的播放器边界，随缩放一起滑出滑入（ChangeBounds 效果）
@@ -1517,15 +1512,16 @@ fun PlayerScreen(
                         controller.hide(WindowInsetsCompat.Type.systemBars())
                     }
                     if (phoneFlipSupported) {
-                        // JUMPCUT：系统直接跳到横屏窗口，不播自带的"旧页截图旋转 + 新页淡入"，
-                        // 旋转的观感全部交给 phoneFlip 自绘过渡（B 站同款效果的前提）
-                        applyJumpcutRotationAnimation(context as? Activity)
+                        // 先在竖屏里自绘"小窗倒下 + 放大铺满"，动画落定后再 JUMPCUT 瞬切横屏
+                        // （LaunchedEffect(phoneFlipToken) 负责后续的旋转请求与布局切换）
+                        phoneFlip = true
+                        phoneFlipToken++
+                    } else {
+                        // 低版本没有 JUMPCUT：退回系统整窗旋转，转完再切全屏布局
+                        (context as? Activity)?.requestedOrientation =
+                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        pendingFullscreen = true
                     }
-                    // 双击即请求系统旋转：API 30+ 由 JUMPCUT 瞬切 + 自绘"小窗倒下"，
-                    // 低版本退回系统整窗旋转动画
-                    (context as? Activity)?.requestedOrientation =
-                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                    pendingFullscreen = true
                 }
             },
             onLockToggle = { locked = true; controlsVisible = false },
@@ -1740,8 +1736,11 @@ private const val LAND_PLAYER_WIDTH_FRACTION = 0.38f
 /** 横屏小窗↔全屏放大/缩回动画时长（对齐 fongmi ChangeBounds 150ms） */
 private const val LAND_ZOOM_DURATION_MS = 150
 
-/** 手机进全屏自绘过渡时长：小窗"倒下"态转正并放大到铺满，比平板缩放略长以看清倾倒过程 */
+/** 手机进全屏自绘过渡时长：小窗"倒下"并放大到铺满，比平板缩放略长以看清倾倒过程 */
 private const val PHONE_FLIP_DURATION_MS = 280
+
+/** 自绘"小窗倒下"的角度（正值=顺时针）：末帧形状 = 横屏全屏画面旋转 90° 后的样子 */
+private const val PHONE_FLIP_DEGREES = 90f
 
 /** 系统窗口旋转动画切 JUMPCUT（API 30+）：瞬切横屏，跳过系统自带的"旧页截图旋转 + 新页淡入" */
 private fun applyJumpcutRotationAnimation(activity: Activity?) {
@@ -1911,23 +1910,28 @@ private fun Modifier.animatedSize(width: State<Dp>, height: State<Dp>): Modifier
     }
 
 /**
- * 手机进全屏的自绘过渡几何（B 站"只有预览小窗倒下"观感的实现）。
+ * 手机进全屏的竖屏自绘过渡几何（B 站"只有预览小窗倒下"观感的实现）。
  *
- * 起点：竖屏小窗随窗口旋转 90° 后在横屏坐标里的等价矩形——贴边平躺，
- * 由 [fromRight] 决定倒下方向（跟随系统实际旋转方向）；终点：铺满全屏、角度归零。
- * [progress] 0→1 同步插值尺寸、位置、角度与圆角，全程只在布局/绘制阶段读状态，
- * 不触发逐帧重组；t=1 时几何与 fullscreen 分支完全一致，因此切布局那一帧不跳变。
+ * 全程在竖屏坐标系里完成：起点=预览小窗原位，[progress] 0→1 同时插值尺寸、绕左上角的
+ * 角度与平移；t=1 时节点旋转 [degrees] 度并放大，其旋转后的可视矩形恰好铺满整屏，
+ * 形状等价于"横屏全屏画面旋转 90°"，因此落定后 JUMPCUT 瞬切横屏不会跳变。
+ * [startLeft] 是窗口横向居中后的起点；[endTranslateX]/[endTranslateY] 是末帧
+ * 旋转后可视矩形归位到屏幕左上角所需的平移量。
+ * 所有动画值只在布局/绘制阶段读取，不触发逐帧重组。
  */
-private fun Modifier.phoneFlipGeometry(
+private fun Modifier.phonePortraitFlipGeometry(
     progress: Animatable<Float, AnimationVector1D>,
-    fromRight: Boolean,
-    startVisualLeft: Dp,
+    startLeft: Dp,
+    startTop: Dp,
     startW: Dp,
     startH: Dp,
     endW: Dp,
     endH: Dp,
+    endTranslateX: Dp,
+    endTranslateY: Dp,
     startCorner: Dp,
     endCorner: Dp,
+    degrees: Float,
 ): Modifier = this
     .layout { measurable, _ ->
         val t = progress.value
@@ -1938,14 +1942,11 @@ private fun Modifier.phoneFlipGeometry(
     }
     .graphicsLayer {
         val t = progress.value
-        // +90°（顺时针）→ 0°：从贴右边平躺转正；-90°（逆时针）→ 0°：从贴左边平躺转正
-        rotationZ = (if (fromRight) 90f else -90f) * (1f - t)
+        rotationZ = degrees * t
         transformOrigin = TransformOrigin(0f, 0f)
-        // 平移起点按"旋转后可视矩形左上角"反推，t=0 时与竖屏小窗转 90° 后的位置完全重合
-        val targetX = if (fromRight) startVisualLeft + startH else startVisualLeft
-        val targetY = if (fromRight) 0.dp else startW
-        translationX = lerpDp(targetX, 0.dp, t).roundToPx().toFloat()
-        translationY = lerpDp(targetY, 0.dp, t).roundToPx().toFloat()
+        // 绕左上角旋转后的可视矩形位置：t=0 落在小窗原位，t=1 铺满整屏
+        translationX = lerpDp(startLeft, endTranslateX, t).roundToPx().toFloat()
+        translationY = lerpDp(startTop, endTranslateY, t).roundToPx().toFloat()
         shape = SquircleShape(lerpDp(startCorner, endCorner, t))
         clip = true
         // 离屏合成：圆角边缘只抗锯齿一次，避免旋转期间视频层与背景叠出弧线黑边
