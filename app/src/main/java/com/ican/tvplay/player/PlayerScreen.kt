@@ -371,9 +371,10 @@ fun PlayerScreen(
             // 旋转进入/退出全屏后都保持纯净画面，工具栏由用户单击唤出
             pendingFullscreen == true && isLandscape -> {
                 if (phoneFlipSupported) {
-                    // 窗口已被 JUMPCUT 瞬切到横屏：恢复系统旋转动画，启动自绘"小窗倒下"过渡，
-                    // 全屏布局等过渡跑完再挂（见下面的 phoneFlipToken effect）
-                    restoreWindowRotationAnimation(context as? Activity)
+                    // 窗口已被 JUMPCUT 瞬切到横屏：启动自绘"小窗倒下"过渡，全屏布局等过渡跑完再挂。
+                    // 注意这里不能马上恢复系统旋转动画：系统旋转动画由 WMS 在配置变化之后才结算，
+                    // 提前恢复会让本次旋转又叠上系统自带的截图旋转/淡入（"叠影"来源）。
+                    // JUMPCUT 一直保留到退出全屏/离开播放页时再恢复。
                     val displayRotation = (context.getSystemService(android.content.Context.WINDOW_SERVICE)
                         as? android.view.WindowManager)?.defaultDisplay?.rotation
                     phoneFlipFromRight =
@@ -1050,6 +1051,8 @@ fun PlayerScreen(
                 }
                 // 清全屏标记：否则退出后 isFullscreen 残留 true，首页按 Home 会误触自动画中画
                 Players.isFullscreen = false
+                // 离开播放页前恢复默认旋转动画，避免 JUMPCUT 残留影响其他页面的旋转
+                restoreWindowRotationAnimation(activity)
                 activity.restoreDefaultOrientation()
             }
         }
@@ -1071,7 +1074,9 @@ fun PlayerScreen(
                 landZooming = true
                 landZoomToken++
             } else {
-                // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
+                // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）；
+                // 退全屏保留系统整窗旋转动画，因此请求前恢复默认动画
+                restoreWindowRotationAnimation(context as? Activity)
                 (context as? Activity).restoreDefaultOrientation()
                 pendingFullscreen = false
             }
