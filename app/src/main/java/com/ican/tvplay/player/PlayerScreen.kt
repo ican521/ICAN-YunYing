@@ -3360,13 +3360,16 @@ private fun EpisodeSideSheet(
     val textMeasurer = rememberTextMeasurer()
     val configuration = LocalConfiguration.current
     val textStyle = TextStyle(fontSize = 14.sp)
-    // fongmi getWidth()：minWidth=200dp，逐项取最长文本宽，上限为屏宽 1/2（1/3 会在平板横屏截断长集名）
+    // fongmi getWidth()：minWidth=200dp，逐项取最长文本宽，上限为屏宽 1/2（1/3 会在平板横屏截断长集名）。
+    // 文本宽需另加按钮水平内边距 24dp（左右各 12dp）+ 面板水平边距 32dp（dialogContentMargin 左右各 16dp），
+    // 否则实际可用显示宽比测量值少 ~56dp，中短集名仍会被截断
     val panelWidth = remember(episodes, configuration) {
         val minPx = with(density) { 200.dp.toPx() }
         val maxPx = with(density) { configuration.screenWidthDp.dp.toPx() / 2f }
+        val paddingPx = with(density) { (24.dp + Spacing.dialogContentMargin * 2).toPx() }
         var w = minPx
         episodes.forEach { ep ->
-            w = maxOf(w, textMeasurer.measure(ep.title, textStyle).size.width.toFloat())
+            w = maxOf(w, textMeasurer.measure(ep.title, textStyle).size.width + paddingPx)
         }
         with(density) { minOf(w, maxPx).toDp() }
     }
