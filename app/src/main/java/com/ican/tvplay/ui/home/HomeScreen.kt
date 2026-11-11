@@ -972,18 +972,14 @@ private fun HomeTopBar(
         }
 
         // 胶囊搜索框：自绘假胶囊（视觉照搬 KernelSU SearchBarFake：左 16dp 起 20dp 放大镜 + 8dp 间距占位字），
-        // 点击进入搜索页；胶囊底不渐隐，仅内部占位文字与放大镜按 contentAlpha 渐隐
+        // 点击进入搜索页；胶囊底不渐隐，仅内部占位文字与放大镜按 contentAlpha 渐隐。
+        // 不加 pressable(SinkFeedback) 按压缩放：搜索胶囊超宽（weight(1f) 占满顶栏），
+        // 0.94 缩放在平板横屏下左右两端位移过大，视觉突兀；按压反馈走 tvCardEffect 自带变色蒙层
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                // pressable 在外层：Sink 按压缩放跟随 tvCardEffect 一起缩小（与视频卡片同序）
-                .pressable(
-                    interactionSource = null,
-                    indication = SinkFeedback(),
-                    delay = null,
-                )
                 .tvCardEffect(onClick = onSearchClick, shape = CircleShape, focusedScale = 1.1f, glow = false)
                 .clip(CircleShape)
                 .background(MiuixTheme.colorScheme.surfaceContainerHigh)
