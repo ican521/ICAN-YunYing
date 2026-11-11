@@ -412,11 +412,12 @@ private fun FavoriteCard(
     }
 }
 
-/** 历史卡片逐个渐显：相邻卡片启动间隔（毫秒），与首页首次加载一致 */
-private const val HISTORY_CARD_FADE_STAGGER_MILLIS = 60L
+/** 历史卡片逐个渐显：相邻卡片启动间隔（毫秒） */
+private const val HISTORY_CARD_FADE_STAGGER_MILLIS = 40L
 
-/** 历史卡片错峰索引上限：超出的卡片不再累加延迟 */
-private const val HISTORY_CARD_FADE_MAX_STAGGER_INDEX = 6
+/** 历史卡片错峰索引上限：需覆盖平板横屏一屏可见卡片数（5 列约 20 张），
+ *  否则上限之后的卡片同批 reveal、同帧解码掉帧（此前上限 6 导致第 7~20 张挤在同一时刻加载） */
+private const val HISTORY_CARD_FADE_MAX_STAGGER_INDEX = 20
 
 /** 单张历史卡片淡入时长（毫秒），与首页一致 */
 private const val HISTORY_CARD_FADE_IN_MILLIS = 200
