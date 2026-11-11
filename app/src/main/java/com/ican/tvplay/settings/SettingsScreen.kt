@@ -410,6 +410,16 @@ fun SettingsScreen(
 
         item {
         Card(modifier = Modifier.fillMaxWidth()) {
+            ArrowPreference(
+                title = "作者",
+                summary = "说到搞机",
+                onClick = { openLink(context, "https://www.coolapk.com/u/22883319") },
+            )
+            ArrowPreference(
+                title = "GitHub项目地址",
+                summary = "https://github.com/ican521/ICAN-YunYing",
+                onClick = { openLink(context, "https://github.com/ican521/ICAN-YunYing") },
+            )
             InfoRow("应用名称", "ICAN云影")
             InfoRow("版本", BuildConfig.VERSION_NAME)
         }
@@ -492,6 +502,16 @@ private fun InfoRow(label: String, value: String) {
             )
         },
     )
+}
+
+/** 用系统默认方式打开外部链接：有对应 App（如酷安注册了 App Link）则跳 App，否则浏览器 */
+private fun openLink(context: android.content.Context, url: String) {
+    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+    try {
+        context.startActivity(intent)
+    } catch (e: android.content.ActivityNotFoundException) {
+        Toast.makeText(context, "没有可打开该链接的应用", Toast.LENGTH_SHORT).show()
+    }
 }
 
 /** 导入配置对话框：miuix WindowDialog + TextField，照搬 KernelSU 弹窗结构。
