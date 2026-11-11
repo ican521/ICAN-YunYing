@@ -419,9 +419,8 @@ private const val HISTORY_CARD_FADE_STAGGER_MILLIS = 40L
  *  否则上限之后的卡片同批 reveal、同帧解码掉帧（此前上限 6 导致第 7~20 张挤在同一时刻加载） */
 private const val HISTORY_CARD_FADE_MAX_STAGGER_INDEX = 20
 
-/** 历史卡片错峰起点延迟（毫秒）：等页面滑入转场动画（约300ms）结束再开始错峰解码，
- *  转场期间帧上只有卡片底色、零海报解码负载，转场帧率最稳 */
-private const val HISTORY_CARD_STAGGER_START_DELAY_MILLIS = 320L
+/** 历史卡片错峰起点延迟（毫秒）：等滑入转场动画过了主体阶段再开始错峰解码 */
+private const val HISTORY_CARD_STAGGER_START_DELAY_MILLIS = 120L
 
 /** 单张历史卡片淡入时长（毫秒），与首页一致 */
 private const val HISTORY_CARD_FADE_IN_MILLIS = 200
