@@ -3345,7 +3345,7 @@ private fun EpisodeChip(
     }
 }
 
-/** 全屏选集侧边弹窗（fongmi EpisodeListDialog 同款：右侧滑出面板，宽度=max(200dp,最长集名14sp文本宽)且≤屏宽1/3，
+/** 全屏选集侧边弹窗（fongmi EpisodeListDialog 同款：右侧滑出面板，宽度=max(200dp,最长集名14sp文本宽)且≤屏宽1/2，
  * 垂直列表、居中 14sp 文本、圆角 8dp 背景、选中集高亮，打开自动滚动到当前集，点击切集并关闭）。
  * 收回动画与呼出对称：先从右往左滑入，收回时原路从左往右滑出，动画结束再通知父级移除。 */
 @Composable
@@ -3360,10 +3360,10 @@ private fun EpisodeSideSheet(
     val textMeasurer = rememberTextMeasurer()
     val configuration = LocalConfiguration.current
     val textStyle = TextStyle(fontSize = 14.sp)
-    // fongmi getWidth()：minWidth=200dp，逐项取最长文本宽，上限为屏宽 1/3
+    // fongmi getWidth()：minWidth=200dp，逐项取最长文本宽，上限为屏宽 1/2（1/3 会在平板横屏截断长集名）
     val panelWidth = remember(episodes, configuration) {
         val minPx = with(density) { 200.dp.toPx() }
-        val maxPx = with(density) { configuration.screenWidthDp.dp.toPx() / 3f }
+        val maxPx = with(density) { configuration.screenWidthDp.dp.toPx() / 2f }
         var w = minPx
         episodes.forEach { ep ->
             w = maxOf(w, textMeasurer.measure(ep.title, textStyle).size.width.toFloat())
