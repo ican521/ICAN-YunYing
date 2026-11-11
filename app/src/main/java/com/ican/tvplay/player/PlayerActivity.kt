@@ -236,6 +236,16 @@ class PlayerActivity : ComponentActivity(), PlayerHost {
                 androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
                     .hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
             }
+        } else if (Players.isFullscreen) {
+            // 双击小窗放大回全屏：系统会恢复系统栏，浅色手势条在放大动画期间
+            // 于屏幕底部闪现一条细白线。全屏播放态下立即重新隐藏系统栏压回去
+            runCatching {
+                androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+                val controller = androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
+                controller.systemBarsBehavior =
+                    androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (isInPictureInPictureMode) {
