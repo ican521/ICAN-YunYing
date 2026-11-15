@@ -58,7 +58,7 @@ fun rememberBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
 
 /**
  * 毛玻璃顶栏容器（照搬 KernelSU BlurredBar）：
- * backdrop 可用时对内容做 25f textureBlur + surface 87% 混合，否则原样渲染。
+ * backdrop 可用时对内容做 12f textureBlur + surface 87% 混合，否则原样渲染。
  */
 @Composable
 fun BlurredBar(
@@ -71,7 +71,7 @@ fun BlurredBar(
             Modifier.textureBlur(
                 backdrop = backdrop,
                 shape = RectangleShape,
-                blurRadius = 25f,
+                blurRadius = 12f,
                 colors = BlurColors(
                     blendColors = listOf(
                         BlendColorEntry(color = MiuixTheme.colorScheme.surface.copy(alpha = 0.87f)),

@@ -259,12 +259,12 @@ fun FloatingBottomBar(
                     ),
                 )
                 .then(
-                    // 底部毛玻璃：与顶栏 BlurredBar 完全同款 textureBlur（25f 模糊 + 背景色 87% 混合）
+                    // 底部毛玻璃：与顶栏 BlurredBar 完全同款 textureBlur（12f 模糊 + 背景色 87% 混合）
                     if (frostedActive) {
                         Modifier.textureBlur(
                             backdrop = backdrop,
                             shape = pillShape,
-                            blurRadius = 25f,
+                            blurRadius = 12f,
                             colors = BlurColors(
                                 blendColors = listOf(
                                     BlendColorEntry(
