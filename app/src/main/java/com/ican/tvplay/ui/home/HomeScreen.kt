@@ -114,7 +114,6 @@ import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
-import com.ican.tvplay.ui.components.rememberContentBackdrop
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
@@ -263,8 +262,6 @@ fun HomeScreen(
     // 顶区毛玻璃（收藏/设置页同款 BlurredBar 机制）：随「顶栏毛玻璃」开关，
     // 内容滚动到顶区（搜索行 + Tab 行）下方时被模糊透出；关闭时顶区为页面底色，与原来一致
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
-    // 内容录制层（顶栏/底栏毛玻璃共用一份，任一栏开启即录制）
-    val contentBackdrop = rememberContentBackdrop()
     val density = LocalDensity.current
 
     // 搜索行滚动折叠（严格 glued：折叠量 = 列表滚动量）：
@@ -401,7 +398,7 @@ fun HomeScreen(
 
         // 内容层：录制给顶区毛玻璃（模糊关闭时原样渲染）
         Box(
-            modifier = (if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop) else Modifier),
+            modifier = (if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
         ) {
 
         // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；

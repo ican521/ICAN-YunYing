@@ -29,25 +29,12 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 val LocalEnableTopBarBlur = staticCompositionLocalOf { true }
 
 /**
- * 全 App 共享的内容录制层（AppRoot 在顶栏/底栏任一毛玻璃开启时下发）：
- * 顶栏与底栏都采样同一份内容录制，避免每帧把整页内容录两遍。
- */
-val LocalSharedBlurBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
-
-/** 页面内容区的录制层：任一栏毛玻璃开启时非空，与具体栏的开关无关 */
-@Composable
-fun rememberContentBackdrop(): LayerBackdrop? = LocalSharedBlurBackdrop.current
-
-/**
- * 某一条栏的毛玻璃内容源（照搬 KernelSU ui/util/BlurExt.kt）：
- * 优先复用共享录制层；该栏开关关闭或设备不支持 RenderEffect 时返回 null
- * （栏退化为不透明 surface 底色）。
+ * 顶栏毛玻璃内容源（照搬 KernelSU ui/util/BlurExt.kt）：
+ * 毛玻璃关闭或设备不支持 RenderEffect 时返回 null（顶栏退化为不透明 surface 底色）。
  */
 @Composable
 fun rememberBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
-    if (!enableBlur) return null
-    LocalSharedBlurBackdrop.current?.let { return it }
-    if (!isRenderEffectSupported()) return null
+    if (!enableBlur || !isRenderEffectSupported()) return null
     // 基色用 miuix surface（浅色 #F7F7F7 / 深色 #000000），与项目背景色一致，保证深色下毛玻璃与全局底色一致
     val surfaceColor = MiuixTheme.colorScheme.surface
     return rememberLayerBackdrop {

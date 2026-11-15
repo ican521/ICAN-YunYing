@@ -79,7 +79,6 @@ import com.ican.tvplay.ui.components.MiuixBottomSheetDialog
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
-import com.ican.tvplay.ui.components.rememberContentBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
@@ -167,7 +166,6 @@ fun SettingsScreen(
     }
     // 固定居中大标题顶栏 + 毛玻璃（关闭毛玻璃时顶栏退化为页面背景色）
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
-    val contentBackdrop = rememberContentBackdrop()
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
@@ -195,7 +193,7 @@ fun SettingsScreen(
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
-        Box(modifier = if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop) else Modifier) {
+        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize(),

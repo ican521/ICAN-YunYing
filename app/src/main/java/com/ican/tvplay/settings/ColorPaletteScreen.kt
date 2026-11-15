@@ -52,7 +52,6 @@ import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
-import com.ican.tvplay.ui.components.rememberContentBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.BrandBlue
 import com.ican.tvplay.ui.theme.BrandBlueDeep
@@ -77,7 +76,6 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
 
     // 固定居中大标题顶栏 + 毛玻璃
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
-    val contentBackdrop = rememberContentBackdrop()
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
@@ -120,7 +118,7 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 // 页面底色与设置页一致（主题 background 的浅灰白），避免露出窗口纯白
                 .background(MiuixTheme.colorScheme.surface)
-                .then(if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop) else Modifier),
+                .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
         ) {
             val horizontal = pageHorizontalPadding()
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
