@@ -1,5 +1,7 @@
 package com.ican.tvplay.ui.search
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -168,7 +170,12 @@ fun SearchHomeScreen(
                 // 空白处点击（子项已消费的点击不受影响）→ 清焦点，输入法随之收起
                 .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
         ) {
-            if (editing) {
+            Crossfade(
+                targetState = editing,
+                animationSpec = tween(200),
+                label = "searchEditResult",
+            ) { isEditing ->
+            if (isEditing) {
                 // ========== 编辑态：历史 + 推荐 ==========
                 Column(
                     modifier = Modifier
@@ -234,6 +241,7 @@ fun SearchHomeScreen(
                     topPadding = innerPadding.calculateTopPadding(),
                     modifier = Modifier.fillMaxSize(),
                 )
+            }
             }
         }
     }
