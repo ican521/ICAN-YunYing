@@ -5,73 +5,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ican.tvplay.ui.theme.Spacing
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InputField
-import top.yukonga.miuix.kmp.blur.BlendColorEntry
-import top.yukonga.miuix.kmp.blur.BlurColors
-import top.yukonga.miuix.kmp.blur.LayerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
-import top.yukonga.miuix.kmp.shader.isRenderEffectSupported
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-
-/** 顶栏毛玻璃独立开关（AppRoot 按设置页「顶栏毛玻璃」开关提供） */
-val LocalEnableTopBarBlur = staticCompositionLocalOf { true }
-
-/**
- * 顶栏毛玻璃内容源（照搬 KernelSU ui/util/BlurExt.kt）：
- * 毛玻璃关闭或设备不支持 RenderEffect 时返回 null（顶栏退化为不透明 surface 底色）。
- */
-@Composable
-fun rememberBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
-    if (!enableBlur || !isRenderEffectSupported()) return null
-    // 基色用 miuix surface（浅色 #F7F7F7 / 深色 #000000），与项目背景色一致，保证深色下毛玻璃与全局底色一致
-    val surfaceColor = MiuixTheme.colorScheme.surface
-    return rememberLayerBackdrop {
-        drawRect(surfaceColor)
-        drawContent()
-    }
-}
-
-/**
- * 毛玻璃顶栏容器（照搬 KernelSU BlurredBar）：
- * backdrop 可用时对内容做 12f textureBlur + surface 87% 混合，否则原样渲染。
- */
-@Composable
-fun BlurredBar(
-    backdrop: LayerBackdrop?,
-    blurActive: Boolean = true,
-    content: @Composable () -> Unit,
-) {
-    androidx.compose.foundation.layout.Box(
-        modifier = if (blurActive && backdrop != null) {
-            Modifier.textureBlur(
-                backdrop = backdrop,
-                shape = RectangleShape,
-                blurRadius = 12f,
-                colors = BlurColors(
-                    blendColors = listOf(
-                        BlendColorEntry(color = MiuixTheme.colorScheme.surface.copy(alpha = 0.87f)),
-                    ),
-                ),
-            )
-        } else {
-            Modifier
-        },
-    ) {
-        content()
-    }
-}
 
 /**
  * 二级页顶栏返回按钮：圆形底 + miuix Back 图标。

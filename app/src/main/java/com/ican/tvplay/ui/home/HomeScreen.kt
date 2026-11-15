@@ -78,7 +78,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
@@ -110,15 +109,11 @@ import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.ArcStretchSpinner
 import com.ican.tvplay.ui.components.EmptyState
-import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.dialogBottomMargin
-import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
-import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topLevelContentPadding
 import com.ican.tvplay.ui.components.tvCardEffect
-import top.yukonga.miuix.kmp.blur.layerBackdrop
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
@@ -259,9 +254,6 @@ fun HomeScreen(
         if (showSitePicker) siteList = viewModel.listSites()
     }
 
-    // 顶区毛玻璃（收藏/设置页同款 BlurredBar 机制）：随「顶栏毛玻璃」开关，
-    // 内容滚动到顶区（搜索行 + Tab 行）下方时被模糊透出；关闭时顶区为页面底色，与原来一致
-    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
     val density = LocalDensity.current
 
     // 搜索行滚动折叠（严格 glued：折叠量 = 列表滚动量）：
@@ -396,9 +388,9 @@ fun HomeScreen(
         // 禁用分类 Tab 栏 + 内容 Pager 的边界 overscroll 回弹效果
         CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
 
-        // 内容层：录制给顶区毛玻璃（模糊关闭时原样渲染）
+        // 内容层
         Box(
-            modifier = (if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
+            modifier = Modifier,
         ) {
 
         // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；
@@ -662,8 +654,7 @@ fun HomeScreen(
         }
         }
 
-        // 顶区悬浮层：搜索 + 历史 / 分类 Tab（收藏/设置页同款 BlurredBar；
-        // 模糊开 → 透出背后滚动内容，模糊关 → 页面底色，与改造前一致）
+        // 顶区悬浮层：搜索 + 历史 / 分类 Tab
         //
         // 性能：折叠量在滑动时逐帧变化，这里组合阶段完全不读它 ——
         // ① 玻璃层尺寸恒为展开态高度，只被外层「裁剪窗口」裁掉底部：miuix 模糊节点一旦 measure
@@ -702,15 +693,12 @@ fun HomeScreen(
                     layout(constraints.maxWidth, visible) { placeable.place(0, 0) }
                 },
         ) {
-            BlurredBar(backdrop) {
+            Box {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(bandHeightDp)
-                        .background(
-                            if (backdrop != null) Color.Transparent
-                            else MiuixTheme.colorScheme.surface,
-                        ),
+                        .background(MiuixTheme.colorScheme.surface),
                 ) {
                     // 状态栏固定占位：不随折叠收起，收起后 Tab 行停在状态栏下缘而非屏幕最顶端
                     Spacer(Modifier.height(contentPadding.calculateTopPadding() - Spacing.pageTop))

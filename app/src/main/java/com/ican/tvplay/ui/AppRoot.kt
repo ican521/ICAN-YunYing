@@ -46,7 +46,6 @@ import com.ican.tvplay.ui.collection.UpdatePopupDialog
 import com.ican.tvplay.ui.collection.UpdateScreen
 import com.ican.tvplay.ui.components.FloatingBottomBar
 import com.ican.tvplay.ui.components.FloatingBottomBarItem
-import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.rememberMainPagerState
 import com.ican.tvplay.ui.home.HomeScreen
 import com.ican.tvplay.ui.nav.Route
@@ -64,8 +63,6 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.rememberNavSystemCornerRadius
@@ -84,8 +81,6 @@ fun AppRoot() {
     var showUpdatePopup by remember { androidx.compose.runtime.mutableStateOf(false) }
     val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by appViewModel.themeColor.collectAsStateWithLifecycle()
-    val bottomBarBlur by appViewModel.bottomBarBlurEnabled.collectAsStateWithLifecycle()
-    val topBarBlur by appViewModel.topBarBlurEnabled.collectAsStateWithLifecycle()
     val configReady by appViewModel.configReady.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -147,11 +142,10 @@ fun AppRoot() {
             )
         }
 
-        // 顶栏毛玻璃开关下发；LocalContentColor 照搬 KernelSU MiuixKernelSUTheme：
+        // LocalContentColor 照搬 KernelSU MiuixKernelSUTheme：
         // miuix TextField/Text/Icon 默认内容色取自该 Local（库默认值为 Black），
         // 不提供则深色模式下导入配置弹窗输入文字为黑色
         CompositionLocalProvider(
-            LocalEnableTopBarBlur provides topBarBlur,
             LocalContentColor provides MiuixTheme.colorScheme.onBackground,
         ) {
 
@@ -182,16 +176,6 @@ fun AppRoot() {
             }
             // 后台检测只更新追番更新页的数据，与启动面板无关
         }
-
-        // 底部毛玻璃的内容源：先铺背景色再记录内容
-        val backgroundColor = MiuixTheme.colorScheme.surface
-        val backdrop = rememberLayerBackdrop {
-            drawRect(backgroundColor)
-            drawContent()
-        }
-        // 只有底部毛玻璃开启时才有消费者采样这层背景：否则挂 layerBackdrop 等于
-        // 每帧都把整页内容多录一遍离屏图层再合成一次（首页快速滑动时是纯浪费的全屏绘制）
-        val needRootBackdrop = bottomBarBlur
 
         // 一级页面（首页/收藏/设置）放进 HorizontalPager，底栏指示器与页面滑动双向联动
         val pagerState = rememberPagerState(pageCount = { topDestinations.size })
@@ -233,8 +217,7 @@ fun AppRoot() {
             NavDisplay(
                 backStack = navigator.backStack,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (needRootBackdrop) Modifier.layerBackdrop(backdrop) else Modifier),
+                    .fillMaxSize(),
                 effects = NavDisplayEffects(cornerClipRadius = navCornerRadius),
                 onBack = {
                     navigator.pop()
@@ -349,9 +332,7 @@ fun AppRoot() {
                         }
                         mainPagerState.animateToPage(index)
                     },
-                    backdrop = backdrop,
                     tabsCount = topDestinations.size,
-                    isFrostedBlur = bottomBarBlur,
                 ) { activateTab ->
                     topDestinations.forEachIndexed { index, destination ->
                         FloatingBottomBarItem(

@@ -47,14 +47,11 @@ import androidx.tv.material3.Text
 import com.ican.tvplay.data.FavoriteUpdateItem
 import com.ican.tvplay.ui.UpdatesViewModel
 import com.ican.tvplay.ui.appViewModel
-import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.EmptyState
-import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixBottomSheetDialog
 import com.ican.tvplay.ui.components.PosterImage
 import com.ican.tvplay.ui.components.pageHorizontalPadding
-import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.Spacing
@@ -66,7 +63,6 @@ import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -97,9 +93,7 @@ fun UpdateScreen(
         }
     }
 
-    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
+    val barColor = MiuixTheme.colorScheme.surface
 
     fun play(item: FavoriteUpdateItem) {
         scope.launch {
@@ -125,7 +119,7 @@ fun UpdateScreen(
     Scaffold(
         containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
-            BlurredBar(backdrop) {
+            Box {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -151,7 +145,7 @@ fun UpdateScreen(
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        Box {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(

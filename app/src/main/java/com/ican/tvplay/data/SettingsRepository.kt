@@ -59,33 +59,6 @@ class SettingsRepository(context: Context) {
         _themeColor.value = color
     }
 
-    /** 底部胶囊毛玻璃（与顶栏同款 textureBlur），默认关闭 */
-    private val _bottomBarBlurEnabled = MutableStateFlow(prefs.getBoolean(KEY_BOTTOM_BAR_BLUR, false))
-    val bottomBarBlurEnabled: StateFlow<Boolean> = _bottomBarBlurEnabled.asStateFlow()
-
-    fun setBottomBarBlurEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_BOTTOM_BAR_BLUR, enabled).apply()
-        _bottomBarBlurEnabled.value = enabled
-    }
-
-    /** 顶栏毛玻璃（独立于全局模糊开关，互不影响），默认开启 */
-    private val _topBarBlurEnabled = MutableStateFlow(prefs.getBoolean(KEY_TOP_BAR_BLUR, true))
-    val topBarBlurEnabled: StateFlow<Boolean> = _topBarBlurEnabled.asStateFlow()
-
-    fun setTopBarBlurEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_TOP_BAR_BLUR, enabled).apply()
-        _topBarBlurEnabled.value = enabled
-    }
-
-    /** 预测性返回手势（KernelSU 同款，默认关闭；切换后立即生效，需 recreate Activity） */
-    private val _enablePredictiveBack = MutableStateFlow(prefs.getBoolean(KEY_PREDICTIVE_BACK, false))
-    val enablePredictiveBack: StateFlow<Boolean> = _enablePredictiveBack.asStateFlow()
-
-    fun setEnablePredictiveBack(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_PREDICTIVE_BACK, enabled).apply()
-        _enablePredictiveBack.value = enabled
-    }
-
     /** 首页网格布局大小（默认中） */
     private val _homeLayoutSize = MutableStateFlow(
         runCatching {
@@ -373,9 +346,6 @@ class SettingsRepository(context: Context) {
             ThemeMode.valueOf(prefs.getString(KEY_THEME, null) ?: ThemeMode.SYSTEM.name)
         }.getOrDefault(ThemeMode.SYSTEM)
         _themeColor.value = prefs.getInt(KEY_THEME_COLOR, 0)
-        _bottomBarBlurEnabled.value = prefs.getBoolean(KEY_BOTTOM_BAR_BLUR, false)
-        _topBarBlurEnabled.value = prefs.getBoolean(KEY_TOP_BAR_BLUR, true)
-        _enablePredictiveBack.value = prefs.getBoolean(KEY_PREDICTIVE_BACK, false)
         _homeLayoutSize.value = runCatching {
             HomeLayoutSize.valueOf(
                 prefs.getString(KEY_HOME_LAYOUT_SIZE, null) ?: HomeLayoutSize.MEDIUM.name,
@@ -409,9 +379,6 @@ class SettingsRepository(context: Context) {
     private companion object {
         const val KEY_THEME = "theme_mode"
         const val KEY_THEME_COLOR = "theme_color"
-        const val KEY_BOTTOM_BAR_BLUR = "bottom_bar_blur"
-        const val KEY_TOP_BAR_BLUR = "top_bar_blur"
-        const val KEY_PREDICTIVE_BACK = "enable_predictive_back"
         const val KEY_HOME_LAYOUT_SIZE = "home_layout_size"
         const val KEY_CONFIG_URL = "config_url"
         const val KEY_SITE_KEY = "site_key"

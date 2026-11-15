@@ -20,25 +20,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.ican.tvplay.ui.appViewModel
-import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.EmptyState
-import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
-import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -75,14 +70,12 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
     val orderedFavorites = orderIds.mapNotNull { favoritesById[it] } +
         favorites.filter { it.videoId !in orderIds }
 
-    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
+    val barColor = MiuixTheme.colorScheme.surface
 
     Scaffold(
         containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
-            BlurredBar(backdrop) {
+            Box {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -108,7 +101,7 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
             }
         },
     ) { innerPadding ->
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        Box {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(

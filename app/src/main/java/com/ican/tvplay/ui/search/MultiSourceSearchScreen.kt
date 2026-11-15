@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
@@ -55,13 +54,10 @@ import com.ican.tvplay.player.core.PlaySpec
 import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.ui.MultiSourceSearchViewModel
 import com.ican.tvplay.ui.appViewModel
-import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.EmptyState
-import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
-import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect

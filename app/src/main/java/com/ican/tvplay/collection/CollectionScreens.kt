@@ -55,7 +55,6 @@ import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -67,13 +66,10 @@ import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.ui.CollectionViewModel
 import com.ican.tvplay.ui.appViewModel
-import com.ican.tvplay.ui.components.BlurredBar
 import com.ican.tvplay.ui.components.EmptyState
-import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
-import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.components.videoGridColumns
 import com.ican.tvplay.ui.theme.LightOnSurface
@@ -111,15 +107,13 @@ fun FavoritesScreen(
     // 编辑模式下按返回 = 取消编辑（不退出页面）；清空弹窗打开时返回由弹窗自行消费
     BackHandler(enabled = editMode && !showConfirm) { editMode = false }
 
-    // 固定居中大标题顶栏 + 毛玻璃
-    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
+    // 固定居中大标题顶栏（不透明 surface 底色）
+    val barColor = MiuixTheme.colorScheme.surface
 
     Scaffold(
         containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
-            BlurredBar(backdrop) {
+            Box {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -140,7 +134,7 @@ fun FavoritesScreen(
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        Box {
             if (favorites.isEmpty()) {
                 // 空收藏时「追番更新」入口仍常驻（否则入口会随空态一起消失）
                 Column(
@@ -463,15 +457,13 @@ fun HistoryScreen(
     // 非编辑模式不拦截，保持原有返回上一页行为
     BackHandler(enabled = editMode && !showConfirm) { editMode = false }
 
-    // 固定居中大标题顶栏 + 毛玻璃
-    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
+    // 固定居中大标题顶栏（不透明 surface 底色）
+    val barColor = MiuixTheme.colorScheme.surface
 
     Scaffold(
         containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
-            BlurredBar(backdrop) {
+            Box {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -496,7 +488,7 @@ fun HistoryScreen(
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        Box {
             if (histories.isEmpty()) {
                 EmptyState(text = "还没有观看记录")
             } else {

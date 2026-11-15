@@ -1,6 +1,5 @@
 package com.ican.tvplay.ui.settings
 
-import android.app.Activity
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -56,14 +55,12 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.BuildConfig
-import com.ican.tvplay.TvPlayApplication
 import com.ican.tvplay.data.BACKGROUND_PIP
 import com.ican.tvplay.data.HomeLayoutSize
 import com.ican.tvplay.data.ThemeMode
@@ -73,12 +70,9 @@ import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.ArcStretchSpinner
-import com.ican.tvplay.ui.components.BlurredBar
-import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBottomSheetDialog
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
-import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
@@ -95,9 +89,6 @@ fun SettingsScreen(
     val viewModel = appViewModel { SettingsViewModel(this) }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
-    val bottomBarBlur by viewModel.bottomBarBlurEnabled.collectAsStateWithLifecycle()
-    val topBarBlur by viewModel.topBarBlurEnabled.collectAsStateWithLifecycle()
-    val enablePredictiveBack by viewModel.enablePredictiveBack.collectAsStateWithLifecycle()
     val backgroundPlay by viewModel.playerBackgroundPlay.collectAsStateWithLifecycle()
     val favoriteUpdateCheckEnabled by viewModel.favoriteUpdateCheckEnabled.collectAsStateWithLifecycle()
     val favoriteUpdateIntervalHours by viewModel.favoriteUpdateIntervalHours.collectAsStateWithLifecycle()
@@ -164,36 +155,32 @@ fun SettingsScreen(
     } else {
         listOf("小", "中")
     }
-    // 固定居中大标题顶栏 + 毛玻璃（关闭毛玻璃时顶栏退化为页面背景色）
-    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
+    // 固定居中大标题顶栏（不透明 surface 底色）
+    val barColor = MiuixTheme.colorScheme.surface
 
     Scaffold(
         containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
-            BlurredBar(backdrop) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(barColor)
-                        .padding(WindowInsets.statusBars.asPaddingValues())
-                        .height(Spacing.centeredTopBarHeight),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "设置",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MiuixTheme.colorScheme.onBackground,
-                    )
-                }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(barColor)
+                    .padding(WindowInsets.statusBars.asPaddingValues())
+                    .height(Spacing.centeredTopBarHeight),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "设置",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MiuixTheme.colorScheme.onBackground,
+                )
             }
         },
         contentWindowInsets = WindowInsets.systemBars
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        Box {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize(),
@@ -270,31 +257,6 @@ fun SettingsScreen(
                 },
                 onClick = onColorPaletteClick,
             )
-            SwitchPreference(
-                title = "底部毛玻璃",
-                summary = "底部导航毛玻璃效果",
-                checked = bottomBarBlur,
-                onCheckedChange = { viewModel.setBottomBarBlurEnabled(it) },
-            )
-            SwitchPreference(
-                title = "顶栏毛玻璃",
-                summary = "顶部栏模糊效果",
-                checked = topBarBlur,
-                onCheckedChange = { viewModel.setTopBarBlurEnabled(it) },
-            )
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                SwitchPreference(
-                    title = "预测性返回",
-                    summary = "侧滑返回时预览返回效果（播放页不生效）",
-                    checked = enablePredictiveBack,
-                    onCheckedChange = { enabled ->
-                        // KernelSU 同款：反射立即应用 + recreate 当前 Activity 重新注册返回回调，无需重启 App
-                        viewModel.setEnablePredictiveBack(enabled)
-                        TvPlayApplication.applyPredictiveBack(context.applicationInfo, enabled)
-                        (context as? Activity)?.recreate()
-                    },
-                )
-            }
         }
         }
 

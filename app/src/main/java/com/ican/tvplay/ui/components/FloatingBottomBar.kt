@@ -72,11 +72,6 @@ import com.ican.tvplay.ui.theme.DarkSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.Spacing
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.blur.BlendColorEntry
-import top.yukonga.miuix.kmp.blur.BlurColors
-import top.yukonga.miuix.kmp.blur.LayerBackdrop
-import top.yukonga.miuix.kmp.blur.textureBlur
-import top.yukonga.miuix.kmp.shader.isRenderEffectSupported
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -122,24 +117,19 @@ fun FloatingBottomBar(
     modifier: Modifier = Modifier,
     selectedIndex: Int,
     onSelected: (index: Int) -> Unit,
-    backdrop: LayerBackdrop,
     tabsCount: Int,
-    isFrostedBlur: Boolean = false,
     content: @Composable RowScope.((Int) -> Unit) -> Unit
 ) {
     // 用 App 内主题模式的实际深浅色状态，而非系统深浅色（App 内可独立切换浅色/深色）
     val isInDark = LocalDarkTheme.current
     val pillShape = remember { CircleShape }
     val accentColor = MiuixTheme.colorScheme.primary
-    // 浅色模式关闭毛玻璃时：未选中图标文字用纯黑（对齐 KernelSU 浅色模式）
-    val tabContentColor = if (!isInDark && !isFrostedBlur) Color.Black else MiuixTheme.colorScheme.onSurface
-    // 深色模式关闭毛玻璃时：胶囊本体用不透明深灰 rgb(36,36,36)；浅色模式关闭毛玻璃时纯白
+    // 浅色模式：未选中图标文字用纯黑（对齐 KernelSU 浅色模式）
+    val tabContentColor = if (!isInDark) Color.Black else MiuixTheme.colorScheme.onSurface
+    // 胶囊本体用不透明深灰 rgb(36,36,36)；浅色模式纯白
     val containerColor = if (isInDark) DarkSurface else Color.White
-    // 关闭毛玻璃时指示器：浅/深色统一用主题色 15% 透明（浅色叠在白底上约等于原 #E1ECFE 的观感，且跟随色板）
+    // 指示器：浅/深色统一用主题色 15% 透明（浅色叠在白底上约等于原 #E1ECFE 的观感，且跟随色板）
     val plainIndicatorColor = accentColor.copy(alpha = 0.15f)
-
-    // 底部普通毛玻璃（与顶栏同款 textureBlur）：设备支持 RenderEffect 时生效
-    val frostedActive = isFrostedBlur && isRenderEffectSupported()
 
     val density = LocalDensity.current
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
@@ -259,23 +249,7 @@ fun FloatingBottomBar(
                     ),
                 )
                 .then(
-                    // 底部毛玻璃：与顶栏 BlurredBar 完全同款 textureBlur（12f 模糊 + 背景色 87% 混合）
-                    if (frostedActive) {
-                        Modifier.textureBlur(
-                            backdrop = backdrop,
-                            shape = pillShape,
-                            blurRadius = 12f,
-                            colors = BlurColors(
-                                blendColors = listOf(
-                                    BlendColorEntry(
-                                        color = MiuixTheme.colorScheme.surface.copy(alpha = 0.87f),
-                                    ),
-                                ),
-                            ),
-                        )
-                    } else {
-                        Modifier.background(containerColor, pillShape)
-                    }
+                    Modifier.background(containerColor, pillShape),
                 )
                 .then(dampedDragAnimation.modifier)
                 .height(Spacing.bottomBarHeight)

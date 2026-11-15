@@ -1,8 +1,6 @@
 package com.ican.tvplay
 
 import android.app.Application
-import android.content.pm.ApplicationInfo
-import android.os.Build
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.gif.GifDecoder
@@ -14,7 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
-import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.util.concurrent.TimeUnit
 
 /**
@@ -31,26 +28,6 @@ class TvPlayApplication : Application(), SingletonImageLoader.Factory {
         private val imageUserAgent: String
             get() = System.getProperty("http.agent")
                 ?: "Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 Mobile Safari/537.36"
-
-        /**
-         * 照搬 KernelSU：HiddenApiBypass + 反射 ApplicationInfo.setEnableOnBackInvokedCallback
-         * 动态开关系统预测返回（manifest 保持 false，开关状态由设置持久化）。
-         * 已在运行的 Activity 需 recreate 后才按新值重新注册返回回调。
-         */
-        fun applyPredictiveBack(appInfo: ApplicationInfo, enable: Boolean) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
-            runCatching {
-                HiddenApiBypass.addHiddenApiExemptions(
-                    "Landroid/content/pm/ApplicationInfo;->setEnableOnBackInvokedCallback",
-                )
-                val method = ApplicationInfo::class.java.getDeclaredMethod(
-                    "setEnableOnBackInvokedCallback",
-                    Boolean::class.javaPrimitiveType,
-                )
-                method.isAccessible = true
-                method.invoke(appInfo, enable)
-            }
-        }
     }
 
     lateinit var container: AppContainer
@@ -64,7 +41,6 @@ class TvPlayApplication : Application(), SingletonImageLoader.Factory {
         container = AppContainer(this)
         // 屏蔽 spider jar 弹出的弹幕类杂音 Toast（如「弹幕加载失败」），只过滤不显示，不影响视频加载
         com.ican.tvplay.util.ToastBlocker.install()
-        applyPredictiveBack(applicationInfo, container.settingsRepository.enablePredictiveBack.value)
         android.util.Log.d("Startup", "app onCreate end")
 
         // 启动本地代理服务器（fongmi 同款）：spider jar 返回 127.0.0.1/proxy 地址时由本机中转拉流

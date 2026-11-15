@@ -39,7 +39,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -47,11 +46,8 @@ import androidx.tv.material3.Text
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
-import com.ican.tvplay.ui.components.BlurredBar
-import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
-import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.BrandBlue
 import com.ican.tvplay.ui.theme.BrandBlueDeep
@@ -74,10 +70,8 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
     val viewModel = appViewModel { SettingsViewModel(this) }
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
 
-    // 固定居中大标题顶栏 + 毛玻璃
-    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
+    // 固定居中大标题顶栏（不透明 surface 底色）
+    val barColor = MiuixTheme.colorScheme.surface
 
     Scaffold(
         // 整窗底色（含状态栏 / 导航条区域）与设置页一致
@@ -86,27 +80,25 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
             .background(MiuixTheme.colorScheme.surface),
         containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
-            BlurredBar(backdrop) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(barColor)
-                        .padding(WindowInsets.statusBars.asPaddingValues())
-                        .height(Spacing.centeredTopBarHeight),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    // 返回按钮靠左
-                    Box(modifier = Modifier.align(Alignment.CenterStart).padding(start = pageHorizontalPadding())) {
-                        MiuixBackButton(onClick = onBack, showBackground = false)
-                    }
-                    // 标题居中
-                    Text(
-                        text = "主题色板",
-                        modifier = Modifier.align(Alignment.Center),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MiuixTheme.colorScheme.onBackground,
-                    )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(barColor)
+                    .padding(WindowInsets.statusBars.asPaddingValues())
+                    .height(Spacing.centeredTopBarHeight),
+                contentAlignment = Alignment.Center,
+            ) {
+                // 返回按钮靠左
+                Box(modifier = Modifier.align(Alignment.CenterStart).padding(start = pageHorizontalPadding())) {
+                    MiuixBackButton(onClick = onBack, showBackground = false)
                 }
+                // 标题居中
+                Text(
+                    text = "主题色板",
+                    modifier = Modifier.align(Alignment.Center),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MiuixTheme.colorScheme.onBackground,
+                )
             }
         },
         contentWindowInsets = WindowInsets.systemBars
@@ -117,8 +109,7 @@ fun ColorPaletteScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 // 页面底色与设置页一致（主题 background 的浅灰白），避免露出窗口纯白
-                .background(MiuixTheme.colorScheme.surface)
-                .then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier),
+                .background(MiuixTheme.colorScheme.surface),
         ) {
             val horizontal = pageHorizontalPadding()
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {

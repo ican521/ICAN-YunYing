@@ -31,26 +31,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.ican.tvplay.ui.MultiSourceSearchViewModel
 import com.ican.tvplay.ui.SearchViewModel
 import com.ican.tvplay.ui.appViewModel
-import com.ican.tvplay.ui.components.BlurredBar
-import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixSearchInput
 import com.ican.tvplay.ui.components.pageHorizontalPadding
-import com.ican.tvplay.ui.components.rememberBlurBackdrop
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
@@ -112,15 +107,13 @@ fun SearchHomeScreen(
         multiVm.searchAll(q)
     }
 
-    // KernelSU 同款：固定毛玻璃顶栏（搜索栏不适合折叠，保持固定高度）
-    val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
+    // 固定顶栏（不透明 surface 底色，搜索栏不适合折叠，保持固定高度）
+    val barColor = MiuixTheme.colorScheme.surface
 
     Scaffold(
         containerColor = MiuixTheme.colorScheme.surface,
         topBar = {
-            BlurredBar(backdrop) {
+            Box {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -171,7 +164,7 @@ fun SearchHomeScreen(
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
         Box(
-            modifier = (if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+            modifier = Modifier
                 // 空白处点击（子项已消费的点击不受影响）→ 清焦点，输入法随之收起
                 .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
         ) {
