@@ -47,6 +47,7 @@ import com.ican.tvplay.ui.collection.UpdateScreen
 import com.ican.tvplay.ui.components.FloatingBottomBar
 import com.ican.tvplay.ui.components.FloatingBottomBarItem
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
+import com.ican.tvplay.ui.components.LocalSharedBlurBackdrop
 import com.ican.tvplay.ui.components.rememberMainPagerState
 import com.ican.tvplay.ui.home.HomeScreen
 import com.ican.tvplay.ui.nav.Route
@@ -147,11 +148,21 @@ fun AppRoot() {
             )
         }
 
+        // 全 App 共享的内容录制层：顶栏与底栏采样同一份，避免整页内容每帧被录两遍
+        val blurBaseColor = MiuixTheme.colorScheme.surface
+        val backdrop = rememberLayerBackdrop {
+            drawRect(blurBaseColor)
+            drawContent()
+        }
+        // 两条栏都关时不下发：页面因此不挂录制节点，避免白白多录一遍整页
+        val sharedBackdrop = if (topBarBlur || bottomBarBlur) backdrop else null
+
         // 顶栏毛玻璃开关下发；LocalContentColor 照搬 KernelSU MiuixKernelSUTheme：
         // miuix TextField/Text/Icon 默认内容色取自该 Local（库默认值为 Black），
         // 不提供则深色模式下导入配置弹窗输入文字为黑色
         CompositionLocalProvider(
             LocalEnableTopBarBlur provides topBarBlur,
+            LocalSharedBlurBackdrop provides sharedBackdrop,
             LocalContentColor provides MiuixTheme.colorScheme.onBackground,
         ) {
 
@@ -182,16 +193,6 @@ fun AppRoot() {
             }
             // 后台检测只更新追番更新页的数据，与启动面板无关
         }
-
-        // 底部毛玻璃的内容源：先铺背景色再记录内容
-        val backgroundColor = MiuixTheme.colorScheme.surface
-        val backdrop = rememberLayerBackdrop {
-            drawRect(backgroundColor)
-            drawContent()
-        }
-        // 只有底部毛玻璃开启时才有消费者采样这层背景：否则挂 layerBackdrop 等于
-        // 每帧都把整页内容多录一遍离屏图层再合成一次（首页快速滑动时是纯浪费的全屏绘制）
-        val needRootBackdrop = bottomBarBlur
 
         // 一级页面（首页/收藏/设置）放进 HorizontalPager，底栏指示器与页面滑动双向联动
         val pagerState = rememberPagerState(pageCount = { topDestinations.size })
@@ -233,8 +234,7 @@ fun AppRoot() {
             NavDisplay(
                 backStack = navigator.backStack,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (needRootBackdrop) Modifier.layerBackdrop(backdrop) else Modifier),
+                    .fillMaxSize(),
                 effects = NavDisplayEffects(cornerClipRadius = navCornerRadius),
                 onBack = {
                     navigator.pop()

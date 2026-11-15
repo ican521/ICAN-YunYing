@@ -74,6 +74,7 @@ import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
+import com.ican.tvplay.ui.components.rememberContentBackdrop
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.components.videoGridColumns
 import com.ican.tvplay.ui.theme.LightOnSurface
@@ -113,6 +114,7 @@ fun FavoritesScreen(
 
     // 固定居中大标题顶栏 + 毛玻璃
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
+    val contentBackdrop = rememberContentBackdrop()
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
@@ -140,7 +142,7 @@ fun FavoritesScreen(
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        Box(modifier = if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop) else Modifier) {
             if (favorites.isEmpty()) {
                 // 空收藏时「追番更新」入口仍常驻（否则入口会随空态一起消失）
                 Column(
@@ -465,6 +467,7 @@ fun HistoryScreen(
 
     // 固定居中大标题顶栏 + 毛玻璃
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
+    val contentBackdrop = rememberContentBackdrop()
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
@@ -496,7 +499,7 @@ fun HistoryScreen(
             .add(WindowInsets.displayCutout)
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        Box(modifier = if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop) else Modifier) {
             if (histories.isEmpty()) {
                 EmptyState(text = "还没有观看记录")
             } else {

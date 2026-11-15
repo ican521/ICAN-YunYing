@@ -51,6 +51,7 @@ import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixSearchInput
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
+import com.ican.tvplay.ui.components.rememberContentBackdrop
 import com.ican.tvplay.ui.components.topBarPadding
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.Spacing
@@ -114,6 +115,7 @@ fun SearchHomeScreen(
 
     // KernelSU 同款：固定毛玻璃顶栏（搜索栏不适合折叠，保持固定高度）
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
+    val contentBackdrop = rememberContentBackdrop()
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
@@ -171,7 +173,7 @@ fun SearchHomeScreen(
             .only(WindowInsetsSides.Horizontal),
     ) { innerPadding ->
         Box(
-            modifier = (if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)
+            modifier = (if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop) else Modifier)
                 // 空白处点击（子项已消费的点击不受影响）→ 清焦点，输入法随之收起
                 .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
         ) {

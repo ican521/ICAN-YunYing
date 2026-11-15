@@ -33,6 +33,7 @@ import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.rememberBlurBackdrop
+import com.ican.tvplay.ui.components.rememberContentBackdrop
 import com.ican.tvplay.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
@@ -76,6 +77,7 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
         favorites.filter { it.videoId !in orderIds }
 
     val backdrop = rememberBlurBackdrop(LocalEnableTopBarBlur.current)
+    val contentBackdrop = rememberContentBackdrop()
     val blurActive = backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
@@ -108,7 +110,7 @@ fun UpdateScheduleScreen(onBack: () -> Unit = {}) {
             }
         },
     ) { innerPadding ->
-        Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+        Box(modifier = if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop) else Modifier) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
