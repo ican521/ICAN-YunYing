@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -80,6 +81,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 
@@ -87,6 +89,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -282,6 +285,11 @@ fun HomeScreen(
             (Spacing.categoryTabVertical * 2 + TabRowHeight).toPx()
     }.roundToInt().toFloat()
     var searchRowCollapsePx by remember { mutableFloatStateOf(0f) }
+    // 折叠量的「非 State 快照」：滑动时 searchRowCollapsePx 每帧都在变，只有必须在组合阶段
+    // 一次性取初值的地方（新建 LazyGridState 的初始滚动位置）才读它。
+    // 若在页面组合里直接读该 state，折叠量一变整页内容 lambda 就重组 —— LazyGrid 的 item 内容 lambda
+    // 每帧换一个实例，会让所有可见卡片一起重组（快速滑动掉帧的主因之一）。
+    val collapseSnapshotPx = remember { intArrayOf(0) }
     // 各页网格状态表：切页时用于把目标页滚动位置对齐折叠量
     val gridStates = remember { mutableStateMapOf<Int, LazyGridState>() }
     // 网格写串行锁：三个钩子（数据装载 / 横向逐帧同步 / settle 对齐）对同一页网格的
@@ -299,7 +307,10 @@ fun HomeScreen(
     fun applyCollapseExpand(expandPx: Float) {
         collapseRaw = (collapseRaw - expandPx).coerceIn(0f, searchRowMaxCollapsePx)
         val c = collapseRaw.roundToInt().toFloat()
-        if (c != searchRowCollapsePx) searchRowCollapsePx = c
+        if (c != searchRowCollapsePx) {
+            searchRowCollapsePx = c
+            collapseSnapshotPx[0] = c.toInt()
+        }
     }
     val gridScrollSync = remember {
         object : NestedScrollConnection {
@@ -522,7 +533,9 @@ fun HomeScreen(
                     else -> onVideoClick(video)
                 }
             }
-            val initialCollapse = searchRowCollapsePx.toInt()
+            // 只读非 State 快照：这里在页面组合阶段执行，读 searchRowCollapsePx 会被登记成
+            // 「组合期读取」，折叠量一变（滑动时逐帧）整页内容就重组，可见卡片全部跟着重组
+            val initialCollapse = collapseSnapshotPx[0]
             val gridState = remember(page) {
                 LazyGridState(firstVisibleItemIndex = 0, firstVisibleItemScrollOffset = initialCollapse)
             }
@@ -531,7 +544,9 @@ fun HomeScreen(
                 gridStates[page] = gridState
                 // 新组合的页立即镜像到当前折叠量：initialCollapse 只在创建时快照一次，
                 // 若此后折叠量已变（或创建时快照值已过期），该页会停在错的滚动位置（卡片不贴 Tab）
-                if (page != pagerState.currentPage) mirrorGridToCollapse(gridState, searchRowCollapsePx)
+                if (page != pagerState.currentPage) {
+                    mirrorGridToCollapse(gridState, collapseSnapshotPx[0].toFloat())
+                }
                 onDispose { gridStates.remove(page) }
             }
             // 钩子①：数据装载完成后立即把网格对齐到折叠量（不管是否当前页）
@@ -649,89 +664,128 @@ fun HomeScreen(
 
         // 顶区悬浮层：搜索 + 历史 / 分类 Tab（收藏/设置页同款 BlurredBar；
         // 模糊开 → 透出背后滚动内容，模糊关 → 页面底色，与改造前一致）
-        BlurredBar(backdrop) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        if (backdrop != null) Color.Transparent
-                        else MiuixTheme.colorScheme.surface,
-                    ),
-            ) {
-                // 状态栏固定占位：不随折叠收起，收起后 Tab 行停在状态栏下缘而非屏幕最顶端
-                Spacer(Modifier.height(contentPadding.calculateTopPadding() - Spacing.pageTop))
+        //
+        // 性能：折叠量在滑动时逐帧变化，这里组合阶段完全不读它 ——
+        // ① 玻璃层尺寸恒为展开态高度，只被外层「裁剪窗口」裁掉底部：miuix 模糊节点一旦 measure
+        //    结果变化就要 releaseGraphicsLayers 重建 GPU 图层，跟着折叠逐帧改高度等于每帧重建一次；
+        // ② 裁剪窗口高度只在 measure 阶段读（Modifier.layout）；
+        // ③ 内容上移量只在 layout 阶段读（Modifier.offset 的 lambda）。
+        // 于是滑动时顶栏（含分类 Tab 的 LazyRow）不再逐帧重组 / 重新测量，只做一次廉价的裁剪与位移。
+        val gapPx = with(density) { Spacing.categoryTabVertical.toPx() }
+        val tabRowPx = with(density) { TabRowHeight.toPx() }
+        // 顶区展开态总高（含状态栏）：玻璃层固定按此尺寸测量
+        val bandHeightPx = topBarHeightPx.roundToInt()
+        val bandHeightDp = with(density) { bandHeightPx.toDp() }
+        // 状态栏以下的可折叠高度（搜索行最大收起量 + 上下余量 + Tab 行）
+        val collapsiblePx = searchRowMaxCollapsePx + gapPx * 2 + tabRowPx
+        val collapsibleDp = with(density) { collapsiblePx.toDp() }
 
-                // 顶区（搜索行 + 分类 Tab）用自定义 Layout 精确摆放：
-                // 搜索行整体按折叠量上移、被容器顶部裁掉（滑到状态栏后面），
-                // Tab 行始终跟在搜索行底缘下方固定间距处 —— 折叠到底时 Tab 行停在状态栏下缘，不会被一起藏掉。
-                // 不用「Box + 收缩高度」：父容器比内容矮时，Compose 会按对齐把搜索行额外上移并压扁
-                val gapPx = with(density) { Spacing.categoryTabVertical.toPx() }
-                val tabRowPx = with(density) { TabRowHeight.toPx() }
-                Layout(
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                // 裁剪必须排在 Modifier.layout 之外（先于它）：clipToBounds 只按「自身尺寸」裁，
+                // 而 Modifier.layout 只改「上报给父级的高度」、不改子节点尺寸 ——
+                // 若把裁剪放在 layout 内侧，裁到的是定高的玻璃层（等于没裁），
+                // 玻璃会一直保持展开态高度，表现为「顶栏不收缩、留一大块空白」
+                .clipToBounds()
+                .layout { measurable, constraints ->
+                    // 玻璃层按展开态高度测量：尺寸恒定，模糊图层不会被反复重建
+                    val placeable = measurable.measure(
+                        Constraints(
+                            maxWidth = constraints.maxWidth,
+                            maxHeight = bandHeightPx,
+                        ),
+                    )
+                    // 可见高度 = 展开态高度 - 折叠量：只在 measure 阶段读 state
+                    val visible = (bandHeightPx - searchRowCollapsePx.roundToInt())
+                        .coerceIn(0, placeable.height)
+                    layout(constraints.maxWidth, visible) { placeable.place(0, 0) }
+                },
+        ) {
+            BlurredBar(backdrop) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(
-                            with(density) {
-                                (searchRowMaxCollapsePx + gapPx * 2 + tabRowPx - searchRowCollapsePx)
-                                    .coerceAtLeast(0f)
-                                    .toDp()
-                            },
-                        )
-                        .clipToBounds(),
-                    content = {
-                        // 0：搜索行（状态栏下缘留白 16dp 由本行顶部 padding 提供，随搜索行一起折叠）
-                        Column(
+                        .height(bandHeightDp)
+                        .background(
+                            if (backdrop != null) Color.Transparent
+                            else MiuixTheme.colorScheme.surface,
+                        ),
+                ) {
+                    // 状态栏固定占位：不随折叠收起，收起后 Tab 行停在状态栏下缘而非屏幕最顶端
+                    Spacer(Modifier.height(contentPadding.calculateTopPadding() - Spacing.pageTop))
+
+                    // 固定裁剪窗口（上沿贴状态栏下缘、高度恒为展开态）：顶区（搜索行 + 分类 Tab）只做
+                    // layout 阶段上移，上移后超出窗口上沿的搜索行（滑进状态栏后面）被裁掉。
+                    // 搜索行整体按折叠量上移、Tab 行始终跟在搜索行底缘下方固定间距处 ——
+                    // 折叠到底时 Tab 行停在状态栏下缘，不会被一起藏掉。
+                    // 不用「Box + 收缩高度」：父容器比内容矮时，Compose 会按对齐把搜索行额外上移并压扁
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clipToBounds()
+                            .height(collapsibleDp),
+                    ) {
+                        Layout(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = homeSearchTopGap)
-                                // 折叠状态下在搜索行上向下滑动 → 把拖动转给当前页网格回滚，
-                                // 搜索行跟着展开（折叠量唯一真源是网格滚动位置，不直接改折叠量）
-                                .pointerInput(Unit) {
-                                    detectVerticalDragGestures { change, dragAmount ->
-                                        change.consume()
-                                        // dispatchRawDelta 不走嵌套滚动链，所以这里手动同步折叠量：
-                                        // 网格消费多少就把折叠量同步展开/收起多少，保持卡片贴着搜索行底缘
-                                        val consumed = gridStates[pagerState.currentPage]
-                                            ?.dispatchRawDelta(-dragAmount) ?: 0f
-                                        if (consumed != 0f) applyCollapseExpand(-consumed)
+                                // 上移量在 layout 阶段读取：只触发摆放，不触发重组 / 重新测量
+                                .offset { IntOffset(0, -searchRowCollapsePx.roundToInt()) },
+                            content = {
+                                // 0：搜索行（状态栏下缘留白 16dp 由本行顶部 padding 提供，随搜索行一起折叠）
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = homeSearchTopGap)
+                                        // 折叠状态下在搜索行上向下滑动 → 把拖动转给当前页网格回滚，
+                                        // 搜索行跟着展开（折叠量唯一真源是网格滚动位置，不直接改折叠量）
+                                        .pointerInput(Unit) {
+                                            detectVerticalDragGestures { change, dragAmount ->
+                                                change.consume()
+                                                // dispatchRawDelta 不走嵌套滚动链，所以这里手动同步折叠量：
+                                                // 网格消费多少就把折叠量同步展开/收起多少，保持卡片贴着搜索行底缘
+                                                val consumed = gridStates[pagerState.currentPage]
+                                                    ?.dispatchRawDelta(-dragAmount) ?: 0f
+                                                if (consumed != 0f) applyCollapseExpand(-consumed)
+                                            }
+                                        },
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(
+                                                start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                                                end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
+                                            ),
+                                    ) {
+                                        HomeTopBar(
+                                            contentAlpha = 1f,
+                                            onSearchClick = onSearchClick,
+                                            onHistoryClick = onHistoryClick,
+                                            onUrlPlayClick = onUrlPlayClick,
+                                            onSitePickerClick = { showSitePicker = true },
+                                        )
                                     }
-                                },
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        start = contentPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                                        end = contentPadding.calculateRightPadding(LayoutDirection.Ltr),
-                                    ),
-                            ) {
-                                HomeTopBar(
-                                    contentAlpha = 1f,
-                                    onSearchClick = onSearchClick,
-                                    onHistoryClick = onHistoryClick,
-                                    onUrlPlayClick = onUrlPlayClick,
-                                    onSitePickerClick = { showSitePicker = true },
-                                )
+                                }
+                                // 1：固定分类 Tab：通栏可滑至屏幕最左/最右缘，静止时首个/末个 Tab 由内部 contentPadding 对齐卡片圆角/直线交界处（左右对称）
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    CategoryChips(
+                                        categories = categories,
+                                        pagerState = pagerState,
+                                        tappedIndex = tappedChipIndex,
+                                        onSelect = onChipClick,
+                                    )
+                                }
+                            },
+                        ) { measurables, constraints ->
+                            val search = measurables[0].measure(Constraints(maxWidth = constraints.maxWidth))
+                            val tabs = measurables[1].measure(Constraints(maxWidth = constraints.maxWidth))
+                            layout(constraints.maxWidth, constraints.maxHeight) {
+                                // 内容高度恒定（展开态），上移由外层 offset 完成，这里只按展开态摆放
+                                search.place(0, 0)
+                                tabs.place(0, search.height + gapPx.roundToInt())
                             }
                         }
-                        // 1：固定分类 Tab：通栏可滑至屏幕最左/最右缘，静止时首个/末个 Tab 由内部 contentPadding 对齐卡片圆角/直线交界处（左右对称）
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            CategoryChips(
-                                categories = categories,
-                                pagerState = pagerState,
-                                tappedIndex = tappedChipIndex,
-                                onSelect = onChipClick,
-                            )
-                        }
-                    },
-                ) { measurables, constraints ->
-                    val search = measurables[0].measure(Constraints(maxWidth = constraints.maxWidth))
-                    val tabs = measurables[1].measure(Constraints(maxWidth = constraints.maxWidth))
-                    val shift = searchRowCollapsePx.roundToInt()
-                    layout(constraints.maxWidth, constraints.maxHeight) {
-                        // 搜索行上移（负 y）＝ 顶部被容器裁掉，底缘与 Tab 行间距恒定
-                        search.place(0, -shift)
-                        tabs.place(0, search.height - shift + gapPx.roundToInt())
                     }
                 }
             }
@@ -793,7 +847,7 @@ fun SitePickerDialog(
             // 标题距弹窗顶部 = 标题距下方列表 = dialogTitleGap
             Text(
                 text = "选择站源",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge,
                 color = MiuixTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -1137,7 +1191,7 @@ private fun UnderlineTabRow(
                                 MiuixTheme.colorScheme.primary
                             } else {
                                 MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            },
+                            },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier

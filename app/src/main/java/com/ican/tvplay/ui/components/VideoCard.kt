@@ -207,12 +207,15 @@ fun PosterImage(
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     val context = LocalContext.current
+    // 请求对象按 cover 缓存：posterModel 内含 @Headers/@Cookie/@Referer 后缀解析（JSONObject 解析），
+    // 每次重组都重建等于在滑动中反复解析同一串 URL
+    val model = remember(context, cover) { posterModel(context, cover) }
     // 轻量 AsyncImage（替代 SubcomposeAsyncImage：去掉子组合的二次测量开销）；
     // 加载失败叠标题文字兜底，与原 error 槽行为一致（remember key 到 cover：换封面后重置失败态）
     var failed by remember(cover) { mutableStateOf(false) }
     Box(modifier = modifier) {
         AsyncImage(
-            model = posterModel(context, cover),
+            model = model,
             contentDescription = title,
             contentScale = contentScale,
             modifier = Modifier.fillMaxSize(),

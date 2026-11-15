@@ -192,6 +192,9 @@ fun AppRoot() {
             drawRect(backgroundColor)
             drawContent()
         }
+        // 只有液态玻璃 / 底部毛玻璃开启时才有消费者采样这层背景：否则挂 layerBackdrop 等于
+        // 每帧都把整页内容多录一遍离屏图层再合成一次（首页快速滑动时是纯浪费的全屏绘制）
+        val needRootBackdrop = enableBlur || bottomBarBlur
 
         // 一级页面（首页/收藏/设置）放进 HorizontalPager，底栏指示器与页面滑动双向联动
         val pagerState = rememberPagerState(pageCount = { topDestinations.size })
@@ -234,7 +237,7 @@ fun AppRoot() {
                 backStack = navigator.backStack,
                 modifier = Modifier
                     .fillMaxSize()
-                    .layerBackdrop(backdrop),
+                    .then(if (needRootBackdrop) Modifier.layerBackdrop(backdrop) else Modifier),
                 effects = NavDisplayEffects(cornerClipRadius = navCornerRadius),
                 onBack = {
                     navigator.pop()
