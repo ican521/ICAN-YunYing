@@ -25,10 +25,7 @@ import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.shader.isRenderEffectSupported
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-/** 全局毛玻璃开关（AppRoot 按设置页「全局模糊」开关提供，KernelSU 同款机制） */
-val LocalEnableBlur = staticCompositionLocalOf { false }
-
-/** 顶栏毛玻璃独立开关（AppRoot 按设置页「顶栏毛玻璃」开关提供，与全局模糊互不影响） */
+/** 顶栏毛玻璃独立开关（AppRoot 按设置页「顶栏毛玻璃」开关提供） */
 val LocalEnableTopBarBlur = staticCompositionLocalOf { true }
 
 /**

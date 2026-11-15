@@ -95,7 +95,6 @@ fun SettingsScreen(
     val viewModel = appViewModel { SettingsViewModel(this) }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
-    val enableBlur by viewModel.enableBlur.collectAsStateWithLifecycle()
     val bottomBarBlur by viewModel.bottomBarBlurEnabled.collectAsStateWithLifecycle()
     val topBarBlur by viewModel.topBarBlurEnabled.collectAsStateWithLifecycle()
     val enablePredictiveBack by viewModel.enablePredictiveBack.collectAsStateWithLifecycle()
@@ -272,20 +271,14 @@ fun SettingsScreen(
                 onClick = onColorPaletteClick,
             )
             SwitchPreference(
-                title = "液态玻璃",
-                summary = "底部导航液态玻璃效果",
-                checked = enableBlur,
-                onCheckedChange = { viewModel.setEnableBlur(it) },
-            )
-            SwitchPreference(
                 title = "底部毛玻璃",
-                summary = "底部导航毛玻璃效果，与液态玻璃互斥",
+                summary = "底部导航毛玻璃效果",
                 checked = bottomBarBlur,
                 onCheckedChange = { viewModel.setBottomBarBlurEnabled(it) },
             )
             SwitchPreference(
                 title = "顶栏毛玻璃",
-                summary = "顶部栏模糊效果，独立于液态玻璃",
+                summary = "顶部栏模糊效果",
                 checked = topBarBlur,
                 onCheckedChange = { viewModel.setTopBarBlurEnabled(it) },
             )

@@ -46,7 +46,6 @@ import com.ican.tvplay.ui.collection.UpdatePopupDialog
 import com.ican.tvplay.ui.collection.UpdateScreen
 import com.ican.tvplay.ui.components.FloatingBottomBar
 import com.ican.tvplay.ui.components.FloatingBottomBarItem
-import com.ican.tvplay.ui.components.LocalEnableBlur
 import com.ican.tvplay.ui.components.LocalEnableTopBarBlur
 import com.ican.tvplay.ui.components.rememberMainPagerState
 import com.ican.tvplay.ui.home.HomeScreen
@@ -85,7 +84,6 @@ fun AppRoot() {
     var showUpdatePopup by remember { androidx.compose.runtime.mutableStateOf(false) }
     val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by appViewModel.themeColor.collectAsStateWithLifecycle()
-    val enableBlur by appViewModel.enableBlur.collectAsStateWithLifecycle()
     val bottomBarBlur by appViewModel.bottomBarBlurEnabled.collectAsStateWithLifecycle()
     val topBarBlur by appViewModel.topBarBlurEnabled.collectAsStateWithLifecycle()
     val configReady by appViewModel.configReady.collectAsStateWithLifecycle()
@@ -149,11 +147,10 @@ fun AppRoot() {
             )
         }
 
-        // 毛玻璃开关下发：顶栏/底栏统一从 LocalEnableBlur 读取（KernelSU 同款机制）
-        // LocalContentColor 照搬 KernelSU MiuixKernelSUTheme：miuix TextField/Text/Icon 默认内容色
-        // 取自该 Local（库默认值为 Black），不提供则深色模式下导入配置弹窗输入文字为黑色
+        // 顶栏毛玻璃开关下发；LocalContentColor 照搬 KernelSU MiuixKernelSUTheme：
+        // miuix TextField/Text/Icon 默认内容色取自该 Local（库默认值为 Black），
+        // 不提供则深色模式下导入配置弹窗输入文字为黑色
         CompositionLocalProvider(
-            LocalEnableBlur provides enableBlur,
             LocalEnableTopBarBlur provides topBarBlur,
             LocalContentColor provides MiuixTheme.colorScheme.onBackground,
         ) {
@@ -186,15 +183,15 @@ fun AppRoot() {
             // 后台检测只更新追番更新页的数据，与启动面板无关
         }
 
-        // 液态玻璃底栏的模糊内容源：先铺背景色再记录内容
+        // 底部毛玻璃的内容源：先铺背景色再记录内容
         val backgroundColor = MiuixTheme.colorScheme.surface
         val backdrop = rememberLayerBackdrop {
             drawRect(backgroundColor)
             drawContent()
         }
-        // 只有液态玻璃 / 底部毛玻璃开启时才有消费者采样这层背景：否则挂 layerBackdrop 等于
+        // 只有底部毛玻璃开启时才有消费者采样这层背景：否则挂 layerBackdrop 等于
         // 每帧都把整页内容多录一遍离屏图层再合成一次（首页快速滑动时是纯浪费的全屏绘制）
-        val needRootBackdrop = enableBlur || bottomBarBlur
+        val needRootBackdrop = bottomBarBlur
 
         // 一级页面（首页/收藏/设置）放进 HorizontalPager，底栏指示器与页面滑动双向联动
         val pagerState = rememberPagerState(pageCount = { topDestinations.size })
@@ -354,7 +351,6 @@ fun AppRoot() {
                     },
                     backdrop = backdrop,
                     tabsCount = topDestinations.size,
-                    isBlurEnabled = enableBlur,
                     isFrostedBlur = bottomBarBlur,
                 ) { activateTab ->
                     topDestinations.forEachIndexed { index, destination ->

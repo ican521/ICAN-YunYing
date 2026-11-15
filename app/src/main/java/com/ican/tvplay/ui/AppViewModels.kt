@@ -50,7 +50,6 @@ class AppViewModel(container: AppContainer) : ViewModel() {
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
     val themeColor: StateFlow<Int> = settings.themeColor
-    val enableBlur: StateFlow<Boolean> = settings.enableBlur
     val bottomBarBlurEnabled: StateFlow<Boolean> = settings.bottomBarBlurEnabled
     val topBarBlurEnabled: StateFlow<Boolean> = settings.topBarBlurEnabled
     val configReady: StateFlow<Boolean> = videoRepository.currentSite
@@ -575,7 +574,6 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
     val themeColor: StateFlow<Int> = settings.themeColor
-    val enableBlur: StateFlow<Boolean> = settings.enableBlur
     val bottomBarBlurEnabled: StateFlow<Boolean> = settings.bottomBarBlurEnabled
     val topBarBlurEnabled: StateFlow<Boolean> = settings.topBarBlurEnabled
     val enablePredictiveBack: StateFlow<Boolean> = settings.enablePredictiveBack
@@ -599,7 +597,6 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
 
     fun setThemeMode(mode: ThemeMode) = settings.setThemeMode(mode)
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
-    fun setEnableBlur(enabled: Boolean) = settings.setEnableBlur(enabled)
     fun setBottomBarBlurEnabled(enabled: Boolean) = settings.setBottomBarBlurEnabled(enabled)
     fun setTopBarBlurEnabled(enabled: Boolean) = settings.setTopBarBlurEnabled(enabled)
     fun setEnablePredictiveBack(enabled: Boolean) = settings.setEnablePredictiveBack(enabled)
