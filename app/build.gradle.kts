@@ -21,20 +21,20 @@ val localProps = Properties().apply {
 }
 
 // 自动版本号：一次确认的改动 = 一个 commit = 版本末位 +1，不再手改本文件
-// 基线：2026-11-15 的第 627 个提交，对应版本 1.0.0 / versionCode 2
-fun gitCommitCount(): Int? = try {
-    val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
+// 基线提交 4773104（2026-11-15）对应版本 1.0.0 / versionCode 2，之后每提交一次末位 +1
+fun gitVersionDelta(): Int = try {
+    val process = ProcessBuilder("git", "rev-list", "--count", "4773104..HEAD")
         .directory(rootDir)
         .redirectErrorStream(true)
         .start()
     val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
-    if (process.waitFor() == 0) output.toIntOrNull() else null
+    if (process.waitFor() == 0) output.toIntOrNull() ?: 0 else 0
 } catch (e: Exception) {
-    null
+    0
 }
 
-// 编译总发生在本轮改动的 commit 之前，所以 +1：让构建出来的 APK 直接显示本轮改动对应的版本
-val versionDelta = (gitCommitCount() ?: 627) - 627 + 1
+// 版本号与提交严格对齐：同一 commit 打出来的包永远是同一个版本号
+val versionDelta = gitVersionDelta()
 
 android {
     namespace = "com.ican.tvplay"
