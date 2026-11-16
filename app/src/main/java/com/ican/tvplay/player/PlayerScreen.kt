@@ -2955,7 +2955,7 @@ private fun FullscreenPlayLayout(
                         adjustType = null
                     } else if (axis == 0 && !gestureBlocked && !sideSheetOpen) {
                         // 未移动未长按（且未点在控件上）：单击/双击判定（fongmi GestureDetector）
-                        val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+                        val second = withTimeoutOrNull(DOUBLE_TAP_TIMEOUT_MS) {
                             awaitFirstDown(requireUnconsumed = false)
                         }
                         if (second != null) {
@@ -4259,6 +4259,13 @@ private const val DETAIL_TIMEOUT_MS = 15_000L
 
 /** 控制层显隐淡入淡出时长（200ms，对齐 miuix 动画时长） */
 private const val CONTROL_FADE_DURATION_MS = 200
+
+/**
+ * 双击判定窗口：系统默认 300ms（ViewConfiguration.doubleTapTimeoutMillis），
+ * 这里缩短到 200ms 以减小单击唤出控制层的延迟；
+ * 代价是双击两次点击必须落在 200ms 内，稍慢会被判成两次单击。
+ */
+private const val DOUBLE_TAP_TIMEOUT_MS = 200L
 
 // ========== 视频加载失败全屏错误态 ==========
 
