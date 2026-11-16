@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -27,6 +28,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
@@ -1921,7 +1924,12 @@ private fun PreviewPlayerArea(
 
         // 预览小窗控制层：单击视频区显示/隐藏（fongmi 同款交互）
         // 返回键随控制层显隐（fongmi 同款：控制层隐藏时返回键一起消失），48dp 纯图标无背景
-        if (controlsVisible && !locked) {
+        // 显隐加淡入淡出（200ms，对齐 miuix），不改尺寸/位置/间距
+        AnimatedVisibility(
+            visible = controlsVisible && !locked,
+            enter = fadeIn(tween(CONTROL_FADE_DURATION_MS)),
+            exit = fadeOut(tween(CONTROL_FADE_DURATION_MS)),
+        ) {
             // 控制层不再自带 clickable：空白处的单击/双击统一由外层手势层处理，
             // 只有按钮（已消费事件）才让位，保证控制层显示时双击同样能进全屏
             Box(modifier = Modifier.fillMaxSize()) {
@@ -3001,7 +3009,12 @@ private fun FullscreenPlayLayout(
             }
         }
 
-        if (controlsVisible && !locked) {
+        // 全屏控制层显隐加淡入淡出（200ms，对齐 miuix）
+        AnimatedVisibility(
+            visible = controlsVisible && !locked,
+            enter = fadeIn(tween(CONTROL_FADE_DURATION_MS)),
+            exit = fadeOut(tween(CONTROL_FADE_DURATION_MS)),
+        ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 // 顶栏（fongmi: 56dp 行高 + 左右 4dp padding，返回 48dp / 标题 16sp 占中间 / 右侧投屏 48dp）
                 // 无黑色渐变遮罩：纯白图标直接叠在画面上
@@ -3144,10 +3157,15 @@ private fun FullscreenPlayLayout(
         }
 
         // 右侧居中（fongmi: view_control_right 48dp 纯图标无背景 + marginEnd 4dp）
-        if (!locked && controlsVisible) {
+        // 属于控制层的一部分，跟随控制层一起淡入淡出
+        AnimatedVisibility(
+            visible = !locked && controlsVisible,
+            enter = fadeIn(tween(CONTROL_FADE_DURATION_MS)),
+            exit = fadeOut(tween(CONTROL_FADE_DURATION_MS)),
+            modifier = Modifier.align(Alignment.CenterEnd),
+        ) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
                     .padding(end = 4.dp)
                     .size(48.dp)
                     .tvCardEffect(onClick = { onLockToggle() }, shape = CircleShape, focusedScale = 1.10f, glow = false, pressEffect = false),
@@ -4234,6 +4252,9 @@ private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
 
 /** 播放页内补拉完整详情的超时：避免慢/坏站源让骨架无限转圈 */
 private const val DETAIL_TIMEOUT_MS = 15_000L
+
+/** 控制层显隐淡入淡出时长（200ms，对齐 miuix 动画时长） */
+private const val CONTROL_FADE_DURATION_MS = 200
 
 // ========== 视频加载失败全屏错误态 ==========
 
