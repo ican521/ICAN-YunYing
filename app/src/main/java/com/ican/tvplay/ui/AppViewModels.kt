@@ -283,9 +283,9 @@ class CollectionViewModel(container: AppContainer) : ViewModel() {
     /** 收藏同步模式：0=双向 1=上传 2=下载（fongmi Setting.sync_mode） */
     val syncMode: StateFlow<Int> = settings.syncMode
 
-    /** 点击模式按钮循环切换：双向 → 上传 → 下载 */
-    fun cycleSyncMode() {
-        settings.setSyncMode((syncMode.value + 1) % 3)
+    /** 分段按钮直接指定模式：0=双向 1=上传 2=下载 */
+    fun setSyncMode(mode: Int) {
+        settings.setSyncMode(mode)
     }
 
     /** 清空设备表并重新扫描局域网（fongmi SyncDialog.onRefresh）；挂起函数，完成后 UI 收尾 */

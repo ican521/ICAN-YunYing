@@ -544,31 +544,45 @@ private fun FavoriteSyncDialog(
         title = "选择设备",
         onDismiss = onDismiss,
     ) {
-            // 操作行：模式切换 | 重新扫描（标题「选择设备」由弹窗提供）
+            // 操作行：模式分段按钮（左）| 重新扫描（右）
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 同步模式：双向 / 上传 / 下载（fongmi mode 按钮循环切换）
-                Box(
-                    modifier = Modifier
-                        .clickable { viewModel.cycleSyncMode() }
-                        .background(
-                            MiuixTheme.colorScheme.primaryContainer,
-                            RoundedCornerShape(percent = 50),
-                        )
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                // 同步模式分段按钮：双向 / 上传 / 下载（选中段主题色，高度沿用原胶囊）
+                val segmentShape = RoundedCornerShape(percent = 50)
+                Row(
+                    modifier = Modifier.background(
+                        MiuixTheme.colorScheme.secondaryVariant,
+                        segmentShape,
+                    ),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = when (syncMode) {
-                            com.ican.tvplay.data.FavoriteSync.MODE_UPLOAD -> "上传"
-                            com.ican.tvplay.data.FavoriteSync.MODE_DOWNLOAD -> "下载"
-                            else -> "双向"
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MiuixTheme.colorScheme.onPrimaryContainer,
-                    )
+                    listOf(
+                        com.ican.tvplay.data.FavoriteSync.MODE_TWO_WAY to "双向",
+                        com.ican.tvplay.data.FavoriteSync.MODE_UPLOAD to "上传",
+                        com.ican.tvplay.data.FavoriteSync.MODE_DOWNLOAD to "下载",
+                    ).forEach { (mode, label) ->
+                        val selected = syncMode == mode
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (selected) {
+                                MiuixTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            },
+                            modifier = Modifier
+                                .clip(segmentShape)
+                                .background(
+                                    if (selected) MiuixTheme.colorScheme.primaryContainer
+                                    else Color.Transparent,
+                                )
+                                .clickable { viewModel.setSyncMode(mode) }
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.width(Spacing.titleContentGap))
                 IconButton(
@@ -662,7 +676,8 @@ private fun FavoriteSyncDialog(
                                         },
                                     )
                                     .background(
-                                        MiuixTheme.colorScheme.surfaceContainer,
+                                        // 与站源选择列表的未选中项同色（secondaryVariant：深 #434343 / 浅 #F0F0F0）
+                                        MiuixTheme.colorScheme.secondaryVariant,
                                         SquircleShape(Spacing.corner),
                                     )
                                     // 列表项内边距统一 16dp
