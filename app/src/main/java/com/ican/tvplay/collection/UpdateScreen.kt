@@ -333,7 +333,8 @@ private fun SectionTitle(text: String, count: Int, modifier: Modifier = Modifier
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMedium,
+
             color = MiuixTheme.colorScheme.onBackground,
         )
         Spacer(Modifier.width(8.dp))
@@ -483,7 +484,8 @@ private fun PopupUpdateRow(
         ) {
             Text(
                 text = item.favorite.title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMedium,
+
                 color = MiuixTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

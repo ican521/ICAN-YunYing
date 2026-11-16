@@ -248,6 +248,8 @@ private fun handlePlayClick(
 ) {
     val entry = vm.siteEntry(siteKey) ?: return
     Players.cacheVideo(video, siteKey, entry.site, entry.jarSpec)
+    // 点击即预取详情：与页面转场并行，播放页直接命中缓存，省掉慢站源的一段等待
+    vm.prefetchDetail(video, siteKey)
 
     // preInit=false: 让 PlayerScreen 自己补详情并调 Players.start()，此时 SurfaceView 已 attach，时序正确
     onPlay(video.id, 0, "", false)

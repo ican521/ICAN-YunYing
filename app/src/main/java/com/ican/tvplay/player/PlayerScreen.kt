@@ -318,6 +318,10 @@ fun PlayerScreen(
     var video by remember { mutableStateOf<Video?>(null) }
     var episodeIndex by remember { mutableIntStateOf(startEpisode) }
     var initialized by remember { mutableStateOf(false) }
+    // 本地历史读取完成前禁止写历史：慢站源进页要异步拉详情（几秒到十几秒），
+    // 这期间 episodeIndex/openingMs 还是默认值，周期保存/开播锚点/退出保存
+    // 会用「第 0 集 + 进度 0 + 片头 0」把旧记录整条覆盖，表现为续播丢失
+    var historyLoaded by remember { mutableStateOf(false) }
     /** 详情（线路/选集/简介）加载中：fongmi 式双圈——小窗一个圈、详情信息流区一个圈 */
     var detailLoading by remember { mutableStateOf(false) }
     var pendingPosition by remember { mutableLongStateOf(0L) }
@@ -498,21 +502,24 @@ fun PlayerScreen(
     // 搜索页点击卡片不再阻塞等详情，详情下沉到播放页内异步加载（慢站源也能秒进播放页）
     suspend fun loadSiteDetail(
         site: com.ican.tvplay.data.remote.TvBoxSite,
+        siteKey: String,
         jarSpec: String,
         id: String,
-    ): Video? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        val item = runCatching {
-            if (site.isSpider()) {
-                val spider = container.spiderManager.getSpider(site, jarSpec)
-                    ?: return@withContext null
-                com.ican.tvplay.data.remote.VodParse.parseVodListJson(
-                    container.spiderManager.detailContent(spider, listOf(id)),
-                ).firstOrNull()
-            } else {
-                com.ican.tvplay.data.remote.VodApiClient().detail(site, id)
-            }
-        }.getOrNull() ?: return@withContext null
-        with(com.ican.tvplay.data.remote.VodParse) { item.toVideo(withEpisodes = true) }
+    ): Video? = Players.detailOnce(siteKey, id) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val item = runCatching {
+                if (site.isSpider()) {
+                    val spider = container.spiderManager.getSpider(site, jarSpec)
+                        ?: return@withContext null
+                    com.ican.tvplay.data.remote.VodParse.parseVodListJson(
+                        container.spiderManager.detailContent(spider, listOf(id)),
+                    ).firstOrNull()
+                } else {
+                    com.ican.tvplay.data.remote.VodApiClient().detail(site, id)
+                }
+            }.getOrNull() ?: return@withContext null
+            with(com.ican.tvplay.data.remote.VodParse) { item.toVideo(withEpisodes = true) }
+        }
     }
 
     // 加载视频信息 + 历史进度
@@ -531,6 +538,8 @@ fun PlayerScreen(
             endingMs = alive.endingMs
             resumeFromBackground = true
             initialized = true
+            // 状态直接来自存活播放上下文（等价于历史已就绪），允许继续落库
+            historyLoaded = true
             return@LaunchedEffect
         }
         // 每次重新进入观看视频：倍速重置为 1 倍速（用户要求），不沿用上次会话的设定值；
@@ -551,7 +560,11 @@ fun PlayerScreen(
             video = v
             initialized = true
             detailLoading = true
-            val full = loadSiteDetail(metaEntry!!.site, metaEntry.jarSpec, v!!.id)
+            val full = runCatching {
+                kotlinx.coroutines.withTimeout(DETAIL_TIMEOUT_MS) {
+                    loadSiteDetail(metaEntry!!.site, metaEntry.siteKey, metaEntry.jarSpec, v!!.id)
+                }
+            }.getOrNull()
             detailLoading = false
             v = if (full != null) {
                 val merged = full.copy(
@@ -600,6 +613,8 @@ fun PlayerScreen(
             // 片头/片尾标记（按剧存储，fongmi History.opening/ending 同款）
             openingMs = history?.openingMs ?: 0L
             endingMs = history?.endingMs ?: 0L
+            // 历史已应用到页面状态，此后才允许写库（避免默认值覆盖旧记录）
+            historyLoaded = true
         }
         initialized = true
     }
@@ -754,6 +769,9 @@ fun PlayerScreen(
     }
 
     fun saveProgress() {
+        // 历史尚未从本地读出：此时的 episodeIndex/openingMs 都是默认值，
+        // 写库会把旧记录（集数/进度/片头）整条覆盖，必须直接跳过
+        if (!historyLoaded) return
         val v = video ?: return
         // 集标题：从实际播放上下文里取（页面 lineEpisodes 可能为空，playbackContext 才是真实数据）
         val epTitle = Players.playbackContext
@@ -4204,6 +4222,9 @@ private fun formatSpeed(speed: Float): String =
 
 private const val RESUME_THRESHOLD_MS = 5_000L
 private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
+
+/** 播放页内补拉完整详情的超时：避免慢/坏站源让骨架无限转圈 */
+private const val DETAIL_TIMEOUT_MS = 15_000L
 
 // ========== 视频加载失败全屏错误态 ==========
 

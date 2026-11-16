@@ -39,6 +39,7 @@ import java.net.UnknownHostException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -202,6 +203,54 @@ object Players {
     fun consumeCachedVideo(videoId: String): CachedVideo? {
         val c = cachedVideo
         return if (c != null && c.video.id == videoId) c else null
+    }
+
+    /**
+     * 已拉取过的完整详情（选集/线路）LRU 缓存：
+     * 网盘类 spider 的 detailContent 要多次网络跳转（站点页 → 分享页 → 网盘目录），
+     * 同会话内重复进入同一部剧直接命中，不再二次等待。上限 8 条。
+     */
+    private val detailCache = object : LinkedHashMap<String, Video>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Video>): Boolean =
+            size > 8
+    }
+
+    fun cacheDetail(siteKey: String, video: Video) {
+        synchronized(detailCache) { detailCache["$siteKey|${video.id}"] = video }
+    }
+
+    fun cachedDetail(siteKey: String, videoId: String): Video? =
+        synchronized(detailCache) { detailCache["$siteKey|$videoId"] }
+
+    /** 详情在途请求去重：预取与播放页同时请求同一部剧时只发一次网络请求 */
+    private val detailInflight = HashMap<String, kotlinx.coroutines.Deferred<Video?>>()
+    private val detailScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO,
+    )
+
+    /**
+     * 详情唯一入口：命中缓存直接返回；否则合并同 key 在途请求，
+     * 结果成功时写入详情缓存。fetch 内部负责真正的站点/采集站请求。
+     */
+    suspend fun detailOnce(
+        siteKey: String,
+        videoId: String,
+        fetch: suspend () -> Video?,
+    ): Video? {
+        cachedDetail(siteKey, videoId)?.let { return it }
+        val key = "$siteKey|$videoId"
+        val deferred = synchronized(detailInflight) {
+            detailInflight[key] ?: detailScope.async {
+                runCatching { fetch() }.getOrNull()?.also { cacheDetail(siteKey, it) }
+            }.also { detailInflight[key] = it }
+        }
+        return try {
+            deferred.await()
+        } finally {
+            synchronized(detailInflight) {
+                if (detailInflight[key] === deferred) detailInflight.remove(key)
+            }
+        }
     }
 
     // ---- 后台续播 / 通知栏控制 / PiP ----

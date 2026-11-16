@@ -216,6 +216,31 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
     fun siteEntry(siteKey: String): SiteEntry? = _sites.value.firstOrNull { it.site.key == siteKey }
 
     /**
+     * 点击卡片瞬间预取完整详情：与页面转场/骨架渲染并行，
+     * 播放页 loadSiteDetail 会命中同一份 Players 详情缓存，省掉一段串行等待。
+     * 失败静默，播放页仍会按原流程补拉。
+     */
+    fun prefetchDetail(video: Video, siteKey: String) {
+        val entry = siteEntry(siteKey) ?: return
+        viewModelScope.launch {
+            // 与播放页共用同一个在途请求：谁先到谁发起，之后双方都只等这一次网络
+            val full = com.ican.tvplay.player.core.Players.detailOnce(siteKey, video.id) {
+                runCatching {
+                    val spider = spiderManager.getSpider(entry.site, entry.jarSpec)
+                        ?: return@runCatching null
+                    val item = com.ican.tvplay.data.remote.VodParse.parseVodListJson(
+                        spiderManager.detailContent(spider, listOf(video.id)),
+                    ).firstOrNull() ?: return@runCatching null
+                    with(com.ican.tvplay.data.remote.VodParse) {
+                        item.toVideo(withEpisodes = true)
+                    }
+                }.getOrNull()
+            }
+            Log.d(TAG, "prefetchDetail id=${video.id} eps=${full?.episodes?.size ?: 0}")
+        }
+    }
+
+    /**
      * 执行指定站点 action 卡片的 jar 操作（fongmi SiteApi.action 同款：网盘配置等），
      * 完成后主线程回调 msg（空串不提示）。
      */
