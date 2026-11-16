@@ -2811,6 +2811,8 @@ private fun FullscreenPlayLayout(
     // 音量走系统媒体音量，亮度作用于本 Activity 窗口
     val audioManager = remember { context.getSystemService(AudioManager::class.java) }
     LaunchedEffect(locked) {
+        // 锁定状态切换时清理解锁按钮显隐：上锁/解锁后都从隐藏开始，避免残留上一状态的显隐
+        unlockHint = false
         if (locked) {
             seekPreview = null
             speedUpHint = false
@@ -2964,7 +2966,9 @@ private fun FullscreenPlayLayout(
                             }
                             onTogglePlay()
                         } else if (locked) {
-                            unlockHint = true
+                            // fongmi onSingleTap 同款：单击切换控制层显隐。
+                            // 锁定态下控制层只有解锁按钮，这里取反实现「再点一次收起」
+                            unlockHint = !unlockHint
                         } else {
                             onToggleControls()
                         }
