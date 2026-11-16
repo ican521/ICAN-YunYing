@@ -160,7 +160,13 @@ object LocalProxyServer {
         }
     }
 
-    private class ProxyServer(port: Int) : NanoHTTPD(port) {
+    /**
+     * 必须显式绑 IPv4 通配地址：NanoHTTPD(port) 只传端口时，绑定的是 IPv6 通配 [::]，
+     * 在部分设备上是 v6only 监听（/proc/net/tcp 无 9978，只有 tcp6 有），
+     * 导致局域网 IPv4 扫描（192.168.x.x:9978/device）永远连不上、收藏同步发现不到本机。
+     * 指定 hostname="0.0.0.0" 后 socket 绑 IPv4，扫描与 127.0.0.1 代理均正常。
+     */
+    private class ProxyServer(port: Int) : NanoHTTPD("0.0.0.0", port) {
 
         override fun serve(session: IHTTPSession): Response {
             return when {
