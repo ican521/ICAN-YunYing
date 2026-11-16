@@ -31,10 +31,22 @@ import kotlinx.serialization.json.longOrNull
  *    修复旧版恢复后重启 getBoolean()/getInt() 抛 ClassCastException 闪退的问题；
  * 3. 恢复顺序与 fongmi `Backup.restore()` 一致：先清库 → 写数据 → 最后写 prefs。
  *
- * 备份内容：SharedPreferences 全部设置 + 收藏表 + 历史表。
+ * 备份内容：SharedPreferences 全部设置（剔除已下线功能的残留键）+ 收藏表 + 历史表。
  * JSON 格式，通过 SAF 由用户选择文件位置。
  */
 object BackupManager {
+
+    /**
+     * 已下线功能的残留键：顶栏模糊 / 底栏模糊 / 液态玻璃（enable_blur）、旧的预测性返回开关。
+     * 代码里已无任何读取方，导出时剔除、恢复时忽略，
+     * 避免新备份继续携带死键、旧备份又把死键写回 prefs。
+     */
+    private val OBSOLETE_PREF_KEYS = setOf(
+        "top_bar_blur",
+        "bottom_bar_blur",
+        "enable_blur",
+        "enable_predictive_back",
+    )
 
     private val json = Json {
         prettyPrint = true
@@ -100,7 +112,10 @@ object BackupManager {
             val prefs = context.applicationContext
                 .getSharedPreferences("tvplay_settings", Context.MODE_PRIVATE)
             // 保留原始类型（fongmi: backup.setPrefers(Prefers.getPrefers().getAll())）
-            val prefersMap = prefs.all.mapValues { (_, v) -> v.toJsonElement() }
+            // 已下线功能的残留键不写入备份
+            val prefersMap = prefs.all
+                .filterKeys { it !in OBSOLETE_PREF_KEYS }
+                .mapValues { (_, v) -> v.toJsonElement() }
 
             val db = AppDatabase.get(context.applicationContext)
             val favorites = db.favoriteDao().observeAll().first()
@@ -136,10 +151,13 @@ object BackupManager {
             }
 
             // 恢复 SharedPreferences：按类型分派写回（fongmi: Prefers.put(key, entry.getValue())）
+            // 旧备份里的已下线功能键直接跳过，不再写回 prefs
             val prefs = context.applicationContext
                 .getSharedPreferences("tvplay_settings", Context.MODE_PRIVATE)
             val editor = prefs.edit()
-            data.prefers.forEach { (k, v) -> editor.putTyped(k, v) }
+            data.prefers.forEach { (k, v) ->
+                if (k !in OBSOLETE_PREF_KEYS) editor.putTyped(k, v)
+            }
             editor.apply()
             true
         }.getOrDefault(false)
