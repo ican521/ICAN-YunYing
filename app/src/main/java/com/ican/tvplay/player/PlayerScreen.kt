@@ -328,8 +328,6 @@ fun PlayerScreen(
     // 本次页面会话是否真正开始过播放：详情已出（历史已加载）但播放地址还没解析完就返回时，
     // player 为空，此时落库会把进度/时长写成 0（覆盖旧记录），必须等真正开播后才允许写
     var playbackStarted by remember { mutableStateOf(false) }
-    /** 详情（线路/选集/简介）加载中：fongmi 式双圈——小窗一个圈、详情信息流区一个圈 */
-    var detailLoading by remember { mutableStateOf(false) }
     var pendingPosition by remember { mutableLongStateOf(0L) }
     // 片头/片尾标记（ms；片尾存"距结尾时长"，fongmi History.opening/ending 同款）
     var openingMs by remember { mutableLongStateOf(0L) }
@@ -571,18 +569,16 @@ fun PlayerScreen(
         if (needAsyncDetail) {
             video = v
             initialized = true
-            detailLoading = true
             val full = runCatching {
                 // 首等 15s；超时只是「等不及」，detailOnce 的请求在 detailScope 里继续跑并未取消。
                 // 慢站源（如玩偶哥哥，多跳网盘）冷启动首次详情常 >15s：复用同一在途请求再最多等 45s，
-                // 期间保持转圈，加载完自动进入；仍失败才走错误页（此前超时即报错，用户需手动重试两次）
+                // 期间预览小窗持续转圈，加载完自动进入；仍失败才走错误页
                 withTimeoutOrNull(DETAIL_TIMEOUT_MS) {
                     loadSiteDetail(metaEntry!!.site, metaEntry.siteKey, metaEntry.jarSpec, v!!.id)
                 } ?: kotlinx.coroutines.withTimeout(DETAIL_SLOW_TIMEOUT_MS) {
                     loadSiteDetail(metaEntry!!.site, metaEntry.siteKey, metaEntry.jarSpec, v!!.id)
                 }
             }.getOrNull()
-            detailLoading = false
             v = if (full != null) {
                 val merged = full.copy(
                     sourceName = v.sourceName.ifBlank {
@@ -1502,21 +1498,6 @@ fun PlayerScreen(
             onAddSubtitle = { launchSubtitlePicker() },
         )
         }
-        }
-
-        // === 全屏居中缓冲转圈 ===
-        // 详情（文字/线路/选集/简介）加载期间，整屏只有这一个居中转圈；
-        // 详情回来后即隐藏。视频自身的缓冲转圈仍由预览小窗内部 playerState.buffering 控制。
-        // 遮罩走统一 FadingScrim：PopupScrim + 200ms 淡入淡出（与全 App 弹窗遮罩一致）。
-        FadingScrim(
-            visible = detailLoading,
-            contentAlignment = Alignment.Center,
-        ) {
-            ArcStretchSpinner(
-                size = 48.dp,
-                strokeWidth = 3.5.dp,
-                color = Color.White,
-            )
         }
 
         // 字幕设置侧边栏：与选集侧边栏同款，从右侧滑入；竖屏时避让状态栏
