@@ -14,6 +14,7 @@ import com.ican.tvplay.data.remote.VodApiClient
 import com.ican.tvplay.data.remote.VodClass
 import com.ican.tvplay.data.remote.VodItem
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -610,6 +611,24 @@ class VideoRepository(
         val config = apiClient.loadConfig(url) ?: return
         val specs = config.sites.filter { it.isSpider() }.map { it.jar.ifBlank { config.spider } }
         spiderManager.prewarmJars(specs)
+    }
+
+    /**
+     * 冷启动单独预热「玩偶哥哥」spider：该站首次 detailContent 要叠加 jar 加载 + spider 初始化
+     * + 网盘多次跳转，常超过播放页 15s 详情超时（超时后底层请求仍在跑，重试才进得去）。
+     * 启动时后台完成实例化与初始化，首次点击进入即可复用已初始化的 spider。
+     * 仅初始化该站（api 含 Wogg 或名称含「玩偶」），其他站点保持按需加载。
+     */
+    suspend fun prewarmWoggSpider() = withContext(Dispatchers.IO) {
+        val url = settingsRepository.configUrl.value
+        if (url.isBlank()) return@withContext
+        runCatching {
+            val config = apiClient.loadConfig(url) ?: return@withContext
+            val site = config.sites.firstOrNull {
+                it.isSpider() && (it.api.contains("Wogg", ignoreCase = true) || it.name.contains("玩偶"))
+            } ?: return@withContext
+            spiderManager.getSpider(site, site.jar.ifBlank { config.spider })
+        }.onFailure { Log.w(REPO_TAG, "prewarmWoggSpider failed", it) }
     }
 
     /**

@@ -568,6 +568,8 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
         // 启动即后台预热：已导入过配置时，加载站点/分类并把首页首屏拉进缓存，
         // 用户切到首页时数据已就绪（fongmi 式启动预加载）
         viewModelScope.launch { videoRepository.prewarmHome() }
+        // 冷启动单独预热玩偶哥哥 spider：首次详情易超 15s 超时，提前初始化后首次点击即可进
+        viewModelScope.launch { videoRepository.prewarmWoggSpider() }
     }
 
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
