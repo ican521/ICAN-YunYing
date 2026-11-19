@@ -1609,7 +1609,8 @@ private fun PortraitPlayLayout(
                     .width(w)
                     .height(h),
                 playerState = playerState,
-                showLoading = false,
+                // 进详情页即转圈（首次画面就绪前，无网速）；ready 后只随缓冲转
+                showLoading = !playerState.ready && playerState.error == null,
                 controlsVisible = controlsVisible,
                 locked = locked,
                 onToggleControls = onToggleControls,
@@ -1776,7 +1777,8 @@ private fun LandscapePlayLayout(
                     },
                 ),
             playerState = playerState,
-            showLoading = false,
+            // 进详情页即转圈（首次画面就绪前，无网速）；ready 后只随缓冲转
+            showLoading = !playerState.ready && playerState.error == null,
             controlsVisible = controlsVisible,
             locked = locked,
             onToggleControls = onToggleControls,
@@ -1936,25 +1938,27 @@ private fun PreviewPlayerArea(
                 strokeWidth = 3.dp,
                 color = Color.White,
             )
-            // fongmi view_progress 同款：网速文字与转圈同为中心锚点、marginTop=40dp（12sp 白色），
-            // 缓冲期间每秒采样刷新（TrafficStats），缓冲结束随转圈一起消失
-            var speedText by remember { mutableStateOf("") }
-            LaunchedEffect(Unit) {
-                com.ican.tvplay.player.core.Traffic.reset()
-                while (true) {
-                    speedText = com.ican.tvplay.player.core.Traffic.setSpeed()
-                    kotlinx.coroutines.delay(1000)
+            // 网速文字只属于「缓冲转圈」：首次进入的加载转圈（showLoading）不显示网速，
+            // 缓冲/换集期间每秒采样刷新（TrafficStats），缓冲结束随转圈一起消失
+            if (playerState.buffering || playerState.switching) {
+                var speedText by remember { mutableStateOf("") }
+                LaunchedEffect(Unit) {
+                    com.ican.tvplay.player.core.Traffic.reset()
+                    while (true) {
+                        speedText = com.ican.tvplay.player.core.Traffic.setSpeed()
+                        kotlinx.coroutines.delay(1000)
+                    }
                 }
-            }
-            if (speedText.isNotEmpty()) {
-                Text(
-                    text = speedText,
-                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-                    color = Color.White,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .offset(y = 40.dp),
-                )
+                if (speedText.isNotEmpty()) {
+                    Text(
+                        text = speedText,
+                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                        color = Color.White,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .offset(y = 40.dp),
+                    )
+                }
             }
         }
 
