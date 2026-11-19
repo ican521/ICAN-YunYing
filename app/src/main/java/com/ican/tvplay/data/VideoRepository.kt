@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -37,6 +39,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 private const val REPO_TAG = "VodApi"
+
+/** 详情磁盘缓存有效期：24h 内同片再进直接命中（fongmi 式详情缓存，首次仍需网络） */
+private const val DETAIL_DISK_TTL_MS = 24L * 60 * 60 * 1000
 
 /** 一次播放所需的 URL 与请求头 */
 data class PlaySource(
@@ -71,6 +76,16 @@ class VideoRepository(
     val isReady: Boolean get() = _currentSite.value != null
 
     private val loadMutex = Mutex()
+
+    /** 首页预热任务句柄与并发限流：用户点开详情时取消预热，详情独占网络/IO（冷启动首次提速） */
+    private var prewarmJob: kotlinx.coroutines.Job? = null
+    private val prewarmPermits = Semaphore(3)
+
+    /** 用户开始拉详情/播放：取消仍在跑的首页预热（OK猫无首页预热，详情独占网络更快） */
+    fun cancelHomePrewarm() {
+        prewarmJob?.cancel()
+        prewarmJob = null
+    }
 
     /** 首屏分类视频缓存（key = siteKey|catId）——fongmi 式预加载：
      *  导入配置/切站点后预热写入，进入首页直接命中，秒出卡片 */
@@ -452,15 +467,57 @@ class VideoRepository(
         return list
     }
 
-    /** 详情：补全选集 / 播放地址等（带内存缓存，重复进详情秒开） */
+    /** 详情：补全选集 / 播放地址等（内存 + 24h 磁盘缓存，重复进详情秒开） */
     suspend fun getVideo(videoId: String): Video? {
         detailCache[videoId]?.let { return it }
+        // 详情优先：取消首页预热，让出网络/IO
+        cancelHomePrewarm()
         ensureLoaded()
         val loaded = _currentSite.value ?: return null
+        readDetailDiskCache(loaded.site.key, videoId)?.let {
+            detailCache[videoId] = it
+            return it
+        }
         val item = fetchDetail(loaded, videoId) ?: return null
         val catName = item.typeName.ifBlank { "未知" }
         return item.toVideo(VideoCategory(id = "", name = catName), withEpisodes = true)
-            .also { detailCache[videoId] = it }
+            .also {
+                detailCache[videoId] = it
+                writeDetailDiskCache(loaded.site.key, videoId, it)
+            }
+    }
+
+    // ---- 详情磁盘缓存：key=siteKey|videoId（MD5 文件名），mtime 超 24h 自动失效 ----
+
+    private val detailDiskDir by lazy {
+        java.io.File(appContext.applicationContext.filesDir, "detail_cache").apply { mkdirs() }
+    }
+
+    fun readDetailDiskCache(siteKey: String, videoId: String): Video? {
+        val file = detailDiskFile(siteKey, videoId)
+        if (!file.exists()) return null
+        if (System.currentTimeMillis() - file.lastModified() > DETAIL_DISK_TTL_MS) {
+            file.delete()
+            return null
+        }
+        return runCatching {
+            rawJson.decodeFromString(Video.serializer(), file.readText())
+        }.getOrNull()
+    }
+
+    fun writeDetailDiskCache(siteKey: String, videoId: String, video: Video) {
+        runCatching {
+            detailDiskFile(siteKey, videoId).writeText(
+                rawJson.encodeToString(Video.serializer(), video),
+            )
+        }
+    }
+
+    private fun detailDiskFile(siteKey: String, videoId: String): java.io.File {
+        val digest = java.security.MessageDigest.getInstance("MD5")
+            .digest("$siteKey|$videoId".toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        return java.io.File(detailDiskDir, "$digest.json")
     }
 
     suspend fun search(query: String): List<Video> {
@@ -585,23 +642,33 @@ class VideoRepository(
      * 完成后首页卡片直接命中缓存，秒出。
      */
     suspend fun prewarmHome() {
-        ensureLoaded()
-        val loaded = _currentSite.value ?: return
-        val cats = _categories.value
-        if (cats.isEmpty()) return
-        coroutineScope {
-            cats.map { cat -> async {
-                // 强制网络刷新（不走 loadCategoryVideos 的缓存命中），刷新后写入内存；
-                // 空结果不写缓存，避免覆盖磁盘恢复出来的有效数据
-                runCatching { fetchCategoryVideos(loaded, cat) }
-                    .getOrNull()
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { homeCache["${loaded.site.key}|${cat.id}"] = it }
-            } }.awaitAll()
+        val job = kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]
+        prewarmJob = job
+        try {
+            ensureLoaded()
+            val loaded = _currentSite.value ?: return
+            val cats = _categories.value
+            if (cats.isEmpty()) return
+            coroutineScope {
+                cats.map { cat -> async {
+                    // 并发上限 3：避免冷启动十几个分类一窝蜂请求，抢占详情/播放的网络与 IO
+                    prewarmPermits.withPermit {
+                        // 强制网络刷新（不走 loadCategoryVideos 的缓存命中），刷新后写入内存；
+                        // 空结果不写缓存，避免覆盖磁盘恢复出来的有效数据
+                        runCatching { fetchCategoryVideos(loaded, cat) }
+                            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                            .getOrNull()
+                            ?.takeIf { it.isNotEmpty() }
+                            ?.let { homeCache["${loaded.site.key}|${cat.id}"] = it }
+                    }
+                } }.awaitAll()
+            }
+            persistHomeCache(loaded.site.key, cats)
+            _homeCacheVersion.value++
+            Log.d(REPO_TAG, "prewarmHome done cats=${cats.size}")
+        } finally {
+            if (prewarmJob === job) prewarmJob = null
         }
-        persistHomeCache(loaded.site.key, cats)
-        _homeCacheVersion.value++
-        Log.d(REPO_TAG, "prewarmHome done cats=${cats.size}")
     }
 
     /** 并发预下载全部站点 spider jar（fongmi 式：导入配置后即预热，后续搜索/详情/播放零首次开销） */

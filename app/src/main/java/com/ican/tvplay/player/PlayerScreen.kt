@@ -512,20 +512,25 @@ fun PlayerScreen(
         jarSpec: String,
         id: String,
     ): Video? = Players.detailOnce(siteKey, id) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val item = runCatching {
-                if (site.isSpider()) {
-                    val spider = container.spiderManager.getSpider(site, jarSpec)
-                        ?: return@withContext null
-                    com.ican.tvplay.data.remote.VodParse.parseVodListJson(
-                        container.spiderManager.detailContent(spider, listOf(id)),
-                    ).firstOrNull()
-                } else {
-                    com.ican.tvplay.data.remote.VodApiClient().detail(site, id)
-                }
-            }.getOrNull() ?: return@withContext null
-            with(com.ican.tvplay.data.remote.VodParse) { item.toVideo(withEpisodes = true) }
-        }
+        // 详情优先：用户点开详情即取消首页预热，让出网络与 IO（冷启动首次提速）
+        container.videoRepository.cancelHomePrewarm()
+        // 24h 详情磁盘缓存：同片再进直接命中，跳过 detailContent 多跳网络
+        container.videoRepository.readDetailDiskCache(siteKey, id)
+            ?: kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val item = runCatching {
+                    if (site.isSpider()) {
+                        val spider = container.spiderManager.getSpider(site, jarSpec)
+                            ?: return@withContext null
+                        com.ican.tvplay.data.remote.VodParse.parseVodListJson(
+                            container.spiderManager.detailContent(spider, listOf(id)),
+                        ).firstOrNull()
+                    } else {
+                        com.ican.tvplay.data.remote.VodApiClient().detail(site, id)
+                    }
+                }.getOrNull() ?: return@withContext null
+                with(com.ican.tvplay.data.remote.VodParse) { item.toVideo(withEpisodes = true) }
+                    .also { container.videoRepository.writeDetailDiskCache(siteKey, id, it) }
+            }
     }
 
     // 加载视频信息 + 历史进度
