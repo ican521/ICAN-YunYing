@@ -1607,9 +1607,13 @@ private fun PortraitPlayLayout(
 
     // 首次进入详情页：视频信息/线路/选集/简介整体 200ms 渐显
     // （graphicsLayer alpha 只作用绘制层，不影响测量、位置与间距）
+    // 触发时机 = 详情内容就绪（线路/选集非空，或已开播）：若在元数据阶段就播放动画，
+    // 线路/选集随后出现时透明度已是 1，视觉上仍是闪现
     val detailAlpha = remember { Animatable(0f) }
-    LaunchedEffect(current != null) {
-        if (current != null) detailAlpha.animateTo(1f, tween(200)) else detailAlpha.snapTo(0f)
+    val detailReady = current != null &&
+        (current.playSources.isNotEmpty() || current.episodes.isNotEmpty() || playerState.ready)
+    LaunchedEffect(detailReady) {
+        if (detailReady) detailAlpha.animateTo(1f, tween(200)) else detailAlpha.snapTo(0f)
     }
 
     // === 可滚动详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===
@@ -1780,9 +1784,12 @@ private fun LandscapePlayLayout(
         )
 
         // 首次进入详情页：信息列 + 线路/选集/简介整体 200ms 渐显（仅绘制层 alpha）
+        // 触发时机同竖屏：详情内容就绪才播放，避免元数据阶段放空、内容出现时仍是闪现
         val detailAlpha = remember { Animatable(0f) }
-        LaunchedEffect(current != null) {
-            if (current != null) detailAlpha.animateTo(1f, tween(200)) else detailAlpha.snapTo(0f)
+        val detailReady = current != null &&
+            (current.playSources.isNotEmpty() || current.episodes.isNotEmpty() || playerState.ready)
+        LaunchedEffect(detailReady) {
+            if (detailReady) detailAlpha.animateTo(1f, tween(200)) else detailAlpha.snapTo(0f)
         }
 
         // 右侧信息列：锚在视频右缘，宽度固定（小窗时的剩余宽度），随放大向右滑出屏幕
