@@ -1738,7 +1738,21 @@ private fun LandscapePlayLayout(
                     shape = SquircleShape(playerCorner.value)
                     clip = true
                     compositingStrategy = CompositingStrategy.Offscreen
-                },
+                }
+                // 仅横屏小窗、深色模式加描边（竖屏小窗贴屏幕顶部，不加）：
+                // 圆角与视频面共用 playerCorner 动画值（16dp squircle 连续曲率），
+                // 0.5dp 宽 + outline 30% 不透明度，只叠加绘制，不改尺寸/位置/间距
+                .then(
+                    if (LocalDarkTheme.current) {
+                        Modifier.border(
+                            width = 0.5.dp,
+                            color = MiuixTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            shape = SquircleShape(playerCorner.value),
+                        )
+                    } else {
+                        Modifier
+                    },
+                ),
             playerState = playerState,
             showLoading = false,
             controlsVisible = controlsVisible,
