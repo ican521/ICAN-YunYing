@@ -135,6 +135,9 @@ object Players {
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state.asStateFlow()
 
+    /** 是否有存活播放会话（播放页未退出，release 时清空）：后台检测类任务据此避让网络 */
+    val hasActivePlayback: Boolean get() = playbackContext != null
+
     private val _progress = MutableStateFlow(ProgressState())
     val progress: StateFlow<ProgressState> = _progress.asStateFlow()
 

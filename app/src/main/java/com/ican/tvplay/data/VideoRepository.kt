@@ -81,10 +81,11 @@ class VideoRepository(
     private var prewarmJob: kotlinx.coroutines.Job? = null
     private val prewarmPermits = Semaphore(3)
 
-    /** 用户开始拉详情/播放：取消仍在跑的首页预热（OK猫无首页预热，详情独占网络更快） */
+    /** 详情优先：用户开始拉详情/播放时，取消仍在跑的首页预热与追番更新检测，让出网络/IO */
     fun cancelHomePrewarm() {
         prewarmJob?.cancel()
         prewarmJob = null
+        FavoriteUpdateChecker.cancelRunningCheck()
     }
 
     /** 首屏分类视频缓存（key = siteKey|catId）——fongmi 式预加载：
@@ -485,6 +486,19 @@ class VideoRepository(
                 detailCache[videoId] = it
                 writeDetailDiskCache(loaded.site.key, videoId, it)
             }
+    }
+
+    /**
+     * 按 sourceKey 直接定位站点与 jarSpec（只读配置缓存，不触发 ensureLoaded 的整站首页初始化）。
+     * 供历史/收藏直达详情：跳过「配置刷新 + homeContent + 分类」的串行等待，与搜索卡片同链路。
+     */
+    suspend fun findSiteForDirectDetail(sourceKey: String): Pair<TvBoxSite, String>? {
+        val url = settingsRepository.configUrl.value
+        if (url.isBlank()) return null
+        val config = apiClient.loadConfig(url) ?: return null
+        val site = config.sites.firstOrNull { it.key == sourceKey } ?: return null
+        val jarSpec = if (site.isSpider()) site.jar.ifBlank { config.spider } else ""
+        return site to jarSpec
     }
 
     // ---- 详情磁盘缓存：key=siteKey|videoId（MD5 文件名），mtime 超 24h 自动失效 ----

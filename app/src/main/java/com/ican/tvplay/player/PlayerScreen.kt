@@ -598,7 +598,20 @@ fun PlayerScreen(
                 null
             }
         } else if (v == null) {
-            v = container.videoRepository.getVideo(videoId)
+            // 历史/收藏直达：用历史记录的站源直接拉详情，不等 ensureLoaded 的整站首页初始化
+            // （配置刷新 + homeContent + 分类的串行等待），与搜索卡片点击同链路；
+            // 查不到站点（URL 播放等）才回退 getVideo
+            val historySite = container.historyDao.observeOne(videoId).first()
+                ?.sourceKey?.takeIf { it.isNotBlank() }
+                ?.let { container.videoRepository.findSiteForDirectDetail(it) }
+            v = if (historySite != null) {
+                val (site, jarSpec) = historySite
+                loadSiteDetail(site, site.key, jarSpec, videoId)?.also {
+                    Players.cacheVideo(it, site.key, site, jarSpec)
+                }
+            } else {
+                container.videoRepository.getVideo(videoId)
+            }
         }
         video = v
         if (v != null) {

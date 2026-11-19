@@ -513,6 +513,12 @@ class UpdatesViewModel(container: AppContainer) : ViewModel() {
                 settings.favoriteUpdatePopupDate() != today)
         if (settings.favoriteUpdateCheckEnabled.value) {
             viewModelScope.launch {
+                // 冷启动延迟 60s 再跑追番检测：让出启动后的网络给首页与用户首次详情；
+                // 到时若仍在播放页（播放会话存活），每 15s 复查，退出播放后再跑，不与播放抢带宽
+                kotlinx.coroutines.delay(60_000)
+                while (com.ican.tvplay.player.core.Players.hasActivePlayback) {
+                    kotlinx.coroutines.delay(15_000)
+                }
                 runCatching { checker.check(force = false) }
             }
         }

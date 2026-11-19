@@ -115,6 +115,16 @@ class FavoriteUpdateChecker(
     private val apiClient: VodApiClient = VodApiClient(),
 ) {
 
+    companion object {
+        /** 在跑的检测任务：用户点开详情/播放时取消，详情优先（不与播放抢网络） */
+        @Volatile private var runningJob: kotlinx.coroutines.Job? = null
+
+        fun cancelRunningCheck() {
+            runningJob?.cancel()
+            runningJob = null
+        }
+    }
+
     /**
      * 执行检测。返回本次检测到「集数增加」的剧集数量。
      * [force] = true 忽略频率节流（手动「重新检查」）。
@@ -133,6 +143,11 @@ class FavoriteUpdateChecker(
         if (!force && intervalMs > 0 && now - settings.favoriteUpdateLastCheckAt() < intervalMs) {
             return@withContext 0
         }
+
+        // 详情优先：注册本次检测任务（用户拉详情时 cancelRunningCheck 取消），完成后自动清句柄
+        val job = kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]
+        runningJob = job
+        job?.invokeOnCompletion { if (runningJob === job) runningJob = null }
 
         val config = apiClient.loadConfig(configUrl) ?: return@withContext 0
         val favorites = favoriteDao.getAll()
