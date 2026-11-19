@@ -568,7 +568,12 @@ fun PlayerScreen(
             initialized = true
             detailLoading = true
             val full = runCatching {
-                kotlinx.coroutines.withTimeout(DETAIL_TIMEOUT_MS) {
+                // 首等 15s；超时只是「等不及」，detailOnce 的请求在 detailScope 里继续跑并未取消。
+                // 慢站源（如玩偶哥哥，多跳网盘）冷启动首次详情常 >15s：复用同一在途请求再最多等 45s，
+                // 期间保持转圈，加载完自动进入；仍失败才走错误页（此前超时即报错，用户需手动重试两次）
+                withTimeoutOrNull(DETAIL_TIMEOUT_MS) {
+                    loadSiteDetail(metaEntry!!.site, metaEntry.siteKey, metaEntry.jarSpec, v!!.id)
+                } ?: kotlinx.coroutines.withTimeout(DETAIL_SLOW_TIMEOUT_MS) {
                     loadSiteDetail(metaEntry!!.site, metaEntry.siteKey, metaEntry.jarSpec, v!!.id)
                 }
             }.getOrNull()
@@ -4275,6 +4280,9 @@ private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
 
 /** 播放页内补拉完整详情的超时：避免慢/坏站源让骨架无限转圈 */
 private const val DETAIL_TIMEOUT_MS = 15_000L
+
+/** 首等超时后，复用同一在途详情请求的额外等待上限（慢站源多跳网盘冷启动可 >15s） */
+private const val DETAIL_SLOW_TIMEOUT_MS = 45_000L
 
 /** 控制层显隐淡入淡出时长（200ms，对齐 miuix 动画时长） */
 private const val CONTROL_FADE_DURATION_MS = 200
