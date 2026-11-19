@@ -3053,14 +3053,11 @@ private fun FullscreenPlayLayout(
                         .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 24.dp),
                 ) {
                     PlainTopBtn(AppIcons.Back, "返回") { onExitFullscreen() }
-                    // 标题 = 片名 · 当前集标题（剔除网盘类选集的 [2.8GB] 等体积前缀），不再显示「第 N 集」
+                    // 标题 = 仅当前集标题（剔除网盘类选集的 [2.8GB] 等体积前缀），不再拼片名；
+                    // 集标题为空（部分站源无集名）时留空，不回退剧名
                     val epTitle = cleanEpisodeTitle(lineEpisodes.getOrNull(episodeIndex)?.title.orEmpty())
                     Text(
-                        text = if (epTitle.isBlank()) {
-                            current?.title.orEmpty()
-                        } else {
-                            "${current?.title.orEmpty()} · $epTitle"
-                        },
+                        text = epTitle,
                         style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
                         color = Color.White,
                         maxLines = 1,
