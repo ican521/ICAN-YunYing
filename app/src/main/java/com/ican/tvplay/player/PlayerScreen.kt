@@ -1605,24 +1605,13 @@ private fun PortraitPlayLayout(
         }
     }
 
-    // 首次进入详情页：视频信息/线路/选集/简介整体 200ms 渐显
-    // （graphicsLayer alpha 只作用绘制层，不影响测量、位置与间距）
-    // 触发时机 = 详情内容就绪（线路/选集非空，或已开播）：若在元数据阶段就播放动画，
-    // 线路/选集随后出现时透明度已是 1，视觉上仍是闪现
-    val detailAlpha = remember { Animatable(0f) }
-    val detailReady = current != null &&
-        (current.playSources.isNotEmpty() || current.episodes.isNotEmpty() || playerState.ready)
-    LaunchedEffect(detailReady) {
-        if (detailReady) detailAlpha.animateTo(1f, tween(200)) else detailAlpha.snapTo(0f)
-    }
-
     // === 可滚动详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===
-    // 详情加载期间整屏遮罩转圈统一显示（见根 Box），此处不再分区域转圈
+    // 框架信息（标题/收藏/站源/年份等）随元数据立即显示，不参与渐显；
+    // 只有需要等详情返回的内容（更新备注/线路/选集/简介）在数据到位后逐块淡入
     Column(
         modifier = Modifier
             .weight(1f)
             .verticalScroll(rememberScrollState())
-            .graphicsLayer { alpha = detailAlpha.value }
             // 水平边距下放到各 Section 内部（首页顶部分类 Tab 同款结构性通栏）：
             // 线路/选集横向列表需天然占满全宽，靠自身 contentPadding 对齐基准线并支持贴边横滑
             // 顶部 3dp：标题行被 48dp 收藏钮撑高，文字居中已含约 8dp 留白，视觉间距约 16dp
@@ -1638,34 +1627,44 @@ private fun PortraitPlayLayout(
             metaTopPadding = Spacing.videoTitleToMetaGap,
         )
 
-        // 类型信息块 → 线路：比常规板块间距更紧（视觉约 19dp）
-        Spacer(modifier = Modifier.height(Spacing.videoMetaToLineGap))
-
-        // 线路（标题↔chips 的次间距在组件内部）
-        LineSection(
-            v = v,
-            lineFlag = lineFlag,
-            onLineChange = onLineChange,
-            horizontalPadding = pageHorizontalPadding(),
-        )
-
-        Spacer(modifier = Modifier.height(Spacing.sectionSpacing))
+        // 线路：详情返回前不占位（避免先露出空「线路」标题），到位后整块淡入
+        if (v.playSources.isNotEmpty()) {
+            // 类型信息块 → 线路：比常规板块间距更紧（视觉约 19dp）
+            Spacer(modifier = Modifier.height(Spacing.videoMetaToLineGap))
+            DetailContentFade {
+                // 线路（标题↔chips 的次间距在组件内部）
+                LineSection(
+                    v = v,
+                    lineFlag = lineFlag,
+                    onLineChange = onLineChange,
+                    horizontalPadding = pageHorizontalPadding(),
+                )
+            }
+        }
 
         // 选集（倒序/展开，横滑↔网格；标题↔按钮的次间距在组件内部）
-        EpisodeSection(
-            lineEpisodes = lineEpisodes,
-            episodeIndex = episodeIndex,
-            onEpisodeSelect = onEpisodeSelect,
-            horizontalPadding = pageHorizontalPadding(),
-        )
+        if (lineEpisodes.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(Spacing.sectionSpacing))
+            DetailContentFade {
+                EpisodeSection(
+                    lineEpisodes = lineEpisodes,
+                    episodeIndex = episodeIndex,
+                    onEpisodeSelect = onEpisodeSelect,
+                    horizontalPadding = pageHorizontalPadding(),
+                )
+            }
+        }
 
-        Spacer(modifier = Modifier.height(Spacing.sectionSpacing))
-
-        // 简介（标题↔正文的次间距在组件内部）
-        DescriptionSection(
-            v = v,
-            modifier = Modifier.padding(horizontal = pageHorizontalPadding()),
-        )
+        // 简介：详情就绪后淡入（无简介时保留「暂无简介」占位，行为与之前一致）
+        if (v.playSources.isNotEmpty() || v.episodes.isNotEmpty() || playerState.ready) {
+            Spacer(modifier = Modifier.height(Spacing.sectionSpacing))
+            DetailContentFade {
+                DescriptionSection(
+                    v = v,
+                    modifier = Modifier.padding(horizontal = pageHorizontalPadding()),
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(60.dp))
     }
@@ -1783,15 +1782,6 @@ private fun LandscapePlayLayout(
             onSeekDragChange = onSeekDragChange,
         )
 
-        // 首次进入详情页：信息列 + 线路/选集/简介整体 200ms 渐显（仅绘制层 alpha）
-        // 触发时机同竖屏：详情内容就绪才播放，避免元数据阶段放空、内容出现时仍是闪现
-        val detailAlpha = remember { Animatable(0f) }
-        val detailReady = current != null &&
-            (current.playSources.isNotEmpty() || current.episodes.isNotEmpty() || playerState.ready)
-        LaunchedEffect(detailReady) {
-            if (detailReady) detailAlpha.animateTo(1f, tween(200)) else detailAlpha.snapTo(0f)
-        }
-
         // 右侧信息列：锚在视频右缘，宽度固定（小窗时的剩余宽度），随放大向右滑出屏幕
         Column(
             modifier = Modifier
@@ -1809,8 +1799,7 @@ private fun LandscapePlayLayout(
                 .padding(
                     start = com.ican.tvplay.ui.theme.Spacing.sectionSpacing,
                     end = pageHorizontal,
-                )
-                .graphicsLayer { alpha = detailAlpha.value },
+                ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (current != null) {
@@ -1840,20 +1829,32 @@ private fun LandscapePlayLayout(
                 .background(MiuixTheme.colorScheme.surface)
                 .verticalScroll(rememberScrollState())
                 // 水平边距下放到各 Section 内部（同竖屏信息流的结构性通栏），此处只保留顶部间距
-                .padding(top = com.ican.tvplay.ui.theme.Spacing.titleContentGap)
-                .graphicsLayer { alpha = detailAlpha.value },
+                .padding(top = com.ican.tvplay.ui.theme.Spacing.titleContentGap),
             // 板块主间距与竖屏信息流统一为 sectionSpacing
             verticalArrangement = Arrangement.spacedBy(com.ican.tvplay.ui.theme.Spacing.sectionSpacing),
         ) {
             if (current != null) {
-                LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange, horizontalPadding = pageHorizontal)
-                EpisodeSection(
-                    lineEpisodes = lineEpisodes,
-                    episodeIndex = episodeIndex,
-                    onEpisodeSelect = onEpisodeSelect,
-                    horizontalPadding = pageHorizontal,
-                )
-                DescriptionSection(v = current, modifier = Modifier.padding(horizontal = pageHorizontal))
+                // 与竖屏一致：框架信息即时显示，仅线路/选集/简介在数据到位后逐块淡入
+                if (current.playSources.isNotEmpty()) {
+                    DetailContentFade {
+                        LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange, horizontalPadding = pageHorizontal)
+                    }
+                }
+                if (lineEpisodes.isNotEmpty()) {
+                    DetailContentFade {
+                        EpisodeSection(
+                            lineEpisodes = lineEpisodes,
+                            episodeIndex = episodeIndex,
+                            onEpisodeSelect = onEpisodeSelect,
+                            horizontalPadding = pageHorizontal,
+                        )
+                    }
+                }
+                if (current.playSources.isNotEmpty() || current.episodes.isNotEmpty() || playerState.ready) {
+                    DetailContentFade {
+                        DescriptionSection(v = current, modifier = Modifier.padding(horizontal = pageHorizontal))
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(60.dp))
             }
@@ -2062,7 +2063,7 @@ private fun VideoMetaSection(
 
         // 更新备注/站源/年份/地区/类型：信息行之间保持行内密度 itemSpacing
         Column(verticalArrangement = Arrangement.spacedBy(itemSpacing)) {
-            // 更新备注（fongmi: remark）
+            // 更新备注（fongmi: remark）：依赖选集数据，详情返回后才出现 → 淡入
             val eps = v.playSources.firstOrNull()?.episodes ?: v.episodes
             val remark = when {
                 eps.isEmpty() -> ""
@@ -2070,11 +2071,13 @@ private fun VideoMetaSection(
                 else -> "更新至第${eps.size}集"
             }
             if (remark.isNotBlank()) {
-                Text(
-                    text = remark,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
+                DetailContentFade {
+                    Text(
+                        text = remark,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
             }
 
             // 站源（fongmi: site）
@@ -2723,6 +2726,23 @@ private fun EpisodeGridDialog(
                 }
             }
         }
+    }
+}
+
+/** 详情页「加载后才出现」内容的淡入：块首次进入组合时 alpha 0→1，只作用绘制层，
+ *  不改尺寸/位置/间距（UI 规范）。数据未就绪时该块不组合，因此每次出现都是一次干净的淡入，
+ *  不会先露出空壳标题；切线路/切集/切正序倒序时块不离开组合，不会重播。 */
+@Composable
+private fun DetailContentFade(
+    durationMs: Int = DETAIL_CONTENT_FADE_MS,
+    content: @Composable () -> Unit,
+) {
+    val alpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        alpha.animateTo(1f, tween(durationMs))
+    }
+    Box(modifier = Modifier.graphicsLayer { this.alpha = alpha.value }) {
+        content()
     }
 }
 
@@ -4312,6 +4332,9 @@ private const val DETAIL_SLOW_TIMEOUT_MS = 45_000L
 
 /** 控制层显隐淡入淡出时长（200ms，对齐 miuix 动画时长） */
 private const val CONTROL_FADE_DURATION_MS = 200
+
+/** 详情页加载后内容（更新备注/线路/选集/简介）的淡入时长 */
+private const val DETAIL_CONTENT_FADE_MS = 200
 
 /**
  * 双击判定窗口：系统默认 300ms（ViewConfiguration.doubleTapTimeoutMillis），
