@@ -1101,7 +1101,6 @@ fun PlayerScreen(
             return
         }
         PlayerErrorScreen(
-            videoId = videoId,
             playerError = playerState.error,
             onBack = { handleBack() },
         )
@@ -3046,8 +3045,14 @@ private fun FullscreenPlayLayout(
                         .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 24.dp),
                 ) {
                     PlainTopBtn(AppIcons.Back, "返回") { onExitFullscreen() }
+                    // 标题 = 片名 · 当前集标题（剔除网盘类选集的 [2.8GB] 等体积前缀），不再显示「第 N 集」
+                    val epTitle = cleanEpisodeTitle(lineEpisodes.getOrNull(episodeIndex)?.title.orEmpty())
                     Text(
-                        text = "${current?.title.orEmpty()} · 第${episodeIndex + 1}集",
+                        text = if (epTitle.isBlank()) {
+                            current?.title.orEmpty()
+                        } else {
+                            "${current?.title.orEmpty()} · $epTitle"
+                        },
                         style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
                         color = Color.White,
                         maxLines = 1,
@@ -4289,7 +4294,6 @@ private const val DOUBLE_TAP_TIMEOUT_MS = 200L
  */
 @Composable
 private fun PlayerErrorScreen(
-    videoId: String,
     playerError: String?,
     onBack: () -> Unit,
 ) {
@@ -4317,8 +4321,7 @@ private fun PlayerErrorScreen(
                 color = MiuixTheme.colorScheme.onBackground,
             )
             Text(
-                text = playerError
-                    ?: "未找到该视频（ID: $videoId），请返回重试或检查站源是否可用",
+                text = playerError ?: "请求超时，返回重试一下吧",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -4345,6 +4348,13 @@ private fun PlayerErrorScreen(
 }
 
 private const val HIDE_DELAY_MS = 5_000L
+
+/** 网盘类站源选集标题的体积前缀：[2.8GB] / 【512MB】等，可连续出现多个，全屏标题展示前剔除 */
+private val EPISODE_SIZE_PREFIX =
+    Regex("""^\s*(?:[\[【]\s*[\d.]+\s*(?i:GB|MB|TB|KB)\s*[\]】]\s*)+""")
+
+private fun cleanEpisodeTitle(title: String): String =
+    title.replace(EPISODE_SIZE_PREFIX, "").trim()
 
 /** 单次播放会话内自动兜底（换线路/换站源）的总次数上限，防止沿站源链无限解析 */
 private const val MAX_AUTO_FALLBACK = 2
