@@ -1605,12 +1605,20 @@ private fun PortraitPlayLayout(
         }
     }
 
+    // 首次进入详情页：视频信息/线路/选集/简介整体 200ms 渐显
+    // （graphicsLayer alpha 只作用绘制层，不影响测量、位置与间距）
+    val detailAlpha = remember { Animatable(0f) }
+    LaunchedEffect(current != null) {
+        if (current != null) detailAlpha.animateTo(1f, tween(200)) else detailAlpha.snapTo(0f)
+    }
+
     // === 可滚动详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===
     // 详情加载期间整屏遮罩转圈统一显示（见根 Box），此处不再分区域转圈
     Column(
         modifier = Modifier
             .weight(1f)
             .verticalScroll(rememberScrollState())
+            .graphicsLayer { alpha = detailAlpha.value }
             // 水平边距下放到各 Section 内部（首页顶部分类 Tab 同款结构性通栏）：
             // 线路/选集横向列表需天然占满全宽，靠自身 contentPadding 对齐基准线并支持贴边横滑
             // 顶部 3dp：标题行被 48dp 收藏钮撑高，文字居中已含约 8dp 留白，视觉间距约 16dp
@@ -1771,6 +1779,12 @@ private fun LandscapePlayLayout(
             onSeekDragChange = onSeekDragChange,
         )
 
+        // 首次进入详情页：信息列 + 线路/选集/简介整体 200ms 渐显（仅绘制层 alpha）
+        val detailAlpha = remember { Animatable(0f) }
+        LaunchedEffect(current != null) {
+            if (current != null) detailAlpha.animateTo(1f, tween(200)) else detailAlpha.snapTo(0f)
+        }
+
         // 右侧信息列：锚在视频右缘，宽度固定（小窗时的剩余宽度），随放大向右滑出屏幕
         Column(
             modifier = Modifier
@@ -1788,7 +1802,8 @@ private fun LandscapePlayLayout(
                 .padding(
                     start = com.ican.tvplay.ui.theme.Spacing.sectionSpacing,
                     end = pageHorizontal,
-                ),
+                )
+                .graphicsLayer { alpha = detailAlpha.value },
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (current != null) {
@@ -1818,7 +1833,8 @@ private fun LandscapePlayLayout(
                 .background(MiuixTheme.colorScheme.surface)
                 .verticalScroll(rememberScrollState())
                 // 水平边距下放到各 Section 内部（同竖屏信息流的结构性通栏），此处只保留顶部间距
-                .padding(top = com.ican.tvplay.ui.theme.Spacing.titleContentGap),
+                .padding(top = com.ican.tvplay.ui.theme.Spacing.titleContentGap)
+                .graphicsLayer { alpha = detailAlpha.value },
             // 板块主间距与竖屏信息流统一为 sectionSpacing
             verticalArrangement = Arrangement.spacedBy(com.ican.tvplay.ui.theme.Spacing.sectionSpacing),
         ) {
