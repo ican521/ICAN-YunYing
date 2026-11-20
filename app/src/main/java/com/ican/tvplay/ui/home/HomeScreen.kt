@@ -640,7 +640,9 @@ fun HomeScreen(
                 ) {
                     gridItemsIndexed(
                         pageVideos.value,
-                        key = { _, v -> v.id },
+                        // key 必须唯一：部分源首页推荐位的 vod_id 为空或重复，纯 id 做 key 会直接抛
+                        // 「Key "" was already used」把整个首页打崩，所以拼上索引兜底
+                        key = { index, v -> "${v.id}#$index" },
                         contentType = { _, _ -> if (driveStyle.value) "drive" else "video" },
                     ) { index, video ->
                         // 逐个渐显：alpha 只挂在卡片自身的 modifier 上，不新增布局层，尺寸/位置/间距不变

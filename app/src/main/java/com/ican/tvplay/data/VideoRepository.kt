@@ -310,8 +310,15 @@ class VideoRepository(
     fun getCategories(): List<VideoCategory> = _categories.value
 
     /** homeContent 自带 list → 「推荐」卡片（对标 OK猫 my0「主页」，随分类同一次请求返回） */
-    private fun parseRecVideos(json: String): List<Video> =
-        parseList(json).map { it.toVideo(VideoCategory(HOME_REC_CATEGORY_ID, HOME_REC_CATEGORY_NAME)) }
+    private fun parseRecVideos(json: String): List<Video> {
+        val items = parseList(json)
+        if (items.isEmpty()) return emptyList()
+        Log.d(
+            REPO_TAG,
+            "rec list n=${items.size} blankId=${items.count { it.vodId.isBlank() }} dup=${items.size - items.map { it.vodId }.toSet().size}",
+        )
+        return items.map { it.toVideo(VideoCategory(HOME_REC_CATEGORY_ID, HOME_REC_CATEGORY_NAME)) }
+    }
 
     /**
      * 发布分类列表：有推荐卡片时把「推荐」作为第一个 tab，并在发布时直接把卡片落进首屏缓存，
