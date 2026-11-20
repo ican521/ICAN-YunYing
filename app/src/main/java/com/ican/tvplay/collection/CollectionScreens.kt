@@ -710,11 +710,12 @@ private fun HistoryCard(
                                 listOf(Color.Transparent, PosterTitleScrim),
                             ),
                         )
-                        // 高度不变（上下各 8dp），纯黑 80% → 全透明渐变
+                        // 高度不变（上 8dp / 下 10dp）：纯黑 80% → 全透明渐变；
+                        // 下内边距用 historyProgressBarGap(10dp)，让底部进度条距卡片底边正好 10dp
                         .padding(
                             start = Spacing.posterTitlePaddingH,
                             end = Spacing.posterTitlePaddingH,
-                            bottom = Spacing.posterTitleVisualGap,
+                            bottom = Spacing.historyProgressBarGap,
                             top = Spacing.posterTitleVisualGap,
                         ),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
