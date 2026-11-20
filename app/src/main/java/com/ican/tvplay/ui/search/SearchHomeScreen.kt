@@ -183,8 +183,8 @@ fun SearchHomeScreen(
                                 .background(MiuixTheme.colorScheme.surfaceContainerHigh),
                         ) {
                             Icon(
-                                // 当前是横卡 → 显示「网格」图标提示可切回海报；反之显示「横条」图标
-                                imageVector = if (wide) AppIcons.GridView else AppIcons.RowView,
+                                // 当前是横卡 → 显示「网格」图标提示可切回海报；反之显示「横卡缩略图」图标
+                                imageVector = if (wide) AppIcons.GridView else AppIcons.WideCardView,
                                 contentDescription = if (wide) "切换为海报网格" else "切换为长条横卡",
                                 tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 modifier = Modifier.size(20.dp),

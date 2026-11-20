@@ -76,16 +76,19 @@ fun SearchWideVideoCard(
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .padding(Spacing.searchWideCardPadding),
+                    .padding(
+                        horizontal = Spacing.searchWideCardPadding,
+                        vertical = Spacing.searchWideCardPaddingV,
+                    ),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(Spacing.posterTagRowTopGap),
                 ) {
-                    // 第 1 行：站源
+                    // 第 1 行：站源（字号与左侧站源胶囊内文字一致）
                     Text(
                         text = siteName,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MiuixTheme.colorScheme.primary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

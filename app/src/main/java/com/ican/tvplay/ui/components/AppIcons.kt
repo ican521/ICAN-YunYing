@@ -49,9 +49,13 @@ object AppIcons {
     )
 
     /** 搜索结果卡片切换：长条形横卡（两条横向长块示意） */
-    val RowView: ImageVector = vector(
-        "row_view",
-        "M2.5 4h19v6.5h-19zM2.5 13.5h19v6.5h-19z",
+    // 长条横卡缩略图：左侧竖条=海报、右侧三条递减粗线=文字行（比两条横杠更易读，不像等号）
+    val WideCardView: ImageVector = vector(
+        "wide_card_view",
+        "M3 5.5h4v13h-4z" +
+            "M9 7.5h12v2h-12z" +
+            "M9 11h12v2h-12z" +
+            "M9 14.5h7.5v2h-7.5z",
     )
 
     // 收藏爱心（澎湃OS MIUIX Normal 粗细）
