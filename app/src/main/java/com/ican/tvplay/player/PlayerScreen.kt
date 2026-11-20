@@ -1464,16 +1464,13 @@ fun PlayerScreen(
                             compositingStrategy = CompositingStrategy.Offscreen
                         }
                 else ->
-                    // 竖屏：静止态与缩放动画共用同一套 offset/宽高修饰符
-                    // （静止值即「状态栏以下 + 满宽 16:9 直角」），
-                    // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，收敛瞬间不会跳。
-                    // 这里不再叠 graphicsLayer：小窗本来就没有圆角，离屏图层只会在 TextureView
-                    // 尺寸逐帧变化时多一层拉伸风险，还多一次整幅拷贝
+                    // 竖屏：静止态与缩放动画共用同一套 offset/宽高修饰符（静止值即「状态栏以下 + 满宽 16:9 直角」）。
+                    // 这条分支只负责「黑底框」；视频层的尺寸/位置由下方 graphicsLayer 映射，不再随框变形
                     Modifier
                         .offset { IntOffset(0, pAnimTop.value.roundToPx()) }
                         .animatedSize(pAnimWidth, pAnimHeight)
-            }.background(Color.Black),
-            contentAlignment = Alignment.Center,
+            }.background(Color.Black).clipToBounds(),
+            contentAlignment = if (letterboxed) Alignment.TopStart else Alignment.Center,
         ) {
             AndroidView(
                 factory = { sharedPlayerView },
@@ -1484,8 +1481,30 @@ fun PlayerScreen(
                     if (view.player !== Players.player) Players.bindPlayerView(view)
                 },
                 modifier = if (letterboxed) {
-                    // 视频层比例 = 片源比例：黑边由外层 Box 的黑底负责，视频层自己不再变形
-                    Modifier.aspectRatio(videoRatio, matchHeightConstraintsFirst = false)
+                    // 竖屏缩放期**不再改 TextureView 尺寸**：逐帧改尺寸会让 SurfaceTexture 的变换慢一帧，
+                    // 实测就是中途画面突然放大裁切 + 变暗闪一下（录屏 0.80~0.87 那几帧）。
+                    // 这里让视频层恒定铺满整屏（媒体层自己按片源比例 FIT），再用 graphicsLayer 做
+                    // 等比缩放 + 平移，把画面映射进当前框：
+                    //   内容宽 = min(框宽, 框高 × 片源比)；缩放 = 内容宽 / 全屏内容宽；纵向位移 = 框中心 - 屏幕中心
+                    // 等比变换保证任何一帧都不变形；surface 尺寸恒定则没有重排、没有滞后帧
+                    Modifier
+                        .requiredSize(screenW, screenH)
+                        .offset { IntOffset(0, -pAnimTop.value.roundToPx()) }
+                        .graphicsLayer {
+                            val fw = pAnimWidth.value.toPx()
+                            val fh = pAnimHeight.value.toPx()
+                            val ftop = pAnimTop.value.toPx()
+                            val contentW = minOf(fw, fh * videoRatio)
+                            val fullContentW = minOf(size.width, size.height * videoRatio)
+                            val s = if (fullContentW > 0f) {
+                                (contentW / fullContentW).coerceIn(0f, 1f)
+                            } else {
+                                1f
+                            }
+                            scaleX = s
+                            scaleY = s
+                            translationY = ftop + fh / 2f - size.height / 2f
+                        }
                 } else {
                     Modifier.fillMaxSize()
                 },
