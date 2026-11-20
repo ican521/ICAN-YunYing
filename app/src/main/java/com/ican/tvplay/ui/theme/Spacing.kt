@@ -21,10 +21,10 @@ import top.yukonga.miuix.kmp.utils.getRoundedCorner
  * | 6dp | 角标级别的左右内边距 | [posterBadgePaddingH] |
  * | 8dp | 相邻元素（标题↔chips 或正文、列表项、胶囊流式排列、叠加层外边距、卡片标题层上下） | [videoTitleContentGap]、[videoTitleToMetaGap]、[dialogItemGap]、[searchChipGap]、[siteListItemGap]、[posterOverlayMargin]、[posterTitleVisualGap]
  * | 10dp | 卡片标题层水平、历史卡片进度条底距（紧贴卡片边） | [posterTitlePaddingH]、[historyProgressBarGap] |
- * | 12dp | 页面骨架次级（页面顶部、板块标题↔内容、顶栏组件之间） | [pageTop]、[titleContentGap]、[topBarItemGap] |
+ * | 12dp | 页面骨架次级（页面顶部、板块标题↔内容、顶栏组件之间、横卡文字区内衬） | [pageTop]、[titleContentGap]、[topBarItemGap]、[searchWideCardPadding] |
  * | 16dp | 页面骨架主级（页面左右、板块之间、卡片网格、弹窗边距与标题、底栏上下） | [pageHorizontal]、[sectionSpacing]、[cardGapH]、[cardGapV]、[dialogContentMargin]、[dialogTitleGap]、[dialogItemPadding]、[bottomBarGap]、[contentBottomInset] 等 |
  *
- * 尺寸类（非间距，按内容或控件固定高度取值）：[chipHeight]、[episodeChipHeight]、[circleButton]、[topBarHeight]、[centeredTopBarHeight]、[bottomBarHeight]。
+ * 尺寸类（非间距，按内容或控件固定高度取值）：[chipHeight]、[episodeChipHeight]、[circleButton]、[topBarHeight]、[centeredTopBarHeight]、[bottomBarHeight]、[searchWideCardHeight]。
  *
  * ## 其他规则
  * - 页面左右边距统一 [pageHorizontal]（手机/平板均为 16dp）
@@ -161,6 +161,12 @@ object Spacing {
 
     /** 搜索结果页左侧站源列表的项间距（纵向） */
     val siteListItemGap = 8.dp
+
+    /** 跨站源搜索结果「长条横卡」高度（尺寸类，对齐 fongmi adapter_search 的 128dp 视觉，留 3:4 海报 84×112） */
+    val searchWideCardHeight = 112.dp
+
+    /** 跨站源搜索结果「长条横卡」文字区四边内边距（12 档） */
+    val searchWideCardPadding = 12.dp
 
     /** 全局统一圆角（卡片/按钮/输入框/弹窗）；圆形按钮与胶囊用 CircleShape，不适用此值 */
     val corner = 16.dp

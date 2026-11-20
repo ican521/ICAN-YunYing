@@ -100,6 +100,9 @@ fun MultiSourceSearchResults(
     val displayVideos by vm.displayVideos.collectAsStateWithLifecycle()
     val loading by vm.loading.collectAsStateWithLifecycle()
     val searchedQuery by vm.query.collectAsStateWithLifecycle()
+    // 结果卡片样式（右上角切换钮持久化）：POSTER=竖版海报网格 / WIDE=长条横卡
+    val cardStyle by vm.cardStyle.collectAsStateWithLifecycle()
+    val wideCards = cardStyle == com.ican.tvplay.data.SearchCardStyle.WIDE
 
     // 已淡入的元素 key 集合：由父层统一计时，元素滑出屏幕被回收再滑回来时不会重播动画
     var revealedChips by remember(searchedQuery) { mutableStateOf<Set<String>>(emptySet()) }
@@ -173,16 +176,17 @@ fun MultiSourceSearchResults(
             // 站源列表与卡片网格之间的间距
             Spacer(modifier = Modifier.width(Spacing.searchGridGap))
 
-            // 右侧卡片网格：手机强制 2 列，大屏（宽 > 640dp）自适应
+            // 右侧卡片网格：竖版海报（手机强制 2 列，大屏自适应）／长条横卡（按剩余宽度自适应列数）
             BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
             ) {
-                val columns = if (maxWidth < 640.dp) {
-                    GridCells.Fixed(2)
-                } else {
-                    GridCells.Adaptive(minSize = 160.dp)
+                val columns = when {
+                    // 长条横卡：手机右侧剩余宽度约 244dp → 1 列；平板自动 2 列
+                    wideCards -> GridCells.Adaptive(minSize = 248.dp)
+                    maxWidth < 640.dp -> GridCells.Fixed(2)
+                    else -> GridCells.Adaptive(minSize = 160.dp)
                 }
 
                 if (displayVideos.isEmpty()) {
@@ -195,34 +199,49 @@ fun MultiSourceSearchResults(
                         modifier = Modifier.fillMaxSize().imePadding(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = topPadding, bottom = Spacing.contentBottomInset),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.searchGridGap),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.searchGridGap),
+                        verticalArrangement = Arrangement.spacedBy(
+                            if (wideCards) Spacing.searchChipGap else Spacing.searchGridGap,
+                        ),
                     ) {
                         itemsIndexed(
                             displayVideos,
                             key = { idx, _ -> "card_$idx" },
                             contentType = { _, _ -> "video" },
                         ) { index, dv ->
+                            val badge = dv.siteName.ifBlank { dv.video.categoryName.ifBlank { "来源" } }
+                            val tags = buildVideoStatus(dv.video).second.take(3).joinToString(" ").ifEmpty { null }
                             // 真实卡片按站源胶囊同款节奏逐个渐显；滑回屏幕不再重播
                             RevealedFade(visible = "card_$index" in revealedCards) {
-                                VideoCard(
-                                    video = dv.video,
-                                    onClick = {
-                                        // fongmi 同款：action 卡片直接执行 jar action → Toast 返回 msg
-                                        if (dv.video.action.isNotBlank()) {
-                                            vm.executeAction(dv.siteKey, dv.video.action) { msg ->
-                                                if (msg.isNotBlank()) {
-                                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-                                                }
+                                val onClick: () -> Unit = {
+                                    // fongmi 同款：action 卡片直接执行 jar action → Toast 返回 msg
+                                    if (dv.video.action.isNotBlank()) {
+                                        vm.executeAction(dv.siteKey, dv.video.action) { msg ->
+                                            if (msg.isNotBlank()) {
+                                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                                             }
-                                        } else {
-                                            handlePlayClick(vm, dv.video, dv.siteKey, onPlay)
                                         }
-                                    },
-                                    width = null,
-                                    showRating = false,
-                                    topStartBadge = dv.siteName.ifBlank { dv.video.categoryName.ifBlank { "来源" } },
-                                    tagLine = buildVideoStatus(dv.video).second.take(3).joinToString(" ").ifEmpty { null },
-                                )
+                                    } else {
+                                        handlePlayClick(vm, dv.video, dv.siteKey, onPlay)
+                                    }
+                                }
+                                if (wideCards) {
+                                    // 长条横卡：左侧海报预览（无文字标签），右侧站源 / 标题 / 标签三行
+                                    SearchWideVideoCard(
+                                        video = dv.video,
+                                        siteName = badge,
+                                        tagLine = tags,
+                                        onClick = onClick,
+                                    )
+                                } else {
+                                    VideoCard(
+                                        video = dv.video,
+                                        onClick = onClick,
+                                        width = null,
+                                        showRating = false,
+                                        topStartBadge = badge,
+                                        tagLine = tags,
+                                    )
+                                }
                             }
                         }
                     }

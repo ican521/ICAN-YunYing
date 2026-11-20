@@ -12,6 +12,9 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 /** 首页网格布局大小：小（手机3列/平板~7列）/ 中（手机2列/平板~5列）/ 大（仅平板可选，~3列） */
 enum class HomeLayoutSize { SMALL, MEDIUM, LARGE }
 
+/** 跨站源搜索结果卡片样式：POSTER=竖版海报网格（默认）/ WIDE=长条形横卡（左海报 + 右站源/标题/标签，对齐 fongmi adapter_search） */
+enum class SearchCardStyle { POSTER, WIDE }
+
 /** 后台播放模式（fongmi「后台播放」三态） */
 const val BACKGROUND_OFF = 0 // 关闭：退出播放页即停止（默认）
 const val BACKGROUND_ON = 1  // 开启：后台续播 + 通知栏控制
@@ -72,6 +75,21 @@ class SettingsRepository(context: Context) {
     fun setHomeLayoutSize(size: HomeLayoutSize) {
         prefs.edit().putString(KEY_HOME_LAYOUT_SIZE, size.name).apply()
         _homeLayoutSize.value = size
+    }
+
+    /** 跨站源搜索结果卡片样式（默认竖版海报网格） */
+    private val _searchCardStyle = MutableStateFlow(
+        runCatching {
+            SearchCardStyle.valueOf(
+                prefs.getString(KEY_SEARCH_CARD_STYLE, null) ?: SearchCardStyle.POSTER.name,
+            )
+        }.getOrDefault(SearchCardStyle.POSTER),
+    )
+    val searchCardStyle: StateFlow<SearchCardStyle> = _searchCardStyle.asStateFlow()
+
+    fun setSearchCardStyle(style: SearchCardStyle) {
+        prefs.edit().putString(KEY_SEARCH_CARD_STYLE, style.name).apply()
+        _searchCardStyle.value = style
     }
 
     /** 导入配置的 URL 链接（仅保存，不解析） */
@@ -360,6 +378,11 @@ class SettingsRepository(context: Context) {
                 prefs.getString(KEY_HOME_LAYOUT_SIZE, null) ?: HomeLayoutSize.MEDIUM.name,
             )
         }.getOrDefault(HomeLayoutSize.MEDIUM)
+        _searchCardStyle.value = runCatching {
+            SearchCardStyle.valueOf(
+                prefs.getString(KEY_SEARCH_CARD_STYLE, null) ?: SearchCardStyle.POSTER.name,
+            )
+        }.getOrDefault(SearchCardStyle.POSTER)
         _configUrl.value = prefs.getString(KEY_CONFIG_URL, null).orEmpty()
         _siteKey.value = prefs.getString(KEY_SITE_KEY, null).orEmpty()
         _playerSpeed.value = prefs.getFloat(KEY_PLAYER_SPEED, 1.0f)
@@ -390,6 +413,7 @@ class SettingsRepository(context: Context) {
         const val KEY_THEME = "theme_mode"
         const val KEY_THEME_COLOR = "theme_color"
         const val KEY_HOME_LAYOUT_SIZE = "home_layout_size"
+        const val KEY_SEARCH_CARD_STYLE = "search_card_style"
         const val KEY_CONFIG_URL = "config_url"
         const val KEY_SITE_KEY = "site_key"
         const val KEY_SITE_SEARCHABLE_PREFIX = "site_searchable_"

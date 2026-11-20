@@ -75,6 +75,22 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
+    /**
+     * 结果卡片样式（竖版海报网格 / 长条形横卡），落盘于 SettingsRepository，
+     * 由结果页右上角切换钮写入，重启后保持。
+     */
+    val cardStyle: StateFlow<com.ican.tvplay.data.SearchCardStyle> = settings.searchCardStyle
+
+    fun toggleCardStyle() {
+        settings.setSearchCardStyle(
+            if (cardStyle.value == com.ican.tvplay.data.SearchCardStyle.WIDE) {
+                com.ican.tvplay.data.SearchCardStyle.POSTER
+            } else {
+                com.ican.tvplay.data.SearchCardStyle.WIDE
+            },
+        )
+    }
+
     /** 显示的视频（带站源信息） */
     private val _displayVideos = MutableStateFlow<List<DisplayVideo>>(emptyList())
     val displayVideos: StateFlow<List<DisplayVideo>> = _displayVideos.asStateFlow()

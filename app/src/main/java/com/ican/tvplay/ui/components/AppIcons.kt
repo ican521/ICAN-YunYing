@@ -42,6 +42,18 @@ object AppIcons {
             "M9.5 14A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z",
     )
 
+    /** 搜索结果卡片切换：竖版海报网格（四宫格示意） */
+    val GridView: ImageVector = vector(
+        "grid_view",
+        "M3 3h8.5v8.5h-8.5zM12.5 3h8.5v8.5h-8.5zM3 12.5h8.5v8.5h-8.5zM12.5 12.5h8.5v8.5h-8.5z",
+    )
+
+    /** 搜索结果卡片切换：长条形横卡（两条横向长块示意） */
+    val RowView: ImageVector = vector(
+        "row_view",
+        "M2.5 4h19v6.5h-19zM2.5 13.5h19v6.5h-19z",
+    )
+
     // 收藏爱心（澎湃OS MIUIX Normal 粗细）
     val Favorite: ImageVector = MiuixIcons.Normal.FavoritesFill
 

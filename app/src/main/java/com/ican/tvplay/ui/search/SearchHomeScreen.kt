@@ -21,8 +21,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -33,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,11 +43,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.ican.tvplay.ui.MultiSourceSearchViewModel
 import com.ican.tvplay.ui.SearchViewModel
 import com.ican.tvplay.ui.appViewModel
+import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.MiuixBackButton
 import com.ican.tvplay.ui.components.MiuixSearchInput
 import com.ican.tvplay.ui.components.pageHorizontalPadding
@@ -158,6 +163,34 @@ fun SearchHomeScreen(
                             // 距返回钮 16dp（右侧距屏幕保持 pageHorizontalPadding 16dp 不变）
                             .padding(start = 16.dp),
                     )
+
+                    // 右上角：结果卡片样式切换钮（竖版海报网格 ↔ 长条横卡），值持久化到设置
+                    if (!editing) {
+                        val cardStyle by multiVm.cardStyle.collectAsStateWithLifecycle()
+                        val wide = cardStyle == com.ican.tvplay.data.SearchCardStyle.WIDE
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .padding(start = Spacing.topBarItemGap)
+                                .size(Spacing.circleButton)
+                                .tvCardEffect(
+                                    onClick = { multiVm.toggleCardStyle() },
+                                    shape = CircleShape,
+                                    focusedScale = 1.1f,
+                                    glow = false,
+                                )
+                                .clip(CircleShape)
+                                .background(MiuixTheme.colorScheme.surfaceContainerHigh),
+                        ) {
+                            Icon(
+                                // 当前是横卡 → 显示「网格」图标提示可切回海报；反之显示「横条」图标
+                                imageVector = if (wide) AppIcons.GridView else AppIcons.RowView,
+                                contentDescription = if (wide) "切换为海报网格" else "切换为长条横卡",
+                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
                 }
             }
         },
