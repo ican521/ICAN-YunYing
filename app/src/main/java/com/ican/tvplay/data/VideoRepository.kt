@@ -77,6 +77,12 @@ class VideoRepository(
 
     private val loadMutex = Mutex()
 
+    /** 切站代数：每次 switchSite +1；旧加载在慢步骤之间检查代数，被更新的切站取代后立即作废 */
+    private val siteLoadGeneration = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /** 当前正在执行的切站协程，用于「最新一次切站优先」时取消旧的加载 */
+    private var siteReloadJob: kotlinx.coroutines.Job? = null
+
     /** 首页预热任务句柄与并发限流：用户点开详情时取消预热，详情独占网络/IO（冷启动首次提速） */
     private var prewarmJob: kotlinx.coroutines.Job? = null
     private val prewarmPermits = Semaphore(3)
@@ -409,10 +415,98 @@ class VideoRepository(
             com.ican.tvplay.ui.components.UrlPlayHelper.preparePushPlay(rawText)
         }
 
-    /** 切换站点：记录选择并重新加载分类（reload 内部已加 loadMutex，此处不可重复加锁——Mutex 不可重入会死锁） */
+    /** 切换站点：最新一次优先——取消上一次还没跑完的切站加载，立即开始新源加载，不排队等旧源慢接口 */
     suspend fun switchSite(siteKey: String) {
         settingsRepository.setSiteKey(siteKey)
-        reload()
+        val gen = siteLoadGeneration.incrementAndGet()
+        siteReloadJob?.cancel()
+        siteReloadJob = kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]
+        reloadLatest(gen)
+    }
+
+    /**
+     * 最新一次切站生效的加载：慢步骤（下载配置 / getSpider / homeContent / 解析）全部在 loadMutex 之外执行，
+     * 每步之间检查代数；只有仍是最新代数时才提交状态，避免旧站慢接口覆盖新站结果。
+     */
+    private suspend fun reloadLatest(gen: Int) {
+        // 快速段：清缓存（持锁，与冷启动 ensureLoaded / 导入配置 reload 互斥）
+        loadMutex.withLock {
+            if (!isLatestSiteLoad(gen)) return
+            homeCache.clear()
+            detailCache.clear()
+            diskCacheFile.delete()
+            configFile.delete()
+        }
+
+        val url = settingsRepository.configUrl.value
+        if (!isLatestSiteLoad(gen)) return
+        if (url.isBlank()) {
+            commitLatestSiteLoad(gen) {
+                _currentSite.value = null
+                _categories.value = emptyList()
+                currentSpider = null
+            }
+            return
+        }
+
+        Log.d("Startup", "switch: loadHomeSite begin")
+        val loaded = apiClient.loadHomeSite(url, settingsRepository.siteKey.value)
+        Log.d("Startup", "switch: loadHomeSite done site=${loaded?.site?.key}")
+        if (!isLatestSiteLoad(gen)) return
+        if (loaded == null) {
+            commitLatestSiteLoad(gen) {
+                _categories.value = emptyList()
+                currentSpider = null
+            }
+            return
+        }
+
+        if (loaded.site.isSpider()) {
+            Log.d("Startup", "switch: getSpider begin")
+            val spider = spiderManager.getSpider(loaded.site, loaded.jarSpec)
+            Log.d("Startup", "switch: getSpider done ok=${spider != null}")
+            if (!isLatestSiteLoad(gen)) return
+            if (spider == null) {
+                commitLatestSiteLoad(gen) {
+                    currentSpider = null
+                    _categories.value = emptyList()
+                }
+                return
+            }
+            Log.d("Startup", "switch: homeContent begin")
+            val homeJson = spiderManager.homeContent(spider, filter = true)
+            if (!isLatestSiteLoad(gen)) return
+            val classes = parseClasses(homeJson)
+            val cats = classes.map { VideoCategory(id = it.typeId, name = it.typeName) }
+            commitLatestSiteLoad(gen) {
+                currentSpider = spider
+                _currentSite.value = loaded
+                _categories.value = cats
+                loadDiskCacheIntoMemory(loaded.site.key)
+                persistConfigCache(loaded)
+            }
+            Log.d("Startup", "switch: categories published size=${cats.size}")
+        } else {
+            val cats = apiClient.homeClasses(loaded.site)
+                .map { VideoCategory(id = it.typeId, name = it.typeName) }
+            if (!isLatestSiteLoad(gen)) return
+            commitLatestSiteLoad(gen) {
+                currentSpider = null
+                _currentSite.value = loaded
+                _categories.value = cats
+                loadDiskCacheIntoMemory(loaded.site.key)
+                persistConfigCache(loaded)
+            }
+            Log.d("Startup", "switch: categories published size=${cats.size}")
+        }
+    }
+
+    private fun isLatestSiteLoad(gen: Int): Boolean = gen == siteLoadGeneration.get()
+
+    private suspend inline fun commitLatestSiteLoad(gen: Int, block: () -> Unit) {
+        loadMutex.withLock {
+            if (isLatestSiteLoad(gen)) block()
+        }
     }
 
     /**
