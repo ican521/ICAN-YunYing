@@ -125,11 +125,11 @@ object Spacing {
     val posterTitlePaddingH = 10.dp
 
     /**
-     * 海报底部标题层的上下留白：10dp（与旧版视觉一致）。
-     * 全局文字已 Trim（见 Theme 的 inkTightTypography），行盒不带字形留白，
-     * 布局即视觉，故沿用旧版 10dp，水平/底部同值。
+     * 海报底部标题层的上下留白：8dp（档位表 8 档）。
+     * 全局文字已 Trim 掉行盒留白，但汉字墨迹仍在基线下约 3dp，故 8dp 布局 ≈ 墨迹离卡片底边 10dp，
+     * 与水平 10dp 在视觉上齐平。
      */
-    val posterTitleVisualGap = 10.dp
+    val posterTitleVisualGap = 8.dp
 
     /** 海报标签行（标题上方胶囊）与上方内容的间距 */
     val posterTagRowTopGap = 4.dp

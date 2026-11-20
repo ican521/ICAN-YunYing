@@ -376,7 +376,7 @@ private fun FavoriteCard(
                 }
             }
 
-            // 底部渐变 + 标题（高度不变：标题上下各 10dp；渐变从底部 80% 黑到顶部全透明）
+            // 底部渐变 + 标题（高度不变：标题上下各 8dp（墨迹离边约 10dp）；渐变从底部 80% 黑到顶部全透明）
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -386,7 +386,7 @@ private fun FavoriteCard(
                             listOf(Color.Transparent, PosterTitleScrim),
                         ),
                     )
-                    // 左右与上下同取 10dp：全局已 Trim 掉字形留白，布局高度即视觉高度
+                    // 水平 10dp、上下 8dp：汉字墨迹在基线下约 3dp，8dp 布局的墨迹离边≈10dp，与水平齐平
                     .padding(
                         start = Spacing.posterTitlePaddingH,
                         end = Spacing.posterTitlePaddingH,
@@ -687,7 +687,7 @@ private fun HistoryCard(
                 if (history.episodeTitle.isNotBlank()) {
                     Box(
                         modifier = Modifier
-                            // 底部不留间距：胶囊底边正好压在渐变 0% 透明分界线上（标题上方 10dp）
+                            // 底部不留间距：胶囊底边正好压在渐变 0% 透明分界线上（标题上方 8dp）
                             // 左边距 8dp：与左上角站源胶囊的 8dp 对齐
                             .padding(start = Spacing.posterOverlayMargin, end = Spacing.posterOverlayMargin, top = 4.dp)
                             .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
@@ -710,7 +710,7 @@ private fun HistoryCard(
                                 listOf(Color.Transparent, PosterTitleScrim),
                             ),
                         )
-                        // 高度不变（上下各 10dp），纯黑 80% → 全透明渐变
+                        // 高度不变（上下各 8dp），纯黑 80% → 全透明渐变
                         .padding(
                             start = Spacing.posterTitlePaddingH,
                             end = Spacing.posterTitlePaddingH,
