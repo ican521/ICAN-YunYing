@@ -102,12 +102,8 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     suspend fun listSites() = repo.listSites()
 
     /** 切换站源：仓库层会保存选择并重新加载分类，sections 随 categoriesFlow 自动刷新。
-     *  返回 true = 新源分类已就绪；false = 该源加载失败（调用方负责淡入/提示） */
-    suspend fun switchSite(siteKey: String): Boolean {
-        val ok = repo.switchSite(siteKey)
-        viewModelScope.launch { repo.prewarmHome() }
-        return ok
-    }
+     *  分类按需加载（不再全量预热）：返回 true = 新源分类已就绪；false = 该源加载失败（调用方负责淡入/提示） */
+    suspend fun switchSite(siteKey: String): Boolean = repo.switchSite(siteKey)
 
     /** 站源「参与搜索」开关（fongmi 同款；返回切换后是否开启；配置锁定的站点返回 false 且不变） */
     fun toggleSiteSearchable(site: TvBoxSite): Boolean = settings.toggleSiteSearchable(site)
@@ -135,7 +131,7 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     }
 
     init {
-        // 站源真正发生变化时重新开启一次逐条渐显
+        // 站源真正发生变化时：重新开启一次逐条渐显，并丢掉上一个站的已访问分类缓存
         viewModelScope.launch {
             var lastKey = ""
             repo.currentSite.collect { site ->
@@ -143,41 +139,25 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
                 if (key != lastKey) {
                     lastKey = key
                     _animateCards.value = true
+                    categoryCacheLock.withLock {
+                        categoryCache.keys.removeAll { !it.startsWith("$key|") }
+                    }
                 }
             }
         }
     }
 
-    // ===== 分类首页数据缓存：启动 / 切站后后台预取，Tab 切换直接命中，不再出现短暂加载 =====
+    // ===== 分类首页数据缓存：只缓存真正访问过的分类，回切同一 Tab 直接命中，不再重复请求 =====
     private val categoryCache = mutableMapOf<String, List<Video>>()
     private val categoryCacheLock = Mutex()
-    private var prefetchJob: Job? = null
 
     private fun categoryCacheKey(categoryId: String) = "${currentSiteKey.value}|$categoryId"
 
-    /** 已预取的分类数据；未就绪返回 null */
+    /** 已访问过的分类数据；未就绪返回 null */
     suspend fun cachedCategoryVideos(categoryId: String): List<Video>? =
         categoryCacheLock.withLock { categoryCache[categoryCacheKey(categoryId)] }
 
-    /**
-     * 后台串行预取全部分类首页数据（跳过第一页：pager 当前页会自行加载）。
-     * 切站源时清掉旧站缓存并重新开始。
-     */
-    fun prefetchCategories() {
-        val site = currentSiteKey.value
-        if (site.isBlank()) return
-        prefetchJob?.cancel()
-        prefetchJob = viewModelScope.launch {
-            categoryCacheLock.withLock {
-                categoryCache.keys.removeAll { !it.startsWith("$site|") }
-            }
-            categories.value.drop(1).forEach { cat ->
-                if (currentSiteKey.value != site) return@launch
-                if (cachedCategoryVideos(cat.id) != null) return@forEach
-                runCatching { getCategoryVideos(cat.id) }
-            }
-        }
-    }
+    /** 按分类 id 独立取该分类下视频（每页独立加载，不依赖 selectedCategory 选中态）；命中已访问缓存则直接返回 */
 
     /** 按分类 id 独立取该分类下视频（每页独立加载，不依赖 selectedCategory 选中态）；命中预取缓存则直接返回 */
     suspend fun getCategoryVideos(categoryId: String): List<Video> {
@@ -577,9 +557,9 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     private val videoRepository = container.videoRepository
 
     init {
-        // 启动即后台预热：已导入过配置时，加载站点/分类并把首页首屏拉进缓存，
-        // 用户切到首页时数据已就绪（fongmi 式启动预加载）
-        viewModelScope.launch { videoRepository.prewarmHome() }
+        // 已导入过配置时，启动只做站点/分类加载（不发任何分类视频请求）。
+        // 分类视频按需加载：用户点开哪个分类才拉哪个（对标 OK猫）
+        viewModelScope.launch { videoRepository.ensureLoaded() }
         // 冷启动单独预热玩偶哥哥 spider：首次详情易超 15s 超时，提前初始化后首次点击即可进
         viewModelScope.launch { videoRepository.prewarmWoggSpider() }
     }
@@ -617,12 +597,11 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setFavoriteUpdatePopupEveryLaunch(everyLaunch: Boolean) =
         settings.setFavoriteUpdatePopupEveryLaunch(everyLaunch)
 
-    /** 保存配置 URL 后立即重新拉取站点与分类，并后台预热首页各分类首屏（fongmi 式） */
+    /** 保存配置 URL 后立即重新拉取站点与分类；分类视频按需加载，不再全量预热 */
     fun setConfigUrl(url: String) {
         settings.setConfigUrl(url)
         viewModelScope.launch {
             videoRepository.reload()
-            launch { videoRepository.prewarmHome() }
             launch { videoRepository.prewarmJars() }
         }
     }
@@ -643,12 +622,9 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     /** 开关版本号：弹窗 collect 后每次切换自动重组刷新图标 */
     val siteToggleVersion: StateFlow<Int> = settings.siteToggleVersion
 
-    /** 切换站源：仓库层会保存选择并重新加载分类，随后后台预热首页首屏 */
+    /** 切换站源：仓库层会保存选择并重新加载分类；分类视频按需加载，不再全量预热 */
     fun switchSite(siteKey: String) {
-        viewModelScope.launch {
-            videoRepository.switchSite(siteKey)
-            launch { videoRepository.prewarmHome() }
-        }
+        viewModelScope.launch { videoRepository.switchSite(siteKey) }
     }
 
     /**
@@ -660,7 +636,6 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
         settings.reloadFromPrefs()
         viewModelScope.launch {
             videoRepository.reload()
-            launch { videoRepository.prewarmHome() }
             launch { videoRepository.prewarmJars() }
         }
     }

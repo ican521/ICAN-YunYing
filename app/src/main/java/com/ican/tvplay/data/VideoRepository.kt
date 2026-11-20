@@ -26,10 +26,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -93,19 +94,14 @@ class VideoRepository(
     /** 当前正在执行的切站协程，用于「最新一次切站优先」时取消旧的加载 */
     private var siteReloadJob: kotlinx.coroutines.Job? = null
 
-    /** 首页预热任务句柄与并发限流：用户点开详情时取消预热，详情独占网络/IO（冷启动首次提速） */
-    private var prewarmJob: kotlinx.coroutines.Job? = null
-    private val prewarmPermits = Semaphore(3)
-
-    /** 详情优先：用户开始拉详情/播放时，取消仍在跑的首页预热与追番更新检测，让出网络/IO */
-    fun cancelHomePrewarm() {
-        prewarmJob?.cancel()
-        prewarmJob = null
+    /** 详情优先：用户开始拉详情/播放时，取消仍在跑的追番更新检测，让出网络/IO。
+     *  首页全量预热已下线（分类只在被选中时加载），这里不再需要取消预热 */
+    fun yieldForDetail() {
         FavoriteUpdateChecker.cancelRunningCheck()
     }
 
-    /** 首屏分类视频缓存（key = siteKey|catId）——fongmi 式预加载：
-     *  导入配置/切站点后预热写入，进入首页直接命中，秒出卡片 */
+    /** 首屏分类视频缓存（key = siteKey|catId）：
+     *  分类按需加载，加载成功后进内存 + 防抖落盘，回切同一分类 / 下次冷启动直接命中 */
     private val homeCache = java.util.concurrent.ConcurrentHashMap<String, List<Video>>()
 
     /** 详情缓存（videoId → Video）：重复进详情页秒开，reload 时清空 */
@@ -151,15 +147,32 @@ class VideoRepository(
         }.onFailure { Log.d(REPO_TAG, "home disk cache miss: ${it.message}") }
     }
 
-    /** 预热完成后把全部分类首屏数据落盘，供下次冷启动秒出 */
-    private suspend fun persistHomeCache(siteKey: String, cats: List<VideoCategory>) =
+    /** 后台落盘协程 + 防抖句柄：分类页真正加载成功后才写盘，不做任何额外网络请求 */
+    private val houseKeepingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var persistHomeJob: kotlinx.coroutines.Job? = null
+
+    /** 按需落盘（防抖 800ms）：连续切几个分类只写最后一次，避免频繁 IO */
+    private fun schedulePersistHomeCache(siteKey: String) {
+        persistHomeJob?.cancel()
+        persistHomeJob = houseKeepingScope.launch {
+            delay(800)
+            persistHomeCache(siteKey)
+        }
+    }
+
+    /** 把该站已加载的分类首屏数据落盘，供下次冷启动秒出（只写内存里已有的，不触发请求） */
+    private suspend fun persistHomeCache(siteKey: String) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             runCatching {
-                val sections = cats.mapNotNull { cat ->
-                    homeCache["${siteKey}|${cat.id}"]?.takeIf { it.isNotEmpty() }?.let {
-                        HomeDiskSection(catId = cat.id, catName = cat.name, videos = it)
+                val catNames = _categories.value.associate { it.id to it.name }
+                val prefix = "$siteKey|"
+                val sections = homeCache.keys
+                    .filter { it.startsWith(prefix) }
+                    .mapNotNull { key ->
+                        val catId = key.removePrefix(prefix)
+                        val videos = homeCache[key]?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+                        HomeDiskSection(catId = catId, catName = catNames[catId] ?: catId, videos = videos)
                     }
-                }
                 if (sections.isEmpty()) return@withContext
                 diskCacheFile.writeText(
                     rawJson.encodeToString(
@@ -329,6 +342,8 @@ class VideoRepository(
             homeCache["$siteKey|$HOME_REC_CATEGORY_ID"] = rec
             // 通知页面：首屏缓存换了新数据（冷启动缓存恢复后又拿到网络推荐位时，页面要重取一次）
             _homeCacheVersion.value++
+            // 推荐位随 homeContent 一起到，直接落盘（不产生额外请求），下次冷启动可秒出
+            schedulePersistHomeCache(siteKey)
         }
         _categories.value = if (rec.isEmpty()) {
             cats
@@ -622,8 +637,8 @@ class VideoRepository(
     /** 详情：补全选集 / 播放地址等（内存 + 24h 磁盘缓存，重复进详情秒开） */
     suspend fun getVideo(videoId: String): Video? {
         detailCache[videoId]?.let { return it }
-        // 详情优先：取消首页预热，让出网络/IO
-        cancelHomePrewarm()
+        // 详情优先：取消追番更新检测，让出网络与 IO（冷启动首次提速）
+        yieldForDetail()
         ensureLoaded()
         val loaded = _currentSite.value ?: return null
         readDetailDiskCache(loaded.site.key, videoId)?.let {
@@ -765,13 +780,19 @@ class VideoRepository(
         cat: VideoCategory,
         page: Int,
     ): List<Video> {
-        // 首页第一页走缓存（预热的收益点）；翻页不缓存
+        // 首页第一页走内存缓存（只有真正访问过的分类才在里面）；翻页不缓存
         val list = if (page == 1) {
             val key = "${loaded.site.key}|${cat.id}"
             // 空结果不入缓存：spider 未就绪 / 网络异常时取到空列表若被缓存，
             // 之后首页会一直命中空缓存（历史 bug：首次启动首页没有视频卡片）
             homeCache[key] ?: fetchCategoryVideos(loaded, cat)
-                .also { if (it.isNotEmpty()) homeCache[key] = it }
+                .also {
+                    if (it.isNotEmpty()) {
+                        homeCache[key] = it
+                        // 按需落盘：只把真正加载成功的分类写盘（不额外发请求），供下次冷启动秒出
+                        schedulePersistHomeCache(loaded.site.key)
+                    }
+                }
         } else {
             fetchCategoryVideos(loaded, cat)
         }
@@ -801,40 +822,6 @@ class VideoRepository(
             parseList(json).map { it.toVideo(cat) }
         } else {
             apiClient.categoryVideos(loaded.site, cat.id, 1).map { it.toVideo(cat) }
-        }
-    }
-
-    /**
-     * 后台预热首页各分类首屏进缓存（fongmi 式：导入配置/切站点后立即预加载）。
-     * 完成后首页卡片直接命中缓存，秒出。
-     */
-    suspend fun prewarmHome() {
-        val job = kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]
-        prewarmJob = job
-        try {
-            ensureLoaded()
-            val loaded = _currentSite.value ?: return
-            val cats = _categories.value
-            if (cats.isEmpty()) return
-            coroutineScope {
-                cats.map { cat -> async {
-                    // 并发上限 3：避免冷启动十几个分类一窝蜂请求，抢占详情/播放的网络与 IO
-                    prewarmPermits.withPermit {
-                        // 强制网络刷新（不走 loadCategoryVideos 的缓存命中），刷新后写入内存；
-                        // 空结果不写缓存，避免覆盖磁盘恢复出来的有效数据
-                        runCatching { fetchCategoryVideos(loaded, cat) }
-                            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
-                            .getOrNull()
-                            ?.takeIf { it.isNotEmpty() }
-                            ?.let { homeCache["${loaded.site.key}|${cat.id}"] = it }
-                    }
-                } }.awaitAll()
-            }
-            persistHomeCache(loaded.site.key, cats)
-            _homeCacheVersion.value++
-            Log.d(REPO_TAG, "prewarmHome done cats=${cats.size}")
-        } finally {
-            if (prewarmJob === job) prewarmJob = null
         }
     }
 

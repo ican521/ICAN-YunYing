@@ -510,8 +510,8 @@ fun PlayerScreen(
         jarSpec: String,
         id: String,
     ): Video? = Players.detailOnce(siteKey, id) {
-        // 详情优先：用户点开详情即取消首页预热，让出网络与 IO（冷启动首次提速）
-        container.videoRepository.cancelHomePrewarm()
+        // 详情优先：用户点开详情即取消后台追番检测，让出网络与 IO（冷启动首次提速）
+        container.videoRepository.yieldForDetail()
         // 24h 详情磁盘缓存：同片再进直接命中，跳过 detailContent 多跳网络
         container.videoRepository.readDetailDiskCache(siteKey, id)
             ?: kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {

@@ -237,10 +237,6 @@ fun HomeScreen(
     // 分类 Tab 切换（点击 chip 翻页 / 手势滑动）不播：pager 一旦发生用户滚动就关闭，
     // 直到再次切换站源才重新开启。开关存放在 ViewModel 中，页面被回收重建也不会重播
     val animateNewCards by viewModel.animateCards.collectAsStateWithLifecycle()
-    // 启动 / 切站后后台预取其余分类的首页数据，快速滑 Tab 时直接命中缓存，不再出现短暂加载
-    LaunchedEffect(categories, currentSiteKey) {
-        viewModel.prefetchCategories()
-    }
 
     // 「全部」页已删除：分类就绪后默认选中第一个分类
     LaunchedEffect(categories) {
