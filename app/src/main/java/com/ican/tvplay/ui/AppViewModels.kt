@@ -10,6 +10,7 @@ import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.data.model.VideoCategory
 import com.ican.tvplay.data.remote.SuggestWordSource
 import com.ican.tvplay.data.remote.TvBoxSite
+import com.ican.tvplay.data.remote.VodStyle
 import com.ican.tvplay.ui.components.siteShortName
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -98,6 +99,14 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
                 site.name.contains("云盘") || site.name.contains("网盘")
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /**
+     * 站点声明的卡片样式（fongmi Site.style，如 {"type":"rect","ratio":1.33}）：
+     * fongmi 里站点样式优先于默认海报，一直播整站宽卡就是配置里带了这个字段
+     */
+    val siteStyle: StateFlow<VodStyle?> = repo.currentSite
+        .map { it?.site?.cardStyle() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
      * 首页卡片直达播放页前的预缓存（对齐搜索页 handlePlayClick）：

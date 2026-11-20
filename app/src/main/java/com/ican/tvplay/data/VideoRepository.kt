@@ -13,6 +13,9 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import com.ican.tvplay.data.remote.VodApiClient
 import com.ican.tvplay.data.remote.VodClass
 import com.ican.tvplay.data.remote.VodItem
+import com.ican.tvplay.data.remote.VodStyle
+import com.ican.tvplay.data.remote.parseStyle
+import com.ican.tvplay.data.remote.styleOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
@@ -936,6 +939,10 @@ class VideoRepository(
             action = s("action"),
             vodTag = s("vod_tag"),
             cate = obj["cate"],
+            style = obj["style"],
+            land = (obj["land"] as? JsonPrimitive)?.content?.toIntOrNull(),
+            circle = (obj["circle"] as? JsonPrimitive)?.content?.toIntOrNull(),
+            ratio = (obj["ratio"] as? JsonPrimitive)?.content?.toDoubleOrNull(),
         )
     }
 
@@ -978,6 +985,9 @@ class VideoRepository(
             isFolder = isFolderItem(),
             // cover 类型目录用横版宽卡渲染（OK猫 flag '2'）
             isCoverFolder = isCoverItem(),
+            // 条目自带样式（fongmi Vod.getStyle）：优先 style 字段，其次 land/circle/ratio 折算
+            cardStyleType = (style?.let { parseStyle(it) } ?: styleOf(land, circle, ratio))?.normalizedType().orEmpty(),
+            cardStyleRatio = (style?.let { parseStyle(it) } ?: styleOf(land, circle, ratio))?.effectiveRatio() ?: 0f,
         )
     }
 

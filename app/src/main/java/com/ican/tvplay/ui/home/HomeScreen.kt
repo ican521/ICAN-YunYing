@@ -109,6 +109,7 @@ import com.ican.tvplay.R
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.data.model.VideoCategory
 import com.ican.tvplay.data.remote.TvBoxSite
+import com.ican.tvplay.data.remote.VodStyle
 import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
@@ -213,6 +214,8 @@ fun HomeScreen(
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
     // 网盘源才有「单列行」：直播/短视源的目录卡（一直播的虎牙/斗鱼频道）走 4:3 宽卡
     val driveSite by viewModel.driveSite.collectAsStateWithLifecycle()
+    // 站点声明的卡片样式（fongmi Site.style）：一直播整站宽卡就来自这个字段
+    val siteStyle by viewModel.siteStyle.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     // 切站源加载态（统一「缓冲」阶段）：选新站先淡出旧内容，分类 Tab 与首页首屏卡片都就绪后一起淡入。
@@ -519,10 +522,29 @@ fun HomeScreen(
             // 数据回来后的兜底判定：type_flag 已定性的页面保持不变，其余按内容切换形状
             fun applyCardMode(list: List<Video>) {
                 if (driveStyle.value) return
+                // fongmi 样式优先级：本页首条自带 style / land / ratio 覆盖整页，其次站点 style
+                val itemStyle = list.firstOrNull()
+                    ?.takeIf { it.cardStyleType.isNotBlank() }
+                    ?.let { VodStyle(it.cardStyleType, it.cardStyleRatio.toDouble()) }
+                val declared = itemStyle ?: siteStyle
+                if (declared != null && com.ican.tvplay.BuildConfig.DEBUG) {
+                    android.util.Log.i(
+                        "HomeCardMode",
+                        "cat=${pageCategory?.id} src=${if (itemStyle != null) "item" else "site"} " +
+                            "type=${declared.normalizedType()} ratio=${declared.effectiveRatio()} " +
+                            "folders=${list.count { it.isFolder }}",
+                    )
+                }
                 when {
+                    // ① 分类 type_flag '1' 已在外层初始化成 driveStyle，这里只处理声明式样式
+                    declared != null && declared.isList() -> driveStyle.value = true
+                    declared != null && declared.normalizedType() == "rect" ->
+                        if (declared.effectiveRatio() > 1f) coverStyle.value = true
+                    // oval 圆形头像：沿用海报网格，不做特殊形状
+                    declared != null && declared.normalizedType() == "oval" -> Unit
                     list.any { it.isCoverFolder } -> coverStyle.value = true
                     // 目录卡：网盘源 → 单列行（真盘目录）；其它源（直播/短视的游戏频道等）→ 4:3 宽卡，
-                    // 与爱刷一致，点击仍然下钻（OK猫 里 folder 标签才 changeView）
+                    // 与爱刷一致，点击仍然下钻（fongmi 里 folder 标签才 openFolder）
                     list.any { it.isFolder } ->
                         if (driveSite) driveStyle.value = true else coverStyle.value = true
                     isChannelCardList(list) -> coverStyle.value = true
@@ -560,7 +582,7 @@ fun HomeScreen(
                     }
             }
             // 首次进入该页、分类变化、切站源或进出子目录时触发加载
-            LaunchedEffect(pageCategory?.id, currentSiteKey, folderStack.value, reloadToken, homeCacheVersion) {
+            LaunchedEffect(pageCategory?.id, currentSiteKey, siteStyle, folderStack.value, reloadToken, homeCacheVersion) {
                 if (pageCategory == null) {
                     pageLoading = false
                     return@LaunchedEffect

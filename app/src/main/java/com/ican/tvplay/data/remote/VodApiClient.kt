@@ -7,6 +7,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.Call
 import okhttp3.Connection
@@ -47,6 +48,8 @@ data class TvBoxSite(
     val searchable: Int = 1,
     val changeable: Int = 1,
     val ext: JsonElement? = null,
+    /** 站点声明的卡片样式（fongmi Site.style）：原样保留 JSON，解析失败不影响站点加载 */
+    val style: JsonElement? = null,
 ) {
     /** 是否 spider 站（type=3 + api=csp_Xxx） */
     fun isSpider(): Boolean = type == 3 && api.startsWith("csp_")
@@ -57,6 +60,9 @@ data class TvBoxSite(
         is JsonPrimitive -> if (e.isString) e.content else e.toString()
         else -> e.toString()
     }
+
+    /** 站点声明的卡片样式（fongmi Site.style）：解析失败/未声明都返回 null */
+    fun cardStyle(): VodStyle? = style?.let { el -> parseStyle(el) }
 }
 
 /** 分类（ac=class 返回的 class 数组元素） */
@@ -88,6 +94,14 @@ data class VodItem(
     @SerialName("vod_tag") val vodTag: String = "",
     /** 目录元数据（fongmi Vod.cate）：非空同样表示文件夹（部分网盘站源用 cate 而非 vod_tag 标记） */
     @SerialName("cate") val cate: JsonElement? = null,
+    /** 条目自带样式（fongmi Vod.style）：原样保留 JSON，交给 parseStyle 解析 */
+    val style: JsonElement? = null,
+    /** fongmi Vod.land：1 = 横版宽卡（默认 4:3） */
+    val land: Int? = null,
+    /** fongmi Vod.circle：1 = 圆形头像卡 */
+    val circle: Int? = null,
+    /** fongmi Vod.ratio：宽高比，0.75 = 3:4 海报，1.33 = 4:3 宽卡 */
+    val ratio: Double? = null,
 ) {
     /** fongmi Vod.isFolder()：vod_tag == "folder"/"cover" 或带 cate 目录元数据 */
     fun isFolderItem(): Boolean = vodTag == "folder" || vodTag == "cover" || (cate != null && cate.toString() != "null")
@@ -95,6 +109,50 @@ data class VodItem(
     /** 带缩略图的目录（vod_tag == "cover"）：OK猫 flag '2' 的横版宽卡 */
     fun isCoverItem(): Boolean = vodTag == "cover"
 }
+
+/**
+ * 卡片样式（fongmi Style）：
+ * type = rect(矩形，按 ratio) / oval(圆形) / list(单列行)；ratio 为宽高比，缺省按 fongmi 规则补 0.75 或 1.33
+ */
+@Serializable
+data class VodStyle(
+    val type: String = "",
+    val ratio: Double = 0.0,
+) {
+    fun normalizedType(): String = type.trim().lowercase().ifEmpty { "rect" }
+
+    /** fongmi Style.getRatio：ratio<=0 时按类型补默认值，上限 4 */
+    fun effectiveRatio(): Float {
+        val t = normalizedType()
+        val r = if (ratio > 0.0) ratio.toFloat() else if (t == "oval") 1.0f else 0.75f
+        return r.coerceAtMost(4f)
+    }
+
+    fun isList(): Boolean = normalizedType() == "list"
+
+    /** 横版宽卡：矩形且宽高比 > 1（fongmi Style.isLand） */
+    fun isLand(): Boolean = normalizedType() == "rect" && effectiveRatio() > 1.0f
+}
+
+/** 把 fongmi 的 land/circle/ratio 三件套折算成样式（无信号返回 null） */
+fun styleOf(land: Int?, circle: Int?, ratio: Double?): VodStyle? = when {
+    land == 1 -> VodStyle(type = "rect", ratio = if (ratio != null && ratio > 0.0) ratio else 1.33)
+    circle == 1 -> VodStyle(type = "oval", ratio = if (ratio != null && ratio > 0.0) ratio else 1.0)
+    ratio != null && ratio > 0.0 -> VodStyle(type = "rect", ratio = ratio)
+    else -> null
+}
+
+/** style 允许写成对象 {"type":"list"} 或裸字符串 "list"，两种都容忍 */
+fun parseStyle(el: JsonElement): VodStyle? = runCatching {
+    when (el) {
+        is JsonPrimitive -> if (el.isString && el.content.isNotBlank()) VodStyle(type = el.content) else null
+        is JsonObject -> VodStyle(
+            type = (el["type"] as? JsonPrimitive)?.content.orEmpty(),
+            ratio = (el["ratio"] as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0,
+        )
+        else -> null
+    }
+}.getOrNull()
 
 /** 列表/分类接口返回 */
 @Serializable

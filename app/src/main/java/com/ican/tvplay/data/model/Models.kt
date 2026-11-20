@@ -53,4 +53,8 @@ data class Video(
     val isFolder: Boolean = false,
     /** 带缩略图的目录（vod_tag == "cover"）：点击同样进入目录，但用横版宽卡渲染（对齐 OK猫 flag '2'） */
     val isCoverFolder: Boolean = false,
+    /** 条目自带卡片样式类型（fongmi Vod.style.type: rect/oval/list），空 = 无信号 */
+    val cardStyleType: String = "",
+    /** 条目自带宽高比（fongmi Vod.style.ratio / land / circle 折算），0 = 无信号 */
+    val cardStyleRatio: Float = 0f,
 )
