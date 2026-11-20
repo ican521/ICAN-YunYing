@@ -73,6 +73,9 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     /** 分类列表：响应式，配置异步加载完成后自动推送 */
     val categories: StateFlow<List<VideoCategory>> = repo.categoriesFlow
 
+    /** 首屏缓存版本号：首页「推荐」卡片晚到（缓存恢复后网络又刷新）时页面据此重取 */
+    val homeCacheVersion: StateFlow<Int> = repo.homeCacheVersion
+
     /** 当前站源名；未加载成功时为「未配置」 */
     val siteName: StateFlow<String> = repo.currentSite
         .map { it?.site?.name?.takeIf { n -> n.isNotBlank() } ?: "未配置" }

@@ -247,17 +247,21 @@ class VodApiClient(
         }
 
     /** 拉取首页分类（ac=class） */
-    suspend fun homeClasses(site: TvBoxSite): List<VodClass> = withContext(Dispatchers.IO) {
-        runCatching {
-            val url = buildUrl(site.api, mapOf("ac" to "class"))
-            Log.d(TAG, "homeClasses url=$url")
-            val body = get(url)
-            Log.d(TAG, "homeClasses bytes=${body.length}, head=${body.take(200)}")
-            val result = json.decodeFromString<VodListResult>(body)
-            Log.d(TAG, "homeClasses classes=${result.classes.size} list=${result.list.size}")
-            result.classes
-        }.onFailure { Log.e(TAG, "homeClasses fail", it) }.getOrDefault(emptyList())
-    }
+    suspend fun homeClasses(site: TvBoxSite): List<VodClass> = homeClassesAndList(site).first
+
+    /** 拉取首页分类 + 首页推荐位卡片（同一响应里的 list，OK猫 的 my0「主页」来源） */
+    suspend fun homeClassesAndList(site: TvBoxSite): Pair<List<VodClass>, List<VodItem>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val url = buildUrl(site.api, mapOf("ac" to "class"))
+                Log.d(TAG, "homeClasses url=$url")
+                val body = get(url)
+                Log.d(TAG, "homeClasses bytes=${body.length}, head=${body.take(200)}")
+                val result = json.decodeFromString<VodListResult>(body)
+                Log.d(TAG, "homeClasses classes=${result.classes.size} list=${result.list.size}")
+                result.classes to result.list
+            }.onFailure { Log.e(TAG, "homeClasses fail", it) }.getOrDefault(emptyList<VodClass>() to emptyList())
+        }
 
     /** 拉取分类下视频列表 */
     suspend fun categoryVideos(site: TvBoxSite, typeId: String, page: Int = 1): List<VodItem> =

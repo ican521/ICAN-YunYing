@@ -43,6 +43,16 @@ private const val REPO_TAG = "VodApi"
 /** 详情磁盘缓存有效期：24h 内同片再进直接命中（fongmi 式详情缓存，首次仍需网络） */
 private const val DETAIL_DISK_TTL_MS = 24L * 60 * 60 * 1000
 
+/**
+ * 首页「推荐」虚拟分类 id（对标 OK猫 的 my0「主页」）：
+ * 卡片来自 homeContent 自带 list，不额外发 categoryContent，
+ * 所以切源时「分类 + 首屏卡片」在同一个请求里一起到，不用再等一次分类请求。
+ */
+const val HOME_REC_CATEGORY_ID = "my0"
+
+/** 首页「推荐」虚拟分类名称（顶部 Tab 文案） */
+private const val HOME_REC_CATEGORY_NAME = "推荐"
+
 /** 一次播放所需的 URL 与请求头 */
 data class PlaySource(
     val url: String,
@@ -258,19 +268,25 @@ class VideoRepository(
             val homeJson = spiderManager.homeContent(spider, filter = true)
             val classes = parseClasses(homeJson)
             Log.d("Startup", "reload: homeContent done classes=${classes.size}")
-            _categories.value = classes.map {
+            val rec = parseRecVideos(homeJson)
+            // 分类就绪后把上次落盘的首页数据读回内存（冷启动秒出）；先读盘再发布，避免旧的推荐卡片覆盖新抓的
+            loadDiskCacheIntoMemory(loaded.site.key)
+            publishCategories(loaded.site.key, classes.map {
                 VideoCategory(id = it.typeId, name = it.typeName)
-            }
-            Log.d("Startup", "reload: categories published size=${classes.size}")
+            }, rec)
+            Log.d("Startup", "reload: categories published size=${_categories.value.size} rec=${rec.size}")
         } else {
             // HTTP 采集站
             currentSpider = null
-            _categories.value = apiClient.homeClasses(loaded.site).map {
-                VideoCategory(id = it.typeId, name = it.typeName)
+            val (classes, recList) = apiClient.homeClassesAndList(loaded.site)
+            val rec = recList.map {
+                it.toVideo(VideoCategory(HOME_REC_CATEGORY_ID, HOME_REC_CATEGORY_NAME))
             }
+            loadDiskCacheIntoMemory(loaded.site.key)
+            publishCategories(loaded.site.key, classes.map {
+                VideoCategory(id = it.typeId, name = it.typeName)
+            }, rec)
         }
-        // 分类就绪后把上次落盘的首页数据读回内存（冷启动秒出）
-        loadDiskCacheIntoMemory(loaded.site.key)
         persistConfigCache(loaded)
     }
 
@@ -292,6 +308,27 @@ class VideoRepository(
     }
 
     fun getCategories(): List<VideoCategory> = _categories.value
+
+    /** homeContent 自带 list → 「推荐」卡片（对标 OK猫 my0「主页」，随分类同一次请求返回） */
+    private fun parseRecVideos(json: String): List<Video> =
+        parseList(json).map { it.toVideo(VideoCategory(HOME_REC_CATEGORY_ID, HOME_REC_CATEGORY_NAME)) }
+
+    /**
+     * 发布分类列表：有推荐卡片时把「推荐」作为第一个 tab，并在发布时直接把卡片落进首屏缓存，
+     * 于是首屏那一页不发 categoryContent，切源的就绪时间 = homeContent 一次请求。
+     */
+    private fun publishCategories(siteKey: String, cats: List<VideoCategory>, rec: List<Video>) {
+        if (rec.isNotEmpty()) {
+            homeCache["$siteKey|$HOME_REC_CATEGORY_ID"] = rec
+            // 通知页面：首屏缓存换了新数据（冷启动缓存恢复后又拿到网络推荐位时，页面要重取一次）
+            _homeCacheVersion.value++
+        }
+        _categories.value = if (rec.isEmpty()) {
+            cats
+        } else {
+            listOf(VideoCategory(id = HOME_REC_CATEGORY_ID, name = HOME_REC_CATEGORY_NAME)) + cats
+        }
+    }
 
     /** 配置中全部可切换站点（spider + HTTP） */
     suspend fun listSites(): List<TvBoxSite> {
@@ -483,30 +520,33 @@ class VideoRepository(
             val homeJson = spiderManager.homeContent(spider, filter = true)
             if (!isLatestSiteLoad(gen)) return false
             val cats = parseClasses(homeJson).map { VideoCategory(id = it.typeId, name = it.typeName) }
-            // 空分类视为该源不可用：不写回分类，也不覆盖配置缓存，下次启动仍回到上一个可用源
-            if (cats.isEmpty()) return false
+            // 首页推荐卡片：和分类同一次请求拿到，切源不必再等一次 categoryContent
+            val rec = parseRecVideos(homeJson)
+            // 空分类且无推荐卡片视为该源不可用：不写回分类，也不覆盖配置缓存，下次启动仍回到上一个可用源
+            if (cats.isEmpty() && rec.isEmpty()) return false
             commitLatestSiteLoad(gen) {
                 currentSpider = spider
                 _currentSite.value = loaded
-                _categories.value = cats
                 loadDiskCacheIntoMemory(loaded.site.key)
+                publishCategories(loaded.site.key, cats, rec)
                 persistConfigCache(loaded)
             }
-            Log.d("Startup", "switch: categories published size=${cats.size}")
+            Log.d("Startup", "switch: categories published size=${cats.size} rec=${rec.size}")
             return true
         } else {
-            val cats = apiClient.homeClasses(loaded.site)
-                .map { VideoCategory(id = it.typeId, name = it.typeName) }
+            val (classes, recList) = apiClient.homeClassesAndList(loaded.site)
             if (!isLatestSiteLoad(gen)) return false
-            if (cats.isEmpty()) return false
+            val cats = classes.map { VideoCategory(id = it.typeId, name = it.typeName) }
+            val rec = recList.map { it.toVideo(VideoCategory(HOME_REC_CATEGORY_ID, HOME_REC_CATEGORY_NAME)) }
+            if (cats.isEmpty() && rec.isEmpty()) return false
             commitLatestSiteLoad(gen) {
                 currentSpider = null
                 _currentSite.value = loaded
-                _categories.value = cats
                 loadDiskCacheIntoMemory(loaded.site.key)
+                publishCategories(loaded.site.key, cats, rec)
                 persistConfigCache(loaded)
             }
-            Log.d("Startup", "switch: categories published size=${cats.size}")
+            Log.d("Startup", "switch: categories published size=${cats.size} rec=${rec.size}")
             return true
         }
     }
@@ -740,6 +780,8 @@ class VideoRepository(
         loaded: LoadedSite,
         cat: VideoCategory,
     ): List<Video> {
+        // 「推荐」是虚拟分类，卡片只来自 homeContent 本地缓存；缓存未命中就返回空，绝不发 categoryContent
+        if (cat.id == HOME_REC_CATEGORY_ID) return emptyList()
         return if (loaded.site.isSpider()) {
             // 冷启动时「配置+分类」先由磁盘缓存恢复，spider 仍在后台加载（[ensureLoaded] 网络刷新）。
             // 此时直接取会拿到空列表，历史上还会把空列表写进缓存与磁盘 → 之后每次启动首页都空白。

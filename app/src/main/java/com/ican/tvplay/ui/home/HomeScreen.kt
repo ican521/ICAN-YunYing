@@ -206,6 +206,8 @@ fun HomeScreen(
 
     val contentPadding = topLevelContentPadding()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
+    // 首屏缓存版本：首页「推荐」卡片晚到（启动先读磁盘、网络随后刷新）时，页面靠它重取一次
+    val homeCacheVersion by viewModel.homeCacheVersion.collectAsStateWithLifecycle()
     val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     // 当前站源 key：切站后即使新旧站分类 id 完全相同，也要强制各页重新取数（修复切站后首页内容不刷新）
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
@@ -527,7 +529,7 @@ fun HomeScreen(
                     }
             }
             // 首次进入该页、分类变化、切站源或进出子目录时触发加载
-            LaunchedEffect(pageCategory?.id, currentSiteKey, folderStack.value, reloadToken) {
+            LaunchedEffect(pageCategory?.id, currentSiteKey, folderStack.value, reloadToken, homeCacheVersion) {
                 if (pageCategory == null) {
                     pageLoading = false
                     return@LaunchedEffect
