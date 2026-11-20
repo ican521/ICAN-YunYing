@@ -1339,7 +1339,10 @@ fun PlayerScreen(
         val pAnimCorner = portraitTransition.animateDp(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "pAnimCorner",
-        ) { expanded -> if (expanded) deviceCorner else Spacing.corner }
+        ) { expanded ->
+            // 竖屏预览小窗不要圆角（用户要求直角满宽铺）；放大到全屏才逐步收成设备屏幕圆角
+            if (expanded) deviceCorner else 0.dp
+        }
 
         LaunchedEffect(portraitZoomToken) {
             if (portraitZooming) {
