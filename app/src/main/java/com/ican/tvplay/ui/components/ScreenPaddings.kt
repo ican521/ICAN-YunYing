@@ -57,7 +57,9 @@ fun topLevelContentPadding(): PaddingValues {
  * 手机（<600dp）：小=3列、中=2列（大不开放）。
  * 平板：全部按「最小卡宽」自适应，列数随屏幕宽度自动变化（对齐 OK猫「卡片物理尺寸固定、列数由宽度算」的思路），
  * 这样横竖屏切换、不同尺寸的平板都能保持同样的卡片观感，不会一台偏大一台偏小。
- * 中号取 210dp：1069dp 横屏 ≈5 列、668dp 竖屏 ≈3 列。
+ * 中号取 190dp：Compose 的 Adaptive 是 floor((可用宽 + 间距) / (最小卡宽 + 间距))，
+ * 可用宽要先扣掉页面左右各 16dp、再扣卡片间距 16dp——
+ * 1069dp 横屏：(1037+16)/206≈5.1 → 5 列；668dp 竖屏：(636+16)/206≈3.2 → 3 列。
  */
 @Composable
 fun videoGridColumns(size: HomeLayoutSize): GridCells =
@@ -65,7 +67,7 @@ fun videoGridColumns(size: HomeLayoutSize): GridCells =
         if (size == HomeLayoutSize.SMALL) GridCells.Fixed(3) else GridCells.Fixed(2)
     } else {
         when (size) {
-            HomeLayoutSize.MEDIUM -> GridCells.Adaptive(minSize = 210.dp)
+            HomeLayoutSize.MEDIUM -> GridCells.Adaptive(minSize = 190.dp)
             HomeLayoutSize.SMALL -> GridCells.Adaptive(minSize = 132.dp)
             HomeLayoutSize.LARGE -> GridCells.Adaptive(minSize = 300.dp)
         }
