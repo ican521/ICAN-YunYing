@@ -211,6 +211,15 @@ fun HomeScreen(
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
+    // 切站源时顶部分类 Tab 的淡出/淡入：选新站先淡出旧 tab，新分类就绪后淡入
+    var tabsFadedOut by remember { mutableStateOf(false) }
+    var pendingOldCategories by remember { mutableStateOf<List<VideoCategory>?>(null) }
+    val tabsAlpha by animateFloatAsState(
+        targetValue = if (tabsFadedOut) 0f else 1f,
+        animationSpec = tween(150),
+        label = "homeTabsAlpha",
+    )
+
     // 卡片逐条渐显只在「App 启动首次加载」和「切换站源后的首次加载」播放；
     // 分类 Tab 切换（点击 chip 翻页 / 手势滑动）不播：pager 一旦发生用户滚动就关闭，
     // 直到再次切换站源才重新开启。开关存放在 ViewModel 中，页面被回收重建也不会重播
@@ -224,6 +233,16 @@ fun HomeScreen(
     LaunchedEffect(categories) {
         if (selectedCategory == null && categories.isNotEmpty()) {
             viewModel.selectCategory(categories.first().id)
+        }
+    }
+
+    // 新站源分类就绪（引用变化且非空）→ 淡入新 tab
+    LaunchedEffect(categories) {
+        if (tabsFadedOut && pendingOldCategories != null &&
+            categories !== pendingOldCategories && categories.isNotEmpty()
+        ) {
+            tabsFadedOut = false
+            pendingOldCategories = null
         }
     }
 
@@ -767,7 +786,7 @@ fun HomeScreen(
                                     }
                                 }
                                 // 1：固定分类 Tab：通栏可滑至屏幕最左/最右缘，静止时首个/末个 Tab 由内部 contentPadding 对齐卡片圆角/直线交界处（左右对称）
-                                Box(modifier = Modifier.fillMaxWidth()) {
+                                Box(modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = tabsAlpha }) {
                                     CategoryChips(
                                         categories = categories,
                                         pagerState = pagerState,
@@ -798,6 +817,10 @@ fun HomeScreen(
         sites = siteList,
         currentKey = currentSiteKey,
         onSelect = { site ->
+            if (site.key != currentSiteKey) {
+                pendingOldCategories = categories
+                tabsFadedOut = true
+            }
             viewModel.switchSite(site.key)
             showSitePicker = false
         },
