@@ -211,14 +211,24 @@ fun HomeScreen(
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    // 切站源时顶部分类 Tab 与视频卡片一起淡出/淡入：选新站先淡出旧内容，新分类就绪后淡入
-    var tabsFadedOut by remember { mutableStateOf(false) }
-    var pendingOldCategories by remember { mutableStateOf<List<VideoCategory>?>(null) }
+    // 切站源加载态（统一「缓冲」阶段）：选新站先淡出旧内容，分类 Tab 与首页首屏卡片都就绪后一起淡入。
+    // 两条规则：① 300ms 内就绪 → 直接淡入，不出现转圈；② 超过 1.2s 仍未就绪 → 先把 Tab 放出来（导航可用），
+    // 卡片区继续转圈，等卡片就绪后再淡入内容
+    var switching by remember { mutableStateOf(false) }
+    var categoriesReady by remember { mutableStateOf(false) }
+    var firstPageReady by remember { mutableStateOf(false) }
+    var tabsPeeking by remember { mutableStateOf(false) }
+    var showSwitchSpinner by remember { mutableStateOf(false) }
     var pendingSiteKey by remember { mutableStateOf<String?>(null) }
-    val homeSwitchAlpha by animateFloatAsState(
-        targetValue = if (tabsFadedOut) 0f else 1f,
+    val tabsSwitchAlpha by animateFloatAsState(
+        targetValue = if (switching && !tabsPeeking) 0f else 1f,
         animationSpec = tween(150),
-        label = "homeSwitchAlpha",
+        label = "tabsSwitchAlpha",
+    )
+    val contentSwitchAlpha by animateFloatAsState(
+        targetValue = if (switching) 0f else 1f,
+        animationSpec = tween(150),
+        label = "contentSwitchAlpha",
     )
 
     // 卡片逐条渐显只在「App 启动首次加载」和「切换站源后的首次加载」播放；
@@ -237,17 +247,32 @@ fun HomeScreen(
         }
     }
 
-    // 淡入只有一个触发点：本次 switchSite 返回（见下方 SitePickerDialog.onSelect）。
-    // 不再按「分类变化 / 站源 key 变化」自动淡入 —— 连续切源时第一个源的分类先到会被提前淡入，
-    // 第二个源提交时又把 tab 清空，表现为「tab 闪现一下」
+    // 淡入只有一个触发点：分类就绪 + 首屏第一页卡片就绪，两端都满足才结束切换（Tab 与卡片一起淡入）
+    LaunchedEffect(switching, categoriesReady, firstPageReady) {
+        if (switching && categoriesReady && firstPageReady) {
+            switching = false
+            tabsPeeking = false
+            pendingSiteKey = null
+        }
+    }
 
-    // 兜底：淡出后长时间没有新分类（站源挂了 / homeContent 超时），自动淡入，避免首页一直隐形
-    LaunchedEffect(tabsFadedOut, pendingSiteKey) {
-        if (!tabsFadedOut) return@LaunchedEffect
-        delay(25_000)
-        if (tabsFadedOut) {
-            tabsFadedOut = false
-            pendingOldCategories = null
+    // 时间阈值 + 最后保险：
+    // ① 300ms 后才显示转圈（快源直接淡入，不闪一下转圈）；
+    // ② 累计 1.2s 仍未就绪 → 先放 Tab 出来，卡片区继续转圈；
+    // ③ 累计约 25s 兜底结束切换，避免站源异常时首页被锁死
+    LaunchedEffect(switching) {
+        if (!switching) {
+            showSwitchSpinner = false
+            tabsPeeking = false
+            return@LaunchedEffect
+        }
+        delay(300)
+        if (switching) showSwitchSpinner = true
+        delay(900)
+        if (switching) tabsPeeking = true
+        delay(23_500)
+        if (switching) {
+            switching = false
             pendingSiteKey = null
         }
     }
@@ -426,7 +451,7 @@ fun HomeScreen(
 
         // 内容层（切站源时与顶部 Tab 一起淡出旧卡片，新内容就绪后一起淡入）
         Box(
-            modifier = Modifier.graphicsLayer { alpha = homeSwitchAlpha },
+            modifier = Modifier.graphicsLayer { alpha = contentSwitchAlpha },
         ) {
 
         // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；
@@ -517,6 +542,8 @@ fun HomeScreen(
                         }
                         pageVideos.value = cached
                         pageLoading = false
+                        // 首屏第一页命中缓存即视为「卡片就绪」，切站缓冲据此结束
+                        if (page == 0) firstPageReady = true
                         return@LaunchedEffect
                     }
                 }
@@ -541,6 +568,8 @@ fun HomeScreen(
                     }
                 } finally {
                     pageLoading = false
+                    // 首屏第一页的数据（含空结果）一落地就算就绪
+                    if (page == 0 && folder == null) firstPageReady = true
                 }
             }
             // 子目录内按返回键退回上一级（fongmi FolderFragment.goBack → popBackStack）
@@ -690,8 +719,8 @@ fun HomeScreen(
         }
 
         // 站源没有任何分类（该源加载失败 / 源站不可达）：给居中空态，避免整片白屏。
-        // 切站淡出期间不渲染：那时分类已被乐观清空，但淡出动画还没走完，会短暂闪一下这行字
-        if (!tabsFadedOut && categories.isEmpty()) {
+        // 切站期间不渲染（那时分类已被乐观清空），只有切换结束且分类仍为空才显示
+        if (!switching && categories.isEmpty()) {
             EmptyState(
                 text = "该站源暂无内容，可换源重试",
                 modifier = Modifier.padding(
@@ -700,6 +729,13 @@ fun HomeScreen(
                 ),
             )
         }
+        }
+
+        // 切站缓冲中的整页转圈：内容层此时 alpha=0，这里独立显示，保证等待期间有明确反馈
+        if (switching && showSwitchSpinner) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                ArcStretchSpinner()
+            }
         }
 
         // 顶区悬浮层：搜索 + 历史 / 分类 Tab
@@ -804,7 +840,7 @@ fun HomeScreen(
                                     }
                                 }
                                 // 1：固定分类 Tab：通栏可滑至屏幕最左/最右缘，静止时首个/末个 Tab 由内部 contentPadding 对齐卡片圆角/直线交界处（左右对称）
-                                Box(modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = homeSwitchAlpha }) {
+                                Box(modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = tabsSwitchAlpha }) {
                                     CategoryChips(
                                         categories = categories,
                                         pagerState = pagerState,
@@ -836,19 +872,22 @@ fun HomeScreen(
         currentKey = currentSiteKey,
         onSelect = { site ->
             if (site.key != currentSiteKey) {
-                pendingOldCategories = categories
+                // 进入切站缓冲：淡出旧内容，等「分类 + 首屏卡片」双就绪再淡入
                 pendingSiteKey = site.key
-                tabsFadedOut = true
+                categoriesReady = false
+                firstPageReady = false
+                switching = true
             }
             showSitePicker = false
-            // 切站流程一结束就淡入：成功→新内容，失败→新站空态 + 提示。
-            // 不再依赖「分类变化」或 25s 兜底（源站挂掉时那两段等待会让首页长时间空白）
+            // 分类结果回来：成功则等首屏卡片就绪后统一淡入；失败立刻结束切换 → 新站空态 + 提示
             scope.launch {
                 val ok = viewModel.switchSite(site.key)
-                pendingOldCategories = null
-                pendingSiteKey = null
-                tabsFadedOut = false
-                if (!ok) {
+                if (ok) {
+                    categoriesReady = true
+                } else {
+                    switching = false
+                    tabsPeeking = false
+                    pendingSiteKey = null
                     android.widget.Toast.makeText(
                         context,
                         "「${site.name}」加载失败，可换源重试",
