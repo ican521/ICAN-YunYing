@@ -56,6 +56,9 @@ object PlayerLauncher {
         flag: String = "",
         preInit: Boolean = false,
         forceStart: Boolean = false,
+        // 卡片标题提示：部分源（如爱刷这类频道卡）详情接口返回的 vod_name 为空，
+        // 传进来作为标题兜底，避免详情页标题行空白
+        titleHint: String = "",
     ) {
         val intent = Intent(context, PlayerActivity::class.java)
             .putExtra(PlayerActivity.EXTRA_VIDEO_ID, videoId)
@@ -63,6 +66,7 @@ object PlayerLauncher {
             .putExtra(PlayerActivity.EXTRA_FLAG, flag)
             .putExtra(PlayerActivity.EXTRA_PRE_INIT, preInit)
             .putExtra(PlayerActivity.EXTRA_FORCE_START, forceStart)
+            .putExtra(PlayerActivity.EXTRA_TITLE_HINT, titleHint)
         if (context !is android.app.Activity) {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -113,6 +117,7 @@ class PlayerActivity : ComponentActivity(), PlayerHost {
         val flag = intent.getStringExtra(EXTRA_FLAG).orEmpty()
         val preInit = intent.getBooleanExtra(EXTRA_PRE_INIT, false)
         val forceStart = intent.getBooleanExtra(EXTRA_FORCE_START, false)
+        val titleHint = intent.getStringExtra(EXTRA_TITLE_HINT).orEmpty()
 
         setContent {
             val container = appContainer()
@@ -144,6 +149,7 @@ class PlayerActivity : ComponentActivity(), PlayerHost {
                                 startFlag = flag,
                                 preInitialized = preInit,
                                 forceStart = forceStart,
+                                titleHint = titleHint,
                                 onBack = { finish() },
                             )
                         }
@@ -332,5 +338,6 @@ class PlayerActivity : ComponentActivity(), PlayerHost {
         const val EXTRA_FLAG = "extra_flag"
         const val EXTRA_PRE_INIT = "extra_pre_init"
         const val EXTRA_FORCE_START = "extra_force_start"
+    const val EXTRA_TITLE_HINT = "extra_title_hint"
     }
 }

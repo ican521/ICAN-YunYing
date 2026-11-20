@@ -8,5 +8,8 @@ package com.ican.tvplay.ui.components
 fun siteShortName(name: String, fallback: String = ""): String {
     val idx = name.indexOfAny(charArrayOf('\u2503', '\uFF5C', '|', '\u4E28', '\uFE31'))
     val cut = if (idx >= 0) name.substring(0, idx) else name
-    return cut.trim().ifBlank { fallback }
+    // 去掉开头的 emoji / 装饰符号：配置里常见 "♻️爱刷┃短视" 这类写法，展示时只要 "爱刷"。
+    // 只裁掉开头的非文字非数字字符，名称内部的符号（如 "OK猫"）不受影响
+    val clean = cut.replace(Regex("^[^\\p{L}\\p{N}]+"), "").trim()
+    return clean.ifBlank { cut.trim() }.ifBlank { fallback }
 }

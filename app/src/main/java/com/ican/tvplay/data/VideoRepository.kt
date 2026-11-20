@@ -648,6 +648,12 @@ class VideoRepository(
         val item = fetchDetail(loaded, videoId) ?: return null
         val catName = item.typeName.ifBlank { "未知" }
         return item.toVideo(VideoCategory(id = "", name = catName), withEpisodes = true)
+            // 站源名回填：详情接口通常不带站点信息，缺了就会在详情页回退显示成线路名（如「刷刷刷」）
+            .copy(
+                sourceName = com.ican.tvplay.ui.components.siteShortName(
+                    loaded.site.name, loaded.site.key,
+                ),
+            )
             .also {
                 detailCache[videoId] = it
                 writeDetailDiskCache(loaded.site.key, videoId, it)

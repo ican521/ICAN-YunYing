@@ -128,6 +128,7 @@ fun AppRoot() {
             flag: String = "",
             preInit: Boolean = false,
             forceStart: Boolean = false,
+            titleHint: String = "",
         ) {
             val now = System.currentTimeMillis()
             if (now - lastCardNavAt.longValue < 600L) return
@@ -139,6 +140,7 @@ fun AppRoot() {
                 flag = flag,
                 preInit = preInit,
                 forceStart = forceStart,
+                titleHint = titleHint,
             )
         }
 
@@ -246,7 +248,8 @@ fun AppRoot() {
                                     if (id.isEmpty() || id.startsWith("msearch:")) {
                                         pushCardRouteThrottled(Route.Search(video.title))
                                     } else if (guardPlay()) {
-                                        openPlayer(id, 0)
+                                        // 带上卡片标题：详情接口不给标题的源（爱刷频道卡）靠它兜底
+                                        openPlayer(id, 0, titleHint = video.title)
                                     }
                                 },
                                 onSearchClick = { navigator.push(Route.Search()) },

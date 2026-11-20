@@ -202,6 +202,7 @@ import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameMillis
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -259,6 +260,8 @@ fun PlayerScreen(
     preInitialized: Boolean = false,
     /** 追番更新入口：强制从 [startEpisode] 开播，不被历史记录覆盖 */
     forceStart: Boolean = false,
+    /** 卡片标题提示：详情接口 vod_name 为空时（如爱刷频道卡）用它兜底标题行 */
+    titleHint: String = "",
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -357,6 +360,10 @@ fun PlayerScreen(
     // 竖屏全屏：OK猫 PlayFragment.changedLandscape 同款——视频是竖屏时进全屏只把播放器放大铺满，
     // 完全不请求旋转（设备保持竖屏），退出时也不等旋转
     var portraitFullscreen by remember { mutableStateOf(false) }
+    // 竖屏小窗↔竖屏全屏的缩放过渡：照抄横屏那套 expandTransition 做法
+    // （竖屏片源进全屏不旋转，旧实现是 fullscreen 直接跳变，画面/信息流瞬间瞬移，没有过渡）
+    var portraitZooming by remember { mutableStateOf(false) }
+    var portraitZoomToken by remember { mutableIntStateOf(0) }
     // 字幕设置侧边栏：根级渲染，保证竖屏/全屏/横屏都能全高覆盖
     var showSubtitleSettings by remember { mutableStateOf(false) }
     // 横屏小窗↔全屏放大/缩回动画进行中：期间只渲染纯视频，不挂任何覆盖层
@@ -530,6 +537,12 @@ fun PlayerScreen(
                     }
                 }.getOrNull() ?: return@withContext null
                 with(com.ican.tvplay.data.remote.VodParse) { item.toVideo(withEpisodes = true) }
+                    // 站源名回填（与 getVideo 同款）：否则详情页只能拿线路名兜底，爱刷会显示成「刷刷刷」
+                    .copy(
+                        sourceName = com.ican.tvplay.ui.components.siteShortName(
+                            site.name, siteKey,
+                        ),
+                    )
                     .also { container.videoRepository.writeDetailDiskCache(siteKey, id, it) }
             }
     }
@@ -584,6 +597,8 @@ fun PlayerScreen(
             }.getOrNull()
             v = if (full != null) {
                 val merged = full.copy(
+                    // 详情标题为空时沿用卡片标题（爱刷这类源详情不给 vod_name）
+                    title = full.title.ifBlank { v.title },
                     sourceName = v.sourceName.ifBlank {
                         com.ican.tvplay.ui.components.siteShortName(
                             metaEntry.site.name, metaEntry.siteKey,
@@ -612,7 +627,20 @@ fun PlayerScreen(
                 container.videoRepository.getVideo(videoId)
             }
         }
-        video = v
+        // 详情缺标题/站源时的兜底：标题用卡片标题（titleHint），站源用当前站源短名。
+        // 部分源（爱刷这类频道卡）详情返回的 vod_name 为空、详情缓存里也可能没有 sourceName
+        val fallbackSiteName = com.ican.tvplay.ui.components.siteShortName(
+            Players.cachedVideo
+                ?.takeIf { it.video.id == videoId }
+                ?.let { it.site?.name.orEmpty() }
+                .orEmpty(),
+        )
+        video = v?.let { item ->
+            item.copy(
+                title = item.title.ifBlank { titleHint },
+                sourceName = item.sourceName.ifBlank { fallbackSiteName },
+            )
+        }
         if (v != null) {
             val history = container.historyDao.observeOne(videoId).first()
             // 恢复上次所选线路：调用方未指定线路（搜索页等）或指定的线路在新详情中不存在时，
@@ -975,7 +1003,8 @@ fun PlayerScreen(
     // 全屏/放大动画期间自动收起状态栏，缩回小窗收敛后恢复（旋转请求在挂起触发处先行发出）；
     // 进入全屏后的旋转等待期（pendingFullscreen）也要收起系统栏，否则旋转动画中顶部/底部
     // 会露出浅色状态栏/导航栏，看着像视频头尾由白色渐变成黑色
-    val immersive = fullscreen || landscapeFullscreen || landZooming || pendingFullscreen != null
+    val immersive = fullscreen || landscapeFullscreen || landZooming || portraitZooming ||
+        pendingFullscreen != null
     LaunchedEffect(immersive) {
         Players.isFullscreen = immersive
         val activity = context as? Activity ?: return@LaunchedEffect
@@ -1081,12 +1110,12 @@ fun PlayerScreen(
                 landZooming = true
                 landZoomToken++
             } else if (portraitFullscreen) {
-                // 竖屏全屏：没有旋转过程，直接撤掉全屏覆盖层回竖屏详情（信息流原地恢复），
-                // 顺带把方向恢复成自由，避免从别的页面带着方向锁进来
+                // 竖屏全屏：不旋转，播放器缩回预览小窗（缩放动画），收敛后再挂详情信息流
                 fullscreen = false
                 controlsVisible = false
                 portraitFullscreen = false
-                (context as? Activity).restoreDefaultOrientation()
+                portraitZooming = true
+                portraitZoomToken++
             } else {
                 // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
                 (context as? Activity).restoreDefaultOrientation()
@@ -1095,7 +1124,7 @@ fun PlayerScreen(
             return
         }
         // 放大/缩回动画进行中忽略返回，避免动画中途退出页面
-        if (landZooming) return
+        if (landZooming || portraitZooming) return
         // 退出播放页前先暂停：返回转场期间若视频继续出帧，转场观感会被片源帧率（约 25fps）拉低，
         // 看起来像动画不是满帧；先让画面静止，转场按屏幕刷新率播放。
         // 后台续播模式不暂停，否则退出后会打断「后台播放」。
@@ -1105,7 +1134,7 @@ fun PlayerScreen(
     }
     // 仅在页面需要自己处理返回时拦截（退全屏 / 缩放动画中忽略）；
     // 竖屏小窗状态下不拦截，交还 NavDisplay → 预测返回动画 + 边缘滑动返回生效
-    BackHandler(enabled = fullscreen || landZooming) { handleBack() }
+    BackHandler(enabled = fullscreen || landZooming || portraitZooming) { handleBack() }
 
     // PiP 画中画：系统会把整个 Activity 窗口直接缩小，因此不切换视图子树
     // （同一个 PlayerView 跨 AndroidView 节点 reparent 有崩溃风险），
@@ -1141,7 +1170,7 @@ fun PlayerScreen(
     // BoxWithConstraints 提供整屏尺寸，供横屏小窗→全屏放大动画插值。
     // 缩放过程中露出的背景直接使用主题背景色（不做黑↔主题色渐变，
     // 避免动画中途出现与主题不一致的灰色板块）
-    val rootBackground = if (landZooming) {
+    val rootBackground = if (landZooming || portraitZooming) {
         // 小窗↔全屏缩放动画中：根背景必须与信息列/下方区块同为主题色。
         // 点全屏时 landscapeFullscreen 在动画开始就置 true，若让它走下面的纯黑分支，
         // 横版布局未显式刷底色的空档（播放器上方/左侧、信息列底部与下方区块之间）
@@ -1200,7 +1229,11 @@ fun PlayerScreen(
         // 不再按视频比例去收缩容器宽度（旧做法用 fillMaxWidth 叠加 width 会被约束吃掉，
         // 导致画面溢出容器、控件与画面错位）。
         // 常量：宽与高同一来源（屏幕宽），保证底层 PlayerView 与覆盖层占位盒像素完全一致
-        val portraitPreviewH = screenW * 9f / 16f
+        // 高度按「宽度像素 × 9/16」取整（与 PortraitPlayLayout 占位盒的 aspectRatio 像素一致），
+        // 保证竖屏全屏缩放首尾两帧与静止态严格对齐，不会有一像素的错位
+        val portraitPreviewH = with(density) {
+            (screenW.toPx() * (9f / 16f)).roundToInt().toDp()
+        }
 
         // 横屏小窗↔全屏放大/缩回过渡：宽/高/顶部偏移连续插值，
         // PlayerView 全程不重建，只有画面在放大，不挂任何控制层
@@ -1283,6 +1316,59 @@ fun PlayerScreen(
                 }
             }
         }
+        // 竖屏小窗↔竖屏全屏缩放：与横屏同一套做法（宽/高/顶部/圆角连续插值，PlayerView 不重建）。
+        // 起点 = 预览小窗（满宽 + 16:9、状态栏以下、16dp 圆角），
+        // 终点 = 铺满整屏（顶部 0、高 = 屏高、圆角 = 设备屏幕圆角），
+        // 收敛后由 fullscreen 分支接管，最后一帧与全屏布局完全重合，不会跳变
+        val portraitTransition = updateTransition(
+            targetState = portraitFullscreen,
+            label = "portraitPlayerExpand",
+        )
+        val pAnimWidth = portraitTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "pAnimWidth",
+        ) { screenW }
+        val pAnimHeight = portraitTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "pAnimHeight",
+        ) { expanded -> if (expanded) screenH else portraitPreviewH }
+        val pAnimTop = portraitTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "pAnimTop",
+        ) { expanded -> if (expanded) 0.dp else statusBarTop }
+        val pAnimCorner = portraitTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "pAnimCorner",
+        ) { expanded -> if (expanded) deviceCorner else Spacing.corner }
+
+        LaunchedEffect(portraitZoomToken) {
+            if (portraitZooming) {
+                snapshotFlow {
+                    !portraitTransition.isRunning &&
+                        portraitTransition.currentState == portraitTransition.targetState
+                }.first { it }
+                if (portraitFullscreen) {
+                    // 放大完成：挂全屏布局，工具栏默认隐藏（与横屏同一手感）
+                    portraitZooming = false
+                    fullscreen = true
+                    controlsVisible = false
+                } else {
+                    // 缩回完成：先把系统栏显示出来，等两帧让 statusBars inset 落到布局上，
+                    // 再撤掉缩放态挂详情信息流。顺序反过来会让竖屏布局先按 0 inset 排一次、
+                    // 状态栏随后才撑开，表现为「整页向上跳一下」（用户反馈的跳动）
+                    val activity = context as? Activity
+                    activity?.let {
+                        WindowCompat.getInsetsController(it.window, it.window.decorView)
+                            .show(WindowInsetsCompat.Type.systemBars())
+                    }
+                    withFrameMillis { }
+                    withFrameMillis { }
+                    portraitZooming = false
+                    controlsVisible = false
+                    activity?.restoreDefaultOrientation()
+                }
+            }
+        }
 
         AndroidView(
             factory = { sharedPlayerView },
@@ -1326,13 +1412,17 @@ fun PlayerScreen(
                         }
                         .background(Color.Black)
                 else ->
+                    // 竖屏：静止态与缩放动画共用同一套 offset/宽高修饰符
+                    // （静止值即「状态栏以下 + 满宽 16:9 + 16dp 圆角」），
+                    // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，收敛瞬间不会跳
                     Modifier
-                        // 竖屏小窗：满宽 + 16:9 定高（与 PortraitPlayLayout 占位盒同一组尺寸，
-                        // 不叠加 width 与 fillMaxWidth，避免约束互相打架导致画面溢出、控件错位）。
-                        // 顶部对齐（statusBarsPadding 让出状态栏），横向自然占满，无需 offset 居中
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .height(portraitPreviewH)
+                        .offset { IntOffset(0, pAnimTop.value.roundToPx()) }
+                        .animatedSize(pAnimWidth, pAnimHeight)
+                        .graphicsLayer {
+                            shape = SquircleShape(pAnimCorner.value)
+                            clip = true
+                            compositingStrategy = CompositingStrategy.Offscreen
+                        }
                         .background(Color.Black)
             },
         )
@@ -1403,6 +1493,8 @@ fun PlayerScreen(
             subtitleSettingsOpen = showSubtitleSettings,
         )
         }
+        // 竖屏缩放动画进行中：只渲染最底层视频（与横屏 landZooming 同款，避免控制层跟着糊成一团）
+        portraitZooming -> Unit
         // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
         pendingFullscreen == true -> Unit
         else -> if (pendingFullscreen == null && isLandscape) {
@@ -1472,12 +1564,13 @@ fun PlayerScreen(
                     landscapeFullscreen = true
                     fullscreen = true
                 } else if (ratio < 1f) {
-                    // 竖屏全屏：不请求旋转，直接把常驻 PlayerView 放大到铺满（设备保持竖屏）。
-                    // 方向自由保持在原状态，退出后无需等旋转；系统栏由 immersive 效果统一隐藏
+                    // 竖屏全屏：不请求旋转，把常驻 PlayerView 从预览小窗放大到铺满（设备保持竖屏）。
+                    // 放大期间只渲染纯视频，收敛后再挂全屏控制层；系统栏由 immersive 统一隐藏
                     Players.setVideoPresent(true)
-                    portraitFullscreen = true
                     landscapeFullscreen = false
-                    fullscreen = true
+                    portraitFullscreen = true
+                    portraitZooming = true
+                    portraitZoomToken++
                     controlsVisible = false
                 } else {
                     // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
@@ -3120,24 +3213,36 @@ private fun FullscreenPlayLayout(
                         })
                     }
                     // 动作栏（fongmi: 左组功能 + 右侧字幕/音轨/片头/片尾，白色 14sp 文字）
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    // 窄屏（竖屏全屏，含平板竖置 668dp；手机横屏约 872dp、平板横屏 1069dp 不受影响）
+                    // 一行放不下全部按钮，照抄 OK猫 player_vod_control_view.xml 的做法：
+                    // 整条动作栏包进 HorizontalScrollView，可左右滑动；
+                    // 宽屏保持原样「左组 + 弹性间距 + 右组贴右」
+                    val barScrollable = maxWidth < 700.dp
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp)
-                            // 屏蔽本栏点击穿透：消费栏内空白区（按钮间隙/两端 padding）的全部手势，
-                            // 手势层 gestureBlocked，不再误触发单击显隐/双击暂停/长按快进/拖动 seek；
-                            // 按钮自身的点击/长按（片头/片尾清除）不受影响
-                            .pointerInput(Unit) {
-                                awaitEachGesture {
-                                    awaitFirstDown(requireUnconsumed = false)
-                                    while (true) {
-                                        val e = awaitPointerEvent()
-                                        e.changes.forEach { it.consume() }
-                                        if (e.changes.all { !it.pressed }) break
+                            .then(
+                                if (barScrollable) {
+                                    // 可横滑分支不能挂「消费全部指针事件」的 pointerInput：
+                                    // 那会把拖动全部吃掉，横滑失效（用户反馈的「底栏无法左右滑动」）
+                                    Modifier.horizontalScroll(rememberScrollState())
+                                } else {
+                                    // 宽屏分支沿用原逻辑：消费栏内空白区手势，避免点击穿透误触显隐/暂停
+                                    Modifier.pointerInput(Unit) {
+                                        awaitEachGesture {
+                                            awaitFirstDown(requireUnconsumed = false)
+                                            while (true) {
+                                                val e = awaitPointerEvent()
+                                                e.changes.forEach { it.consume() }
+                                                if (e.changes.all { !it.pressed }) break
+                                            }
+                                        }
                                     }
-                                }
-                            },
+                                },
+                            ),
                     ) {
                         // 左组：内核（EXO/MPV/其他弹窗，fongmi PlayerEngineDialog）/ 缓冲 / 重播 / 倍速 / 缩放（点击循环切换）
                         // 点击动作栏按钮重置 5 秒自动隐藏计时（fongmi setR1Callback 同款），不立即消失
@@ -3159,7 +3264,9 @@ private fun FullscreenPlayLayout(
                             onScaleChange(modes[(playerState.scaleMode.ordinal + 1) % modes.size])
                             onControlInteract()
                         }
-                        Spacer(modifier = Modifier.weight(1f))
+                        // 弹性占位只在宽屏分支有效：横滑分支里 weight 需要一个有界父宽，
+                        // 而滚动容器宽度无限，占位会退化成 0 甚至崩溃，所以窄屏直接不留
+                        if (!barScrollable) Spacer(modifier = Modifier.weight(1f))
                         // 右组：字幕 / 音轨 / 片头 / 片尾（点击标记当前位置，长按清除）
                         ActionBtn("字幕") { showText = true; onControlInteract() }
                         ActionBtn("音轨") { showAudio = true; onControlInteract() }
@@ -3179,6 +3286,7 @@ private fun FullscreenPlayLayout(
                             ActionBtn("选集") { showEpisodes = true; onControlInteract() }
                         }
                     }
+                    } // BoxWithConstraints（动作栏横滑容器）结束
                 }
             }
         }
