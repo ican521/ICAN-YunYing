@@ -349,6 +349,14 @@ fun PlayerScreen(
         ?.let { sources -> sources.firstOrNull { it.flag == lineFlag } ?: sources.firstOrNull() }
     val lineEpisodes = playLine?.episodes ?: video?.episodes.orEmpty()
 
+    // 画质（fongmi QualityAdapter + Url.values）：只有 playerContent 返回多画质时才显示这一行。
+    // 切线路/切集都会重置为空（fongmi selectFlag/selectEpisode 里 renderQualityVisible(false)）
+    var qualities by remember { mutableStateOf<List<com.ican.tvplay.data.remote.PlayQuality>>(emptyList()) }
+    var qualityPosition by remember { mutableIntStateOf(0) }
+    // 画质切换请求：-1 表示不指定（按 playerContent 返回体自带的 position）。
+    // 单独作为重解析的触发键，避免「解析结果回写 qualityPosition」再触发一次重解析（网盘 jar 重解析很贵）
+    var qualityRequest by remember { mutableIntStateOf(-1) }
+
     // 控制层状态：进入播放页默认隐藏，用户单击预览小窗后才呼出
     var controlsVisible by remember { mutableStateOf(false) }
     // 控制层交互计数：动作栏按钮点击时自增，重置 5 秒自动隐藏计时（fongmi setR1Callback 同款）
@@ -704,7 +712,7 @@ fun PlayerScreen(
     var autoFallbackCount by remember { mutableIntStateOf(0) }
 
     // 解析并播放（video 变化也触发：自动换站源后整片替换重解析）
-    LaunchedEffect(initialized, video, episodeIndex, lineFlag) {
+    LaunchedEffect(initialized, video, episodeIndex, lineFlag, qualityRequest) {
         if (!initialized) return@LaunchedEffect
         if (resumeFromBackground) {
             // 后台续播接管：播放器已在播，无需重新解析
@@ -727,6 +735,7 @@ fun PlayerScreen(
                         jarSpec = cached.jarSpec,
                         playUrl = episode.playUrl,
                         flag = playLine?.flag ?: v.playFrom,
+                        qualityPosition = qualityRequest,
                     )
                 }
                 cached != null -> {
@@ -735,9 +744,14 @@ fun PlayerScreen(
                     com.ican.tvplay.data.PlaySource(episode.playUrl)
                 }
                 else -> {
-                    container.videoRepository.resolvePlaySource(v, episode, playLine?.flag ?: v.playFrom)
+                    container.videoRepository.resolvePlaySource(
+                        v, episode, playLine?.flag ?: v.playFrom, qualityRequest,
+                    )
                 }
             }
+            // 画质行数据（fongmi renderQuality：values.size > 1 才 setQualityVisible(true)）
+            qualities = source.qualities
+            qualityPosition = source.qualityPosition
             val spec = PlaySpec(url = source.url, headers = source.headers)
             // 注册播放上下文：通知栏展示 / 上一集下一集 / 后台片尾自动切集依赖
             Players.playbackContext = Players.PlaybackContext(
@@ -916,6 +930,10 @@ fun PlayerScreen(
                 // 否则解析新线路（网盘类 jar 秒级）期间旧画面继续播，看起来像"点了没反应"
                 Players.beginSwitch()
                 lineFlag = flag
+                // 切线路后画质列表作废（fongmi selectFlag → renderQualityVisible(false)）
+                qualities = emptyList()
+                qualityPosition = 0
+                qualityRequest = -1
                 saveProgress()
             }
         }
@@ -930,7 +948,25 @@ fun PlayerScreen(
         if (idx != episodeIndex) {
             Players.beginSwitch()
             saveProgress()
+            // 换集后画质列表作废（fongmi selectEpisode → renderQualityVisible(false)）
+            qualities = emptyList()
+            qualityPosition = 0
+            qualityRequest = -1
             episodeIndex = idx
+        }
+    }
+
+    /**
+     * 切换画质（fongmi VodPlaybackController.selectQuality）：
+     * 记住当前播放位置 → 停播进加载态 → 带新的 qualityPosition 重新请求 playerContent，
+     * 新源在原位置继续播。只在多画质（qualities.size > 1）时才可能被点到。
+     */
+    val requestQualityChange: (Int) -> Unit = { pos ->
+        if (pos != qualityPosition) {
+            // 切换前抓当前进度：fongmi 用 host.getPlayerPosition() 作为 startPositionMs
+            pendingPosition = Players.progress.value.positionMs
+            Players.beginSwitch()
+            qualityRequest = pos
         }
     }
 
@@ -1727,6 +1763,9 @@ fun PlayerScreen(
                 onBack = { handleBack() },
                 onLineChange = requestLineChange,
                 onEpisodeSelect = requestEpisodeChange,
+                qualities = qualities,
+                qualityPosition = qualityPosition,
+                onQualityChange = requestQualityChange,
                 onSeekDragChange = { seekDragging = it },
             )
         } else {
@@ -1802,6 +1841,9 @@ fun PlayerScreen(
             onBack = { handleBack() },
             onLineChange = requestLineChange,
             onEpisodeSelect = requestEpisodeChange,
+            qualities = qualities,
+            qualityPosition = qualityPosition,
+            onQualityChange = requestQualityChange,
             onSpeedChange = { settings.setPlayerSpeed(it) },
             onScaleChange = { settings.setPlayerScale(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
@@ -1849,6 +1891,10 @@ private fun PortraitPlayLayout(
     onBack: () -> Unit,
     onLineChange: (String) -> Unit,
     onEpisodeSelect: (Int) -> Unit,
+    /** 可选画质（fongmi Url.values）：>1 条才显示「画质」行 */
+    qualities: List<com.ican.tvplay.data.remote.PlayQuality>,
+    qualityPosition: Int,
+    onQualityChange: (Int) -> Unit,
     onSpeedChange: (Float) -> Unit,
     onScaleChange: (Players.ScaleMode) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
@@ -1938,6 +1984,18 @@ private fun PortraitPlayLayout(
             onLineChange = onLineChange,
             horizontalPadding = pageHorizontalPadding(),
         )
+
+        // 画质：紧贴线路下方的一条 chip 行（fongmi activity_video.xml 里 flag 与 quality 两行，
+        // 间距 16dp；且只有 url.values.size > 1 时才 VISIBLE）
+        if (qualities.size > 1) {
+            Spacer(modifier = Modifier.height(10.dp))
+            QualityRow(
+                qualities = qualities,
+                qualityPosition = qualityPosition,
+                onQualityChange = onQualityChange,
+                horizontalPadding = pageHorizontalPadding(),
+            )
+        }
 
         Spacer(modifier = Modifier.height(Spacing.sectionSpacing))
 
@@ -2030,6 +2088,10 @@ private fun LandscapePlayLayout(
     onBack: () -> Unit,
     onLineChange: (String) -> Unit,
     onEpisodeSelect: (Int) -> Unit,
+    /** 可选画质（fongmi Url.values）：>1 条才显示「画质」行 */
+    qualities: List<com.ican.tvplay.data.remote.PlayQuality>,
+    qualityPosition: Int,
+    onQualityChange: (Int) -> Unit,
     onSeekDragChange: (Boolean) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -2125,7 +2187,18 @@ private fun LandscapePlayLayout(
             verticalArrangement = Arrangement.spacedBy(com.ican.tvplay.ui.theme.Spacing.sectionSpacing),
         ) {
             if (current != null) {
-                LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange, horizontalPadding = pageHorizontal)
+                // 线路 + 画质：两行紧贴（10dp），外层仍按 sectionSpacing 与选集分隔
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange, horizontalPadding = pageHorizontal)
+                    if (qualities.size > 1) {
+                        QualityRow(
+                            qualities = qualities,
+                            qualityPosition = qualityPosition,
+                            onQualityChange = onQualityChange,
+                            horizontalPadding = pageHorizontal,
+                        )
+                    }
+                }
                 EpisodeSection(
                     lineEpisodes = lineEpisodes,
                     episodeIndex = episodeIndex,
@@ -2694,6 +2767,71 @@ private fun LineSection(
             }
         }
     }
+    }
+}
+
+/**
+ * 画质行（fongmi QualityAdapter + activity_video.xml 的 quality 行）：
+ * 只渲染 chip、无标题；显示条件是 url.values.size > 1（由调用方判断）。
+ * 样式与线路/选集 chip 完全一致，选中态用主题 primary。
+ */
+@Composable
+private fun QualityRow(
+    qualities: List<com.ican.tvplay.data.remote.PlayQuality>,
+    qualityPosition: Int,
+    onQualityChange: (Int) -> Unit,
+    horizontalPadding: Dp,
+) {
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = qualityPosition.coerceAtLeast(0))
+    LaunchedEffect(qualityPosition) {
+        if (qualityPosition !in qualities.indices) return@LaunchedEffect
+        snapshotFlow { listState.layoutInfo.totalItemsCount }
+            .filter { it > qualityPosition }
+            .first()
+        val info = listState.layoutInfo
+        val item = info.visibleItemsInfo.firstOrNull { it.index == qualityPosition }
+        when {
+            item == null -> listState.scrollToItem(qualityPosition)
+            item.offset < info.viewportStartOffset ->
+                listState.animateScrollBy((item.offset - info.viewportStartOffset).toFloat())
+            item.offset + item.size > info.viewportEndOffset ->
+                listState.animateScrollBy((item.offset + item.size - info.viewportEndOffset).toFloat())
+        }
+    }
+    LazyRow(
+        state = listState,
+        contentPadding = PaddingValues(horizontal = horizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
+    ) {
+        itemsIndexed(qualities, key = { idx, q -> "$idx|${q.name}|${q.url.take(40)}" }, contentType = { _, _ -> "quality" }) { idx, q ->
+            val selected = idx == qualityPosition
+            val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 40.dp)
+                    .tvCardEffect(
+                        onClick = { onQualityChange(idx) },
+                        shape = shape, focusedScale = 1.05f, glow = false,
+                        pressEffect = false,
+                    )
+                    .background(
+                        if (selected) MiuixTheme.colorScheme.primary
+                        else MiuixTheme.colorScheme.secondaryVariant,
+                        shape,
+                    )
+                    .padding(12.dp),
+            ) {
+                Text(
+                    // 名称为空时兜底成位置（fongmi Url.n(position)，数组形态才有名称）
+                    text = q.name.ifBlank { "画质${idx + 1}" },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (selected) MiuixTheme.colorScheme.onPrimary
+                    else MiuixTheme.colorScheme.onSecondaryVariant,
+                    maxLines = 1,
+                )
+            }
+        }
     }
 }
 

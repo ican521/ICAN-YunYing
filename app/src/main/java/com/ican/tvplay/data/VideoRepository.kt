@@ -62,6 +62,10 @@ private const val HOME_REC_CATEGORY_NAME = "推荐"
 data class PlaySource(
     val url: String,
     val headers: Map<String, String> = emptyMap(),
+    /** 可选画质列表（fongmi Url.values）：>1 条时播放页才显示「画质」行 */
+    val qualities: List<com.ican.tvplay.data.remote.PlayQuality> = emptyList(),
+    /** 当前选中的画质下标（fongmi Url.position） */
+    val qualityPosition: Int = 0,
 )
 
 /**
@@ -749,7 +753,12 @@ class VideoRepository(
      * 播放前调用：spider 站经 playerContent 解析真实 URL（可能带 header）；
      * HTTP 站直接返回原 url。flag 为所选线路标识，缺省用视频首源。
      */
-    suspend fun resolvePlaySource(video: Video, episode: Episode, flag: String? = null): PlaySource {
+    suspend fun resolvePlaySource(
+        video: Video,
+        episode: Episode,
+        flag: String? = null,
+        qualityPosition: Int = -1,
+    ): PlaySource {
         val loaded = _currentSite.value ?: return PlaySource(episode.playUrl)
         // 站点级 header（fongmi Site.header）：HTTP 站直接拉流也要带上，否则防盗链站 403/空
         val siteHeaders = loaded.site.headerMap()
@@ -762,7 +771,7 @@ class VideoRepository(
                     episode.playUrl,
                 )
                 if (!json.isNullOrBlank()) {
-                    val content = parsePlayerContent(json, episode.playUrl, siteHeaders)
+                    val content = parsePlayerContent(json, episode.playUrl, siteHeaders, qualityPosition)
                     if (content.url.isNotBlank()) return content
                 }
             }
@@ -773,7 +782,7 @@ class VideoRepository(
             ?: video.playFrom.ifBlank { loaded.site.key }
         val json = spiderManager.playerContent(spider, resolvedFlag, episode.playUrl)
         if (json.isBlank()) return PlaySource(episode.playUrl, siteHeaders)
-        return parsePlayerContent(json, episode.playUrl, siteHeaders)
+        return parsePlayerContent(json, episode.playUrl, siteHeaders, qualityPosition)
     }
 
     /**
@@ -781,10 +790,19 @@ class VideoRepository(
      * 对齐 fongmi Result：url 支持字符串/扁平数组/values 对象（[parsePlayerUrl]），
      * header 为站点 header 与返回 header 的并集（返回的优先）。
      */
-    private suspend fun parsePlayerContent(json: String, fallbackUrl: String, siteHeaders: Map<String, String>): PlaySource {
+    private suspend fun parsePlayerContent(
+        json: String,
+        fallbackUrl: String,
+        siteHeaders: Map<String, String>,
+        qualityPosition: Int = -1,
+    ): PlaySource {
         return runCatching {
             val obj = rawJson.parseToJsonElement(json).jsonObject
-            val rawUrl = parsePlayerUrl(obj["url"]).ifBlank { fallbackUrl }
+            // fongmi Result.Url：全部画质 + 当前 position（切画质时由调用方指定）
+            val qualities = com.ican.tvplay.data.remote.parsePlayerQualities(obj["url"])
+            val pos = (if (qualityPosition >= 0) qualityPosition else com.ican.tvplay.data.remote.parsePlayerPosition(obj["url"]))
+                .coerceIn(0, (qualities.size - 1).coerceAtLeast(0))
+            val rawUrl = com.ican.tvplay.data.remote.parsePlayerUrl(obj["url"], pos).ifBlank { fallbackUrl }
             val headers = siteHeaders.toMutableMap()
             obj["header"]?.let { el ->
                 runCatching {
@@ -811,7 +829,7 @@ class VideoRepository(
             } else {
                 rawUrl
             }
-            PlaySource(url = finalUrl.ifBlank { fallbackUrl }, headers = headers)
+            PlaySource(url = finalUrl.ifBlank { fallbackUrl }, headers = headers, qualities = qualities, qualityPosition = pos)
         }.onFailure { Log.e(REPO_TAG, "parse playerContent fail", it) }
             .getOrDefault(PlaySource(fallbackUrl, siteHeaders))
     }

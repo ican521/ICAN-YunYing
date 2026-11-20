@@ -178,41 +178,81 @@ fun parseStyle(el: JsonElement): VodStyle? = runCatching {
     }
 }.getOrNull()
 
+/** 一个可选的播放画质（对应 fongmi bean/Url.Value：n 名称、v 地址） */
+data class PlayQuality(val name: String, val url: String)
+
 /**
- * playerContent 的 url 字段（对齐 fongmi UrlAdapter）：三种写法都兼容
- * - 字符串 "https://..."
- * - 扁平数组 ["原画", "https://...", "高清", "https://..."]（偶数位是名称）
- * - 对象 {"values":[{"n":"原画","v":"https://..."}],"position":0}
- * 取第一条（fongmi 默认 position=0）；解析不出返回空串
+ * playerContent 的 url 字段（对齐 fongmi UrlAdapter + Url）：
+ * - 字符串 "https://..." → 单个地址、无名称
+ * - 扁平数组 ["原画","https://...","高清","https://..."] → 名称/地址成对
+ * - 对象 {"values":[{"n":"原画","v":"https://..."}],"position":0} → 带名称的多画质
+ * 数组里也容忍 [{"n":..,"v":..}] 这种对象元素写法（部分非标准 spider）
  */
-fun parsePlayerUrl(el: JsonElement?): String = runCatching {
+fun parsePlayerQualities(el: JsonElement?): List<PlayQuality> = runCatching {
     when (el) {
-        null -> ""
-        is JsonPrimitive -> if (el.isString) el.content else ""
+        null -> emptyList()
+        is JsonPrimitive -> if (el.isString && el.content.isNotBlank()) {
+            listOf(PlayQuality("", el.content))
+        } else emptyList()
         is JsonArray -> {
             val first = el.firstOrNull()
             when (first) {
-                is JsonPrimitive -> if (first.isString) {
-                    // 扁平 [name, url, name, url...]：名称位是第 0 个，url 是第 1 个；
-                    // 但也要容忍直接给 [url] 的情况
-                    (el.getOrNull(1) as? JsonPrimitive)?.content ?: first.content
-                } else ""
-                is JsonObject -> (first["v"] as? JsonPrimitive)?.content.orEmpty()
-                else -> ""
+                // 扁平 [name, url, ...]：与 fongmi UrlAdapter.convert 同款，i+1 < size 才成对
+                is JsonPrimitive -> buildList {
+                    if (el.size == 1) {
+                        val only = (el[0] as? JsonPrimitive)?.content.orEmpty()
+                        if (only.isNotBlank()) add(PlayQuality("", only))
+                    } else {
+                        var i = 0
+                        while (i + 1 < el.size) {
+                            val name = (el[i] as? JsonPrimitive)?.content.orEmpty()
+                            val url = (el[i + 1] as? JsonPrimitive)?.content.orEmpty()
+                            if (url.isNotBlank()) add(PlayQuality(name, url))
+                            i += 2
+                        }
+                    }
+                }
+                is JsonObject -> el.mapNotNull { item ->
+                    val o = item as? JsonObject ?: return@mapNotNull null
+                    val u = (o["v"] as? JsonPrimitive)?.content.orEmpty()
+                    if (u.isBlank()) null
+                    else PlayQuality((o["n"] as? JsonPrimitive)?.content.orEmpty(), u)
+                }
+                else -> emptyList()
             }
         }
         is JsonObject -> {
             val values = el["values"]
             if (values is JsonArray && values.isNotEmpty()) {
-                val pos = ((el["position"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0)
-                    .coerceIn(0, values.size - 1)
-                ((values[pos] as? JsonObject)?.get("v") as? JsonPrimitive)?.content.orEmpty()
+                values.mapNotNull { item ->
+                    val o = item as? JsonObject ?: return@mapNotNull null
+                    val u = (o["v"] as? JsonPrimitive)?.content.orEmpty()
+                    if (u.isBlank()) null
+                    else PlayQuality((o["n"] as? JsonPrimitive)?.content.orEmpty(), u)
+                }
             } else {
-                (el["v"] as? JsonPrimitive)?.content.orEmpty()
+                val u = (el["v"] as? JsonPrimitive)?.content.orEmpty()
+                if (u.isBlank()) emptyList() else listOf(PlayQuality("", u))
             }
         }
-        else -> ""
+        else -> emptyList()
     }
+}.getOrDefault(emptyList())
+
+/** url 对象里声明的当前画质下标（fongmi Url.position），数组/字符串形态恒为 0 */
+fun parsePlayerPosition(el: JsonElement?): Int = runCatching {
+    (el as? JsonObject)?.let { (it["position"] as? JsonPrimitive)?.content?.toIntOrNull() } ?: 0
+}.getOrDefault(0)
+
+/**
+ * 取当前选中的播放地址；解析不出返回空串
+ * @param overridePosition 调用方指定的画质下标（播放页切画质时传入），<0 表示按返回体里的 position
+ */
+fun parsePlayerUrl(el: JsonElement?, overridePosition: Int = -1): String = runCatching {
+    val qualities = parsePlayerQualities(el)
+    if (qualities.isEmpty()) return@runCatching ""
+    val pos = if (overridePosition >= 0) overridePosition else parsePlayerPosition(el)
+    (qualities.getOrNull(pos) ?: qualities.first()).url
 }.getOrDefault("")
 
 /** 列表/分类接口返回 */

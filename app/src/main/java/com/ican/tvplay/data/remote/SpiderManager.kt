@@ -333,12 +333,15 @@ class SpiderManager(private val appContext: Context) {
 
     /** 完整播放地址解析：spider 走 playerContent + 可选 jx/parse 二次解析，HTTP 站直接返回原 URL。
      * 供播放页延迟解析使用（某些网盘 jar 在 playerContent 时触发扫码弹窗，须在进入播放页后调用）。
+     * @param qualityPosition 指定画质下标（播放页切画质时传入，fongmi SiteApi.playerContent 的 qualityPosition）；
+     *   <0 表示按返回体里自带的 position
      */
     suspend fun resolvePlayUrl(
         site: TvBoxSite,
         jarSpec: String,
         playUrl: String,
         flag: String,
+        qualityPosition: Int = -1,
     ): com.ican.tvplay.data.PlaySource = withContext(Dispatchers.IO) {
         // fongmi Source.fetch：处理特殊协议（video://、push://等）
         val fixedPlayUrl = fixSpecialProtocol(playUrl)
@@ -358,12 +361,16 @@ class SpiderManager(private val appContext: Context) {
         runCatching {
             val json = Json { ignoreUnknownKeys = true }
             val obj = json.parseToJsonElement(jsonStr).jsonObject
-            val rawUrl = parsePlayerUrl(obj["url"]).ifBlank { playUrl }
+            // 对齐 fongmi Result.Url：先取全部画质，再按 position/override 选中一条
+            val qualities = parsePlayerQualities(obj["url"])
+            val pos = (if (qualityPosition >= 0) qualityPosition else parsePlayerPosition(obj["url"]))
+                .coerceIn(0, (qualities.size - 1).coerceAtLeast(0))
+            val rawUrl = parsePlayerUrl(obj["url"], pos).ifBlank { playUrl }
             val headers = mutableMapOf<String, String>()
             obj["header"]?.let { el -> parseHeaderElement(el, headers) }
             val parse = obj["parse"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             val jx = obj["jx"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-            Log.d(TAG, "resolvePlayUrl rawUrl=$rawUrl parse=$parse jx=$jx headers=${headers.keys}")
+            Log.d(TAG, "resolvePlayUrl rawUrl=$rawUrl parse=$parse jx=$jx pos=$pos/${qualities.size} headers=${headers.keys}")
             val fixedUrl = fixProxyUrl(rawUrl)
             if (fixedUrl != rawUrl) Log.d(TAG, "resolvePlayUrl proxy fixed: $fixedUrl")
             val finalUrl = if (com.ican.tvplay.data.remote.JxParser.needsParse(fixedUrl, parse, jx)) {
@@ -371,7 +378,14 @@ class SpiderManager(private val appContext: Context) {
             } else {
                 fixedUrl
             }
-            com.ican.tvplay.data.PlaySource(url = percentEncodeUrl(finalUrl.ifBlank { playUrl }), headers = headers)
+            // 每个画质条目也要走一遍代理端口修正，播放页切画质时直接用（省一次 jar 解析）
+            val fixedQualities = qualities.map { q -> q.copy(url = fixProxyUrl(q.url)) }
+            com.ican.tvplay.data.PlaySource(
+                url = percentEncodeUrl(finalUrl.ifBlank { playUrl }),
+                headers = headers,
+                qualities = fixedQualities,
+                qualityPosition = pos,
+            )
         }.getOrNull()?.let { source ->
             // 网盘分享描述（形如 {"pg":"1","sToken":...}）不是可播放地址：
             // jar 返回它说明「没解析出真实直链」，把它交给播放器只会得到一个必然失败的加载。
