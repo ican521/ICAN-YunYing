@@ -2772,8 +2772,8 @@ private fun LineSection(
 
 /**
  * 画质行（fongmi QualityAdapter + activity_video.xml 的 quality 行）：
- * 只渲染 chip、无标题；显示条件是 url.values.size > 1（由调用方判断）。
- * 样式与线路/选集 chip 完全一致，选中态用主题 primary。
+ * 结构与 LineSection 一致（标题 + chip 行），显示条件是 url.values.size > 1（由调用方判断）。
+ * 样式与线路/选集完全一致，选中态用主题 primary。
  */
 @Composable
 private fun QualityRow(
@@ -2798,6 +2798,15 @@ private fun QualityRow(
                 listState.animateScrollBy((item.offset + item.size - info.viewportEndOffset).toFloat())
         }
     }
+    Column {
+        Text(
+            text = "画质",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MiuixTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(horizontal = horizontalPadding),
+        )
+        Spacer(modifier = Modifier.height(Spacing.titleContentGap))
     LazyRow(
         state = listState,
         contentPadding = PaddingValues(horizontal = horizontalPadding),
@@ -2832,6 +2841,7 @@ private fun QualityRow(
                 )
             }
         }
+    }
     }
 }
 
