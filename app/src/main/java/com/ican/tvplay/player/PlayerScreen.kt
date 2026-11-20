@@ -13,6 +13,7 @@ import android.provider.OpenableColumns
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -101,6 +102,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -1105,31 +1107,36 @@ fun PlayerScreen(
         }
     }
 
+    // 退全屏（返回键 / 预测返回手势共用）：只负责把「全屏 → 小窗」这一段动画起起来
+    fun exitFullscreen() {
+        if (landscapeFullscreen) {
+            // 平板横屏直进的全屏：立即卸载全屏覆盖层，PlayerView 执行缩回动画，
+            // 动画期间只有纯视频，结束后恢复横版小窗（同样不弹工具栏）
+            fullscreen = false
+            controlsVisible = false
+            landscapeFullscreen = false
+            landZooming = true
+            landZoomToken++
+        } else if (portraitFullscreen) {
+            // 竖屏全屏：不旋转，播放器缩回预览小窗（缩放动画），收敛后再挂详情信息流
+            fullscreen = false
+            controlsVisible = false
+            portraitFullscreen = false
+            portraitZooming = true
+            portraitZoomToken++
+        } else {
+            // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
+            (context as? Activity).restoreDefaultOrientation()
+            pendingFullscreen = false
+        }
+    }
+
     fun handleBack() {
         // 锁定状态下屏蔽返回（对齐 fongmi isLock() 拦截语义），
         // 系统侧滑/返回键不退出全屏、不退出页面，解锁后恢复
         if (locked) return
         if (fullscreen) {
-            if (landscapeFullscreen) {
-                // 平板横屏直进的全屏：立即卸载全屏覆盖层，PlayerView 执行缩回动画，
-                // 动画期间只有纯视频，结束后恢复横版小窗（同样不弹工具栏）
-                fullscreen = false
-                controlsVisible = false
-                landscapeFullscreen = false
-                landZooming = true
-                landZoomToken++
-            } else if (portraitFullscreen) {
-                // 竖屏全屏：不旋转，播放器缩回预览小窗（缩放动画），收敛后再挂详情信息流
-                fullscreen = false
-                controlsVisible = false
-                portraitFullscreen = false
-                portraitZooming = true
-                portraitZoomToken++
-            } else {
-                // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
-                (context as? Activity).restoreDefaultOrientation()
-                pendingFullscreen = false
-            }
+            exitFullscreen()
             return
         }
         // 放大/缩回动画进行中忽略返回，避免动画中途退出页面
@@ -1142,8 +1149,40 @@ fun PlayerScreen(
         onBack()
     }
     // 仅在页面需要自己处理返回时拦截（退全屏 / 缩放动画中忽略）；
-    // 竖屏小窗状态下不拦截，交还 NavDisplay → 预测返回动画 + 边缘滑动返回生效
-    BackHandler(enabled = fullscreen || landZooming || portraitZooming) { handleBack() }
+    // 竖屏小窗状态下不拦截，交还 NavDisplay → 预测返回动画 + 边缘滑动返回生效。
+    //
+    // 必须用 PredictiveBackHandler 而不是 BackHandler：targetSdk 37 在 Android 16 上
+    // 预测返回已无法关闭（manifest 的 enableOnBackInvokedCallback=false 从 36 起失效），
+    // 只挂 BackHandler 时系统会先自播一段「窗口缩小 + 变暗 + 左侧手势箭头」的关闭预览，
+    // 抬手被我们消费掉再弹回，再跑自己的 zoom-out → 两段动画叠在一起（录屏 6.30s 整屏变暗帧）。
+    // 由我们接收 onBackInvoked 进度后系统不再自播关闭动画：进度一出现就起缩回动画，
+    // 手势取消则把同一套 transition 反向续播回全屏，避免「滑一半松手就掉了全屏」。
+    PredictiveBackHandler(enabled = fullscreen || landZooming || portraitZooming) { progress ->
+        var started = false
+        var completed = false
+        try {
+            progress.collect {
+                if (!started) {
+                    started = true
+                    // 返回键等同于一次立即生效的手势：直接走原 handleBack 语义（含锁定屏蔽）
+                    handleBack()
+                }
+            }
+            completed = true
+        } catch (cancelled: CancellationException) {
+            // 手势取消：下面统一回弹（变量只用于声明捕获类型）
+            if (cancelled.message == null) Unit
+        }
+        if (!completed && started && !locked) {
+            if (portraitZooming && !portraitFullscreen) {
+                portraitFullscreen = true
+                portraitZoomToken++
+            } else if (landZooming && !landscapeFullscreen) {
+                landscapeFullscreen = true
+                landZoomToken++
+            }
+        }
+    }
 
     // 播完（STATE_ENDED）后进/退全屏：播放器不再输出新帧，PlayerView 尺寸变化后
     // 上一帧仍是按旧尺寸渲染的，表现为「全屏里缩着一个小画面」。这里先强制重排，
@@ -1360,13 +1399,8 @@ fun PlayerScreen(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "pAnimTop",
         ) { expanded -> if (expanded) 0.dp else statusBarTop }
-        val pAnimCorner = portraitTransition.animateDp(
-            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
-            label = "pAnimCorner",
-        ) { expanded ->
-            // 竖屏预览小窗不要圆角（用户要求直角满宽铺）；放大到全屏才逐步收成设备屏幕圆角
-            if (expanded) deviceCorner else 0.dp
-        }
+        // 竖屏预览小窗无圆角（用户要求直角满宽铺），缩放期间也不插值圆角：
+        // 收敛后由 fullscreen 分支按设备屏幕圆角裁剪，圆角落在黑边上本来就看不见
 
         LaunchedEffect(portraitZoomToken) {
             if (portraitZooming) {
@@ -1397,29 +1431,32 @@ fun PlayerScreen(
             }
         }
 
-        AndroidView(
-            factory = { sharedPlayerView },
-            update = { view ->
-                view.resizeMode = playerState.scaleMode.resizeMode
-                // PlayerView 背景直接用黑色：视频 FIT 模式黑边区显示黑色。
-                view.setBackgroundColor(android.graphics.Color.BLACK)
-                if (view.player !== Players.player) Players.bindPlayerView(view)
-            },
+        // 视频层宽高比：竖屏缩放期间必须让视频层比例恒等于片源（见下方 letterboxed 说明）
+        val videoRatio = playerState.videoAspectRatio.takeIf { it > 0f }
+            ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
+        // 竖屏（稳态 + 缩放）：外框只当黑底，视频层按片源比例居中贴在框内。
+        // 直接逐帧改 PlayerView 尺寸时，media3 的黑边重排跟不上每帧变化，动画中途画面被压扁
+        // （录屏 4.20s 1080×1380、4.24s 1080×1560，正常应 1080×1920），最后一帧才回正 → 「抖/跳」。
+        // 让视频层比例恒等于片源后，Surface 重采样滞后最多表现为一次整体轻微缩放，永不变形；
+        // 且首尾像素与静止小窗、全屏稳态完全重合（黑边本来就该是黑的）。
+        // 其余分支（全屏 / 横屏 / 画中画）保持原样：盒子本身就是稳态尺寸，交给 media3 自身 FIT
+        val letterboxed = !inPip && !pipExitHold && !fullscreen &&
+            pendingFullscreen == null && !isLandscape &&
+            playerState.scaleMode == Players.ScaleMode.FIT
+
+        Box(
             modifier = when {
                 // 画中画（含退出过渡）：铺满整个（已被系统缩小的）Activity 窗口
-                inPip || pipExitHold -> Modifier.fillMaxSize().background(Color.Black)
+                inPip || pipExitHold -> Modifier.fillMaxSize()
                 // 全屏（手机旋转 / 平板横屏）：无条件铺满，fongmi MATCH_PARENT 同款。
                 // 平板横屏全屏稳态若走下面 isLandscape 定尺寸分支（宽高取自 Configuration），
                 // PiP 退出放大期间可能拿到中间态尺寸，Surface 与系统动画窗口错位跳变
-                fullscreen ->
-                    Modifier.fillMaxSize().background(Color.Black)
-                        .clip(SquircleShape(deviceCorner))
+                fullscreen -> Modifier.fillMaxSize().clip(SquircleShape(deviceCorner))
                 // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
                 // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感。
                 // 这里不叠加 clip：旋转过渡只有 200~300ms，四角都是黑底看不出圆角差异，
                 // 省掉一次离屏图层合成（interop TextureView 上这笔开销不小，双击后更跟手）
-                pendingFullscreen != null ->
-                    Modifier.fillMaxSize().background(Color.Black)
+                pendingFullscreen != null -> Modifier.fillMaxSize()
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
@@ -1437,22 +1474,34 @@ fun PlayerScreen(
                             // 半透明像素叠出弧线黑边
                             compositingStrategy = CompositingStrategy.Offscreen
                         }
-                        .background(Color.Black)
                 else ->
                     // 竖屏：静止态与缩放动画共用同一套 offset/宽高修饰符
-                    // （静止值即「状态栏以下 + 满宽 16:9 + 16dp 圆角」），
-                    // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，收敛瞬间不会跳
+                    // （静止值即「状态栏以下 + 满宽 16:9 直角」），
+                    // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，收敛瞬间不会跳。
+                    // 这里不再叠 graphicsLayer：小窗本来就没有圆角，离屏图层只会在 TextureView
+                    // 尺寸逐帧变化时多一层拉伸风险，还多一次整幅拷贝
                     Modifier
                         .offset { IntOffset(0, pAnimTop.value.roundToPx()) }
                         .animatedSize(pAnimWidth, pAnimHeight)
-                        .graphicsLayer {
-                            shape = SquircleShape(pAnimCorner.value)
-                            clip = true
-                            compositingStrategy = CompositingStrategy.Offscreen
-                        }
-                        .background(Color.Black)
-            },
-        )
+            }.background(Color.Black),
+            contentAlignment = Alignment.Center,
+        ) {
+            AndroidView(
+                factory = { sharedPlayerView },
+                update = { view ->
+                    view.resizeMode = playerState.scaleMode.resizeMode
+                    // PlayerView 背景直接用黑色：视频 FIT 模式黑边区显示黑色。
+                    view.setBackgroundColor(android.graphics.Color.BLACK)
+                    if (view.player !== Players.player) Players.bindPlayerView(view)
+                },
+                modifier = if (letterboxed) {
+                    // 视频层比例 = 片源比例：黑边由外层 Box 的黑底负责，视频层自己不再变形
+                    Modifier.aspectRatio(videoRatio, matchHeightConstraintsFirst = false)
+                } else {
+                    Modifier.fillMaxSize()
+                },
+            )
+        }
         // 诊断日志：仅 debug 构建保留（release 自动剔除）
         val branchName = when {
             inPip -> "pip"
@@ -1596,7 +1645,13 @@ fun PlayerScreen(
                     fullscreen = true
                 } else if (ratio < 1f) {
                     // 竖屏全屏：不请求旋转，把常驻 PlayerView 从预览小窗放大到铺满（设备保持竖屏）。
-                    // 放大期间只渲染纯视频，收敛后再挂全屏控制层；系统栏由 immersive 统一隐藏
+                    // 放大期间只渲染纯视频，收敛后再挂全屏控制层
+                    // 系统栏与缩放同一帧收起：只靠 immersive 的 LaunchedEffect 会晚一帧，
+                    // 状态栏图标会压在放大中的画面上（录屏 4.24s 帧）
+                    activityWindow?.let { w ->
+                        WindowCompat.getInsetsController(w, w.decorView)
+                            .hide(WindowInsetsCompat.Type.systemBars())
+                    }
                     Players.setVideoPresent(true)
                     landscapeFullscreen = false
                     portraitFullscreen = true
