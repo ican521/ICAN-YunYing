@@ -400,9 +400,18 @@ fun PlayerScreen(
             if (v.getGlobalVisibleRect(rect)) {
                 // 诊断日志：仅 debug 构建保留（release 自动剔除），排查画中画进出动画用
                 if (com.ican.tvplay.BuildConfig.DEBUG) {
+                    // 同时打出内部画面容器的尺寸：播完后画面缩在左上角这类问题，
+                    // 需要区分「PlayerView 没变大」还是「内部 AspectRatioFrameLayout 没重排」
+                    val child = (v as? android.view.ViewGroup)?.let { g ->
+                        (0 until g.childCount).map { g.getChildAt(it) }
+                            .firstOrNull { it.visibility == android.view.View.VISIBLE }
+                    }
                     android.util.Log.i(
                         "PipTrace",
-                        "videoRect=${rect.width()}x${rect.height()}@${rect.left},${rect.top}",
+                        "videoRect=${rect.width()}x${rect.height()}@${rect.left},${rect.top} " +
+                            "pv=${v.width}x${v.height} " +
+                            "inner=${child?.javaClass?.simpleName}@${child?.left},${child?.top} " +
+                            "${child?.width}x${child?.height}",
                     )
                 }
                 (context as? PlayerHost)?.syncPipSourceRect(rect)
@@ -1136,6 +1145,19 @@ fun PlayerScreen(
     // 竖屏小窗状态下不拦截，交还 NavDisplay → 预测返回动画 + 边缘滑动返回生效
     BackHandler(enabled = fullscreen || landZooming || portraitZooming) { handleBack() }
 
+    // 播完（STATE_ENDED）后进/退全屏：播放器不再输出新帧，PlayerView 尺寸变化后
+    // 上一帧仍是按旧尺寸渲染的，表现为「全屏里缩着一个小画面」。这里先强制重排，
+    // 再 seek 到结尾前 1ms 逼渲染器按新尺寸重新出一帧（只对已播完的播放器生效，
+    // 播放中/暂停中都不动，避免多余的解码器 flush）
+    fun refreshEndedFrame() {
+        sharedPlayerView.requestLayout()
+        val p = Players.player ?: return
+        if (p.playbackState != androidx.media3.common.Player.STATE_ENDED) return
+        val duration = p.duration
+        val target = if (duration > 0) minOf(p.currentPosition, duration - 1) else p.currentPosition
+        runCatching { p.seekTo(target) }
+    }
+
     // PiP 画中画：系统会把整个 Activity 窗口直接缩小，因此不切换视图子树
     // （同一个 PlayerView 跨 AndroidView 节点 reparent 有崩溃风险），
     // 只在原布局上让视频铺满、隐藏全部覆盖层与信息流（对齐 fongmi 行为）
@@ -1302,6 +1324,7 @@ fun PlayerScreen(
                     landZooming = false
                     fullscreen = true
                     controlsVisible = false
+                    refreshEndedFrame()
                 } else {
                     // 缩回完成：恢复方向自由并显示状态栏（组件位置均由动画值驱动，无 inset 跳变）
                     controlsVisible = false
@@ -1313,6 +1336,7 @@ fun PlayerScreen(
                         ).show(WindowInsetsCompat.Type.statusBars())
                     }
                     landZooming = false
+                    refreshEndedFrame()
                 }
             }
         }
@@ -1355,6 +1379,7 @@ fun PlayerScreen(
                     portraitZooming = false
                     fullscreen = true
                     controlsVisible = false
+                    refreshEndedFrame()
                 } else {
                     // 缩回完成：恢复系统栏并撤掉缩放态。
                     // 竖屏布局的首屏高度全部由动画值驱动（不再读 statusBars inset），
@@ -1367,6 +1392,7 @@ fun PlayerScreen(
                     portraitZooming = false
                     controlsVisible = false
                     activity?.restoreDefaultOrientation()
+                    refreshEndedFrame()
                 }
             }
         }
