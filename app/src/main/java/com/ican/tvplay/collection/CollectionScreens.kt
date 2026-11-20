@@ -386,7 +386,7 @@ private fun FavoriteCard(
                             listOf(Color.Transparent, PosterTitleScrim),
                         ),
                     )
-                    // 水平 10dp、上下 8dp：汉字墨迹在基线下约 3dp，8dp 布局的墨迹离边≈10dp，与水平齐平
+                    // 四边统一 8dp（posterTitlePaddingH / posterTitleVisualGap），标题层留白左右上下一致
                     .padding(
                         start = Spacing.posterTitlePaddingH,
                         end = Spacing.posterTitlePaddingH,
