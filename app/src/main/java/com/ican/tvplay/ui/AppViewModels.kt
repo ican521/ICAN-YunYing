@@ -130,6 +130,11 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
         _animateCards.value = false
     }
 
+    // ===== 分类首页数据缓存：只缓存真正访问过的分类，回切同一 Tab 直接命中，不再重复请求 =====
+    // 必须声明在 init 之前：init 里的 collect 会同步 emit 一次，此时后面声明的字段还是 null
+    private val categoryCache = mutableMapOf<String, List<Video>>()
+    private val categoryCacheLock = Mutex()
+
     init {
         // 站源真正发生变化时：重新开启一次逐条渐显，并丢掉上一个站的已访问分类缓存
         viewModelScope.launch {
@@ -146,10 +151,6 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
             }
         }
     }
-
-    // ===== 分类首页数据缓存：只缓存真正访问过的分类，回切同一 Tab 直接命中，不再重复请求 =====
-    private val categoryCache = mutableMapOf<String, List<Video>>()
-    private val categoryCacheLock = Mutex()
 
     private fun categoryCacheKey(categoryId: String) = "${currentSiteKey.value}|$categoryId"
 
