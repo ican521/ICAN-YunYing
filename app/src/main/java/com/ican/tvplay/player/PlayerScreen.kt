@@ -1374,6 +1374,11 @@ fun PlayerScreen(
         // 视频层宽高比：竖屏缩放期间必须让视频层比例恒等于片源（见下方 letterboxed 说明）
         val videoRatio = playerState.videoAspectRatio.takeIf { it > 0f }
             ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
+        // 竖屏片源（宽高比 < 1）：画面缩放锁定「原始」。
+        // 判据与「双击放大是否请求横屏」一致（OK猫 changedLandscape 同款：只有 width>height 才请求横屏）。
+        // 锁定后 PlayerView 一律 FIT，media3 不再把内层 AspectRatioFrameLayout 撑到
+        // 1880x3342 这种「铺满不留边」的尺寸，画面就不会溢出小窗压到信息流上。
+        val portraitSource = videoRatio < 1f
         // 竖屏两端的「画面内容矩形」（media3 FIT 之后真正有画面的那块）：
         // 预览态 = 状态栏之下满宽 16:9 框内；全屏态 = 整屏居中 FIT。
         // 缩放期间直接在这两个矩形之间插值，不再跟着黑框走 —— 跟着黑框走时，
@@ -1456,7 +1461,7 @@ fun PlayerScreen(
         // 其余分支（全屏 / 横屏 / 画中画）保持原样：盒子本身就是稳态尺寸，交给 media3 自身 FIT
         val letterboxed = !inPip && !pipExitHold && !fullscreen &&
             pendingFullscreen == null && !isLandscape &&
-            playerState.scaleMode == Players.ScaleMode.FIT
+            (portraitSource || playerState.scaleMode == Players.ScaleMode.FIT)
 
         // 播完态「静帧替身」：STATE_ENDED 之后解码器已经停了，这时再 resize TextureView，
         // Android 要么重新分配一块没写过的空缓冲（未写入的 YUV → 深蓝块），
@@ -1545,7 +1550,13 @@ fun PlayerScreen(
             AndroidView(
                 factory = { sharedPlayerView },
                 update = { view ->
-                    view.resizeMode = playerState.scaleMode.resizeMode
+                    // 竖屏片源锁定原始：不让 media3 做裁剪/填充，几何交给上面那套按比例贴框的插值，
+                    // 避免内层内容被撑大后溢出小窗（EXO 与 MPV 一致）
+                    view.resizeMode = if (portraitSource) {
+                        androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    } else {
+                        playerState.scaleMode.resizeMode
+                    }
                     // PlayerView 背景直接用黑色：视频 FIT 模式黑边区显示黑色。
                     view.setBackgroundColor(android.graphics.Color.BLACK)
                     if (view.player !== Players.player) Players.bindPlayerView(view)
@@ -1616,6 +1627,7 @@ fun PlayerScreen(
             controlsVisible = controlsVisible,
             locked = locked,
             settings = settings,
+            scaleLocked = portraitSource,
             onToggleControls = { controlsVisible = !controlsVisible },
             onControlInteract = { controlsTick++ },
             onTogglePlay = { Players.playPause() },
@@ -3043,6 +3055,8 @@ private fun FullscreenPlayLayout(
     controlsVisible: Boolean,
     locked: Boolean,
     settings: SettingsRepository,
+    // 竖屏片源：画面缩放锁定「原始」，控制条按钮只显示不响应
+    scaleLocked: Boolean,
     onToggleControls: () -> Unit,
     onControlInteract: () -> Unit,
     onTogglePlay: () -> Unit,
@@ -3462,10 +3476,16 @@ private fun FullscreenPlayLayout(
                                 null
                             },
                         ) { showSpeed = true; onControlInteract() }
-                        ActionBtn(playerState.scaleMode.label) {
-                            val modes = Players.ScaleMode.entries
-                            onScaleChange(modes[(playerState.scaleMode.ordinal + 1) % modes.size])
-                            onControlInteract()
+                        // 画面缩放：竖屏片源锁定「原始」（几何固定按片源比例装框，改档位只会让
+                        // media3 撑大内层溢出小窗），按钮只显示不响应
+                        ActionBtn(if (scaleLocked) "原始" else playerState.scaleMode.label) {
+                            if (scaleLocked) {
+                                onControlInteract()
+                            } else {
+                                val modes = Players.ScaleMode.entries
+                                onScaleChange(modes[(playerState.scaleMode.ordinal + 1) % modes.size])
+                                onControlInteract()
+                            }
                         }
                         // 弹性占位只在宽屏分支有效：横滑分支里 weight 需要一个有界父宽，
                         // 而滚动容器宽度无限，占位会退化成 0 甚至崩溃，所以窄屏直接不留
