@@ -69,41 +69,42 @@ fun SearchWideVideoCard(
                     .background(MiuixTheme.colorScheme.surfaceContainerHigh),
             )
 
-            // 右侧文字区：站源 → 标题 → 标签，垂直居中
+            // 右侧文字区：站源 → 标题 → 标签；外层负责垂直居中，内层只负责行间距
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
                     .padding(Spacing.searchWideCardPadding),
-                verticalArrangement = Arrangement.spacedBy(
-                    Spacing.posterTagRowTopGap,
-                    Alignment.CenterVertically,
-                ),
+                verticalArrangement = Arrangement.Center,
             ) {
-                // 第 1 行：站源
-                Text(
-                    text = siteName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MiuixTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                // 第 2 行：视频标题
-                Text(
-                    text = video.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MiuixTheme.colorScheme.onSurfaceContainer,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                // 第 3 行：标签文字（更新状态 / 备注）
-                if (tagLine != null) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(Spacing.posterTagRowTopGap),
+                ) {
+                    // 第 1 行：站源
                     Text(
-                        text = tagLine,
+                        text = siteName,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        color = MiuixTheme.colorScheme.primary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    // 第 2 行：视频标题
+                    Text(
+                        text = video.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MiuixTheme.colorScheme.onSurfaceContainer,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    // 第 3 行：标签文字（更新状态 / 备注）
+                    if (tagLine != null) {
+                        Text(
+                            text = tagLine,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
