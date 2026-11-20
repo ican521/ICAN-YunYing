@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -130,9 +131,11 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -1433,6 +1436,48 @@ fun PlayerScreen(
             pendingFullscreen == null && !isLandscape &&
             playerState.scaleMode == Players.ScaleMode.FIT
 
+        // 播完态「静帧替身」：STATE_ENDED 之后解码器已经停了，这时再 resize TextureView，
+        // Android 要么重新分配一块没写过的空缓冲（未写入的 YUV → 深蓝块），
+        // 要么保留旧缓冲但变换矩阵还是旧尺寸（画面缩到左上角）。
+        // 手机和平板都会中，和播放内核无关，只跟「播完后还去改 surface 尺寸」有关。
+        // 所以播完那一刻抓一帧存成位图，播完期间视频区只显示这张图、真实 surface 隐藏；
+        // 之后进/退全屏、侧滑缩放都只是缩放一张图片，surface 怎么 resize 都无所谓。
+        // 恢复播放 / 切集 / seek（state 离开 ENDED）时丢弃这张图，把画面交回 surface。
+        var endedFrame by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+        LaunchedEffect(playerState.ended) {
+            if (!playerState.ended) {
+                if (endedFrame != null) endedFrame = null
+                return@LaunchedEffect
+            }
+            if (endedFrame != null) return@LaunchedEffect
+            // 抓帧偶尔会赶在最后一帧上屏之前，最多重试 3 次
+            var captured: android.graphics.Bitmap? = null
+            var attempt = 0
+            while (captured == null && attempt < 3) {
+                if (attempt > 0) delay(120)
+                captured = runCatching { findTextureView(sharedPlayerView)?.bitmap }.getOrNull()
+                attempt++
+            }
+            val raw = captured
+            if (raw != null) {
+                val cropped = cropToContent(raw, videoRatio)
+                endedFrame = cropped.asImageBitmap()
+                if (com.ican.tvplay.BuildConfig.DEBUG) {
+                    android.util.Log.i(
+                        "PipTrace",
+                        "endedFrame ${cropped.width}x${cropped.height} " +
+                            "raw=${raw.width}x${raw.height} ratio=$videoRatio",
+                    )
+                }
+            } else {
+                android.util.Log.w("PipTrace", "endedFrame capture failed")
+            }
+        }
+
+        // 在组合期读一次状态：AndroidView 的 update lambda 不是组合上下文，
+        // 直接在里面读 State 不会触发重组，所以先取到局部变量
+        val endedFrameSnapshot = endedFrame
+
         Box(
             modifier = when {
                 // 画中画（含退出过渡）：铺满整个（已被系统缩小的）Activity 窗口
@@ -1464,13 +1509,16 @@ fun PlayerScreen(
                             compositingStrategy = CompositingStrategy.Offscreen
                         }
                 else ->
-                    // 竖屏：静止态与缩放动画共用同一套 offset/宽高修饰符（静止值即「状态栏以下 + 满宽 16:9 直角」）。
-                    // 这条分支只负责「黑底框」；视频层的尺寸/位置由下方 graphicsLayer 映射，不再随框变形
+                    // 竖屏：静止态与缩放动画共用同一套 offset/宽高修饰符
+                    // （静止值即「状态栏以下 + 满宽 16:9 直角」），
+                    // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，收敛瞬间不会跳。
+                    // 这里不再叠 graphicsLayer：小窗本来就没有圆角，离屏图层只会在 TextureView
+                    // 尺寸逐帧变化时多一层拉伸风险，还多一次整幅拷贝
                     Modifier
                         .offset { IntOffset(0, pAnimTop.value.roundToPx()) }
                         .animatedSize(pAnimWidth, pAnimHeight)
-            }.background(Color.Black).clipToBounds(),
-            contentAlignment = if (letterboxed) Alignment.TopStart else Alignment.Center,
+            }.background(Color.Black),
+            contentAlignment = Alignment.Center,
         ) {
             AndroidView(
                 factory = { sharedPlayerView },
@@ -1479,49 +1527,30 @@ fun PlayerScreen(
                     // PlayerView 背景直接用黑色：视频 FIT 模式黑边区显示黑色。
                     view.setBackgroundColor(android.graphics.Color.BLACK)
                     if (view.player !== Players.player) Players.bindPlayerView(view)
-                    // 诊断：确认视频层实际测量尺寸与等比映射参数（logcat: PipTrace）
-                    android.util.Log.d(
-                        "PipTrace",
-                        "videoLayer ${view.width}x${view.height} box=$letterboxed " +
-                            "ratio=$videoRatio top=${pAnimTop.value} h=${pAnimHeight.value} " +
-                            "screen=${screenW.value}x${screenH.value}",
-                    )
+                    // 静帧替身顶上时把真实 surface 藏掉，避免空缓冲/旧矩阵缓冲从图外露出来
+                    val hide = endedFrameSnapshot != null
+                    view.visibility = if (hide) android.view.View.INVISIBLE else android.view.View.VISIBLE
                 },
                 modifier = if (letterboxed) {
-                    // 竖屏缩放期**不再改 TextureView 尺寸**：逐帧改尺寸会让 SurfaceTexture 的变换慢一帧，
-                    // 实测就是中途画面突然放大裁切 + 变暗闪一下（录屏 0.80~0.87 那几帧）。
-                    // 这里让视频层恒定铺满整屏（媒体层自己按片源比例 FIT），再用 graphicsLayer 做
-                    // 等比缩放 + 平移，把画面映射进当前框：
-                    //   内容宽 = min(框宽, 框高 × 片源比)；缩放 = 内容宽 / 全屏内容宽；纵向位移 = 框中心 - 屏幕中心
-                    // 等比变换保证任何一帧都不变形；surface 尺寸恒定则没有重排、没有滞后帧
-                    Modifier
-                        .requiredSize(screenW, screenH)
-                        // 整块视频层中心对齐到当前黑框中心：
-                        // 视频层贴在框顶（外层已带 pAnimTop 的 offset），中心在 screenH/2，
-                        // 所以这里只需再位移 (框高 - 屏高)/2，框高在布局阶段读取，动画期间不重组
-                        .offset {
-                            val fhPx = pAnimHeight.value.roundToPx()
-                            IntOffset(0, (fhPx - screenH.roundToPx()) / 2)
-                        }
-                        // 只做等比缩放（绕自身中心，即片源内容中心），不加 translationY，
-                        // 避免「offset 与 translationY 各算一次、中心跑偏」
-                        .graphicsLayer {
-                            val fw = pAnimWidth.value.toPx()
-                            val fh = pAnimHeight.value.toPx()
-                            val contentW = minOf(fw, fh * videoRatio)
-                            val fullContentW = minOf(size.width, size.height * videoRatio)
-                            val s = if (fullContentW > 0f) {
-                                (contentW / fullContentW).coerceIn(0f, 1f)
-                            } else {
-                                1f
-                            }
-                            scaleX = s
-                            scaleY = s
-                        }
+                    // 视频层比例 = 片源比例：黑边由外层 Box 的黑底负责，视频层自己不再变形
+                    Modifier.aspectRatio(videoRatio, matchHeightConstraintsFirst = false)
                 } else {
                     Modifier.fillMaxSize()
                 },
             )
+            // 播完后的静态画面：几何与真实视频层一致（片源比例居中），
+            // 缩放动画期间它跟着黑框走，完全不碰 surface
+            endedFrameSnapshot?.let { frame ->
+                Image(
+                    bitmap = frame,
+                    contentDescription = null,
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier.aspectRatio(
+                        videoRatio,
+                        matchHeightConstraintsFirst = false,
+                    ),
+                )
+            }
         }
         // 诊断日志：仅 debug 构建保留（release 自动剔除）
         val branchName = when {
@@ -4606,3 +4635,38 @@ private fun cleanEpisodeTitle(title: String): String =
 
 /** 单次播放会话内自动兜底（换线路/换站源）的总次数上限，防止沿站源链无限解析 */
 private const val MAX_AUTO_FALLBACK = 2
+
+/** 在 PlayerView 的视图树里找 TextureView（surface_type=texture_view 时由 media3 创建） */
+private fun findTextureView(root: android.view.View?): android.view.TextureView? {
+    if (root == null) return null
+    if (root is android.view.TextureView) return root
+    if (root is android.view.ViewGroup) {
+        for (i in 0 until root.childCount) {
+            val found = findTextureView(root.getChildAt(i))
+            if (found != null) return found
+        }
+    }
+    return null
+}
+
+/**
+ * 把 TextureView 的整帧裁成「片源内容矩形」（media3 FIT 之后真正有画面的那部分），
+ * 静帧替身才能直接按 aspectRatio(片源比例) 摆放，和真实视频层几何完全重合。
+ */
+private fun cropToContent(
+    src: android.graphics.Bitmap,
+    ratio: Float,
+): android.graphics.Bitmap {
+    if (ratio <= 0f || src.width <= 0 || src.height <= 0) return src
+    val w = src.width.toFloat()
+    val h = src.height.toFloat()
+    val contentW = if (w / h > ratio) h * ratio else w
+    val contentH = contentW / ratio
+    val left = ((w - contentW) / 2f).toInt().coerceIn(0, src.width - 1)
+    val top = ((h - contentH) / 2f).toInt().coerceIn(0, src.height - 1)
+    val cw = contentW.toInt().coerceIn(1, src.width - left)
+    val ch = contentH.toInt().coerceIn(1, src.height - top)
+    if (cw >= src.width && ch >= src.height) return src
+    return runCatching { android.graphics.Bitmap.createBitmap(src, left, top, cw, ch) }
+        .getOrDefault(src)
+}

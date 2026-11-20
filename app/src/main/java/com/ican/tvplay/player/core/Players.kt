@@ -105,6 +105,8 @@ object Players {
         val ready: Boolean = false,
         val playing: Boolean = false,
         val buffering: Boolean = false,
+        /** 播放到结尾（STATE_ENDED）：竖屏用「最后一帧静帧」顶替真实 surface */
+        val ended: Boolean = false,
         val speed: Float = 1.0f,
         val decode: Decode = Decode.HARD,
         val kernel: Kernel = Kernel.EXO,
@@ -481,6 +483,9 @@ object Players {
             _state.value = _state.value.copy(
                 buffering = playbackState == Player.STATE_BUFFERING,
                 ready = playbackState >= Player.STATE_READY,
+                // 播完态：竖屏要据此把画面换成「最后一帧静帧替身」，
+                // 否则播完后 resize TextureView 会显示空缓冲（深蓝块）或旧矩阵旧缓冲（缩在左上角）
+                ended = playbackState == Player.STATE_ENDED,
             )
         }
 
