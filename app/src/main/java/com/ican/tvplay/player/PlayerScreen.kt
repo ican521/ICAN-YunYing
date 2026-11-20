@@ -1479,6 +1479,13 @@ fun PlayerScreen(
                     // PlayerView 背景直接用黑色：视频 FIT 模式黑边区显示黑色。
                     view.setBackgroundColor(android.graphics.Color.BLACK)
                     if (view.player !== Players.player) Players.bindPlayerView(view)
+                    // 诊断：确认视频层实际测量尺寸与等比映射参数（logcat: PipTrace）
+                    android.util.Log.d(
+                        "PipTrace",
+                        "videoLayer ${view.width}x${view.height} box=$letterboxed " +
+                            "ratio=$videoRatio top=${pAnimTop.value} h=${pAnimHeight.value} " +
+                            "screen=${screenW.value}x${screenH.value}",
+                    )
                 },
                 modifier = if (letterboxed) {
                     // 竖屏缩放期**不再改 TextureView 尺寸**：逐帧改尺寸会让 SurfaceTexture 的变换慢一帧，
@@ -1489,11 +1496,18 @@ fun PlayerScreen(
                     // 等比变换保证任何一帧都不变形；surface 尺寸恒定则没有重排、没有滞后帧
                     Modifier
                         .requiredSize(screenW, screenH)
-                        .offset { IntOffset(0, -pAnimTop.value.roundToPx()) }
+                        // 整块视频层中心对齐到当前黑框中心：
+                        // 视频层贴在框顶（外层已带 pAnimTop 的 offset），中心在 screenH/2，
+                        // 所以这里只需再位移 (框高 - 屏高)/2，框高在布局阶段读取，动画期间不重组
+                        .offset {
+                            val fhPx = pAnimHeight.value.roundToPx()
+                            IntOffset(0, (fhPx - screenH.roundToPx()) / 2)
+                        }
+                        // 只做等比缩放（绕自身中心，即片源内容中心），不加 translationY，
+                        // 避免「offset 与 translationY 各算一次、中心跑偏」
                         .graphicsLayer {
                             val fw = pAnimWidth.value.toPx()
                             val fh = pAnimHeight.value.toPx()
-                            val ftop = pAnimTop.value.toPx()
                             val contentW = minOf(fw, fh * videoRatio)
                             val fullContentW = minOf(size.width, size.height * videoRatio)
                             val s = if (fullContentW > 0f) {
@@ -1503,7 +1517,6 @@ fun PlayerScreen(
                             }
                             scaleX = s
                             scaleY = s
-                            translationY = ftop + fh / 2f - size.height / 2f
                         }
                 } else {
                     Modifier.fillMaxSize()
