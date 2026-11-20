@@ -358,7 +358,7 @@ class SpiderManager(private val appContext: Context) {
         runCatching {
             val json = Json { ignoreUnknownKeys = true }
             val obj = json.parseToJsonElement(jsonStr).jsonObject
-            val rawUrl = obj["url"]?.jsonPrimitive?.content ?: playUrl
+            val rawUrl = parsePlayerUrl(obj["url"]).ifBlank { playUrl }
             val headers = mutableMapOf<String, String>()
             obj["header"]?.let { el -> parseHeaderElement(el, headers) }
             val parse = obj["parse"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
