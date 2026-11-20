@@ -1374,20 +1374,25 @@ fun PlayerScreen(
         // 视频层宽高比：竖屏缩放期间必须让视频层比例恒等于片源（见下方 letterboxed 说明）
         val videoRatio = playerState.videoAspectRatio.takeIf { it > 0f }
             ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
-        // 竖屏片源（宽高比 < 1）：画面缩放锁定「原始」。
-        // 判据与「双击放大是否请求横屏」一致（OK猫 changedLandscape 同款：只有 width>height 才请求横屏）。
-        // 锁定后 PlayerView 一律 FIT，media3 不再把内层 AspectRatioFrameLayout 撑到
-        // 1880x3342 这种「铺满不留边」的尺寸，画面就不会溢出小窗压到信息流上。
-        val portraitSource = videoRatio < 1f
-        // 竖屏两端的「画面内容矩形」（media3 FIT 之后真正有画面的那块）：
-        // 预览态 = 状态栏之下满宽 16:9 框内；全屏态 = 整屏居中 FIT。
-        // 缩放期间直接在这两个矩形之间插值，不再跟着黑框走 —— 跟着黑框走时，
-        // 中途内容会填满框高、顶边被顶到状态栏上方（贴到屏幕最顶，和状态栏重叠）。
-        // 这样顶边全程不低于状态栏底部，画面看起来是「顶端贴着状态栏、整体向下放大」
-        val previewContentH = minOf(portraitPreviewH, screenW / videoRatio)
-        val previewContentTop = statusBarTop + (portraitPreviewH - previewContentH) * 0.5f
-        val fullContentH = minOf(screenH, screenW / videoRatio)
-        val fullContentTop = (screenH - fullContentH) * 0.5f
+        // 竖屏画面内容的尺寸由我们自己算，不看 media3 的 resizeMode：
+        // media3 在「裁剪」下会把内层 AspectRatioFrameLayout 撑到 1880x3342（比小窗高 3 倍）
+        // 这类「铺满不留边」的尺寸，溢出部分没有被裁剪，直接画到信息流上（实测画面到 2290px）。
+        // 所以这里按三种档位直接给出画面矩形，PlayerView 恒 FIT，超出部分由外层 Box 裁掉：
+        //   原始 = 等比装进框内（contain）；裁剪 = 等比铺满框（cover，超出裁掉）；填充 = 拉伸铺满
+        // 预览框 = 状态栏之下满宽 16:9；全屏框 = 整屏。缩放期间在这两套矩形之间插值。
+        fun contentSizeFor(boxW: Dp, boxH: Dp): Pair<Dp, Dp> = when (playerState.scaleMode) {
+            Players.ScaleMode.FIT -> {
+                val h = minOf(boxH, boxW / videoRatio)
+                Pair(h * videoRatio, h)
+            }
+            Players.ScaleMode.ZOOM -> {
+                val h = maxOf(boxH, boxW / videoRatio)
+                Pair(h * videoRatio, h)
+            }
+            Players.ScaleMode.FILL -> Pair(boxW, boxH)
+        }
+        val (previewContentW, previewContentH) = contentSizeFor(screenW, portraitPreviewH)
+        val (fullContentW, fullContentH) = contentSizeFor(screenW, screenH)
         // 竖屏小窗↔竖屏全屏缩放：与横屏同一套做法（宽/高/顶部/圆角连续插值，PlayerView 不重建）。
         // 起点 = 预览小窗（满宽 + 16:9、状态栏以下、16dp 圆角），
         // 终点 = 铺满整屏（顶部 0、高 = 屏高、圆角 = 设备屏幕圆角），
@@ -1408,19 +1413,17 @@ fun PlayerScreen(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "pAnimTop",
         ) { expanded -> if (expanded) 0.dp else statusBarTop }
-        // 画面内容的「高度 + 顶边」单独插值：黑框继续按上面那组值铺满/退出，
-        // 但画面本身只在 previewContent 与 fullContent 之间等比长大，顶边 121px→240px 单调下行
+        // 画面内容矩形单独插值（宽 + 高），居中贴在黑框里：
+        // 黑框继续按上面那组值铺满/退出，画面只在 previewContent 与 fullContent 之间长大，
+        // 顶边 = 框顶 + (框高 - 内容高)/2，全程不会越过状态栏
+        val pContentWidth = portraitTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "pContentWidth",
+        ) { expanded -> if (expanded) fullContentW else previewContentW }
         val pContentHeight = portraitTransition.animateDp(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "pContentHeight",
         ) { expanded -> if (expanded) fullContentH else previewContentH }
-        val pContentTop = portraitTransition.animateDp(
-            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
-            label = "pContentTop",
-        ) { expanded -> if (expanded) fullContentTop else previewContentTop }
-        // 组合期直接取当前值（与 pAnim* 同源，逐帧同步）
-        val contentH = pContentHeight.value
-        val contentTop = pContentTop.value
         // 竖屏预览小窗无圆角（用户要求直角满宽铺），缩放期间也不插值圆角：
         // 收敛后由 fullscreen 分支按设备屏幕圆角裁剪，圆角落在黑边上本来就看不见
 
@@ -1459,9 +1462,10 @@ fun PlayerScreen(
         // 让视频层比例恒等于片源后，Surface 重采样滞后最多表现为一次整体轻微缩放，永不变形；
         // 且首尾像素与静止小窗、全屏稳态完全重合（黑边本来就该是黑的）。
         // 其余分支（全屏 / 横屏 / 画中画）保持原样：盒子本身就是稳态尺寸，交给 media3 自身 FIT
+        // 竖屏（非全屏、非横屏）画面几何一律由我们自己算，PlayerView 恒 FIT，
+        // 所以这个分支对三种档位都走同一套「内容矩形 + 居中 + 外层裁剪」
         val letterboxed = !inPip && !pipExitHold && !fullscreen &&
-            pendingFullscreen == null && !isLandscape &&
-            (portraitSource || playerState.scaleMode == Players.ScaleMode.FIT)
+            pendingFullscreen == null && !isLandscape
 
         // 播完态「静帧替身」：STATE_ENDED 之后解码器已经停了，这时再 resize TextureView，
         // Android 要么重新分配一块没写过的空缓冲（未写入的 YUV → 深蓝块），
@@ -1544,15 +1548,19 @@ fun PlayerScreen(
                     Modifier
                         .offset { IntOffset(0, pAnimTop.value.roundToPx()) }
                         .animatedSize(pAnimWidth, pAnimHeight)
-            }.background(Color.Black),
+            }
+                // 裁剪档位下画面矩形会大于框（cover），超出部分在这里裁掉，
+                // 绝不越界画到下面的信息流上
+                .clipToBounds()
+                .background(Color.Black),
             contentAlignment = Alignment.Center,
         ) {
             AndroidView(
                 factory = { sharedPlayerView },
                 update = { view ->
-                    // 竖屏片源锁定原始：不让 media3 做裁剪/填充，几何交给上面那套按比例贴框的插值，
-                    // 避免内层内容被撑大后溢出小窗（EXO 与 MPV 一致）
-                    view.resizeMode = if (portraitSource) {
+                    // 竖屏几何由我们自己算（原始/裁剪/填充都在 contentSizeFor 里定了尺寸），
+                    // 这里恒 FIT，不让 media3 再按自己的方式撑大内层（撑大会溢出小窗压到信息流）
+                    view.resizeMode = if (letterboxed) {
                         androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                     } else {
                         playerState.scaleMode.resizeMode
@@ -1560,9 +1568,8 @@ fun PlayerScreen(
                     if (com.ican.tvplay.BuildConfig.DEBUG) {
                         android.util.Log.i(
                             "PipTrace",
-                            "videoMode mode=${playerState.scaleMode} portrait=$portraitSource " +
-                                "ratio=${"%.3f".format(videoRatio)} resize=${view.resizeMode} " +
-                                "v=${playerState.videoAspectRatio}",
+                            "videoMode mode=${playerState.scaleMode} letterboxed=$letterboxed " +
+                                "ratio=${"%.3f".format(videoRatio)}",
                         )
                     }
                     // PlayerView 背景直接用黑色：视频 FIT 模式黑边区显示黑色。
@@ -1573,13 +1580,11 @@ fun PlayerScreen(
                     view.visibility = if (hide) android.view.View.INVISIBLE else android.view.View.VISIBLE
                 },
                 modifier = if (letterboxed) {
-                    // 几何完全由插值决定：高 607→1920、顶边 121→240，顶边全程不低于状态栏底部；
-                    // 黑边交给外层黑底，视频层自己比例恒等片源，不会变形
+                    // 居中 + 精确内容矩形：宽/高在布局阶段读取，逐帧不重组；
+                    // 裁剪档位下内容会比框大，由外层 Box 的 clipToBounds 裁掉
                     Modifier
-                        .align(Alignment.TopCenter)
-                        .height(contentH)
-                        .aspectRatio(videoRatio, matchHeightConstraintsFirst = true)
-                        .offset { IntOffset(0, (contentTop - pAnimTop.value).roundToPx()) }
+                        .align(Alignment.Center)
+                        .animatedSize(pContentWidth, pContentHeight)
                 } else {
                     Modifier.fillMaxSize()
                 },
@@ -1593,10 +1598,8 @@ fun PlayerScreen(
                     contentScale = ContentScale.FillBounds,
                     modifier = if (letterboxed) {
                         Modifier
-                            .align(Alignment.TopCenter)
-                            .height(contentH)
-                            .aspectRatio(videoRatio, matchHeightConstraintsFirst = true)
-                            .offset { IntOffset(0, (contentTop - pAnimTop.value).roundToPx()) }
+                            .align(Alignment.Center)
+                            .animatedSize(pContentWidth, pContentHeight)
                     } else {
                         Modifier.aspectRatio(videoRatio, matchHeightConstraintsFirst = false)
                     },
@@ -1635,7 +1638,6 @@ fun PlayerScreen(
             controlsVisible = controlsVisible,
             locked = locked,
             settings = settings,
-            scaleLocked = portraitSource,
             onToggleControls = { controlsVisible = !controlsVisible },
             onControlInteract = { controlsTick++ },
             onTogglePlay = { Players.playPause() },
@@ -3063,8 +3065,6 @@ private fun FullscreenPlayLayout(
     controlsVisible: Boolean,
     locked: Boolean,
     settings: SettingsRepository,
-    // 竖屏片源：画面缩放锁定「原始」，控制条按钮只显示不响应
-    scaleLocked: Boolean,
     onToggleControls: () -> Unit,
     onControlInteract: () -> Unit,
     onTogglePlay: () -> Unit,
@@ -3484,22 +3484,18 @@ private fun FullscreenPlayLayout(
                                 null
                             },
                         ) { showSpeed = true; onControlInteract() }
-                        // 画面缩放：竖屏片源锁定「原始」（几何固定按片源比例装框，改档位只会让
-                        // media3 撑大内层溢出小窗），按钮只显示不响应
-                        ActionBtn(if (scaleLocked) "原始" else playerState.scaleMode.label) {
+                        // 画面缩放：竖屏的裁剪/填充几何由 contentSizeFor 自己算，
+                        // 换档位只改画面矩形，media3 恒 FIT，不会再把内层撑大溢出小窗
+                        ActionBtn(playerState.scaleMode.label) {
                             if (com.ican.tvplay.BuildConfig.DEBUG) {
                                 android.util.Log.i(
                                     "PipTrace",
-                                    "scaleTap locked=$scaleLocked mode=${playerState.scaleMode}",
+                                    "scaleTap mode=${playerState.scaleMode}",
                                 )
                             }
-                            if (scaleLocked) {
-                                onControlInteract()
-                            } else {
-                                val modes = Players.ScaleMode.entries
-                                onScaleChange(modes[(playerState.scaleMode.ordinal + 1) % modes.size])
-                                onControlInteract()
-                            }
+                            val modes = Players.ScaleMode.entries
+                            onScaleChange(modes[(playerState.scaleMode.ordinal + 1) % modes.size])
+                            onControlInteract()
                         }
                         // 弹性占位只在宽屏分支有效：横滑分支里 weight 需要一个有界父宽，
                         // 而滚动容器宽度无限，占位会退化成 0 甚至崩溃，所以窄屏直接不留
