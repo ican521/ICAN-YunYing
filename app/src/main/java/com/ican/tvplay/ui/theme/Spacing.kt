@@ -13,13 +13,27 @@ import top.yukonga.miuix.kmp.utils.getRoundedCorner
 /**
  * 全局 UI 间距/圆角规范（所有 Compose 页面强制遵守，禁止硬编码魔法数字）。
  *
- * 规则要点：
+ * ## 间距档位表（新增间距只能从下表中挑，不得引入 3dp/5dp/15dp 这类中间值）
+ * | 档位 | 用途 | 对应常量 |
+ * | ---- | ---- | ---- |
+ * | 2dp | 极小元素内部微调（角标上下、分类 Tab 上下） | [categoryTabVertical]、[posterBadgePaddingV] |
+ * | 4dp | 小元素内部 / 胶囊内衬 | [posterTagRowTopGap]、[bottomBarInnerPadding] |
+ * | 6dp | 角标级别的左右内边距 | [posterBadgePaddingH] |
+ * | 8dp | 相邻元素（标题↔chips 或正文、列表项、胶囊流式排列、叠加层外边距） | [videoTitleContentGap]、[videoTitleToMetaGap]、[dialogItemGap]、[searchChipGap]、[siteListItemGap]、[posterOverlayMargin]
+ * | 10dp | 海报卡片标题层（紧贴卡片底部，视觉需更贴边） | [posterTitlePaddingH]、[posterTitleVisualGap] |
+ * | 12dp | 页面骨架次级（页面顶部、板块标题↔内容、顶栏组件之间） | [pageTop]、[titleContentGap]、[topBarItemGap] |
+ * | 16dp | 页面骨架主级（页面左右、板块之间、卡片网格、弹窗边距与标题、底栏上下） | [pageHorizontal]、[sectionSpacing]、[cardGapH]、[cardGapV]、[dialogContentMargin]、[dialogTitleGap]、[dialogItemPadding]、[bottomBarGap]、[contentBottomInset] 等 |
+ *
+ * 尺寸类（非间距，按内容或控件固定高度取值）：[chipHeight]、[episodeChipHeight]、[circleButton]、[topBarHeight]、[centeredTopBarHeight]、[bottomBarHeight]。
+ *
+ * ## 其他规则
  * - 页面左右边距统一 [pageHorizontal]（手机/平板均为 16dp）
  * - 页面顶部距状态栏统一 [pageTop]
  * - 大板块之间 [sectionSpacing]；板块标题与内容之间 [titleContentGap]
  * - 卡片网格横向间距 [cardGapH]、纵向间距 [cardGapV]
  * - 全局圆角统一 [corner]（圆形按钮/胶囊保持 CircleShape 不变）
  * - 圆形按钮统一尺寸 [circleButton]
+ * - 1.0.79 起全局文字已 Trim 字形上下留白（见 Theme 的 inkTightTypography），布局值即视觉值，不再做额外补偿
  */
 object Spacing {
     /** 页面左右内边距（全设备统一） */
