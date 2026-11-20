@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
@@ -86,6 +87,8 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -1116,16 +1119,37 @@ private fun UnderlineTabRow(
         val tabEndPadding = edgePadding + Spacing.corner
         var lastSettledIndex by remember { mutableIntStateOf(-1) }
 
-        // 各 tab 文字的实际渲染宽度（选中变大后由 onSizeChanged 重新记录；只需宽度，不用 onGloballyPositioned 监听位置）
-        val textWidths = remember { mutableStateMapOf<Int, Int>() }
+        // 各 tab 文字宽度：用 TextMeasurer 一次性把「全部下标」量出来（仅用于算滚动位移，不参与排版）。
+        // 屏外/未组合的 tab 也能精确算出「滚到离屏幕边缘留 itemSpacing/2」需要滚多少，避免左对齐滚到底。
+        val textMeasurer = rememberTextMeasurer()
+        val density = LocalDensity.current
+        val tabTextStyle = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp)
+        val spacingPx = with(density) { itemSpacing.toPx() }
+        val marginPx = spacingPx / 2f
+        val startPaddingPx = with(density) { tabStartPadding.toPx() }
+        val viewportWidthPx = with(density) { availableWidth.toPx() }
+        val tabWidths = remember(tabs, tabTextStyle) {
+            tabs.map { text ->
+                textMeasurer.measure(AnnotatedString(text), tabTextStyle, maxLines = 1)
+                    .size.width.coerceAtLeast(1)
+            }
+        }
+        // 每个 tab 在「滚动位置=0」时的起点（含起始 contentPadding），用于反推当前滚动偏移与屏外项位置
+        val tabStartOffsets = remember(tabWidths, startPaddingPx, spacingPx) {
+            val offsets = FloatArray(tabs.size)
+            var acc = startPaddingPx
+            for (i in tabs.indices) {
+                offsets[i] = acc
+                acc += tabWidths[i] + spacingPx
+            }
+            offsets
+        }
 
-        // 选中 tab 仅在被截断/完全不可见时才滚动到可视范围（与播放页线路/选集同款）：
-        // 完全可见则不滚动；左侧被遮则左滚到贴左，右侧被遮则右滚到完整显示。
-        // 首次定位用无动画 scrollToItem，后续切 tab 用 animateScrollBy 平滑过渡。
-        // 注意：选中态文字是绘制层放大（scale = TAB_SELECTED_SCALE），布局宽度不变但视觉上
-        // 左右各溢出 (scale-1)/2 倍宽度，这部分溢出会被 viewport 裁掉，所以裁剪判断和滚动
-        // 目标都必须把溢出量算进去，否则滚到布局右边缘后放大的文字右边仍被裁（尤其末项）。
-        LaunchedEffect(selectedTabIndex, textWidths[selectedTabIndex], availableWidth) {
+        // 滚动规则（首尾 tab 不特殊处理，全统一）：
+        // 选中 tab 视觉上完全在屏内（左右距屏幕边缘都 ≥ itemSpacing/2）就不滚；
+        // 被截断/在屏外时，滚到「视觉边缘离屏幕边缘正好留 itemSpacing/2」。
+        // 视觉边缘要算 19/16 绘制层放大溢出，否则放大文字会贴边/被裁。
+        LaunchedEffect(selectedTabIndex, tabWidths, viewportWidthPx) {
             if (tabs.isEmpty() || selectedTabIndex !in tabs.indices) return@LaunchedEffect
             snapshotFlow { listState.layoutInfo.totalItemsCount }
                 .filter { it > selectedTabIndex }
@@ -1133,27 +1157,27 @@ private fun UnderlineTabRow(
             val isInitial = lastSettledIndex < 0
             lastSettledIndex = selectedTabIndex
             val info = listState.layoutInfo
-            val viewportStart = info.viewportStartOffset
-            val viewportEnd = info.viewportEndOffset
+            val viewportStart = info.viewportStartOffset.toFloat()
+            val viewportEnd = info.viewportEndOffset.toFloat()
             val item = info.visibleItemsInfo.firstOrNull { it.index == selectedTabIndex }
-            // 选中态绘制层放大的单侧溢出量（仅已组合的 item 能拿到真实宽度；未组合时先滚入，
-            // 组合后 onSizeChanged 回写 textWidths 会再次触发本 effect 走到下面已组合分支补滚）
-            val overflow = if (item != null) (TAB_SELECTED_SCALE - 1f) * item.size / 2f else 0f
-            val leftCut = item?.let { it.offset - viewportStart - overflow }
-            val rightCut = item?.let { it.offset + it.size - viewportEnd + overflow }
-            val needsScroll = item == null ||
-                (leftCut != null && leftCut < 0f) ||
-                (rightCut != null && rightCut > 0f)
-            if (!needsScroll) return@LaunchedEffect
-            when {
-                item == null ->
-                    if (isInitial) listState.scrollToItem(selectedTabIndex)
-                    else listState.animateScrollToItem(selectedTabIndex)
-                leftCut != null && leftCut < 0f ->
-                    listState.animateScrollBy(leftCut)
-                else ->
-                    listState.animateScrollBy(rightCut ?: 0f)
+            val firstVisible = info.visibleItemsInfo.firstOrNull()
+            // 当前实际滚动偏移 = 首个可见项「滚动位置=0 时的起点」- 它现在的真实 offset
+            val currentScroll = firstVisible?.let { tabStartOffsets[it.index] - it.offset.toFloat() } ?: 0f
+            val itemLeft = if (item != null) item.offset.toFloat()
+                else tabStartOffsets[selectedTabIndex] - currentScroll
+            val itemWidth = if (item != null) item.size.toFloat()
+                else tabWidths[selectedTabIndex].toFloat()
+            val overflow = (TAB_SELECTED_SCALE - 1f) * itemWidth / 2f
+            val leftCut = itemLeft - viewportStart - marginPx - overflow
+            val rightCut = itemLeft + itemWidth - viewportEnd + marginPx + overflow
+            if (item != null && leftCut >= 0f && rightCut <= 0f) return@LaunchedEffect
+            val delta = when {
+                leftCut < 0f -> leftCut
+                rightCut > 0f -> rightCut
+                else -> 0f
             }
+            if (delta == 0f) return@LaunchedEffect
+            if (isInitial) listState.scrollBy(delta) else listState.animateScrollBy(delta)
         }
 
         val hasScrollRange by remember {
@@ -1213,9 +1237,6 @@ private fun UnderlineTabRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
-                                .onSizeChanged { size ->
-                                    textWidths[index] = size.width
-                                }
                                 .graphicsLayer {
                                     scaleX = textScale
                                     scaleY = textScale
