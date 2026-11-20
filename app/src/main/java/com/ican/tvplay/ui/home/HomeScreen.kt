@@ -211,6 +211,8 @@ fun HomeScreen(
     val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     // 当前站源 key：切站后即使新旧站分类 id 完全相同，也要强制各页重新取数（修复切站后首页内容不刷新）
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
+    // 网盘源才有「单列行」：直播/短视源的目录卡（一直播的虎牙/斗鱼频道）走 4:3 宽卡
+    val driveSite by viewModel.driveSite.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     // 切站源加载态（统一「缓冲」阶段）：选新站先淡出旧内容，分类 Tab 与首页首屏卡片都就绪后一起淡入。
@@ -519,7 +521,10 @@ fun HomeScreen(
                 if (driveStyle.value) return
                 when {
                     list.any { it.isCoverFolder } -> coverStyle.value = true
-                    list.any { it.isFolder } -> driveStyle.value = true
+                    // 目录卡：网盘源 → 单列行（真盘目录）；其它源（直播/短视的游戏频道等）→ 4:3 宽卡，
+                    // 与爱刷一致，点击仍然下钻（OK猫 里 folder 标签才 changeView）
+                    list.any { it.isFolder } ->
+                        if (driveSite) driveStyle.value = true else coverStyle.value = true
                     isChannelCardList(list) -> coverStyle.value = true
                 }
             }

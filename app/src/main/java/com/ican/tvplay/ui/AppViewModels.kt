@@ -87,6 +87,19 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
     /**
+     * 当前站源是否网盘类：只有网盘源才把目录卡渲染成单列行（driveStyle）。
+     * 直播/短视这类源的目录卡（一直播的虎牙/斗鱼游戏频道）应该像爱刷一样用 4:3 宽卡
+     */
+    val driveSite: StateFlow<Boolean> = repo.currentSite
+        .map { loaded ->
+            val site = loaded?.site ?: return@map false
+            val api = site.api.orEmpty()
+            api.contains("Drive", ignoreCase = true) ||
+                site.name.contains("云盘") || site.name.contains("网盘")
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /**
      * 首页卡片直达播放页前的预缓存（对齐搜索页 handlePlayClick）：
      * 把卡片元数据 + 当前站点（含 jarSpec）塞进 Players.cachedVideo，
      * 播放页才能一进去就画出「预览小窗 + 详情骨架」，而不是先黑屏转圈
