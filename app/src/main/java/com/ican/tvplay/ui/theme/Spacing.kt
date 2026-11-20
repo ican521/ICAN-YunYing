@@ -168,8 +168,8 @@ object Spacing {
     /** 跨站源搜索结果「长条横卡」文字区左右内边距（12 档） */
     val searchWideCardPadding = 12.dp
 
-    /** 跨站源搜索结果「长条横卡」文字区上下内边距（8 档：站源贴顶、标签贴底） */
-    val searchWideCardPaddingV = 8.dp
+    /** 跨站源搜索结果「长条横卡」文字区上下内边距（0dp：站源贴顶、标签贴底，与海报齐边） */
+    val searchWideCardPaddingV = 0.dp
 
     /** 全局统一圆角（卡片/按钮/输入框/弹窗）；圆形按钮与胶囊用 CircleShape，不适用此值 */
     val corner = 16.dp
