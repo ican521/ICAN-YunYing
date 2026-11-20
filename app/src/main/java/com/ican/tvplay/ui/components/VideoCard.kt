@@ -165,8 +165,8 @@ fun VideoCard(
                         .padding(
                             start = Spacing.posterTitlePaddingH,
                             end = Spacing.posterTitlePaddingH,
-                            bottom = Spacing.posterTitlePaddingV,
-                            top = Spacing.posterTitlePaddingV,
+                            bottom = Spacing.posterTitleVisualGap,
+                            top = Spacing.posterTitleVisualGap,
                         ),
                 ) {
                     Text(

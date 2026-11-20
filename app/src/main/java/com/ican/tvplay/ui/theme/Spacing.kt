@@ -85,9 +85,6 @@ object Spacing {
     /** 居中大标题顶栏高度（状态栏以下）：52dp，与首页顶栏收起态总高（Tab 上下 5dp + 42dp）一致 */
     val centeredTopBarHeight = 52.dp
 
-    /** 标题在顶栏内的顶部偏移：按可见状态栏内容下缘对齐，使上下视觉间隙相等 */
-    val centeredTopBarTitleInset = 5.dp
-
     /** 底部弹窗内并排按钮（取消/确认等）之间的间距 */
     val dialogButtonGap = 16.dp
 
@@ -112,8 +109,12 @@ object Spacing {
     /** 海报底部标题层内边距（水平） */
     val posterTitlePaddingH = 10.dp
 
-    /** 海报底部标题层内边距（垂直） */
-    val posterTitlePaddingV = 6.dp
+    /**
+     * 海报底部标题层的上下留白：6dp（唯一实现点，卡片组件统一引用本常量）。
+     * 特殊点在下方一侧：文字行盒在字形下方自带约 4dp 留白，所以底部实际占位 6dp + 4dp = 10dp，
+     * 才与左侧 10dp（[posterTitlePaddingH]）视觉一致；改动前先看这条，别当成普通 6dp 调平。
+     */
+    val posterTitleVisualGap = 6.dp
 
     /** 海报标签行（标题上方胶囊）与上方内容的间距 */
     val posterTagRowTopGap = 4.dp
