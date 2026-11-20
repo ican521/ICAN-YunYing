@@ -507,10 +507,6 @@ fun HomeScreen(
             val coverStyle = remember(page, pageCategory?.id, currentSiteKey) {
                 mutableStateOf(catFlag == '2')
             }
-            // 宽卡宽高比（fongmi Style.ratio，缺省 4:3）：一直播站点声明的是 1.597 → 16:10 更扁
-            val coverRatio = remember(page, pageCategory?.id, currentSiteKey) {
-                mutableFloatStateOf(4f / 3f)
-            }
             // 「频道卡」类目：条目 id 全是 http(s) 外链（没有站内 id）、且不是目录卡。
             // 典型就是爱刷（csp_SsspGuard）这类短视源：每个卡是一个频道入口（其他随机/黑丝/抖音萌妹…），
             // 采集数据里既无 type_flag 也无 vod_tag，普通源的 id 是站内数字串，所以这个判据不会误伤
@@ -543,11 +539,7 @@ fun HomeScreen(
                     // ① 分类 type_flag '1' 已在外层初始化成 driveStyle，这里只处理声明式样式
                     declared != null && declared.isList() -> driveStyle.value = true
                     declared != null && declared.normalizedType() == "rect" ->
-                        if (declared.effectiveRatio() > 1f) {
-                            coverStyle.value = true
-                            // fongmi 就是拿 style.ratio 当卡片宽高比用，这里同样跟随（上限已在 effectiveRatio 裁到 4）
-                            coverRatio.floatValue = declared.effectiveRatio()
-                        }
+                        if (declared.effectiveRatio() > 1f) coverStyle.value = true
                     // oval 圆形头像：沿用海报网格，不做特殊形状
                     declared != null && declared.normalizedType() == "oval" -> Unit
                     list.any { it.isCoverFolder } -> coverStyle.value = true
@@ -733,7 +725,6 @@ fun HomeScreen(
                                 onClick = { onItemClick(video) },
                                 modifier = Modifier.alpha(cardAlpha),
                                 wide = coverStyle.value,
-                                wideRatio = coverRatio.floatValue,
                             )
                         }
                     }
@@ -1426,14 +1417,13 @@ private fun VideoCardItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     wide: Boolean = false,
-    wideRatio: Float = 4f / 3f,
 ) {
     com.ican.tvplay.ui.components.VideoCard(
         video = video,
         onClick = onClick,
         modifier = modifier,
-        // 横版宽卡：样式沿用普通海报卡，只把 3:4 换成站点声明的宽高比（缺省 4:3）
-        aspectRatio = if (wide) wideRatio else 3f / 4f,
+        // 横版宽卡：样式完全沿用普通海报卡，只把 3:4 变成 4:3（等于「旋转 90 度」）
+        aspectRatio = if (wide) 4f / 3f else 3f / 4f,
     )
 }
 
