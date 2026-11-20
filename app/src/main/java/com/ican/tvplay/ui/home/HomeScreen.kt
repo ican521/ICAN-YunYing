@@ -338,7 +338,7 @@ fun HomeScreen(
     val statusBarTopDp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val topBarHeightPx = with(density) {
         statusBarTopDp.toPx() + searchRowMaxCollapsePx +
-            (Spacing.categoryTabVertical * 2 + TabRowHeight).toPx()
+            (Spacing.sectionSpacing * 2 + TabRowHeight).toPx()
     }.roundToInt().toFloat()
     var searchRowCollapsePx by remember { mutableFloatStateOf(0f) }
     // 折叠量的「非 State 快照」：滑动时 searchRowCollapsePx 每帧都在变，只有必须在组合阶段
@@ -813,7 +813,7 @@ fun HomeScreen(
         // ② 裁剪窗口高度只在 measure 阶段读（Modifier.layout）；
         // ③ 内容上移量只在 layout 阶段读（Modifier.offset 的 lambda）。
         // 于是滑动时顶栏（含分类 Tab 的 LazyRow）不再逐帧重组 / 重新测量，只做一次廉价的裁剪与位移。
-        val gapPx = with(density) { Spacing.categoryTabVertical.toPx() }
+        val gapPx = with(density) { Spacing.sectionSpacing.toPx() }
         val tabRowPx = with(density) { TabRowHeight.toPx() }
         // 顶区展开态总高（含状态栏）：玻璃层固定按此尺寸测量
         val bandHeightPx = topBarHeightPx.roundToInt()
@@ -1359,7 +1359,7 @@ private fun UnderlineTabRow(
                 itemsIndexed(tabs, contentType = { _, _ -> "tab" }) { index, tabText ->
                     val selected = selectedTabIndex == index
                     // 文字垂直居中于 42dp 行内：因 Tab 行本身已居中于「搜索框底→卡片顶」的
-                    // （上方 categoryTabVertical + 行高42dp + 下方同值余量）区间，
+                    // （上方 sectionSpacing(16dp) + 行高42dp + 下方同值）区间，
                     // 行内居中即保证「tab文字底→卡片顶」=「tab文字顶→搜索框底」，且不随字号变化破坏等式
                     Box(
                         contentAlignment = Alignment.Center,

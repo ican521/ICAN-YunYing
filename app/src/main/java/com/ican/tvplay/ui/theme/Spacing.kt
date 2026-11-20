@@ -31,13 +31,6 @@ object Spacing {
     /** 大板块之间的间距（今日推荐/分类Tab/视频网格等模块之间） */
     val sectionSpacing = 16.dp
 
-    /**
-     * 首页顶部分类Tab与上（搜索栏）/下（内容区）的间距：0dp。
-     * Tab 行本身固定 42dp、文字垂直居中，全局文字 Trim 后文字块会自然把间隙留出来，
-     * 不再额外加补偿值（原 4dp 是「行内 11dp 留白 + 4 = 视觉 15dp」的补偿，已随 Trim 一并移除）。
-     */
-    val categoryTabVertical = 0.dp
-
     /** 板块内部标题与下方内容的间距（播放页底部弹窗的大标题间距也用此值） */
     val titleContentGap = 12.dp
 
@@ -107,13 +100,13 @@ object Spacing {
     /** 海报角标内边距（垂直） */
     val posterBadgePaddingV = 2.dp
 
-    /** 海报底部标题层内边距（水平）：12dp，与 [posterTitleVisualGap] 同值 */
+    /** 海报底部标题层内边距（水平）：12dp（规范值） */
     val posterTitlePaddingH = 12.dp
 
     /**
-     * 海报底部标题层的上下留白：12dp。
-     * 全局文字已开启 LineHeightStyle.Trim（见 Theme 的 inkTightTypography），
-     * 行盒不再带字形留白，故此处直接用规范值 12dp，与水平内边距同值，不做视觉补偿。
+     * 海报底部标题层的上下留白：12dp（规范值）。
+     * 全局文字已 Trim（见 Theme 的 inkTightTypography），行盒不带字形留白，
+     * 布局即视觉，故直接用 12dp 档，与水平同值；旧版视觉 10dp 就近归到 12dp 档。
      */
     val posterTitleVisualGap = 12.dp
 
