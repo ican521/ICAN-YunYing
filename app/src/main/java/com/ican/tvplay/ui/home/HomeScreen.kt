@@ -211,14 +211,14 @@ fun HomeScreen(
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    // 切站源时顶部分类 Tab 的淡出/淡入：选新站先淡出旧 tab，新分类就绪后淡入
+    // 切站源时顶部分类 Tab 与视频卡片一起淡出/淡入：选新站先淡出旧内容，新分类就绪后淡入
     var tabsFadedOut by remember { mutableStateOf(false) }
     var pendingOldCategories by remember { mutableStateOf<List<VideoCategory>?>(null) }
     var pendingSiteKey by remember { mutableStateOf<String?>(null) }
-    val tabsAlpha by animateFloatAsState(
+    val homeSwitchAlpha by animateFloatAsState(
         targetValue = if (tabsFadedOut) 0f else 1f,
         animationSpec = tween(150),
-        label = "homeTabsAlpha",
+        label = "homeSwitchAlpha",
     )
 
     // 卡片逐条渐显只在「App 启动首次加载」和「切换站源后的首次加载」播放；
@@ -432,9 +432,9 @@ fun HomeScreen(
         // 禁用分类 Tab 栏 + 内容 Pager 的边界 overscroll 回弹效果
         CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
 
-        // 内容层
+        // 内容层（切站源时与顶部 Tab 一起淡出旧卡片，新内容就绪后一起淡入）
         Box(
-            modifier = Modifier,
+            modifier = Modifier.graphicsLayer { alpha = homeSwitchAlpha },
         ) {
 
         // 内容区 pager：相邻页预渲染（beyondViewportPageCount=1）；
@@ -800,7 +800,7 @@ fun HomeScreen(
                                     }
                                 }
                                 // 1：固定分类 Tab：通栏可滑至屏幕最左/最右缘，静止时首个/末个 Tab 由内部 contentPadding 对齐卡片圆角/直线交界处（左右对称）
-                                Box(modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = tabsAlpha }) {
+                                Box(modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = homeSwitchAlpha }) {
                                     CategoryChips(
                                         categories = categories,
                                         pagerState = pagerState,
