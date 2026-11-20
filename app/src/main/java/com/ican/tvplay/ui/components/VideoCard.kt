@@ -123,7 +123,7 @@ fun VideoCard(
                 }
             }
 
-            // 底部：可选标签行 + 渐变标题（高度不变：标题上下各 6dp；渐变从底部 80% 黑到顶部全透明）
+            // 底部：可选标签行 + 渐变标题（高度不变：标题上下各 10dp；渐变从底部 80% 黑到顶部全透明）
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -159,7 +159,7 @@ fun VideoCard(
                                 listOf(Color.Transparent, PosterTitleScrim),
                             ),
                         )
-                        // 底部留 6dp：文字行盒本身在字形下方还有约 4dp 余量，6+4 才和左侧 10dp 视觉一致
+                        // 左右与上下同取 10dp：全局已 Trim 掉字形留白，布局高度即视觉高度
                         .padding(
                             start = Spacing.posterTitlePaddingH,
                             end = Spacing.posterTitlePaddingH,

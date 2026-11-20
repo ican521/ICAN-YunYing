@@ -107,15 +107,15 @@ object Spacing {
     /** 海报角标内边距（垂直） */
     val posterBadgePaddingV = 2.dp
 
-    /** 海报底部标题层内边距（水平）：12dp（规范值） */
-    val posterTitlePaddingH = 12.dp
+    /** 海报底部标题层内边距（水平）：10dp（与旧版视觉一致） */
+    val posterTitlePaddingH = 10.dp
 
     /**
-     * 海报底部标题层的上下留白：12dp（规范值）。
+     * 海报底部标题层的上下留白：10dp（与旧版视觉一致）。
      * 全局文字已 Trim（见 Theme 的 inkTightTypography），行盒不带字形留白，
-     * 布局即视觉，故直接用 12dp 档，与水平同值；旧版视觉 10dp 就近归到 12dp 档。
+     * 布局即视觉，故沿用旧版 10dp，水平/底部同值。
      */
-    val posterTitleVisualGap = 12.dp
+    val posterTitleVisualGap = 10.dp
 
     /** 海报标签行（标题上方胶囊）与上方内容的间距 */
     val posterTagRowTopGap = 4.dp
