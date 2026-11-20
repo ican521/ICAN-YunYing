@@ -19,8 +19,8 @@ import top.yukonga.miuix.kmp.utils.getRoundedCorner
  * | 2dp | 极小元素内部微调（角标上下、分类 Tab 上下） | [categoryTabVertical]、[posterBadgePaddingV] |
  * | 4dp | 小元素内部 / 胶囊内衬 | [posterTagRowTopGap]、[bottomBarInnerPadding] |
  * | 6dp | 角标级别的左右内边距 | [posterBadgePaddingH] |
- * | 8dp | 相邻元素（标题↔chips 或正文、列表项、胶囊流式排列、叠加层外边距） | [videoTitleContentGap]、[videoTitleToMetaGap]、[dialogItemGap]、[searchChipGap]、[siteListItemGap]、[posterOverlayMargin]
- * | 10dp | 海报卡片标题层、历史卡片进度条底距（紧贴卡片底部，视觉需更贴边） | [posterTitlePaddingH]、[posterTitleVisualGap]、[historyProgressBarGap] |
+ * | 8dp | 相邻元素（标题↔chips 或正文、列表项、胶囊流式排列、叠加层外边距） | [videoTitleContentGap]、[videoTitleToMetaGap]、[dialogItemGap]、[searchChipGap]、[siteListItemGap]
+ * | 10dp | 海报叠加层角标外距、卡片标题层、历史卡片进度条底距（紧贴卡片边） | [posterTitlePaddingH]、[posterTitleVisualGap]、[historyProgressBarGap]、[posterOverlayMargin] |
  * | 12dp | 页面骨架次级（页面顶部、板块标题↔内容、顶栏组件之间） | [pageTop]、[titleContentGap]、[topBarItemGap] |
  * | 16dp | 页面骨架主级（页面左右、板块之间、卡片网格、弹窗边距与标题、底栏上下） | [pageHorizontal]、[sectionSpacing]、[cardGapH]、[cardGapV]、[dialogContentMargin]、[dialogTitleGap]、[dialogItemPadding]、[bottomBarGap]、[contentBottomInset] 等 |
  *
@@ -112,8 +112,11 @@ object Spacing {
     /** 追番更新页海报圆角（连续曲率）：板块卡片内的预览小图统一使用 */
     val updateCardCorner = 10.dp
 
-    /** 海报叠加层（角标 / 编辑删除钮）距海报边缘的外边距 */
-    val posterOverlayMargin = 8.dp
+    /**
+     * 海报叠加层（左上/右上角标胶囊、编辑删除钮）距海报边缘的外边距：10dp（档位表 10 档）。
+     * 胶囊底是绘制出来的，没有字形下沉，布局值即视觉值。
+     */
+    val posterOverlayMargin = 10.dp
 
     /** 海报角标内边距（水平） */
     val posterBadgePaddingH = 6.dp
