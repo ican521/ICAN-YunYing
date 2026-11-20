@@ -14,6 +14,7 @@ import com.ican.tvplay.data.remote.VodApiClient
 import com.ican.tvplay.data.remote.VodClass
 import com.ican.tvplay.data.remote.VodItem
 import com.ican.tvplay.data.remote.VodStyle
+import com.ican.tvplay.data.remote.parsePlayerUrl
 import com.ican.tvplay.data.remote.parseStyle
 import com.ican.tvplay.data.remote.styleOf
 import kotlinx.coroutines.Dispatchers
@@ -750,36 +751,69 @@ class VideoRepository(
      */
     suspend fun resolvePlaySource(video: Video, episode: Episode, flag: String? = null): PlaySource {
         val loaded = _currentSite.value ?: return PlaySource(episode.playUrl)
-        if (!loaded.site.isSpider()) return PlaySource(episode.playUrl)
-        val spider = currentSpider ?: return PlaySource(episode.playUrl)
+        // 站点级 header（fongmi Site.header）：HTTP 站直接拉流也要带上，否则防盗链站 403/空
+        val siteHeaders = loaded.site.headerMap()
+        if (!loaded.site.isSpider()) {
+            // type=4：播放地址要再经 api?play=&flag= 换一次（fongmi loadPlayerContent type 4 分支）
+            if (loaded.site.type == 4) {
+                val json = apiClient.playerContentHttp(
+                    loaded.site,
+                    flag?.takeIf { it.isNotBlank() } ?: video.playFrom,
+                    episode.playUrl,
+                )
+                if (!json.isNullOrBlank()) {
+                    val content = parsePlayerContent(json, episode.playUrl, siteHeaders)
+                    if (content.url.isNotBlank()) return content
+                }
+            }
+            return PlaySource(episode.playUrl, siteHeaders)
+        }
+        val spider = currentSpider ?: return PlaySource(episode.playUrl, siteHeaders)
         val resolvedFlag = flag?.takeIf { it.isNotBlank() }
             ?: video.playFrom.ifBlank { loaded.site.key }
         val json = spiderManager.playerContent(spider, resolvedFlag, episode.playUrl)
-        if (json.isBlank()) return PlaySource(episode.playUrl)
+        if (json.isBlank()) return PlaySource(episode.playUrl, siteHeaders)
+        return parsePlayerContent(json, episode.playUrl, siteHeaders)
+    }
+
+    /**
+     * 解析 playerContent 返回的 JSON → 可播放地址 + 请求头。
+     * 对齐 fongmi Result：url 支持字符串/扁平数组/values 对象（[parsePlayerUrl]），
+     * header 为站点 header 与返回 header 的并集（返回的优先）。
+     */
+    private suspend fun parsePlayerContent(json: String, fallbackUrl: String, siteHeaders: Map<String, String>): PlaySource {
         return runCatching {
             val obj = rawJson.parseToJsonElement(json).jsonObject
-            val rawUrl = obj["url"]?.jsonPrimitive?.content ?: episode.playUrl
-            // header 可能是 JSON 对象 {"User-Agent": "...", "Referer": "..."} 或字符串
-            val headers = mutableMapOf<String, String>()
+            val rawUrl = parsePlayerUrl(obj["url"]).ifBlank { fallbackUrl }
+            val headers = siteHeaders.toMutableMap()
             obj["header"]?.let { el ->
                 runCatching {
-                    el.jsonObject.entries.forEach { (k, v) ->
-                        headers[k] = v.jsonPrimitive.content
+                    when (el) {
+                        is kotlinx.serialization.json.JsonObject -> el.entries.forEach { (k, v) ->
+                            (v as? kotlinx.serialization.json.JsonPrimitive)?.let { h -> headers[k] = h.content }
+                        }
+                        is kotlinx.serialization.json.JsonArray -> el.mapNotNull {
+                            (it as? kotlinx.serialization.json.JsonPrimitive)?.content
+                        }.forEach { line ->
+                            val idx = line.indexOf(':')
+                            if (idx > 0) headers[line.substring(0, idx).trim()] = line.substring(idx + 1).trim()
+                        }
+                        else -> Unit
                     }
                 }
             }
             val parse = obj["parse"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             val jx = obj["jx"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-            Log.d(REPO_TAG, "playerContent rawUrl=$rawUrl parse=$parse jx=$jx headers=${headers.keys}")
+            Log.d(REPO_TAG, "playerContent url=${rawUrl.take(120)} parse=$parse jx=$jx headers=${headers.keys}")
             // parse=1/2 或 jx=1 → 需 jx 解析（很多 spider 返回的是解析页 URL 而非真实流）
             val finalUrl = if (JxParser.needsParse(rawUrl, parse, jx)) {
                 JxParser.resolve(rawUrl, headers).ifBlank { rawUrl }
             } else {
                 rawUrl
             }
-            PlaySource(url = finalUrl.ifBlank { episode.playUrl }, headers = headers)
+            PlaySource(url = finalUrl.ifBlank { fallbackUrl }, headers = headers)
         }.onFailure { Log.e(REPO_TAG, "parse playerContent fail", it) }
-            .getOrDefault(PlaySource(episode.playUrl))
+            .getOrDefault(PlaySource(fallbackUrl, siteHeaders))
     }
 
     // ---- 内部：按站点类型分发数据加载 ----

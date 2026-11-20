@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -50,9 +51,14 @@ data class TvBoxSite(
     val ext: JsonElement? = null,
     /** 站点声明的卡片样式（fongmi Site.style）：原样保留 JSON，解析失败不影响站点加载 */
     val style: JsonElement? = null,
+    /** 站点级请求头（fongmi Site.header）：对象 {"UA":"..."} 或数组 ["UA: ..."] */
+    val header: JsonElement? = null,
 ) {
-    /** 是否 spider 站（type=3 + api=csp_Xxx） */
-    fun isSpider(): Boolean = type == 3 && api.startsWith("csp_")
+    /** 是否 spider 站（type=3；jar 类蜘蛛的 api 形如 csp_Xxx） */
+    fun isSpider(): Boolean = type == 3
+
+    /** jar 蜘蛛：api 为 csp_Xxx（js/py/node 蜘蛛的 api 不是这个形状，暂不支持） */
+    fun isJarSpider(): Boolean = type == 3 && api.startsWith("csp_")
 
     /** ext 字段统一为字符串：字符串原样返回，对象/数组序列化为 JSON 字符串 */
     fun extAsString(): String = when (val e = ext) {
@@ -63,6 +69,24 @@ data class TvBoxSite(
 
     /** 站点声明的卡片样式（fongmi Site.style）：解析失败/未声明都返回 null */
     fun cardStyle(): VodStyle? = style?.let { el -> parseStyle(el) }
+
+    /**
+     * 站点级请求头（fongmi Site.getHeader）：
+     * 支持对象 {"User-Agent":"..."} 与数组 ["User-Agent: ...", ...] 两种写法
+     */
+    fun headerMap(): Map<String, String> = runCatching {
+        when (val h = header) {
+            is JsonObject -> h.entries.mapNotNull { (k, v) ->
+                (v as? JsonPrimitive)?.takeIf { it.isString }?.let { k to it.content }
+            }.toMap()
+            is JsonArray -> h.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
+                .mapNotNull { line ->
+                    val idx = line.indexOf(':')
+                    if (idx <= 0) null else line.substring(0, idx).trim() to line.substring(idx + 1).trim()
+                }.toMap()
+            else -> emptyMap()
+        }
+    }.getOrDefault(emptyMap())
 }
 
 /** 分类（ac=class 返回的 class 数组元素） */
@@ -153,6 +177,43 @@ fun parseStyle(el: JsonElement): VodStyle? = runCatching {
         else -> null
     }
 }.getOrNull()
+
+/**
+ * playerContent 的 url 字段（对齐 fongmi UrlAdapter）：三种写法都兼容
+ * - 字符串 "https://..."
+ * - 扁平数组 ["原画", "https://...", "高清", "https://..."]（偶数位是名称）
+ * - 对象 {"values":[{"n":"原画","v":"https://..."}],"position":0}
+ * 取第一条（fongmi 默认 position=0）；解析不出返回空串
+ */
+fun parsePlayerUrl(el: JsonElement?): String = runCatching {
+    when (el) {
+        null -> ""
+        is JsonPrimitive -> if (el.isString) el.content else ""
+        is JsonArray -> {
+            val first = el.firstOrNull()
+            when (first) {
+                is JsonPrimitive -> if (first.isString) {
+                    // 扁平 [name, url, name, url...]：名称位是第 0 个，url 是第 1 个；
+                    // 但也要容忍直接给 [url] 的情况
+                    (el.getOrNull(1) as? JsonPrimitive)?.content ?: first.content
+                } else ""
+                is JsonObject -> (first["v"] as? JsonPrimitive)?.content.orEmpty()
+                else -> ""
+            }
+        }
+        is JsonObject -> {
+            val values = el["values"]
+            if (values is JsonArray && values.isNotEmpty()) {
+                val pos = ((el["position"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0)
+                    .coerceIn(0, values.size - 1)
+                ((values[pos] as? JsonObject)?.get("v") as? JsonPrimitive)?.content.orEmpty()
+            } else {
+                (el["v"] as? JsonPrimitive)?.content.orEmpty()
+            }
+        }
+        else -> ""
+    }
+}.getOrDefault("")
 
 /** 列表/分类接口返回 */
 @Serializable
@@ -316,9 +377,14 @@ class VodApiClient(
     suspend fun homeClassesAndList(site: TvBoxSite): Pair<List<VodClass>, List<VodItem>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val url = buildUrl(site.api, mapOf("ac" to "class"))
+                // fongmi SiteApi.homeContent：type=4 只带 filter=true，其它 JSON 站带 ac=class
+                val url = if (site.type == 4) {
+                    buildUrl(site.api, mapOf("filter" to "true"))
+                } else {
+                    buildUrl(site.api, mapOf("ac" to "class"))
+                }
                 Log.d(TAG, "homeClasses url=$url")
-                val body = get(url)
+                val body = get(url, site.headerMap())
                 Log.d(TAG, "homeClasses bytes=${body.length}, head=${body.take(200)}")
                 val result = json.decodeFromString<VodListResult>(body)
                 Log.d(TAG, "homeClasses classes=${result.classes.size} list=${result.list.size}")
@@ -330,12 +396,14 @@ class VodApiClient(
     suspend fun categoryVideos(site: TvBoxSite, typeId: String, page: Int = 1): List<VodItem> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val url = buildUrl(
-                    site.api,
-                    mapOf("ac" to "videolist", "t" to typeId, "pg" to page.toString()),
-                )
+                // fongmi ac(type)：type=0 是 videolist，其余（含 type 4）是 detail
+                val ac = if (site.type == 0) "videolist" else "detail"
+                val params = linkedMapOf("ac" to ac, "t" to typeId, "pg" to page.toString())
+                // type=4（ext-api）额外带 ext：fongmi 总是发送 base64(extend)，无筛选时就是 "{}" 的 URL-safe base64
+                if (site.type == 4) params["ext"] = "e30"
+                val url = buildUrl(site.api, params)
                 Log.d(TAG, "categoryVideos url=$url")
-                val body = get(url)
+                val body = get(url, site.headerMap())
                 Log.d(TAG, "categoryVideos bytes=${body.length}, head=${body.take(200)}")
                 val result = json.decodeFromString<VodListResult>(body)
                 Log.d(TAG, "categoryVideos list=${result.list.size}")
@@ -343,15 +411,28 @@ class VodApiClient(
             }.onFailure { Log.e(TAG, "categoryVideos fail", it) }.getOrDefault(emptyList())
         }
 
-    /** 搜索（ac=videolist&wd=） */
+    /** 搜索：先用 fongmi SiteApi.searchContent 的原始参数形态（wd/quick/extend，不带 ac），
+     *  空结果再退回老式 ac=videolist&wd= —— 有些采集站只认其中一种 */
     suspend fun search(site: TvBoxSite, keyword: String): List<VodItem> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val url = buildUrl(site.api, mapOf("ac" to "videolist", "wd" to keyword))
-                Log.d(TAG, "search url=$url")
-                val body = get(url)
+                val headers = site.headerMap()
+                val fongmiStyle = buildUrl(
+                    site.api,
+                    linkedMapOf("wd" to keyword, "quick" to "false", "extend" to ""),
+                )
+                Log.d(TAG, "search url=$fongmiStyle")
+                val body = get(fongmiStyle, headers)
                 Log.d(TAG, "search bytes=${body.length}")
-                json.decodeFromString<VodListResult>(body).list
+                val first = runCatching { json.decodeFromString<VodListResult>(body).list }
+                    .getOrDefault(emptyList())
+                if (first.isNotEmpty()) return@runCatching first
+
+                val ac = if (site.type == 0) "videolist" else "detail"
+                val legacy = buildUrl(site.api, linkedMapOf("ac" to ac, "wd" to keyword))
+                Log.d(TAG, "search fallback url=$legacy")
+                val body2 = get(legacy, headers)
+                json.decodeFromString<VodListResult>(body2).list
             }.onFailure { Log.e(TAG, "search fail", it) }.getOrDefault(emptyList())
         }
 
@@ -360,18 +441,35 @@ class VodApiClient(
         runCatching {
             val url = buildUrl(site.api, mapOf("ac" to "detail", "ids" to vodId))
             Log.d(TAG, "detail url=$url")
-            val body = get(url)
+            val body = get(url, site.headerMap())
             Log.d(TAG, "detail bytes=${body.length}, head=${body.take(200)}")
             json.decodeFromString<VodDetailResult>(body).list.firstOrNull()
         }.onFailure { Log.e(TAG, "detail fail", it) }.getOrNull()
     }
 
-    private fun get(url: String): String {
-        val request = Request.Builder()
+    /**
+     * type=4 站点的播放解析（fongmi SiteApi.loadPlayerContent 的 type 4 分支）：
+     * GET api?play=<选集地址/ID>&flag=<线路> → 返回 {url, header, parse, jx}
+     */
+    suspend fun playerContentHttp(site: TvBoxSite, flag: String, playId: String): String? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val url = buildUrl(site.api, mapOf("play" to playId, "flag" to flag))
+                Log.d(TAG, "playerContentHttp url=$url")
+                val body = get(url, site.headerMap())
+                Log.d(TAG, "playerContentHttp bytes=${body.length}, head=${body.take(200)}")
+                body
+            }.onFailure { Log.e(TAG, "playerContentHttp fail", it) }.getOrNull()
+        }
+
+    private fun get(url: String, headers: Map<String, String> = emptyMap()): String {
+        val builder = Request.Builder()
             .url(url)
             // TVBox 服务器按 UA 区分返回：okhttp UA 才返回伪装 JPEG 配置，浏览器 UA 返回 HTML 导航页
             .header("User-Agent", "okhttp/4.12.0")
-            .build()
+        // 站点级 header（fongmi Site.header）覆盖默认 UA：有些采集站只认自己的 UA/Referer
+        headers.forEach { (k, v) -> builder.header(k, v) }
+        val request = builder.build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code} for $url")
             return response.body?.string().orEmpty()

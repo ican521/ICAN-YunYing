@@ -99,7 +99,13 @@ class SpiderManager(private val appContext: Context) {
      * @param jarSpec 完整 spider 字段（可能含 `;md5;xxx` 后缀）
      */
     suspend fun getSpider(site: TvBoxSite, jarSpec: String): Any? {
-        if (site.type != 3 || !site.api.startsWith("csp_")) return null
+        if (site.type != 3) return null
+        // type=3 但 api 不是 csp_Xxx 的是 js/py/node 蜘蛛（fongmi 用 quickjs/chaquopy 加载），
+        // 我们只有 jar 加载器：这里明确记一条日志，避免被误当成 JSON 站静默失败
+        if (!site.api.startsWith("csp_")) {
+            Log.w(TAG, "unsupported spider api (js/py/node): site=${site.key} api=${site.api.take(60)}")
+            return null
+        }
         if (jarSpec.isBlank()) return null
         val jarUrl = jarSpec.substringBefore(";md5;").trim()
         if (jarUrl.isBlank()) return null
