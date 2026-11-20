@@ -260,6 +260,17 @@ fun HomeScreen(
         }
     }
 
+    // 兜底：淡出后长时间没有新分类（站源挂了 / homeContent 超时），自动淡入，避免首页一直隐形
+    LaunchedEffect(tabsFadedOut, pendingSiteKey) {
+        if (!tabsFadedOut) return@LaunchedEffect
+        delay(25_000)
+        if (tabsFadedOut) {
+            tabsFadedOut = false
+            pendingOldCategories = null
+            pendingSiteKey = null
+        }
+    }
+
     // 顶部分类 pager：每个分类一页（第 0 页 = 第一个分类）
     val pagerState = rememberPagerState(pageCount = { categories.size })
 

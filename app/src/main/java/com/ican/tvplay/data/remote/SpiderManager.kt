@@ -4,12 +4,16 @@ import android.content.Context
 import android.util.Log
 import dalvik.system.DexClassLoader
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -21,6 +25,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 private const val TAG = "Spider"
+
+/** homeContent 最长等待：jar 卡死/源站挂掉时不能无限占着实例串行锁，超时后丢弃实例 */
+private const val HOME_CONTENT_TIMEOUT_MS = 20_000L
 
 /**
  * TVBox Spider（csp_Xxx）加载器：
@@ -153,16 +160,45 @@ class SpiderManager(private val appContext: Context) {
         Log.d(TAG, "prewarmJars done count=${specs.size}")
     }
 
-    /** homeContent(boolean filter) → JSON {class, list, filters} */
+    /** homeContent(boolean filter) → JSON {class, list, filters}；超时/取消时丢弃实例，避免僵尸调用占锁 */
     suspend fun homeContent(spider: Any, filter: Boolean = true): String = withContext(Dispatchers.IO) {
-        lockOf(spider).withLock {
-            runCatching {
-                val result = spider.javaClass.getMethod("homeContent", Boolean::class.javaPrimitiveType)
-                    .invoke(spider, filter) as? String ?: ""
-                Log.d(TAG, "homeContent bytes=${result.length} head=${result.take(120)}")
-                result
+        try {
+            lockOf(spider).withLock {
+                withTimeout(HOME_CONTENT_TIMEOUT_MS) {
+                    runInterruptible {
+                        val result = spider.javaClass.getMethod("homeContent", Boolean::class.javaPrimitiveType)
+                            .invoke(spider, filter) as? String ?: ""
+                        Log.d(TAG, "homeContent bytes=${result.length} head=${result.take(120)}")
+                        result
+                    }
+                }
             }
-        }.onFailure { Log.e(TAG, "homeContent fail", it) }.getOrDefault("")
+        } catch (t: Throwable) {
+            when {
+                t is TimeoutCancellationException -> {
+                    discardSpider(spider)
+                    Log.w(TAG, "homeContent timeout(${HOME_CONTENT_TIMEOUT_MS}ms), spider discarded")
+                    ""
+                }
+                t is kotlinx.coroutines.CancellationException ||
+                    !kotlinx.coroutines.currentCoroutineContext().isActive -> {
+                    discardSpider(spider)
+                    Log.w(TAG, "homeContent cancelled, spider discarded")
+                    throw t
+                }
+                else -> {
+                    Log.e(TAG, "homeContent fail", t)
+                    ""
+                }
+            }
+        }
+    }
+
+    /** 丢弃指定 spider 实例缓存（连同它的串行锁），下次 getSpider 会新建实例，不再被僵尸调用堵住 */
+    private fun discardSpider(spider: Any) {
+        spiders.entries.removeAll { it.value === spider }
+        spiderLocks.remove(spider)
+        Log.w(TAG, "spider instance discarded from cache")
     }
 
     /** categoryContent(tid, pg, filter, HashMap extend) → JSON {list, page, pagecount, ...} */
