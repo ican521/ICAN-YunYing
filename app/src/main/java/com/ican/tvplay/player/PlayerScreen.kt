@@ -1974,8 +1974,8 @@ private fun PortraitPlayLayout(
             metaTopPadding = Spacing.videoTitleToMetaGap,
         )
 
-        // 类型信息块 → 线路：比常规板块间距更紧（视觉约 19dp）
-        Spacer(modifier = Modifier.height(Spacing.videoMetaToLineGap))
+        // 类型信息块 → 线路：统一走板块主间距（选项→下一个标题 16dp）
+        Spacer(modifier = Modifier.height(Spacing.sectionSpacing))
 
         // 线路（标题↔chips 的次间距在组件内部）
         LineSection(
@@ -1985,10 +1985,10 @@ private fun PortraitPlayLayout(
             horizontalPadding = pageHorizontalPadding(),
         )
 
-        // 画质：紧贴线路下方的一条 chip 行（fongmi activity_video.xml 里 flag 与 quality 两行，
-        // 间距 16dp；且只有 url.values.size > 1 时才 VISIBLE）
+        // 画质：与线路同属一组选项行（fongmi activity_video.xml 里 flag 与 quality 两行间距 16dp，
+        // 即「选项→下一个标题」的同一档间距）；只有 url.values.size > 1 时才显示
         if (qualities.size > 1) {
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(Spacing.sectionSpacing))
             QualityRow(
                 qualities = qualities,
                 qualityPosition = qualityPosition,
@@ -2187,8 +2187,8 @@ private fun LandscapePlayLayout(
             verticalArrangement = Arrangement.spacedBy(com.ican.tvplay.ui.theme.Spacing.sectionSpacing),
         ) {
             if (current != null) {
-                // 线路 + 画质：两行紧贴（10dp），外层仍按 sectionSpacing 与选集分隔
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // 线路 + 画质：两行同属一组选项，行间距同「选项→下一个标题」的 16dp
+                Column(verticalArrangement = Arrangement.spacedBy(com.ican.tvplay.ui.theme.Spacing.sectionSpacing)) {
                     LineSection(v = current, lineFlag = lineFlag, onLineChange = onLineChange, horizontalPadding = pageHorizontal)
                     if (qualities.size > 1) {
                         QualityRow(
