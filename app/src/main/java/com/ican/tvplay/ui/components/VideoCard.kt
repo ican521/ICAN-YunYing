@@ -123,7 +123,7 @@ fun VideoCard(
                 }
             }
 
-            // 底部：可选标签行 + 渐变标题（高度不变：标题上下各 8dp（墨迹离边约 10dp）；渐变从底部 80% 黑到顶部全透明）
+            // 底部：可选标签行 + 渐变标题（高度不变：标题上下各 8dp（水平 10dp，墨迹四边约 11dp）；渐变从底部 80% 黑到顶部全透明）
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -159,7 +159,7 @@ fun VideoCard(
                                 listOf(Color.Transparent, PosterTitleScrim),
                             ),
                         )
-                        // 四边统一 8dp（posterTitlePaddingH / posterTitleVisualGap），标题层留白左右上下一致
+                        // 水平 10dp / 上下 8dp：汉字左侧字面约 1.3dp、基线下约 3.1dp，墨迹到左≈11.3dp、到底≈11.1dp，视觉齐平
                         .padding(
                             start = Spacing.posterTitlePaddingH,
                             end = Spacing.posterTitlePaddingH,
