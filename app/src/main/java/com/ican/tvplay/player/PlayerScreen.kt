@@ -1557,6 +1557,14 @@ fun PlayerScreen(
                     } else {
                         playerState.scaleMode.resizeMode
                     }
+                    if (com.ican.tvplay.BuildConfig.DEBUG) {
+                        android.util.Log.i(
+                            "PipTrace",
+                            "videoMode mode=${playerState.scaleMode} portrait=$portraitSource " +
+                                "ratio=${"%.3f".format(videoRatio)} resize=${view.resizeMode} " +
+                                "v=${playerState.videoAspectRatio}",
+                        )
+                    }
                     // PlayerView 背景直接用黑色：视频 FIT 模式黑边区显示黑色。
                     view.setBackgroundColor(android.graphics.Color.BLACK)
                     if (view.player !== Players.player) Players.bindPlayerView(view)
@@ -3479,6 +3487,12 @@ private fun FullscreenPlayLayout(
                         // 画面缩放：竖屏片源锁定「原始」（几何固定按片源比例装框，改档位只会让
                         // media3 撑大内层溢出小窗），按钮只显示不响应
                         ActionBtn(if (scaleLocked) "原始" else playerState.scaleMode.label) {
+                            if (com.ican.tvplay.BuildConfig.DEBUG) {
+                                android.util.Log.i(
+                                    "PipTrace",
+                                    "scaleTap locked=$scaleLocked mode=${playerState.scaleMode}",
+                                )
+                            }
                             if (scaleLocked) {
                                 onControlInteract()
                             } else {
