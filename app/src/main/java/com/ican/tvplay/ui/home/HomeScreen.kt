@@ -237,28 +237,9 @@ fun HomeScreen(
         }
     }
 
-    // 新站源分类就绪（引用变化且非空）→ 淡入新 tab
-    LaunchedEffect(categories) {
-        if (tabsFadedOut && pendingOldCategories != null &&
-            categories !== pendingOldCategories && categories.isNotEmpty()
-        ) {
-            tabsFadedOut = false
-            pendingOldCategories = null
-            pendingSiteKey = null
-        }
-    }
-
-    // 边界：新站分类与旧站完全相同（内容相等）时，StateFlow 不会因 categories 触发上面的 effect，
-    // 改用 currentSiteKey 变化来淡入——此时新旧 tab 视觉一致，直接淡入即可
-    LaunchedEffect(currentSiteKey) {
-        if (tabsFadedOut && pendingSiteKey != null && currentSiteKey == pendingSiteKey &&
-            categories.isNotEmpty() && categories == pendingOldCategories
-        ) {
-            tabsFadedOut = false
-            pendingOldCategories = null
-            pendingSiteKey = null
-        }
-    }
+    // 淡入只有一个触发点：本次 switchSite 返回（见下方 SitePickerDialog.onSelect）。
+    // 不再按「分类变化 / 站源 key 变化」自动淡入 —— 连续切源时第一个源的分类先到会被提前淡入，
+    // 第二个源提交时又把 tab 清空，表现为「tab 闪现一下」
 
     // 兜底：淡出后长时间没有新分类（站源挂了 / homeContent 超时），自动淡入，避免首页一直隐形
     LaunchedEffect(tabsFadedOut, pendingSiteKey) {
@@ -708,8 +689,9 @@ fun HomeScreen(
             }
         }
 
-        // 站源没有任何分类（该源加载失败 / 源站不可达）：给居中空态，避免整片白屏
-        if (categories.isEmpty()) {
+        // 站源没有任何分类（该源加载失败 / 源站不可达）：给居中空态，避免整片白屏。
+        // 切站淡出期间不渲染：那时分类已被乐观清空，但淡出动画还没走完，会短暂闪一下这行字
+        if (!tabsFadedOut && categories.isEmpty()) {
             EmptyState(
                 text = "该站源暂无内容，可换源重试",
                 modifier = Modifier.padding(
