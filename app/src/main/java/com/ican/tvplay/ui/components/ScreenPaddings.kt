@@ -54,7 +54,10 @@ fun topLevelContentPadding(): PaddingValues {
 
 /**
  * 视频网格统一列数规则（首页 / 收藏 / 历史共用），跟随「设置-首页布局大小」：
- * 手机（<600dp）：小=3列、中=2列（大不开放）；平板：中=固定5列，小/大按最小卡宽自适应（小≈7列、大≈3列）。
+ * 手机（<600dp）：小=3列、中=2列（大不开放）。
+ * 平板：全部按「最小卡宽」自适应，列数随屏幕宽度自动变化（对齐 OK猫「卡片物理尺寸固定、列数由宽度算」的思路），
+ * 这样横竖屏切换、不同尺寸的平板都能保持同样的卡片观感，不会一台偏大一台偏小。
+ * 中号取 210dp：1069dp 横屏 ≈5 列、668dp 竖屏 ≈3 列。
  */
 @Composable
 fun videoGridColumns(size: HomeLayoutSize): GridCells =
@@ -62,7 +65,7 @@ fun videoGridColumns(size: HomeLayoutSize): GridCells =
         if (size == HomeLayoutSize.SMALL) GridCells.Fixed(3) else GridCells.Fixed(2)
     } else {
         when (size) {
-            HomeLayoutSize.MEDIUM -> GridCells.Fixed(5)
+            HomeLayoutSize.MEDIUM -> GridCells.Adaptive(minSize = 210.dp)
             HomeLayoutSize.SMALL -> GridCells.Adaptive(minSize = 132.dp)
             HomeLayoutSize.LARGE -> GridCells.Adaptive(minSize = 300.dp)
         }
