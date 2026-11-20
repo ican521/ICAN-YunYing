@@ -214,6 +214,7 @@ fun HomeScreen(
     // 切站源时顶部分类 Tab 的淡出/淡入：选新站先淡出旧 tab，新分类就绪后淡入
     var tabsFadedOut by remember { mutableStateOf(false) }
     var pendingOldCategories by remember { mutableStateOf<List<VideoCategory>?>(null) }
+    var pendingSiteKey by remember { mutableStateOf<String?>(null) }
     val tabsAlpha by animateFloatAsState(
         targetValue = if (tabsFadedOut) 0f else 1f,
         animationSpec = tween(150),
@@ -243,6 +244,19 @@ fun HomeScreen(
         ) {
             tabsFadedOut = false
             pendingOldCategories = null
+            pendingSiteKey = null
+        }
+    }
+
+    // 边界：新站分类与旧站完全相同（内容相等）时，StateFlow 不会因 categories 触发上面的 effect，
+    // 改用 currentSiteKey 变化来淡入——此时新旧 tab 视觉一致，直接淡入即可
+    LaunchedEffect(currentSiteKey) {
+        if (tabsFadedOut && pendingSiteKey != null && currentSiteKey == pendingSiteKey &&
+            categories.isNotEmpty() && categories == pendingOldCategories
+        ) {
+            tabsFadedOut = false
+            pendingOldCategories = null
+            pendingSiteKey = null
         }
     }
 
@@ -819,6 +833,7 @@ fun HomeScreen(
         onSelect = { site ->
             if (site.key != currentSiteKey) {
                 pendingOldCategories = categories
+                pendingSiteKey = site.key
                 tabsFadedOut = true
             }
             viewModel.switchSite(site.key)
