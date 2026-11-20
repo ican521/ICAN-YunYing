@@ -134,9 +134,8 @@ fun MiuixBottomSheetDialog(
         largeScreen = false,
         onDismissRequest = onDismiss,
     ) {
-        // 标题用 titleLarge（22sp / 行高 28sp），行盒上下各多 3dp 半行距；
-        // 扣掉后「弹窗顶边→标题」「标题→内容」的视觉间距均为 dialogTitleGap(16dp)
-        val titleOpticalGap = Spacing.dialogTitleGap - 3.dp
+        // 标题用 titleLarge（22sp）：全局文字已 Trim 掉行盒多余行距，标题块高度即字形高度，
+        // 「弹窗顶边→标题」「标题→内容」直接用规范值 dialogTitleGap(16dp)，不再扣 3dp
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -153,9 +152,9 @@ fun MiuixBottomSheetDialog(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = titleOpticalGap),
+                    .padding(top = Spacing.dialogTitleGap),
             )
-            Spacer(Modifier.height(titleOpticalGap))
+            Spacer(Modifier.height(Spacing.dialogTitleGap))
             content()
         }
     }

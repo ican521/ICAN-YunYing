@@ -6,12 +6,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme as TvMaterialTheme
+import androidx.tv.material3.Typography
 import androidx.tv.material3.darkColorScheme
 import androidx.tv.material3.lightColorScheme
 import com.ican.tvplay.data.ThemeMode
@@ -81,10 +85,45 @@ fun TvPlayTheme(
         }
     }
 
-    TvMaterialTheme(colorScheme = colors) {
+    TvMaterialTheme(colorScheme = colors, typography = inkTightTypography()) {
         CompositionLocalProvider(LocalDarkTheme provides dark, content = content)
     }
 }
+
+/**
+ * 全局文字「所见即所高」口径（2026-11-20 用户选定层次一：全局覆盖）：
+ * 1. `includeFontPadding = false`：去掉 Android 给每个字形加的固定内边距（API 24+ 即生效）；
+ * 2. `LineHeightStyle(Alignment.Center, Trim.Both)`：把行盒比字号多出的行距裁掉，
+ *    文字块布局高度 ≈ 可见字形高度（仅 API 28+ 生效，24-27 自动回退为带行距的旧排版）。
+ * 生效后所有基于「字形留白」的视觉补偿都失去前提，间距一律回到规范值（12/16 档），勿再加补偿。
+ */
+private fun TextStyle.inkTight(): TextStyle = copy(
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Center,
+        trim = LineHeightStyle.Trim.Both,
+    ),
+)
+
+private fun Typography.inkTight(): Typography = copy(
+    displayLarge = displayLarge.inkTight(),
+    displayMedium = displayMedium.inkTight(),
+    displaySmall = displaySmall.inkTight(),
+    headlineLarge = headlineLarge.inkTight(),
+    headlineMedium = headlineMedium.inkTight(),
+    headlineSmall = headlineSmall.inkTight(),
+    titleLarge = titleLarge.inkTight(),
+    titleMedium = titleMedium.inkTight(),
+    titleSmall = titleSmall.inkTight(),
+    bodyLarge = bodyLarge.inkTight(),
+    bodyMedium = bodyMedium.inkTight(),
+    bodySmall = bodySmall.inkTight(),
+    labelLarge = labelLarge.inkTight(),
+    labelMedium = labelMedium.inkTight(),
+    labelSmall = labelSmall.inkTight(),
+)
+
+private fun inkTightTypography(): Typography = Typography().inkTight()
 
 /**
  * miuix 主题色板：表面色固定为项目既定值（surfaceContainer 深色 #242424 / 浅色 #FFFFFF，

@@ -133,8 +133,6 @@ fun VideoCard(
                 if (tagLine != null) {
                     Box(
                         modifier = Modifier
-                            // 往下压 1dp：让「标签→标题」视觉间距（约 8–9dp）接近「标题→卡片底边」的约 10dp
-                            .offset(y = Spacing.posterTagRowOffsetY)
                             // 左右边距与左上角胶囊的 8dp 对齐
                             .padding(
                                 start = Spacing.posterOverlayMargin,
