@@ -415,23 +415,26 @@ class VideoRepository(
             com.ican.tvplay.ui.components.UrlPlayHelper.preparePushPlay(rawText)
         }
 
-    /** 切换站点：最新一次优先——取消上一次还没跑完的切站加载，立即开始新源加载，不排队等旧源慢接口 */
-    suspend fun switchSite(siteKey: String) {
+    /**
+     * 切换站点：最新一次优先——取消上一次还没跑完的切站加载，立即开始新源加载，不排队等旧源慢接口。
+     * 返回 true = 新站分类已就绪；false = 失败或被更新的切站取代（站点身份已确认时停留在新站空态）。
+     */
+    suspend fun switchSite(siteKey: String): Boolean {
         settingsRepository.setSiteKey(siteKey)
         val gen = siteLoadGeneration.incrementAndGet()
         siteReloadJob?.cancel()
         siteReloadJob = kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]
-        reloadLatest(gen)
+        return reloadLatest(gen)
     }
 
     /**
      * 最新一次切站生效的加载：慢步骤（下载配置 / getSpider / homeContent / 解析）全部在 loadMutex 之外执行，
      * 每步之间检查代数；只有仍是最新代数时才提交状态，避免旧站慢接口覆盖新站结果。
      */
-    private suspend fun reloadLatest(gen: Int) {
+    private suspend fun reloadLatest(gen: Int): Boolean {
         // 快速段：清缓存（持锁，与冷启动 ensureLoaded / 导入配置 reload 互斥）
         loadMutex.withLock {
-            if (!isLatestSiteLoad(gen)) return
+            if (!isLatestSiteLoad(gen)) return false
             homeCache.clear()
             detailCache.clear()
             diskCacheFile.delete()
@@ -439,45 +442,49 @@ class VideoRepository(
         }
 
         val url = settingsRepository.configUrl.value
-        if (!isLatestSiteLoad(gen)) return
+        if (!isLatestSiteLoad(gen)) return false
         if (url.isBlank()) {
             commitLatestSiteLoad(gen) {
                 _currentSite.value = null
                 _categories.value = emptyList()
                 currentSpider = null
             }
-            return
+            return false
         }
 
         Log.d("Startup", "switch: loadHomeSite begin")
         val loaded = apiClient.loadHomeSite(url, settingsRepository.siteKey.value)
         Log.d("Startup", "switch: loadHomeSite done site=${loaded?.site?.key}")
-        if (!isLatestSiteLoad(gen)) return
+        if (!isLatestSiteLoad(gen)) return false
         if (loaded == null) {
-            commitLatestSiteLoad(gen) {
-                _categories.value = emptyList()
-                currentSpider = null
-            }
-            return
+            // 连配置都没读到，目标站身份无从确认：保持原站原内容不动（失败即回滚）
+            Log.w(REPO_TAG, "switch: loadHomeSite failed, keep current site")
+            return false
+        }
+
+        // 乐观提交站点身份：站源列表高亮 / 顶栏归属立即与用户的点击一致，
+        // 分类等 homeContent 回来再补；失败了就停在新站空态，不再出现「内容没了、选中还是旧源」
+        commitLatestSiteLoad(gen) {
+            _currentSite.value = loaded
+            _categories.value = emptyList()
+            currentSpider = null
         }
 
         if (loaded.site.isSpider()) {
             Log.d("Startup", "switch: getSpider begin")
             val spider = spiderManager.getSpider(loaded.site, loaded.jarSpec)
             Log.d("Startup", "switch: getSpider done ok=${spider != null}")
-            if (!isLatestSiteLoad(gen)) return
+            if (!isLatestSiteLoad(gen)) return false
             if (spider == null) {
-                commitLatestSiteLoad(gen) {
-                    currentSpider = null
-                    _categories.value = emptyList()
-                }
-                return
+                Log.e(REPO_TAG, "switch: spider load fail, stay empty")
+                return false
             }
             Log.d("Startup", "switch: homeContent begin")
             val homeJson = spiderManager.homeContent(spider, filter = true)
-            if (!isLatestSiteLoad(gen)) return
-            val classes = parseClasses(homeJson)
-            val cats = classes.map { VideoCategory(id = it.typeId, name = it.typeName) }
+            if (!isLatestSiteLoad(gen)) return false
+            val cats = parseClasses(homeJson).map { VideoCategory(id = it.typeId, name = it.typeName) }
+            // 空分类视为该源不可用：不写回分类，也不覆盖配置缓存，下次启动仍回到上一个可用源
+            if (cats.isEmpty()) return false
             commitLatestSiteLoad(gen) {
                 currentSpider = spider
                 _currentSite.value = loaded
@@ -486,10 +493,12 @@ class VideoRepository(
                 persistConfigCache(loaded)
             }
             Log.d("Startup", "switch: categories published size=${cats.size}")
+            return true
         } else {
             val cats = apiClient.homeClasses(loaded.site)
                 .map { VideoCategory(id = it.typeId, name = it.typeName) }
-            if (!isLatestSiteLoad(gen)) return
+            if (!isLatestSiteLoad(gen)) return false
+            if (cats.isEmpty()) return false
             commitLatestSiteLoad(gen) {
                 currentSpider = null
                 _currentSite.value = loaded
@@ -498,6 +507,7 @@ class VideoRepository(
                 persistConfigCache(loaded)
             }
             Log.d("Startup", "switch: categories published size=${cats.size}")
+            return true
         }
     }
 

@@ -26,8 +26,9 @@ import java.util.concurrent.TimeUnit
 
 private const val TAG = "Spider"
 
-/** homeContent 最长等待：jar 卡死/源站挂掉时不能无限占着实例串行锁，超时后丢弃实例 */
-private const val HOME_CONTENT_TIMEOUT_MS = 20_000L
+/** homeContent 最长等待：jar 卡死/源站挂掉时不能无限占着实例串行锁，超时后丢弃实例。
+ *  好源一般 1s 内返回，10s 足够判死（荐影这类连 socket 都连不上的源不必等 20s） */
+private const val HOME_CONTENT_TIMEOUT_MS = 10_000L
 
 /**
  * TVBox Spider（csp_Xxx）加载器：

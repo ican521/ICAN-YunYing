@@ -707,6 +707,17 @@ fun HomeScreen(
                 }
             }
         }
+
+        // 站源没有任何分类（该源加载失败 / 源站不可达）：给居中空态，避免整片白屏
+        if (categories.isEmpty()) {
+            EmptyState(
+                text = "该站源暂无内容，可换源重试",
+                modifier = Modifier.padding(
+                    top = with(density) { topBarHeightPx.toDp() },
+                    bottom = contentPadding.calculateBottomPadding(),
+                ),
+            )
+        }
         }
 
         // 顶区悬浮层：搜索 + 历史 / 分类 Tab
@@ -847,8 +858,22 @@ fun HomeScreen(
                 pendingSiteKey = site.key
                 tabsFadedOut = true
             }
-            viewModel.switchSite(site.key)
             showSitePicker = false
+            // 切站流程一结束就淡入：成功→新内容，失败→新站空态 + 提示。
+            // 不再依赖「分类变化」或 25s 兜底（源站挂掉时那两段等待会让首页长时间空白）
+            scope.launch {
+                val ok = viewModel.switchSite(site.key)
+                pendingOldCategories = null
+                pendingSiteKey = null
+                tabsFadedOut = false
+                if (!ok) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "「${site.name}」加载失败，可换源重试",
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
         },
         onDismiss = { showSitePicker = false },
         isSearchable = { viewModel.isSiteSearchable(it) },

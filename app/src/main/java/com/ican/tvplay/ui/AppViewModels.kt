@@ -98,9 +98,12 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     /** 配置中全部可切换站点 */
     suspend fun listSites() = repo.listSites()
 
-    /** 切换站源：仓库层会保存选择并重新加载分类，sections 随 categoriesFlow 自动刷新 */
-    fun switchSite(siteKey: String) {
-        viewModelScope.launch { repo.switchSite(siteKey) }
+    /** 切换站源：仓库层会保存选择并重新加载分类，sections 随 categoriesFlow 自动刷新。
+     *  返回 true = 新源分类已就绪；false = 该源加载失败（调用方负责淡入/提示） */
+    suspend fun switchSite(siteKey: String): Boolean {
+        val ok = repo.switchSite(siteKey)
+        viewModelScope.launch { repo.prewarmHome() }
+        return ok
     }
 
     /** 站源「参与搜索」开关（fongmi 同款；返回切换后是否开启；配置锁定的站点返回 false 且不变） */
