@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -59,22 +61,23 @@ fun SearchWideVideoCard(
         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(height)) {
-            // 左侧海报：3:4 竖版，按卡片高度换算宽度（112dp → 84dp）
+            // 左侧海报：3:4 竖版、满高贴边，四角（含右侧两角）与卡片同圆角
             PosterImage(
                 title = video.title,
                 cover = video.cover,
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(height * 3f / 4f)
+                    .clip(RoundedCornerShape(corner))
                     .background(MiuixTheme.colorScheme.surfaceContainerHigh),
             )
 
-            // 右侧文字区：站源 → 标题 → 标签；外层负责垂直居中，内层只负责行间距
+            // 右侧文字区（排版 A，借鉴 fongmi）：站源贴顶、标题紧随、标签贴底
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
                     .padding(Spacing.searchWideCardPadding),
-                verticalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(Spacing.posterTagRowTopGap),
@@ -90,21 +93,21 @@ fun SearchWideVideoCard(
                     // 第 2 行：视频标题
                     Text(
                         text = video.title,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                         color = MiuixTheme.colorScheme.onSurfaceContainer,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    // 第 3 行：标签文字（更新状态 / 备注）
-                    if (tagLine != null) {
-                        Text(
-                            text = tagLine,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                }
+                // 第 3 行：标签文字（更新状态 / 备注），贴卡片底边
+                if (tagLine != null) {
+                    Text(
+                        text = tagLine,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
