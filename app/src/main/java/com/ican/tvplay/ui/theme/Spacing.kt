@@ -31,6 +31,13 @@ object Spacing {
     /** 大板块之间的间距（今日推荐/分类Tab/视频网格等模块之间） */
     val sectionSpacing = 16.dp
 
+    /**
+     * 首页顶部分类Tab与上（搜索栏）/下（内容区）的间距：2dp。
+     * 旧版视觉 15dp = 4dp 布局 + 行内居中留白约 11dp；全局文字 Trim 后行盒变矮，
+     * 行内留白自动涨到约 13dp，故补 2dp 即回到旧版 15dp 的视觉（Tab 行高固定 42dp，文字居中）。
+     */
+    val categoryTabVertical = 2.dp
+
     /** 板块内部标题与下方内容的间距（播放页底部弹窗的大标题间距也用此值） */
     val titleContentGap = 12.dp
 
