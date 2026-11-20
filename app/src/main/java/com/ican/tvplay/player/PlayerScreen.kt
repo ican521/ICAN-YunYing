@@ -1356,16 +1356,14 @@ fun PlayerScreen(
                     fullscreen = true
                     controlsVisible = false
                 } else {
-                    // 缩回完成：先把系统栏显示出来，等两帧让 statusBars inset 落到布局上，
-                    // 再撤掉缩放态挂详情信息流。顺序反过来会让竖屏布局先按 0 inset 排一次、
-                    // 状态栏随后才撑开，表现为「整页向上跳一下」（用户反馈的跳动）
+                    // 缩回完成：恢复系统栏并撤掉缩放态。
+                    // 竖屏布局的首屏高度全部由动画值驱动（不再读 statusBars inset），
+                    // 所以系统栏出现/消失都不会改变布局尺寸，无需再等帧对齐
                     val activity = context as? Activity
                     activity?.let {
                         WindowCompat.getInsetsController(it.window, it.window.decorView)
                             .show(WindowInsetsCompat.Type.systemBars())
                     }
-                    withFrameMillis { }
-                    withFrameMillis { }
                     portraitZooming = false
                     controlsVisible = false
                     activity?.restoreDefaultOrientation()
@@ -1496,8 +1494,6 @@ fun PlayerScreen(
             subtitleSettingsOpen = showSubtitleSettings,
         )
         }
-        // 竖屏缩放动画进行中：只渲染最底层视频（与横屏 landZooming 同款，避免控制层跟着糊成一团）
-        portraitZooming -> Unit
         // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
         pendingFullscreen == true -> Unit
         else -> if (pendingFullscreen == null && isLandscape) {
@@ -1551,6 +1547,12 @@ fun PlayerScreen(
             // 同 LandscapePlayLayout：解析后的实际播放线路，保证初始就有选中高亮
             lineFlag = playLine?.flag ?: lineFlag,
             playerState = playerState,
+            // 视频占位区（含状态栏黑条）的顶部/高度交给缩放动画驱动：
+            // 放大时占位区撑满整屏、信息流被顶出屏幕；缩小时反过来滑回原位。
+            // 布局全程挂载不卸载，避免「信息流整块瞬间消失/出现」造成的跳动
+            playerTop = pAnimTop,
+            playerHeight = pAnimHeight,
+            zooming = portraitZooming,
             controlsVisible = controlsVisible,
             locked = locked,
             onToggleControls = { controlsVisible = !controlsVisible },
@@ -1632,6 +1634,12 @@ private fun PortraitPlayLayout(
     lineEpisodes: List<Episode>,
     lineFlag: String,
     playerState: Players.PlayerState,
+    /** 视频占位区顶部（静止=状态栏高度，全屏=0），由小窗↔全屏缩放动画驱动 */
+    playerTop: State<Dp>,
+    /** 视频占位区高度（静止=满宽 16:9，全屏=屏高），同上 */
+    playerHeight: State<Dp>,
+    /** 缩放动画进行中：隐藏覆盖层（控制条/转圈），只让占位区尺寸跟着变 */
+    zooming: Boolean,
     controlsVisible: Boolean,
     locked: Boolean,
     onToggleControls: () -> Unit,
@@ -1670,25 +1678,27 @@ private fun PortraitPlayLayout(
     // 容器尺寸不随视频比例变化 —— 与底层 PlayerView 用同一个 16:9 比例，像素天然对齐。
     // 平板横屏走 LandscapePlayLayout（固定 38% 宽 16:9），不进入此布局。
     // 状态栏占位区：与视频区统一黑底（沉浸式），避免返回动画中浅色 surface 被转场压暗成灰色横条。
-    // 用独立黑条承载状态栏高度，而不给视频占位容器加背景——否则不透明背景会盖住底层常驻的 PlayerView 画面
+    // 用独立黑条承载状态栏高度，而不给视频占位容器加背景——否则不透明背景会盖住底层常驻的 PlayerView 画面。
+    // 高度跟随缩放动画（全屏时收到 0），正好贴着视频上缘，不会在放大过程中露出一条黑缝
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .windowInsetsTopHeight(WindowInsets.statusBars)
+            .animatedHeight(playerTop)
             .background(Color.Black),
     )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(16f / 9f),
+            .animatedHeight(playerHeight),
     ) {
         PreviewPlayerArea(
             modifier = Modifier.fillMaxSize(),
             playerState = playerState,
-            // 进详情页即转圈（首次画面就绪前，无网速）；ready 后只随缓冲转
-            showLoading = !playerState.ready && playerState.error == null,
-            controlsVisible = controlsVisible,
+            // 进详情页即转圈（首次画面就绪前，无网速）；ready 后只随缓冲转。
+            // 缩放动画期间不画覆盖层（转圈跟着放大缩小会很怪）
+            showLoading = !zooming && !playerState.ready && playerState.error == null,
+            controlsVisible = controlsVisible && !zooming,
             locked = locked,
             onToggleControls = onToggleControls,
             onBack = onBack,
@@ -1940,6 +1950,24 @@ private fun Modifier.animatedSize(width: State<Dp>, height: State<Dp>): Modifier
         val h = height.value.roundToPx()
         val placeable = measurable.measure(Constraints.fixed(w, h))
         layout(w, h) { placeable.place(0, 0) }
+    }
+
+/**
+ * 只驱动高度、宽度铺满父级的布局修饰符（布局阶段读 State，动画期间不触发重组）。
+ * 用于竖屏预览区占位：高度随小窗↔全屏动画连续变化，宽度始终取父级可用宽。
+ */
+private fun Modifier.animatedHeight(height: State<Dp>): Modifier =
+    layout { measurable, constraints ->
+        val h = height.value.roundToPx()
+        val w = constraints.maxWidth
+        val placeable = measurable.measure(
+            if (w == Constraints.Infinity) {
+                Constraints(minHeight = h, maxHeight = h)
+            } else {
+                Constraints(minWidth = w, maxWidth = w, minHeight = h, maxHeight = h)
+            },
+        )
+        layout(placeable.width, h) { placeable.place(0, 0) }
     }
 
 // ========== 非全屏播放器区与信息区块（竖屏 / 横屏共用） ==========
