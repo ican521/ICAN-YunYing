@@ -1371,6 +1371,18 @@ fun PlayerScreen(
                 }
             }
         }
+        // 视频层宽高比：竖屏缩放期间必须让视频层比例恒等于片源（见下方 letterboxed 说明）
+        val videoRatio = playerState.videoAspectRatio.takeIf { it > 0f }
+            ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
+        // 竖屏两端的「画面内容矩形」（media3 FIT 之后真正有画面的那块）：
+        // 预览态 = 状态栏之下满宽 16:9 框内；全屏态 = 整屏居中 FIT。
+        // 缩放期间直接在这两个矩形之间插值，不再跟着黑框走 —— 跟着黑框走时，
+        // 中途内容会填满框高、顶边被顶到状态栏上方（贴到屏幕最顶，和状态栏重叠）。
+        // 这样顶边全程不低于状态栏底部，画面看起来是「顶端贴着状态栏、整体向下放大」
+        val previewContentH = minOf(portraitPreviewH, screenW / videoRatio)
+        val previewContentTop = statusBarTop + (portraitPreviewH - previewContentH) * 0.5f
+        val fullContentH = minOf(screenH, screenW / videoRatio)
+        val fullContentTop = (screenH - fullContentH) * 0.5f
         // 竖屏小窗↔竖屏全屏缩放：与横屏同一套做法（宽/高/顶部/圆角连续插值，PlayerView 不重建）。
         // 起点 = 预览小窗（满宽 + 16:9、状态栏以下、16dp 圆角），
         // 终点 = 铺满整屏（顶部 0、高 = 屏高、圆角 = 设备屏幕圆角），
@@ -1391,6 +1403,19 @@ fun PlayerScreen(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "pAnimTop",
         ) { expanded -> if (expanded) 0.dp else statusBarTop }
+        // 画面内容的「高度 + 顶边」单独插值：黑框继续按上面那组值铺满/退出，
+        // 但画面本身只在 previewContent 与 fullContent 之间等比长大，顶边 121px→240px 单调下行
+        val pContentHeight = portraitTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "pContentHeight",
+        ) { expanded -> if (expanded) fullContentH else previewContentH }
+        val pContentTop = portraitTransition.animateDp(
+            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+            label = "pContentTop",
+        ) { expanded -> if (expanded) fullContentTop else previewContentTop }
+        // 组合期直接取当前值（与 pAnim* 同源，逐帧同步）
+        val contentH = pContentHeight.value
+        val contentTop = pContentTop.value
         // 竖屏预览小窗无圆角（用户要求直角满宽铺），缩放期间也不插值圆角：
         // 收敛后由 fullscreen 分支按设备屏幕圆角裁剪，圆角落在黑边上本来就看不见
 
@@ -1423,9 +1448,6 @@ fun PlayerScreen(
             }
         }
 
-        // 视频层宽高比：竖屏缩放期间必须让视频层比例恒等于片源（见下方 letterboxed 说明）
-        val videoRatio = playerState.videoAspectRatio.takeIf { it > 0f }
-            ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
         // 竖屏（稳态 + 缩放）：外框只当黑底，视频层按片源比例居中贴在框内。
         // 直接逐帧改 PlayerView 尺寸时，media3 的黑边重排跟不上每帧变化，动画中途画面被压扁
         // （录屏 4.20s 1080×1380、4.24s 1080×1560，正常应 1080×1920），最后一帧才回正 → 「抖/跳」。
@@ -1532,23 +1554,33 @@ fun PlayerScreen(
                     view.visibility = if (hide) android.view.View.INVISIBLE else android.view.View.VISIBLE
                 },
                 modifier = if (letterboxed) {
-                    // 视频层比例 = 片源比例：黑边由外层 Box 的黑底负责，视频层自己不再变形
-                    Modifier.aspectRatio(videoRatio, matchHeightConstraintsFirst = false)
+                    // 几何完全由插值决定：高 607→1920、顶边 121→240，顶边全程不低于状态栏底部；
+                    // 黑边交给外层黑底，视频层自己比例恒等片源，不会变形
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .height(contentH)
+                        .aspectRatio(videoRatio, matchHeightConstraintsFirst = true)
+                        .offset { IntOffset(0, (contentTop - pAnimTop.value).roundToPx()) }
                 } else {
                     Modifier.fillMaxSize()
                 },
             )
-            // 播完后的静态画面：几何与真实视频层一致（片源比例居中），
+            // 播完后的静态画面：几何与真实视频层完全一致（同一套插值），
             // 缩放动画期间它跟着黑框走，完全不碰 surface
             endedFrameSnapshot?.let { frame ->
                 Image(
                     bitmap = frame,
                     contentDescription = null,
                     contentScale = ContentScale.FillBounds,
-                    modifier = Modifier.aspectRatio(
-                        videoRatio,
-                        matchHeightConstraintsFirst = false,
-                    ),
+                    modifier = if (letterboxed) {
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .height(contentH)
+                            .aspectRatio(videoRatio, matchHeightConstraintsFirst = true)
+                            .offset { IntOffset(0, (contentTop - pAnimTop.value).roundToPx()) }
+                    } else {
+                        Modifier.aspectRatio(videoRatio, matchHeightConstraintsFirst = false)
+                    },
                 )
             }
         }
