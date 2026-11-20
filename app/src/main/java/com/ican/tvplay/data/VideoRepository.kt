@@ -43,9 +43,6 @@ private const val REPO_TAG = "VodApi"
 /** 详情磁盘缓存有效期：24h 内同片再进直接命中（fongmi 式详情缓存，首次仍需网络） */
 private const val DETAIL_DISK_TTL_MS = 24L * 60 * 60 * 1000
 
-/** 首页磁盘缓存最多保留几个站点（按文件更新时间淘汰），切回看过的站点可秒出 */
-private const val HOME_DISK_CACHE_KEEP = 8
-
 /** 一次播放所需的 URL 与请求头 */
 data class PlaySource(
     val url: String,
@@ -104,25 +101,9 @@ class VideoRepository(
     /** 详情缓存（videoId → Video）：重复进详情页秒开，reload 时清空 */
     private val detailCache = java.util.concurrent.ConcurrentHashMap<String, Video>()
 
-    /** 首页磁盘缓存：**按站点分文件**（文件名 home_<siteKey>.json）。
-     *  切站不再删掉别的站的缓存 —— 切回看过的站点时分类一回来，卡片直接命中本地数据，省掉一次分类列表请求 */
-    private val diskCacheDir: java.io.File by lazy {
-        java.io.File(appContext.filesDir, "home_cache").apply { mkdirs() }
-    }
-
-    /** 站点 key 里可能有 : / | 等字符，落盘时统一替换成下划线 */
-    private fun diskCacheFileOf(siteKey: String): java.io.File =
-        java.io.File(diskCacheDir, "home_${siteKey.replace(Regex("[^A-Za-z0-9._-]"), "_")}.json")
-
-    /** 只保留最近更新的 HOME_DISK_CACHE_KEEP 个站点缓存，避免站点很多时无限增长 */
-    private fun pruneDiskCache() {
-        runCatching {
-            val files = diskCacheDir.listFiles()?.filter { it.isFile } ?: return
-            if (files.size <= HOME_DISK_CACHE_KEEP) return
-            files.sortedByDescending { it.lastModified() }
-                .drop(HOME_DISK_CACHE_KEEP)
-                .forEach { it.delete() }
-        }
+    /** 首页磁盘缓存：进程被杀后冷启动秒出上次数据（内存缓存随进程丢失，磁盘不丢） */
+    private val diskCacheFile: java.io.File by lazy {
+        java.io.File(appContext.filesDir, "home_cache.json")
     }
 
     /** 配置+分类磁盘缓存：冷启动毫秒级恢复分类列表，网络全链路只在后台刷新（fongmi VodConfig 同款策略） */
@@ -142,14 +123,13 @@ class VideoRepository(
     private val _homeCacheVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
     val homeCacheVersion: kotlinx.coroutines.flow.StateFlow<Int> = _homeCacheVersion.asStateFlow()
 
-    /** 冷启动 / 切回站点：把该站上次的磁盘缓存读回内存（站点不匹配则丢弃该站缓存） */
+    /** 冷启动：把上次的磁盘缓存读回内存（站点不匹配则丢弃） */
     private fun loadDiskCacheIntoMemory(siteKey: String) {
         runCatching {
-            val file = diskCacheFileOf(siteKey)
-            if (!file.exists()) return
-            val cache = rawJson.decodeFromString<HomeDiskCache>(file.readText())
+            if (!diskCacheFile.exists()) return
+            val cache = rawJson.decodeFromString<HomeDiskCache>(diskCacheFile.readText())
             if (cache.siteKey != siteKey) {
-                file.delete()
+                diskCacheFile.delete()
                 return
             }
             cache.sections.forEach { s ->
@@ -161,7 +141,7 @@ class VideoRepository(
         }.onFailure { Log.d(REPO_TAG, "home disk cache miss: ${it.message}") }
     }
 
-    /** 预热完成后把全部分类首屏数据落盘（按站点分文件），供冷启动 / 切回该站时秒出 */
+    /** 预热完成后把全部分类首屏数据落盘，供下次冷启动秒出 */
     private suspend fun persistHomeCache(siteKey: String, cats: List<VideoCategory>) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             runCatching {
@@ -171,14 +151,13 @@ class VideoRepository(
                     }
                 }
                 if (sections.isEmpty()) return@withContext
-                diskCacheFileOf(siteKey).writeText(
+                diskCacheFile.writeText(
                     rawJson.encodeToString(
                         HomeDiskCache.serializer(),
                         HomeDiskCache(siteKey = siteKey, updatedAt = System.currentTimeMillis(), sections = sections),
                     ),
                 )
-                pruneDiskCache()
-                Log.d(REPO_TAG, "home disk cache persisted site=$siteKey sections=${sections.size}")
+                Log.d(REPO_TAG, "home disk cache persisted sections=${sections.size}")
             }
         }
 
@@ -214,8 +193,7 @@ class VideoRepository(
         loadMutex.withLock {
             homeCache.clear()
             detailCache.clear()
-            // 换了新配置：全部分类的缓存作废（各站点的首页缓存文件一并清掉）
-            runCatching { diskCacheDir.listFiles()?.forEach { it.delete() } }
+            diskCacheFile.delete()
             configFile.delete()
             refreshFromNetwork(preserveState = false)
         }
@@ -314,12 +292,6 @@ class VideoRepository(
     }
 
     fun getCategories(): List<VideoCategory> = _categories.value
-
-    /** 只读入口：当前站该分类已缓存的首屏卡片（含冷启动 / 切回站点时从磁盘恢复的那份）；未命中返回 null */
-    fun cachedHomeVideos(categoryId: String): List<Video>? {
-        val siteKey = _currentSite.value?.site?.key ?: return null
-        return homeCache["$siteKey|$categoryId"]?.takeIf { it.isNotEmpty() }
-    }
 
     /** 配置中全部可切换站点（spider + HTTP） */
     suspend fun listSites(): List<TvBoxSite> {
@@ -465,7 +437,7 @@ class VideoRepository(
             if (!isLatestSiteLoad(gen)) return false
             homeCache.clear()
             detailCache.clear()
-            // 首页磁盘缓存按站点分文件，这里**不删**：切回看过的站点时分类一回来就能直接命中本地卡片
+            diskCacheFile.delete()
             configFile.delete()
         }
 
