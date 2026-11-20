@@ -1,13 +1,16 @@
 package com.ican.tvplay.ui.home
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -84,6 +87,8 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -131,6 +136,12 @@ import kotlin.math.roundToInt
 
 /** 顶部分类 Tab 行高度（与 [UnderlineTabRow] 默认高度一致，用于确定性计算顶区展开总高） */
 private val TabRowHeight = 42.dp
+
+/** 分类 Tab 选中态缩放：19sp / 16sp，保持原视觉大小，仅用绘制层缩放做过渡 */
+private const val TAB_SELECTED_SCALE = 19f / 16f
+
+/** 分类 Tab 文字选中/取消的缩放与颜色过渡时长 */
+private const val TAB_TEXT_ANIM_MS = 100
 
 /** 卡片逐个渐显：相邻卡片启动间隔（毫秒），与跨站源搜索页一致 */
 private const val CARD_FADE_STAGGER_MILLIS = 60L
@@ -1108,33 +1119,61 @@ private fun UnderlineTabRow(
         val tabEndPadding = edgePadding + Spacing.corner
         var lastSettledIndex by remember { mutableIntStateOf(-1) }
 
-        // 各 tab 文字的实际渲染宽度（选中变大后由 onSizeChanged 重新记录；只需宽度，不用 onGloballyPositioned 监听位置）
-        val textWidths = remember { mutableStateMapOf<Int, Int>() }
+        // 各 tab 文字宽度：用 TextMeasurer 一次性把「全部下标」量出来（不依赖某项被组合后才量得到），
+        // 这样任何下标的滚动目标都能直接算准 —— 一次滚到位，不需要滚完再补滚。
+        val textMeasurer = rememberTextMeasurer()
+        val density = LocalDensity.current
+        val tabTextStyle = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp)
+        val viewportWidthPx = with(density) { availableWidth.roundToPx() }
+        val tabWidths = remember(tabs, tabTextStyle, viewportWidthPx) {
+            tabs.map { text ->
+                textMeasurer.measure(AnnotatedString(text), tabTextStyle, maxLines = 1)
+                    .size.width.coerceIn(1, viewportWidthPx)
+            }
+        }
 
-        // 选中 tab 仅在被截断/完全不可见时才滚动到可视范围（与播放页线路/选集同款）：
-        // 完全可见则不滚动；左侧被遮则左滚到贴左，右侧被遮则右滚到完整显示。
-        // 首次定位用无动画 scrollToItem，后续切 tab 用 animateScrollBy 平滑过渡。
-        LaunchedEffect(selectedTabIndex, textWidths[selectedTabIndex], availableWidth) {
+        // 选中 tab 仅在「被截断」时滚动到刚好完整显示（与播放页线路/选集同款）：
+        // 完全可见不滚；左侧被切则左滚到贴左，右侧被切则右滚到该项右边缘对齐可视区右边缘。
+        // 已组合的 tab 直接用 layoutInfo 的真实位置算位移（不猜）；
+        // 尚未组合（完全不可见）的 tab 用已量好的精确宽度一次性定位，避免估算误差。
+        // 两种情况都把选中态绘制层放大的左右溢出量算进去，滚完文字不会压着屏幕边缘。
+        LaunchedEffect(selectedTabIndex, tabWidths, viewportWidthPx) {
             if (tabs.isEmpty() || selectedTabIndex !in tabs.indices) return@LaunchedEffect
             snapshotFlow { listState.layoutInfo.totalItemsCount }
                 .filter { it > selectedTabIndex }
                 .first()
             val isInitial = lastSettledIndex < 0
+            val prevSettledIndex = lastSettledIndex
             lastSettledIndex = selectedTabIndex
+            val targetWidth = tabWidths[selectedTabIndex].toFloat()
+            // 选中态绘制层放大（scale = TAB_SELECTED_SCALE）后左右各溢出 (scale - 1) / 2 倍宽度
+            val overflow = (TAB_SELECTED_SCALE - 1f) * targetWidth / 2f
             val info = listState.layoutInfo
-            val viewportStart = info.viewportStartOffset
-            val viewportEnd = info.viewportEndOffset
-            val item = info.visibleItemsInfo.firstOrNull { it.index == selectedTabIndex }
-            val needsScroll = item == null || item.offset < viewportStart || item.offset + item.size > viewportEnd
-            if (!needsScroll) return@LaunchedEffect
-            when {
-                item == null ->
-                    if (isInitial) listState.scrollToItem(selectedTabIndex)
-                    else listState.animateScrollToItem(selectedTabIndex)
-                item.offset < viewportStart ->
-                    listState.animateScrollBy((item.offset - viewportStart).toFloat())
-                else ->
-                    listState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat())
+            val viewportStartPx = info.viewportStartOffset
+            val viewportEndPx = info.viewportEndOffset
+            val itemInfo = info.visibleItemsInfo.firstOrNull { it.index == selectedTabIndex }
+            if (itemInfo != null) {
+                // 已组合：用真实布局位置，位移一次算准
+                val leftCut = itemInfo.offset - viewportStartPx - overflow
+                val rightCut = itemInfo.offset + itemInfo.size - viewportEndPx + overflow
+                val delta = when {
+                    leftCut < 0f -> leftCut
+                    rightCut > 0f -> rightCut
+                    else -> 0f
+                }
+                if (delta == 0f) return@LaunchedEffect
+                if (isInitial) listState.scrollBy(delta) else listState.animateScrollBy(delta)
+            } else {
+                // 未组合：直接用「右边缘对齐 / 左边缘对齐」定位（宽度是精确量出来的）
+                val viewportSize = (viewportEndPx - viewportStartPx).coerceAtLeast(1)
+                val movingForward = selectedTabIndex >= prevSettledIndex
+                val offset = if (movingForward) {
+                    (targetWidth + overflow).toInt() - viewportSize
+                } else {
+                    -overflow.toInt()
+                }
+                if (isInitial) listState.scrollToItem(selectedTabIndex, offset)
+                else listState.animateScrollToItem(selectedTabIndex, offset)
             }
         }
 
@@ -1169,22 +1208,35 @@ private fun UnderlineTabRow(
                                 onClick = { onTabSelected(index) },
                             ),
                     ) {
-                        Text(
-                            text = tabText,
-                            style = MaterialTheme.typography.labelLarge,
-                            // 选中态比未选中大 3sp（16→19），不加粗，仅字号变化区分
-                            fontSize = if (selected) 19.sp else 16.sp,
-                            color = if (selected) {
+                        // 选中态：字号保持 16sp 不变，靠绘制层缩放放大到原先 19sp 的视觉大小，
+                        // 切换时 scale/颜色各做 200ms 过渡（切走反向缩回），tab 宽度不逐帧变化，
+                        // 相邻 tab 不会位移（动画只作用绘制层，符合 UI 规范）
+                        val textScale by animateFloatAsState(
+                            targetValue = if (selected) TAB_SELECTED_SCALE else 1f,
+                            animationSpec = tween(TAB_TEXT_ANIM_MS),
+                            label = "tabTextScale",
+                        )
+                        val textColor by animateColorAsState(
+                            targetValue = if (selected) {
                                 // 选中态用主题蓝（主色），未选中保持次要文字色
                                 MiuixTheme.colorScheme.primary
                             } else {
                                 MiuixTheme.colorScheme.onSurfaceVariantSummary
                             },
+                            animationSpec = tween(TAB_TEXT_ANIM_MS),
+                            label = "tabTextColor",
+                        )
+                        Text(
+                            text = tabText,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontSize = 16.sp,
+                            color = textColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
-                                .onSizeChanged { size ->
-                                    textWidths[index] = size.width
+                                .graphicsLayer {
+                                    scaleX = textScale
+                                    scaleY = textScale
                                 },
                         )
                     }
