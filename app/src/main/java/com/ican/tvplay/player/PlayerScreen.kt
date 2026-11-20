@@ -354,6 +354,9 @@ fun PlayerScreen(
     var pendingFullscreen by remember { mutableStateOf<Boolean?>(null) }
     // 平板已处于横屏时进入全屏：不会触发方向配置变化，无需等待旋转，退出时也不请求旋转
     var landscapeFullscreen by remember { mutableStateOf(false) }
+    // 竖屏全屏：OK猫 PlayFragment.changedLandscape 同款——视频是竖屏时进全屏只把播放器放大铺满，
+    // 完全不请求旋转（设备保持竖屏），退出时也不等旋转
+    var portraitFullscreen by remember { mutableStateOf(false) }
     // 字幕设置侧边栏：根级渲染，保证竖屏/全屏/横屏都能全高覆盖
     var showSubtitleSettings by remember { mutableStateOf(false) }
     // 横屏小窗↔全屏放大/缩回动画进行中：期间只渲染纯视频，不挂任何覆盖层
@@ -1077,6 +1080,13 @@ fun PlayerScreen(
                 landscapeFullscreen = false
                 landZooming = true
                 landZoomToken++
+            } else if (portraitFullscreen) {
+                // 竖屏全屏：没有旋转过程，直接撤掉全屏覆盖层回竖屏详情（信息流原地恢复），
+                // 顺带把方向恢复成自由，避免从别的页面带着方向锁进来
+                fullscreen = false
+                controlsVisible = false
+                portraitFullscreen = false
+                (context as? Activity).restoreDefaultOrientation()
             } else {
                 // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
                 (context as? Activity).restoreDefaultOrientation()
@@ -1185,16 +1195,12 @@ fun PlayerScreen(
             }
             with(density) { px.toDp() }
         }
-        // 竖屏详情页小窗动态比例（fongmi PlayerView.aspectRatio 同款）：PlayerView 与 PortraitPlayLayout 覆盖层共用，
-        // 宽占满、高=宽/视频宽高比；视频为竖屏（宽高比<1）时高度封顶并横向收缩居中。
-        // PlayerView 必须与覆盖层同比例——否则宽银幕源会在固定 16:9 容器里留上下黑边、控制层与画面错位
-        val videoRatio = playerState.videoAspectRatio.takeIf { it > 0f } ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
-        val portraitPreviewMaxH = (screenH - statusBarTop) * VERTICAL_PREVIEW_MAX_HEIGHT_FRACTION
-        val portraitPreviewH = (screenW / videoRatio).coerceAtMost(portraitPreviewMaxH)
-        val portraitPreviewW = (portraitPreviewH * videoRatio).coerceAtMost(screenW)
-        // 视频比例就绪时小窗高宽平滑过渡（否则从默认 16:9 跳到实际比例会瞬间跳变）
-        val animatedPreviewH by animateDpAsState(portraitPreviewH, tween(250), label = "portraitPreviewH")
-        val animatedPreviewW by animateDpAsState(portraitPreviewW, tween(250), label = "portraitPreviewW")
+        // 竖屏预览小窗尺寸：照抄 OK猫 activity_detail.xml 的 previewPlayer——
+        // 「满宽 + 固定 16:9 高」，视频由 PlayerView 自身 resizeMode 在盒内自适应，
+        // 不再按视频比例去收缩容器宽度（旧做法用 fillMaxWidth 叠加 width 会被约束吃掉，
+        // 导致画面溢出容器、控件与画面错位）。
+        // 常量：宽与高同一来源（屏幕宽），保证底层 PlayerView 与覆盖层占位盒像素完全一致
+        val portraitPreviewH = screenW * 9f / 16f
 
         // 横屏小窗↔全屏放大/缩回过渡：宽/高/顶部偏移连续插值，
         // PlayerView 全程不重建，只有画面在放大，不挂任何控制层
@@ -1321,13 +1327,12 @@ fun PlayerScreen(
                         .background(Color.Black)
                 else ->
                     Modifier
-                        // 竖屏小窗跟随视频比例（fongmi PlayerView.aspectRatio 同款）：顶部对齐，横向收缩时居中，
-                        // 与 PortraitPlayLayout 覆盖层像素对齐（否则宽银幕源 16:9 留黑边 + 控制层错位）
+                        // 竖屏小窗：满宽 + 16:9 定高（与 PortraitPlayLayout 占位盒同一组尺寸，
+                        // 不叠加 width 与 fillMaxWidth，避免约束互相打架导致画面溢出、控件错位）。
+                        // 顶部对齐（statusBarsPadding 让出状态栏），横向自然占满，无需 offset 居中
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .offset { IntOffset(((screenW - animatedPreviewW) / 2f).roundToPx(), 0) }
-                        .width(animatedPreviewW)
-                        .height(animatedPreviewH)
+                        .height(portraitPreviewH)
                         .background(Color.Black)
             },
         )
@@ -1459,13 +1464,25 @@ fun PlayerScreen(
             onNext = { if (episodeIndex < lineEpisodes.size - 1) episodeIndex++ },
             onEnterFullscreen = {
                 controlsTick++
+                // 视频宽高比 <1 视为竖屏片源（OK猫 changedLandscape 同款判据：只有 width>height 才请求横屏）
+                val ratio = playerState.videoAspectRatio.takeIf { it > 0f }
+                    ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
                 if (isLandscape) {
                     // 平板已横屏：不会触发 Configuration 变化，直接切全屏布局
                     landscapeFullscreen = true
                     fullscreen = true
+                } else if (ratio < 1f) {
+                    // 竖屏全屏：不请求旋转，直接把常驻 PlayerView 放大到铺满（设备保持竖屏）。
+                    // 方向自由保持在原状态，退出后无需等旋转；系统栏由 immersive 效果统一隐藏
+                    Players.setVideoPresent(true)
+                    portraitFullscreen = true
+                    landscapeFullscreen = false
+                    fullscreen = true
+                    controlsVisible = false
                 } else {
                     // 先请求横屏，旋转完成（Configuration 变化）后再铺满全屏
                     landscapeFullscreen = false
+                    portraitFullscreen = false
                     // 请求旋转前同步把根底色切黑（系统栏同步隐藏并切浅色图标）。
                     // 窗口背景不再重复设置：Players.setVideoPresent(true) 已触发上方 LaunchedEffect
                     // 把 window 背景切成黑色，这里再新建 ColorDrawable 重设会多一次全窗口重绘。
@@ -1512,10 +1529,6 @@ fun PlayerScreen(
 
 // ========== 竖屏布局 ==========
 
-/** 竖屏顶部预览小窗高度的封顶比例（相对状态栏下方可用高度）：视频为竖屏（宽高比<1）时高度封顶并横向收缩居中，
- *  避免 9:16 等竖屏片源把整屏占满、压掉详情信息流（fongmi 竖屏详情小窗也限制在可用区域内的同款思路） */
-private const val VERTICAL_PREVIEW_MAX_HEIGHT_FRACTION = 0.6f
-
 @Composable
 private fun PortraitPlayLayout(
     current: Video?,
@@ -1557,9 +1570,9 @@ private fun PortraitPlayLayout(
     ) {
 
     // === 视频播放区占位（PlayerView 常驻于根 Box 最底层，此处仅放控制层/加载/错误覆盖层） ===
-    // 竖屏预览小窗跟随视频比例（fongmi onVideoSizeChanged → PlayerView.aspectRatio 同款）：
-    // 宽占满、高 = 宽 / 视频宽高比；视频为竖屏（宽高比<1）时高度封顶并横向收缩居中，避免把详情信息流顶飞。
-    // 平板横屏走 LandscapePlayLayout（固定 38% 宽 16:9），不进入此布局，天然不随视频比例调整。
+    // 竖屏预览小窗照抄 OK猫：满宽 + 固定 16:9，视频在盒内由 PlayerView 的 resizeMode 自适应，
+    // 容器尺寸不随视频比例变化 —— 与底层 PlayerView 用同一个 16:9 比例，像素天然对齐。
+    // 平板横屏走 LandscapePlayLayout（固定 38% 宽 16:9），不进入此布局。
     // 状态栏占位区：与视频区统一黑底（沉浸式），避免返回动画中浅色 surface 被转场压暗成灰色横条。
     // 用独立黑条承载状态栏高度，而不给视频占位容器加背景——否则不透明背景会盖住底层常驻的 PlayerView 画面
     Box(
@@ -1569,40 +1582,26 @@ private fun PortraitPlayLayout(
             .background(Color.Black),
     )
 
-    BoxWithConstraints(
+    Box(
         modifier = Modifier
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f),
     ) {
-        val ratio = playerState.videoAspectRatio.takeIf { it > 0f } ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
-        // 可用宽高（px，statusBarsPadding 之后）；高度封顶比例防止竖屏视频占满整屏
-        val availW = constraints.maxWidth
-        val availH = constraints.maxHeight
-        val maxH = (availH * VERTICAL_PREVIEW_MAX_HEIGHT_FRACTION).roundToInt()
-        val targetH = (availW / ratio).roundToInt().coerceAtMost(maxH)
-        val targetW = (targetH * ratio).roundToInt().coerceAtMost(availW)
-        with(LocalDensity.current) {
-            // 视频比例就绪时平滑过渡（与底层 PlayerView 动画同步，避免高度瞬间跳变）
-            val h by animateDpAsState(targetH.toDp(), tween(250), label = "portraitPreviewH")
-            val w by animateDpAsState(targetW.toDp(), tween(250), label = "portraitPreviewW")
-            PreviewPlayerArea(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .width(w)
-                    .height(h),
-                playerState = playerState,
-                // 进详情页即转圈（首次画面就绪前，无网速）；ready 后只随缓冲转
-                showLoading = !playerState.ready && playerState.error == null,
-                controlsVisible = controlsVisible,
-                locked = locked,
-                onToggleControls = onToggleControls,
-                onBack = onBack,
-                onTogglePlay = onTogglePlay,
-                onPrev = onPrev,
-                onNext = onNext,
-                onEnterFullscreen = onEnterFullscreen,
-                onSeekDragChange = onSeekDragChange,
-            )
-        }
+        PreviewPlayerArea(
+            modifier = Modifier.fillMaxSize(),
+            playerState = playerState,
+            // 进详情页即转圈（首次画面就绪前，无网速）；ready 后只随缓冲转
+            showLoading = !playerState.ready && playerState.error == null,
+            controlsVisible = controlsVisible,
+            locked = locked,
+            onToggleControls = onToggleControls,
+            onBack = onBack,
+            onTogglePlay = onTogglePlay,
+            onPrev = onPrev,
+            onNext = onNext,
+            onEnterFullscreen = onEnterFullscreen,
+            onSeekDragChange = onSeekDragChange,
+        )
     }
 
     // === 可滚动详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===

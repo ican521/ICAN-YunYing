@@ -502,13 +502,25 @@ fun HomeScreen(
             val coverStyle = remember(page, pageCategory?.id, currentSiteKey) {
                 mutableStateOf(catFlag == '2')
             }
-            // 数据回来后的兜底判定：type_flag 已定性的页面保持不变，其余按内容里有没有目录卡切换形状
+            // 「频道卡」类目：条目 id 全是 http(s) 外链（没有站内 id）、且不是目录卡。
+            // 典型就是爱刷（csp_SsspGuard）这类短视源：每个卡是一个频道入口（其他随机/黑丝/抖音萌妹…），
+            // 采集数据里既无 type_flag 也无 vod_tag，普通源的 id 是站内数字串，所以这个判据不会误伤
+            fun isChannelCardList(list: List<Video>): Boolean {
+                if (list.isEmpty()) return false
+                return list.all { v ->
+                    val id = v.id.trim()
+                    (id.startsWith("http://") || id.startsWith("https://")) &&
+                        !v.isFolder && !v.isCoverFolder
+                }
+            }
+
+            // 数据回来后的兜底判定：type_flag 已定性的页面保持不变，其余按内容切换形状
             fun applyCardMode(list: List<Video>) {
                 if (driveStyle.value) return
-                if (list.any { it.isCoverFolder }) {
-                    coverStyle.value = true
-                } else if (list.any { it.isFolder }) {
-                    driveStyle.value = true
+                when {
+                    list.any { it.isCoverFolder } -> coverStyle.value = true
+                    list.any { it.isFolder } -> driveStyle.value = true
+                    isChannelCardList(list) -> coverStyle.value = true
                 }
             }
             // 已渐显的卡片索引：计时放在父层，卡片滑出屏幕被回收再滑回来不会重播。
@@ -569,11 +581,8 @@ fun HomeScreen(
                     } else {
                         viewModel.getFolderVideos(folder.first)
                     }
-                    if (!driveStyle.value) {
-                        // cover 目录优先切横版宽卡；只有无图 folder 才退单列行
-                        if (list.any { it.isCoverFolder }) coverStyle.value = true
-                        else if (list.any { it.isFolder }) driveStyle.value = true
-                    }
+                    // 内容判定与缓存分支共用同一套规则（目录卡优先，其次频道卡）
+                    applyCardMode(list)
                     // 最短展示时长：数据来得太快时也让等待动画完整走一小段，避免闪烁
                     val remain = LOADING_MIN_SHOW_MILLIS - (System.currentTimeMillis() - startedAt)
                     if (remain > 0) delay(remain)
