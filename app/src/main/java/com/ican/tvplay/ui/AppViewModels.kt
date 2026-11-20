@@ -152,9 +152,10 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
 
     private fun categoryCacheKey(categoryId: String) = "${currentSiteKey.value}|$categoryId"
 
-    /** 已预取的分类数据；未就绪返回 null */
+    /** 已预取的分类数据；VM 缓存未命中时回落到仓库缓存（含磁盘恢复的那份），都没有才返回 null */
     suspend fun cachedCategoryVideos(categoryId: String): List<Video>? =
         categoryCacheLock.withLock { categoryCache[categoryCacheKey(categoryId)] }
+            ?: repo.cachedHomeVideos(categoryId)
 
     /**
      * 后台串行预取全部分类首页数据（跳过第一页：pager 当前页会自行加载）。

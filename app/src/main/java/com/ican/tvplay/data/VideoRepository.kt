@@ -315,6 +315,12 @@ class VideoRepository(
 
     fun getCategories(): List<VideoCategory> = _categories.value
 
+    /** 只读入口：当前站该分类已缓存的首屏卡片（含冷启动 / 切回站点时从磁盘恢复的那份）；未命中返回 null */
+    fun cachedHomeVideos(categoryId: String): List<Video>? {
+        val siteKey = _currentSite.value?.site?.key ?: return null
+        return homeCache["$siteKey|$categoryId"]?.takeIf { it.isNotEmpty() }
+    }
+
     /** 配置中全部可切换站点（spider + HTTP） */
     suspend fun listSites(): List<TvBoxSite> {
         val url = settingsRepository.configUrl.value
