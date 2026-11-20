@@ -152,6 +152,15 @@ class SettingsRepository(context: Context) {
         _playerScale.value = scale
     }
 
+    /** 连播：一集播完是否自动播下一集（默认开） */
+    private val _playerAutoNext = MutableStateFlow(prefs.getBoolean(KEY_PLAYER_AUTO_NEXT, true))
+    val playerAutoNext: StateFlow<Boolean> = _playerAutoNext.asStateFlow()
+
+    fun setPlayerAutoNext(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_PLAYER_AUTO_NEXT, enabled).apply()
+        _playerAutoNext.value = enabled
+    }
+
     /** 播放内核：EXO / MPV（默认 EXO，仿 fongmi PlayerSetting.player_engine） */
     private val _playerEngine = MutableStateFlow(prefs.getString(KEY_PLAYER_ENGINE, null).orEmpty())
     val playerEngine: StateFlow<String> = _playerEngine.asStateFlow()
@@ -355,6 +364,7 @@ class SettingsRepository(context: Context) {
         _siteKey.value = prefs.getString(KEY_SITE_KEY, null).orEmpty()
         _playerSpeed.value = prefs.getFloat(KEY_PLAYER_SPEED, 1.0f)
         _playerScale.value = prefs.getString(KEY_PLAYER_SCALE, null).orEmpty()
+        _playerAutoNext.value = prefs.getBoolean(KEY_PLAYER_AUTO_NEXT, true)
         _playerEngine.value = prefs.getString(KEY_PLAYER_ENGINE, null).orEmpty()
         _playerBuffer.value = prefs.getInt(KEY_PLAYER_BUFFER, 1)
         _playerBrightness.value = prefs.getFloat(KEY_PLAYER_BRIGHTNESS, -1f)
@@ -386,6 +396,7 @@ class SettingsRepository(context: Context) {
         const val KEY_SITE_CHANGEABLE_PREFIX = "site_changeable_"
         const val KEY_PLAYER_SPEED = "player_speed"
         const val KEY_PLAYER_SCALE = "player_scale"
+        const val KEY_PLAYER_AUTO_NEXT = "player_auto_next"
         const val KEY_PLAYER_ENGINE = "player_engine"
         const val KEY_PLAYER_BUFFER = "player_buffer"
         const val KEY_PLAYER_BRIGHTNESS = "player_brightness"

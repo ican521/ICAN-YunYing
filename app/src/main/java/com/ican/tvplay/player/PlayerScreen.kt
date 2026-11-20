@@ -321,6 +321,7 @@ fun PlayerScreen(
     val settings = container.settingsRepository
     val savedSpeed by settings.playerSpeed.collectAsStateWithLifecycle()
     val savedScale by settings.playerScale.collectAsStateWithLifecycle()
+    val savedAutoNext by settings.playerAutoNext.collectAsStateWithLifecycle()
     val savedEngine by settings.playerEngine.collectAsStateWithLifecycle()
     val savedBuffer by settings.playerBuffer.collectAsStateWithLifecycle()
     val savedSubtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
@@ -980,6 +981,15 @@ fun PlayerScreen(
                 }
             }
         }
+    }
+
+    // 连播：一集播完（STATE_ENDED）后自动进下一集；关掉则停在最后一帧等手动切
+    LaunchedEffect(playerState.ended, savedAutoNext, episodeIndex) {
+        if (!playerState.ended || !savedAutoNext) return@LaunchedEffect
+        if (episodeIndex >= lineEpisodes.size - 1) return@LaunchedEffect
+        delay(AUTO_NEXT_DELAY_MS)
+        // 停顿期间用户可能手动切集/关连播/退出，结束态已变就放弃
+        if (playerState.ended && savedAutoNext) episodeIndex++
     }
 
     // 周期性保存进度
@@ -1650,6 +1660,8 @@ fun PlayerScreen(
             onSpeedChange = { settings.setPlayerSpeed(it) },
             playbackSpeed = settings.playerSpeed.collectAsStateWithLifecycle().value,
             onScaleChange = { settings.setPlayerScale(it.name) },
+            autoNext = savedAutoNext,
+            onAutoNextChange = { settings.setPlayerAutoNext(it) },
             onEpisodeSelect = requestEpisodeChange,
             onEngineChange = { settings.setPlayerEngine(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
@@ -3077,6 +3089,8 @@ private fun FullscreenPlayLayout(
     onSpeedChange: (Float) -> Unit,
     playbackSpeed: Float,
     onScaleChange: (Players.ScaleMode) -> Unit,
+    autoNext: Boolean,
+    onAutoNextChange: (Boolean) -> Unit,
     onEpisodeSelect: (Int) -> Unit,
     onEngineChange: (Players.Kernel) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
@@ -3497,6 +3511,11 @@ private fun FullscreenPlayLayout(
                             onScaleChange(modes[(playerState.scaleMode.ordinal + 1) % modes.size])
                             onControlInteract()
                         }
+                        // 连播开关：开 = 一集播完自动进下一集；关 = 停在最后一帧
+                        ActionBtn(if (autoNext) "连播·开" else "连播·关", active = autoNext) {
+                            onAutoNextChange(!autoNext)
+                            onControlInteract()
+                        }
                         // 弹性占位只在宽屏分支有效：横滑分支里 weight 需要一个有界父宽，
                         // 而滚动容器宽度无限，占位会退化成 0 甚至崩溃，所以窄屏直接不留
                         if (!barScrollable) Spacer(modifier = Modifier.weight(1f))
@@ -3701,12 +3720,12 @@ private fun GestureAdjustOverlay(type: AdjustType, percent: Int, modifier: Modif
 @Composable
 private fun ActionBtn(
     text: String,
-    onLongClick: (() -> Unit)? = null, onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null, active: Boolean = true, onClick: () -> Unit,
 ) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-        color = Color.White,
+        color = if (active) Color.White else Color.White.copy(alpha = 0.45f),
         maxLines = 1,
         modifier = Modifier
             .tvCardEffect(
@@ -4617,6 +4636,9 @@ private fun formatSpeed(speed: Float): String =
 
 private const val RESUME_THRESHOLD_MS = 5_000L
 private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
+
+/** 连播：一集播完后停顿多久再进下一集（留出最后一帧的观感） */
+private const val AUTO_NEXT_DELAY_MS = 1_200L
 
 /** 播放页内补拉完整详情的超时：避免慢/坏站源让骨架无限转圈 */
 private const val DETAIL_TIMEOUT_MS = 15_000L
