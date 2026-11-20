@@ -1122,6 +1122,9 @@ private fun UnderlineTabRow(
         // 选中 tab 仅在被截断/完全不可见时才滚动到可视范围（与播放页线路/选集同款）：
         // 完全可见则不滚动；左侧被遮则左滚到贴左，右侧被遮则右滚到完整显示。
         // 首次定位用无动画 scrollToItem，后续切 tab 用 animateScrollBy 平滑过渡。
+        // 注意：选中态文字是绘制层放大（scale = TAB_SELECTED_SCALE），布局宽度不变但视觉上
+        // 左右各溢出 (scale-1)/2 倍宽度，这部分溢出会被 viewport 裁掉，所以裁剪判断和滚动
+        // 目标都必须把溢出量算进去，否则滚到布局右边缘后放大的文字右边仍被裁（尤其末项）。
         LaunchedEffect(selectedTabIndex, textWidths[selectedTabIndex], availableWidth) {
             if (tabs.isEmpty() || selectedTabIndex !in tabs.indices) return@LaunchedEffect
             snapshotFlow { listState.layoutInfo.totalItemsCount }
@@ -1133,16 +1136,23 @@ private fun UnderlineTabRow(
             val viewportStart = info.viewportStartOffset
             val viewportEnd = info.viewportEndOffset
             val item = info.visibleItemsInfo.firstOrNull { it.index == selectedTabIndex }
-            val needsScroll = item == null || item.offset < viewportStart || item.offset + item.size > viewportEnd
+            // 选中态绘制层放大的单侧溢出量（仅已组合的 item 能拿到真实宽度；未组合时先滚入，
+            // 组合后 onSizeChanged 回写 textWidths 会再次触发本 effect 走到下面已组合分支补滚）
+            val overflow = if (item != null) (TAB_SELECTED_SCALE - 1f) * item.size / 2f else 0f
+            val leftCut = item?.let { it.offset - viewportStart - overflow }
+            val rightCut = item?.let { it.offset + it.size - viewportEnd + overflow }
+            val needsScroll = item == null ||
+                (leftCut != null && leftCut < 0f) ||
+                (rightCut != null && rightCut > 0f)
             if (!needsScroll) return@LaunchedEffect
             when {
                 item == null ->
                     if (isInitial) listState.scrollToItem(selectedTabIndex)
                     else listState.animateScrollToItem(selectedTabIndex)
-                item.offset < viewportStart ->
-                    listState.animateScrollBy((item.offset - viewportStart).toFloat())
+                leftCut != null && leftCut < 0f ->
+                    listState.animateScrollBy(leftCut)
                 else ->
-                    listState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat())
+                    listState.animateScrollBy(rightCut ?: 0f)
             }
         }
 
