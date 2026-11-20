@@ -85,11 +85,11 @@ fun SearchWideVideoCard(
                 Column(
                     verticalArrangement = Arrangement.spacedBy(Spacing.posterTagRowTopGap),
                 ) {
-                    // 第 1 行：站源（与左侧胶囊同字号 12sp；胶囊是白字蓝底、这里是蓝字白底，加半粗补偿视觉重量）
+                    // 第 1 行：站源（与左侧站源列表未选中态完全一致：labelMedium + onSurfaceContainer）
                     Text(
                         text = siteName,
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = MiuixTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MiuixTheme.colorScheme.onSurfaceContainer,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

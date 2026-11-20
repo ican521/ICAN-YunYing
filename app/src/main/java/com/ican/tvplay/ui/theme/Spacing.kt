@@ -17,9 +17,9 @@ import top.yukonga.miuix.kmp.utils.getRoundedCorner
  * | 档位 | 用途 | 对应常量 |
  * | ---- | ---- | ---- |
  * | 2dp | 极小元素内部微调（角标上下、分类 Tab 上下） | [categoryTabVertical]、[posterBadgePaddingV] |
- * | 4dp | 小元素内部 / 胶囊内衬 | [posterTagRowTopGap]、[bottomBarInnerPadding] |
+ * | 4dp | 小元素内部 / 胶囊内衬 / 横卡文字区上下内衬 | [posterTagRowTopGap]、[bottomBarInnerPadding]、[searchWideCardPaddingV] |
  * | 6dp | 角标级别的左右内边距 | [posterBadgePaddingH] |
- * | 8dp | 相邻元素（标题↔chips 或正文、列表项、胶囊流式排列、叠加层外边距、卡片标题层上下、横卡文字区上下内衬） | [videoTitleContentGap]、[videoTitleToMetaGap]、[dialogItemGap]、[searchChipGap]、[siteListItemGap]、[posterOverlayMargin]、[posterTitleVisualGap]、[searchWideCardPaddingV]
+ * | 8dp | 相邻元素（标题↔chips 或正文、列表项、胶囊流式排列、叠加层外边距、卡片标题层上下） | [videoTitleContentGap]、[videoTitleToMetaGap]、[dialogItemGap]、[searchChipGap]、[siteListItemGap]、[posterOverlayMargin]、[posterTitleVisualGap]
  * | 10dp | 卡片标题层水平、历史卡片进度条底距（紧贴卡片边） | [posterTitlePaddingH]、[historyProgressBarGap] |
  * | 12dp | 页面骨架次级（页面顶部、板块标题↔内容、顶栏组件之间、横卡文字区内衬） | [pageTop]、[titleContentGap]、[topBarItemGap]、[searchWideCardPadding] |
  * | 16dp | 页面骨架主级（页面左右、板块之间、卡片网格、弹窗边距与标题、底栏上下） | [pageHorizontal]、[sectionSpacing]、[cardGapH]、[cardGapV]、[dialogContentMargin]、[dialogTitleGap]、[dialogItemPadding]、[bottomBarGap]、[contentBottomInset] 等 |
@@ -168,8 +168,8 @@ object Spacing {
     /** 跨站源搜索结果「长条横卡」文字区左右内边距（12 档） */
     val searchWideCardPadding = 12.dp
 
-    /** 跨站源搜索结果「长条横卡」文字区上下内边距（0dp：站源贴顶、标签贴底，与海报齐边） */
-    val searchWideCardPaddingV = 0.dp
+    /** 跨站源搜索结果「长条横卡」文字区上下内边距（4dp：与站源胶囊内的行距感觉一致） */
+    val searchWideCardPaddingV = 4.dp
 
     /** 全局统一圆角（卡片/按钮/输入框/弹窗）；圆形按钮与胶囊用 CircleShape，不适用此值 */
     val corner = 16.dp
