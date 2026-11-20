@@ -2160,7 +2160,7 @@ private fun LandscapePlayLayout(
                 VideoMetaSection(
                     v = current,
                     lineFlag = lineFlag,
-                    itemSpacing = 10.dp,
+                    itemSpacing = 8.dp,
                     metaTopPadding = com.ican.tvplay.ui.theme.Spacing.videoTitleToMetaGap,
                 )
             }
@@ -2182,7 +2182,7 @@ private fun LandscapePlayLayout(
                 .background(MiuixTheme.colorScheme.surface)
                 .verticalScroll(rememberScrollState())
                 // 水平边距下放到各 Section 内部（同竖屏信息流的结构性通栏），此处只保留顶部间距
-                .padding(top = com.ican.tvplay.ui.theme.Spacing.titleContentGap),
+                .padding(top = com.ican.tvplay.ui.theme.Spacing.videoTitleRowTopGap),
             // 板块主间距与竖屏信息流统一为 sectionSpacing
             verticalArrangement = Arrangement.spacedBy(com.ican.tvplay.ui.theme.Spacing.sectionSpacing),
         ) {
@@ -2401,7 +2401,7 @@ private fun VideoMetaSection(
     v: Video,
     lineFlag: String,
     modifier: Modifier = Modifier,
-    itemSpacing: Dp = 6.dp,
+    itemSpacing: Dp = 8.dp,
     // 标题行 → 下方信息行的间距：竖屏补 8dp（收藏钮缩 32dp 后需恢复呼吸感）；
     // 横屏 0（横屏标题顶部需与小窗顶对齐，仅标题下方要呼吸感，由 metaTopPadding 提供）
     metaTopPadding: Dp = 0.dp,
@@ -2727,7 +2727,7 @@ private fun LineSection(
             color = MiuixTheme.colorScheme.onBackground,
             modifier = Modifier.padding(horizontal = horizontalPadding),
         )
-        Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+        Spacer(modifier = Modifier.height(Spacing.videoTitleContentGap))
     // 通栏横滑（首页顶部分类 Tab 同款）：列表天然占满全宽，contentPadding 保证
     // 静止时首尾 chips 对齐全局基准线，滑动时条目可完整滑到屏幕最边缘
     LazyRow(
@@ -2806,7 +2806,7 @@ private fun QualityRow(
             color = MiuixTheme.colorScheme.onBackground,
             modifier = Modifier.padding(horizontal = horizontalPadding),
         )
-        Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+        Spacer(modifier = Modifier.height(Spacing.videoTitleContentGap))
     LazyRow(
         state = listState,
         contentPadding = PaddingValues(horizontal = horizontalPadding),
@@ -2889,7 +2889,7 @@ private fun EpisodeSection(
                 ) { showEpisodeGrid = true },
             )
         }
-        Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+        Spacer(modifier = Modifier.height(Spacing.videoTitleContentGap))
 
         val displayEps = if (reversedEp) lineEpisodes.asReversed() else lineEpisodes
         // 选中集在显示序列中的位置（倒序时需换算）
@@ -3205,7 +3205,7 @@ private fun DescriptionSection(v: Video, modifier: Modifier = Modifier) {
             fontWeight = FontWeight.SemiBold,
             color = MiuixTheme.colorScheme.onBackground,
         )
-        Spacer(modifier = Modifier.height(Spacing.titleContentGap))
+        Spacer(modifier = Modifier.height(Spacing.videoTitleContentGap))
         Text(
             text = cleanDescription(v.description).ifBlank { "暂无简介" },
             style = MaterialTheme.typography.bodyMedium,

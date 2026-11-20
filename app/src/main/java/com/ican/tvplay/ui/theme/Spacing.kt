@@ -41,15 +41,20 @@ object Spacing {
     val titleContentGap = 12.dp
 
     /**
-     * 播放页「视频下缘 → 视频标题行」的行框间距：11dp。
-     * 收藏钮已缩为 32dp（≈标题行高），不再撑出行内居中留白，
-     * 叠加字形自身留白后，11dp 行框间距呈现约 16dp 的视觉间距。
+     * 播放页板块标题↔其下方内容（线路/画质/选集/简介的标题→chips 或正文）：8dp。
+     * 对齐 fongmi `activity_video.xml`：标题 marginTop 16dp + 内容 marginTop 8dp 的原始口径，
+     * 不做字形留白补偿（fongmi 本身不区分「文字对文字」与「文字对 chip」）。
      */
-    val videoTitleRowTopGap = 11.dp
+    val videoTitleContentGap = 8.dp
 
     /**
-     * 播放页「视频标题行 → 下方信息行」的行框间距：8dp。
-     * 补偿收藏钮缩小后丢失的行内居中留白，视觉约 16dp。
+     * 播放页「视频下缘 → 视频标题行」的行框间距：16dp（fongmi paddingTop 同值）。
+     * 不再做字形留白补偿。
+     */
+    val videoTitleRowTopGap = 16.dp
+
+    /**
+     * 播放页「视频标题行 → 下方信息行」的行框间距：8dp（fongmi 逐行 marginTop 8dp）。
      */
     val videoTitleToMetaGap = 8.dp
 
