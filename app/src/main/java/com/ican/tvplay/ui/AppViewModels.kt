@@ -86,6 +86,27 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
         .map { it?.site?.key.orEmpty() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
+    /**
+     * 首页卡片直达播放页前的预缓存（对齐搜索页 handlePlayClick）：
+     * 把卡片元数据 + 当前站点（含 jarSpec）塞进 Players.cachedVideo，
+     * 播放页才能一进去就画出「预览小窗 + 详情骨架」，而不是先黑屏转圈
+     * 等整站初始化 + 详情接口。详情（选集/播放地址）仍由播放页异步补齐。
+     */
+    fun cacheCardForPlayer(video: Video) {
+        val loaded = repo.currentSite.value ?: return
+        com.ican.tvplay.player.core.Players.cacheVideo(
+            video = video.copy(
+                // 站源名带上图标（siteShortName 不再剥离前缀 emoji）
+                sourceName = com.ican.tvplay.ui.components.siteShortName(
+                    loaded.site.name, loaded.site.key,
+                ),
+            ),
+            siteKey = loaded.site.key,
+            site = loaded.site,
+            jarSpec = loaded.jarSpec,
+        )
+    }
+
     private val selectedCategoryId = MutableStateFlow<String?>(null)
     val selectedCategory: StateFlow<String?> = selectedCategoryId.asStateFlow()
 

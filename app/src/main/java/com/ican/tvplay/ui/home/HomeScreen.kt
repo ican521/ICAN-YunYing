@@ -612,7 +612,13 @@ fun HomeScreen(
                     }
                     // 网盘文件夹：进入该目录（压栈），不再跳搜索/详情
                     video.isFolder -> folderStack.value = folderStack.value + (video.id to video.title)
-                    else -> onVideoClick(video)
+                    // 直达播放页：先把卡片元数据 + 当前站点缓存进 Players（与搜索页点卡片同款），
+                    // 播放页一进去就是「顶部预览小窗 + 底部详情骨架」；
+                    // 否则要等整站初始化 + 详情接口，期间只有黑屏和中间一个转圈
+                    else -> {
+                        viewModel.cacheCardForPlayer(video)
+                        onVideoClick(video)
+                    }
                 }
             }
             // 只读非 State 快照：这里在页面组合阶段执行，读 searchRowCollapsePx 会被登记成

@@ -2309,8 +2309,17 @@ private fun VideoMetaSection(
             }
 
             // 站源（fongmi: site）
+            // 兜底顺序：detail 自带的站源名 → 本次播放缓存的站点名 → 线路名。
+            // 爱刷这类详情返回不带站点信息的源，只能靠后两级，否则会显示成线路名「刷刷刷」
+            val sourceDisplay = v.sourceName
+                .ifBlank {
+                    com.ican.tvplay.ui.components.siteShortName(
+                        Players.cachedVideo?.site?.name.orEmpty(),
+                    )
+                }
+                .ifBlank { lineFlag.substringBefore("|") }
             Text(
-                text = "站源：${v.sourceName.takeIf { it.isNotBlank() } ?: lineFlag.substringBefore("|")}",
+                text = "站源：$sourceDisplay",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             )
