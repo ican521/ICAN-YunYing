@@ -1148,53 +1148,42 @@ fun PlayerScreen(
         // release / 后台续播转交由 onDispose 统一处理（popBackStack 后触发）
         onBack()
     }
-    // 仅在页面需要自己处理返回时拦截（退全屏 / 缩放动画中忽略）；
-    // 竖屏小窗状态下不拦截，交还 NavDisplay → 预测返回动画 + 边缘滑动返回生效。
-    //
-    // 必须用 PredictiveBackHandler 而不是 BackHandler：targetSdk 37 在 Android 16 上
-    // 预测返回已无法关闭（manifest 的 enableOnBackInvokedCallback=false 从 36 起失效），
-    // 只挂 BackHandler 时系统会先自播一段「窗口缩小 + 变暗 + 左侧手势箭头」的关闭预览，
-    // 抬手被我们消费掉再弹回，再跑自己的 zoom-out → 两段动画叠在一起（录屏 6.30s 整屏变暗帧）。
-    // 由我们接收 onBackInvoked 进度后系统不再自播关闭动画：进度一出现就起缩回动画，
-    // 手势取消则把同一套 transition 反向续播回全屏，避免「滑一半松手就掉了全屏」。
+    // 返回键 / 三键导航：退回最稳的 BackHandler（手势导航那一侧由下面的预测返回接管）
+    BackHandler(enabled = fullscreen || landZooming || portraitZooming) { handleBack() }
+
+    // 手势导航的预测返回：targetSdk 37 在 Android 16 上预测返回已无法关闭
+    // （manifest 的 enableOnBackInvokedCallback=false 从 36 起失效），只挂 BackHandler 时
+    // 系统会先自播一段「窗口缩小 + 变暗 + 左侧手势箭头」的关闭预览，抬手被我们消费掉再弹回，
+    // 再跑自己的 zoom-out → 两段动画叠在一起（录屏 6.30s 整屏变暗帧）。
+    // 这里只消费系统进度、不提前动画面：手势过程中画面完全静默（系统也不再自播关闭预览），
+    // 抬手越过阈值（flow 正常结束）才走原 handleBack 逻辑；
+    // 手势取消则什么都不做——不能像上一版那样「进度一出现就缩放、取消再反向弹回」，
+    // 否则用户看到的是滑一下闪一下、实际没退出去。
     PredictiveBackHandler(enabled = fullscreen || landZooming || portraitZooming) { progress ->
-        var started = false
-        var completed = false
         try {
-            progress.collect {
-                if (!started) {
-                    started = true
-                    // 返回键等同于一次立即生效的手势：直接走原 handleBack 语义（含锁定屏蔽）
-                    handleBack()
+            progress.collect { p ->
+                if (com.ican.tvplay.BuildConfig.DEBUG) {
+                    android.util.Log.i("PbTrace", "predictive progress=$p")
                 }
             }
-            completed = true
+            if (com.ican.tvplay.BuildConfig.DEBUG) {
+                android.util.Log.i("PbTrace", "predictive committed → handleBack")
+            }
+            handleBack()
         } catch (cancelled: CancellationException) {
-            // 手势取消：下面统一回弹（变量只用于声明捕获类型）
-            if (cancelled.message == null) Unit
-        }
-        if (!completed && started && !locked) {
-            if (portraitZooming && !portraitFullscreen) {
-                portraitFullscreen = true
-                portraitZoomToken++
-            } else if (landZooming && !landscapeFullscreen) {
-                landscapeFullscreen = true
-                landZoomToken++
+            if (com.ican.tvplay.BuildConfig.DEBUG) {
+                android.util.Log.i("PbTrace", "predictive cancelled: ${cancelled.message}")
             }
         }
     }
 
-    // 播完（STATE_ENDED）后进/退全屏：播放器不再输出新帧，PlayerView 尺寸变化后
-    // 上一帧仍是按旧尺寸渲染的，表现为「全屏里缩着一个小画面」。这里先强制重排，
-    // 再 seek 到结尾前 1ms 逼渲染器按新尺寸重新出一帧（只对已播完的播放器生效，
-    // 播放中/暂停中都不动，避免多余的解码器 flush）
+    // 播完（STATE_ENDED）后进/退全屏：播放器不再输出新帧，尺寸变化后上一帧仍按旧尺寸渲染，
+    // 表现为「全屏里缩着一个小画面」。这里只强制一次重排让 media3 重算 contentFrame；
+    // 视频层本身已恒等于片源比例，重排后旧帧是等比放大，不会缩在角落。
+    // 不再 seekTo(结尾前一帧)：MTK 解码器在越界位置上会吐一个未写满的空缓冲，
+    // 表现为整块纯蓝（#000D7F）盖住视频区（用户实测：播完后双击进全屏必现）。
     fun refreshEndedFrame() {
         sharedPlayerView.requestLayout()
-        val p = Players.player ?: return
-        if (p.playbackState != androidx.media3.common.Player.STATE_ENDED) return
-        val duration = p.duration
-        val target = if (duration > 0) minOf(p.currentPosition, duration - 1) else p.currentPosition
-        runCatching { p.seekTo(target) }
     }
 
     // PiP 画中画：系统会把整个 Activity 窗口直接缩小，因此不切换视图子树
