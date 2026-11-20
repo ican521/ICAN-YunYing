@@ -487,12 +487,30 @@ fun HomeScreen(
             val folderStack = remember(page, pageCategory?.id, currentSiteKey) {
                 mutableStateOf<List<Pair<String, String>>>(emptyList())
             }
-            // 网盘行样式（单列、全宽、64dp 高）：该分类出现「文件夹」卡片即锁定，
-            // 钻进子目录后沿用同一样式。
+            // 卡片形状（对齐 OK猫 sortData.flag / vod_tag）：
+            // ① 分类自带 type_flag 首位 '1' → 文件夹模式：单列全宽行（driveStyle）
+            // ② 首位 '2'，或页面里出现 vod_tag=cover 的带缩略图目录 → 横版宽卡（coverStyle，样式同海报卡只是 4:3）
+            // ③ 其余 → 普通 3:4 海报网格
             // 不能用 action 卡片判断 —— 「云盘配置」这个 tab 里放的就是配置卡片（action），
-            // 但它的卡片样式要保持原海报网格不变；只有配置好云盘后新出现的那些 tab
-            // （内容是文件夹 / 文件）才切到行样式
-            val driveStyle = remember(page, pageCategory?.id, currentSiteKey) { mutableStateOf(false) }
+            // 但它的卡片样式要保持原海报网格不变；只有内容里真出现目录卡才切样式
+            val catFlag = remember(page, pageCategory?.id) {
+                pageCategory?.typeFlag?.trim()?.firstOrNull()
+            }
+            val driveStyle = remember(page, pageCategory?.id, currentSiteKey) {
+                mutableStateOf(catFlag == '1')
+            }
+            val coverStyle = remember(page, pageCategory?.id, currentSiteKey) {
+                mutableStateOf(catFlag == '2')
+            }
+            // 数据回来后的兜底判定：type_flag 已定性的页面保持不变，其余按内容里有没有目录卡切换形状
+            fun applyCardMode(list: List<Video>) {
+                if (driveStyle.value) return
+                if (list.any { it.isCoverFolder }) {
+                    coverStyle.value = true
+                } else if (list.any { it.isFolder }) {
+                    driveStyle.value = true
+                }
+            }
             // 已渐显的卡片索引：计时放在父层，卡片滑出屏幕被回收再滑回来不会重播。
             // 切站源 / 换分类 / 进出子目录都会重建该集合，从而重播一次逐个渐显
             var revealedCards by remember(page, pageCategory?.id, currentSiteKey, folderStack.value) {
@@ -535,9 +553,7 @@ fun HomeScreen(
                 if (folder == null) {
                     val cached = viewModel.cachedCategoryVideos(pageCategory.id)
                     if (cached != null) {
-                        if (!driveStyle.value && cached.any { it.isFolder }) {
-                            driveStyle.value = true
-                        }
+                        applyCardMode(cached)
                         pageVideos.value = cached
                         pageLoading = false
                         // 首屏第一页命中缓存即视为「卡片就绪」，切站缓冲据此结束
@@ -553,8 +569,10 @@ fun HomeScreen(
                     } else {
                         viewModel.getFolderVideos(folder.first)
                     }
-                    if (!driveStyle.value && list.any { it.isFolder }) {
-                        driveStyle.value = true
+                    if (!driveStyle.value) {
+                        // cover 目录优先切横版宽卡；只有无图 folder 才退单列行
+                        if (list.any { it.isCoverFolder }) coverStyle.value = true
+                        else if (list.any { it.isFolder }) driveStyle.value = true
                     }
                     // 最短展示时长：数据来得太快时也让等待动画完整走一小段，避免闪烁
                     val remain = LOADING_MIN_SHOW_MILLIS - (System.currentTimeMillis() - startedAt)
@@ -639,7 +657,13 @@ fun HomeScreen(
                         // key 必须唯一：部分源首页推荐位的 vod_id 为空或重复，纯 id 做 key 会直接抛
                         // 「Key "" was already used」把整个首页打崩，所以拼上索引兜底
                         key = { index, v -> "${v.id}#$index" },
-                        contentType = { _, _ -> if (driveStyle.value) "drive" else "video" },
+                        contentType = { _, _ ->
+                            when {
+                                driveStyle.value -> "drive"
+                                coverStyle.value -> "cover"
+                                else -> "video"
+                            }
+                        },
                     ) { index, video ->
                         // 逐个渐显：alpha 只挂在卡片自身的 modifier 上，不新增布局层，尺寸/位置/间距不变
                         val cardAlpha by animateFloatAsState(
@@ -658,6 +682,7 @@ fun HomeScreen(
                                 video = video,
                                 onClick = { onItemClick(video) },
                                 modifier = Modifier.alpha(cardAlpha),
+                                wide = coverStyle.value,
                             )
                         }
                     }
@@ -1349,11 +1374,14 @@ private fun VideoCardItem(
     video: Video,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    wide: Boolean = false,
 ) {
     com.ican.tvplay.ui.components.VideoCard(
         video = video,
         onClick = onClick,
         modifier = modifier,
+        // 横版宽卡：样式完全沿用普通海报卡，只把 3:4 变成 4:3（等于「旋转 90 度」）
+        aspectRatio = if (wide) 4f / 3f else 3f / 4f,
     )
 }
 

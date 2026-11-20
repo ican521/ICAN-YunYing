@@ -68,6 +68,8 @@ fun VideoCard(
     showRating: Boolean = true,
     topStartBadge: String? = null,
     tagLine: String? = null,
+    /** 海报区域的宽高比：默认 3:4 竖版；传 4:3 即「横过来的宽卡」（目录源 cover 卡，其余样式不变） */
+    aspectRatio: Float = 3f / 4f,
 ) {
     // 全局统一 16dp 连续曲率角（SquircleShape，与 miuix Card/弹窗同曲线风格，全 API 生效）
     val corner = Spacing.corner
@@ -94,7 +96,7 @@ fun VideoCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(3f / 4f),
+                .aspectRatio(aspectRatio),
         ) {
             PosterImage(
                 title = video.title,

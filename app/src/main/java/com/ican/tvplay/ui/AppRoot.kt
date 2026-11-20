@@ -238,8 +238,16 @@ fun AppRoot() {
                     ) { page ->
                         when (page) {
                             0 -> HomeScreen(
+                                // 卡片点击对齐 OK猫 GridFragment：有 id 直接进详情/播放页（当前站源），
+                                // 只有 id 为空或 msearch: 前缀（源站没有真实条目）才退回聚合搜索兜底。
+                                // 目录卡（folder/cover）在 HomeScreen 内已被拦下钻进子目录，不会到这里
                                 onVideoClick = { video ->
-                                    pushCardRouteThrottled(Route.Search(video.title))
+                                    val id = video.id.trim()
+                                    if (id.isEmpty() || id.startsWith("msearch:")) {
+                                        pushCardRouteThrottled(Route.Search(video.title))
+                                    } else if (guardPlay()) {
+                                        openPlayer(id, 0)
+                                    }
                                 },
                                 onSearchClick = { navigator.push(Route.Search()) },
                                 onHistoryClick = { navigator.push(Route.History) },

@@ -7,6 +7,8 @@ import kotlinx.serialization.Serializable
 data class VideoCategory(
     val id: String,
     val name: String,
+    /** 采集站 class 里的 type_flag（OK猫 sortData.flag）：'1' 文件夹模式、'2' 带缩略图文件夹模式，空=普通分类 */
+    val typeFlag: String = "",
 )
 
 /** 单集（电影通常只有一个「正片」） */
@@ -49,4 +51,6 @@ data class Video(
     val action: String = "",
     /** 网盘文件夹标记（fongmi Vod.isFolder）：true 表示点击后进入该目录，而不是直接播放 */
     val isFolder: Boolean = false,
+    /** 带缩略图的目录（vod_tag == "cover"）：点击同样进入目录，但用横版宽卡渲染（对齐 OK猫 flag '2'） */
+    val isCoverFolder: Boolean = false,
 )

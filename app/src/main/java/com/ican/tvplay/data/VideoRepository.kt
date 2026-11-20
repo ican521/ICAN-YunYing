@@ -285,7 +285,7 @@ class VideoRepository(
             // 分类就绪后把上次落盘的首页数据读回内存（冷启动秒出）；先读盘再发布，避免旧的推荐卡片覆盖新抓的
             loadDiskCacheIntoMemory(loaded.site.key)
             publishCategories(loaded.site.key, classes.map {
-                VideoCategory(id = it.typeId, name = it.typeName)
+                VideoCategory(id = it.typeId, name = it.typeName, typeFlag = it.typeFlag)
             }, rec)
             Log.d("Startup", "reload: categories published size=${_categories.value.size} rec=${rec.size}")
         } else {
@@ -297,7 +297,7 @@ class VideoRepository(
             }
             loadDiskCacheIntoMemory(loaded.site.key)
             publishCategories(loaded.site.key, classes.map {
-                VideoCategory(id = it.typeId, name = it.typeName)
+                VideoCategory(id = it.typeId, name = it.typeName, typeFlag = it.typeFlag)
             }, rec)
         }
         persistConfigCache(loaded)
@@ -541,7 +541,7 @@ class VideoRepository(
             Log.d("Startup", "switch: homeContent begin")
             val homeJson = spiderManager.homeContent(spider, filter = true)
             if (!isLatestSiteLoad(gen)) return false
-            val cats = parseClasses(homeJson).map { VideoCategory(id = it.typeId, name = it.typeName) }
+            val cats = parseClasses(homeJson).map { VideoCategory(id = it.typeId, name = it.typeName, typeFlag = it.typeFlag) }
             // 首页推荐卡片：和分类同一次请求拿到，切源不必再等一次 categoryContent
             val rec = parseRecVideos(homeJson)
             // 空分类且无推荐卡片视为该源不可用：不写回分类，也不覆盖配置缓存，下次启动仍回到上一个可用源
@@ -558,7 +558,7 @@ class VideoRepository(
         } else {
             val (classes, recList) = apiClient.homeClassesAndList(loaded.site)
             if (!isLatestSiteLoad(gen)) return false
-            val cats = classes.map { VideoCategory(id = it.typeId, name = it.typeName) }
+            val cats = classes.map { VideoCategory(id = it.typeId, name = it.typeName, typeFlag = it.typeFlag) }
             val rec = recList.map { it.toVideo(VideoCategory(HOME_REC_CATEGORY_ID, HOME_REC_CATEGORY_NAME)) }
             if (cats.isEmpty() && rec.isEmpty()) return false
             commitLatestSiteLoad(gen) {
@@ -968,8 +968,10 @@ class VideoRepository(
             playFrom = firstPlayFrom,
             playSources = playSources,
             action = action,
-            // 文件夹判定对齐 fongmi Vod.isFolder()：vod_tag == "folder" 或带 cate 目录元数据
+            // 目录判定对齐 fongmi Vod.isFolder()：vod_tag == "folder"/"cover" 或带 cate 目录元数据
             isFolder = isFolderItem(),
+            // cover 类型目录用横版宽卡渲染（OK猫 flag '2'）
+            isCoverFolder = isCoverItem(),
         )
     }
 

@@ -64,6 +64,8 @@ data class TvBoxSite(
 data class VodClass(
     @SerialName("type_id") val typeId: String = "",
     @SerialName("type_name") val typeName: String = "",
+    /** 页面模式标记（OK猫 sortData.flag）：'1' 文件夹模式、'2' 带缩略图文件夹模式 */
+    @SerialName("type_flag") val typeFlag: String = "",
 )
 
 /** 列表项（ac=videolist 返回的 list 数组元素，字段缺省容忍） */
@@ -87,8 +89,11 @@ data class VodItem(
     /** 目录元数据（fongmi Vod.cate）：非空同样表示文件夹（部分网盘站源用 cate 而非 vod_tag 标记） */
     @SerialName("cate") val cate: JsonElement? = null,
 ) {
-    /** fongmi Vod.isFolder()：vod_tag == "folder" 或带 cate 目录元数据 */
-    fun isFolderItem(): Boolean = vodTag == "folder" || (cate != null && cate.toString() != "null")
+    /** fongmi Vod.isFolder()：vod_tag == "folder"/"cover" 或带 cate 目录元数据 */
+    fun isFolderItem(): Boolean = vodTag == "folder" || vodTag == "cover" || (cate != null && cate.toString() != "null")
+
+    /** 带缩略图的目录（vod_tag == "cover"）：OK猫 flag '2' 的横版宽卡 */
+    fun isCoverItem(): Boolean = vodTag == "cover"
 }
 
 /** 列表/分类接口返回 */
