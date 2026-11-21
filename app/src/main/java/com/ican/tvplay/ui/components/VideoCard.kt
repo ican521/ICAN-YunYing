@@ -53,9 +53,9 @@ import top.yukonga.miuix.kmp.utils.pressable
  * 低版本自动回退 RoundedCornerShape；底色由 Card colors 提供，兼作海报加载占位色）。
  *
  * 交互分两层，与 miuix Card 可点版内部结构同构：
- * - [pressable] + SinkFeedback：按压形变（整体缩到 0.94，spring(0.8f, 600f)，delay=null 立即下沉）。
- *   必须放在外层：缩放绘制作用于其后的全部内容，按压蒙层才跟随卡片一起缩小；
- *   其外再加同色底衬垫满原始轮廓，缩放露出的边就是卡片底色，不会出现白块或灰边；
+ * - [pressable] + SinkFeedback：按压形变（整卡缩到 0.94，spring(0.8f, 600f)，delay=null 立即下沉）。
+ *   放在修饰链最前面，阴影跟在其后（缩放层内），卡片与投影一起缩放；不加任何底衬，
+ *   缩小时露出的就是页面底色，不出现异物色块/灰边；
  * - [tvCardEffect]：焦点放大/发光描边 + MiuixIndication 按压蒙层（无水波纹）+ 遥控器点击。
  *
  * @param width 固定宽度；传 null 不限宽（跨站源搜索结果网格内撑满单元格）
@@ -85,7 +85,14 @@ fun VideoCard(
         modifier = modifier
             .then(if (width != null) Modifier.width(width) else Modifier)
             .aspectRatio(aspectRatio)
-            // 浅色模式：12dp 柔光投影（13% 黑），卡片浮起感更强；深色模式不加，避免灰雾
+            // 按压下沉放在最外层之外、阴影之前：卡片和投影作为一体一起缩放，不会出现阴影原位露一圈
+            .pressable(
+                interactionSource = null,
+                indication = SinkFeedback(),
+                delay = null,
+            )
+            // 浅色模式：12dp 柔光投影（30% 黑），卡片浮起感更强；深色模式不加，避免灰雾
+            // 必须排在 pressable 之后（缩放层内），跟着卡片一起缩
             .then(
                 if (isDark) Modifier else Modifier
                     .shadow(
@@ -95,15 +102,6 @@ fun VideoCard(
                         ambientColor = CardShadowColor,
                         spotColor = CardShadowColor,
                     ),
-            )
-            // 按压下沉（SinkFeedback 整体缩到 0.94）会让四周露出卡片背后的页面底色，
-            // 浅色页面接近纯白，看着像多了一块白矩形；这里先按卡片原始轮廓铺一层同色底衬，
-            // 露出的边就是卡片自己的底色 —— 观感等同「卡片不动、内容轻轻下沉」，不出现异物色块。
-            .background(cardColor, shape)
-            .pressable(
-                interactionSource = null,
-                indication = SinkFeedback(),
-                delay = null,
             )
             // 按压蒙层固定浅色模式同款浅黑(#15161D)：深色模式不再出现浅白按压块，两套模式完全一致
             // shape 用 SquircleShape 连续曲率角，与 Card 自带 squircleSurface 轮廓一致
