@@ -19,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -31,7 +30,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
-import com.ican.tvplay.ui.theme.CardShadowColor
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
@@ -54,8 +52,8 @@ import top.yukonga.miuix.kmp.utils.pressable
  *
  * 交互分两层，与 miuix Card 可点版内部结构同构：
  * - [pressable] + SinkFeedback：按压形变（整卡缩到 0.94，spring(0.8f, 600f)，delay=null 立即下沉）。
- *   放在修饰链最前面，阴影跟在其后（缩放层内），卡片与投影一起缩放；不加任何底衬，
- *   缩小时露出的就是页面底色，不出现异物色块/灰边；
+ *   放在修饰链最前面，整卡（含内容）一起缩，不加底衬也不铺投影；
+ *   轮廓靠页面底色（#EDEDED）与纯白卡片的亮度反差撑出来，缩小时露出页面底色不出现异物色块。
  * - [tvCardEffect]：焦点放大/发光描边 + MiuixIndication 按压蒙层（无水波纹）+ 遥控器点击。
  *
  * @param width 固定宽度；传 null 不限宽（跨站源搜索结果网格内撑满单元格）
@@ -77,34 +75,21 @@ fun VideoCard(
 ) {
     // 全局统一 16dp 连续曲率角（SquircleShape，与 miuix Card/弹窗同曲线风格，全 API 生效）
     val corner = Spacing.corner
-    val isDark = LocalDarkTheme.current
     val shape = SquircleShape(corner)
-    // 卡片底色：既作 Card 背景（海报占位色），也作按压下沉时的底衬
+    // 卡片底色：Card 背景色，兼作海报加载占位色
     val cardColor = MiuixTheme.colorScheme.surfaceContainer
     Card(
         modifier = modifier
             .then(if (width != null) Modifier.width(width) else Modifier)
             .aspectRatio(aspectRatio)
-            // 按压下沉放在最外层之外、阴影之前：卡片和投影作为一体一起缩放，不会出现阴影原位露一圈
+            // 按压下沉放在最外层：整卡连同内容一起缩到 0.94
             .pressable(
                 interactionSource = null,
                 indication = SinkFeedback(),
                 delay = null,
             )
-            // 浅色模式：12dp 投影（80% 黑），卡片浮起感更强；深色模式不加，避免灰雾
-            // 必须排在 pressable 之后（缩放层内），跟着卡片一起缩
-            // ambientColor 必须透明：环境光组件是全向散开的，会在卡片顶部和两个上角糊出一圈灰；
-            // 只留 spotColor（主光源自上而下，投影落在底部和两侧）
-            .then(
-                if (isDark) Modifier else Modifier
-                    .shadow(
-                        elevation = Spacing.cardShadowElevation,
-                        shape = shape,
-                        clip = false,
-                        ambientColor = Color.Transparent,
-                        spotColor = CardShadowColor,
-                    ),
-            )
+            // 不铺投影：轮廓靠页面底色（#EDEDED）与纯白卡片的亮度反差撑出来，
+            // 按压下沉时也不会出现投影原位残留的一圈灰
             // 按压蒙层固定浅色模式同款浅黑(#15161D)：深色模式不再出现浅白按压块，两套模式完全一致
             // shape 用 SquircleShape 连续曲率角，与 Card 自带 squircleSurface 轮廓一致
             .tvCardEffect(

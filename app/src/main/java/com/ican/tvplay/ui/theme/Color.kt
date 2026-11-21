@@ -24,7 +24,7 @@ val DarkGlassTintStrong = Color(0x52FFFFFF)
 val DarkScrim = Color(0xCC07070D)
 
 // 浅色主题
-val LightBackground = Color(0xFFF7F7F7)
+val LightBackground = Color(0xFFEDEDED)
 val LightSurface = Color(0xFFFFFFFF)
 val LightOnSurface = Color(0xFF15161D)
 val LightOnSurfaceMuted = Color(0xFF5C5E6E)
