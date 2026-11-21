@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
@@ -182,10 +183,18 @@ fun MultiSourceSearchResults(
                     .weight(1f)
                     .fillMaxHeight(),
             ) {
+                // 列数按「设备类型 + 屏幕宽度」判定，不再看网格自身剩余宽度：
+                // 网格宽度 = 屏宽 − 左右各 16dp − 左侧站源列表 100dp − 间距 16dp，
+                // 平板竖屏 668dp 屏宽只剩 520dp，用旧阈值(640dp)会误判成手机 → 只给 2 列。
+                // 手机（smallestScreenWidthDp < 600，横竖屏都算）：2 列；
+                // 平板竖屏（< 900dp）：3 列；平板横屏（≥ 900dp）：按最小卡宽自适应。
+                val configuration = LocalConfiguration.current
+                val isPhone = configuration.smallestScreenWidthDp < 600
                 val columns = when {
                     // 长条横卡：手机右侧剩余宽度约 244dp → 1 列；平板自动 2 列
                     wideCards -> GridCells.Adaptive(minSize = 248.dp)
-                    maxWidth < 640.dp -> GridCells.Fixed(2)
+                    isPhone -> GridCells.Fixed(2)
+                    configuration.screenWidthDp < 900 -> GridCells.Fixed(3)
                     else -> GridCells.Adaptive(minSize = 160.dp)
                 }
 
