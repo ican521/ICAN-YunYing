@@ -18,8 +18,7 @@ import top.yukonga.miuix.kmp.utils.getRoundedCorner
  * | ---- | ---- | ---- |
  * | 2dp | 极小元素内部微调（角标上下、分类 Tab 上下） | [categoryTabVertical]、[posterBadgePaddingV] |
  * | 4dp | 小元素内部 / 胶囊内衬 / 横卡文字区上下内衬 | [posterTagRowTopGap]、[bottomBarInnerPadding]、[searchWideCardPaddingV] |
- * | 6dp | 角标级别的左右内边距 | [posterBadgePaddingH] |
- * | 7dp | 卡片标题层顶部（真机实测微调） | [posterTitleTopGap] |
+ * | 6dp | 角标级别左右内边距、卡片标题层顶部 | [posterBadgePaddingH]、[posterTitleTopGap] |
  * | 8dp | 相邻元素（标题↔chips 或正文、列表项、胶囊流式排列、叠加层外边距、卡片标题层底部） | [videoTitleContentGap]、[videoTitleToMetaGap]、[dialogItemGap]、[searchChipGap]、[siteListItemGap]、[posterOverlayMargin]、[posterTitleVisualGap]
  * | 10dp | 卡片标题层水平、历史卡片进度条底距（紧贴卡片边） | [posterTitlePaddingH]、[historyProgressBarGap] |
  * | 12dp | 页面骨架次级（页面顶部、板块标题↔内容、顶栏组件之间、横卡文字区内衬） | [pageTop]、[titleContentGap]、[topBarItemGap]、[searchWideCardPadding] |
@@ -140,11 +139,11 @@ object Spacing {
     val posterTitleVisualGap = 8.dp
 
     /**
-     * 海报底部标题层顶部留白：7dp（档位表 7 档，真机实测微调值）。
-     * 上方紧邻标签胶囊，胶囊自带 2dp 垂直内衬，8dp 时墨迹间距反而略大于底部（约 11.3 vs 11.1dp），
-     * 故收 1dp 到 7dp，视觉上 ≈ 10.3dp。
+     * 海报底部标题层顶部留白：6dp（档位表 6 档）。
+     * 上方紧邻标签胶囊，胶囊自带 2dp 垂直内衬，留白收得比底部（8dp）更紧，
+     * 墨迹距离 ≈ 9.3dp，视觉上标题更贴近上方的标签胶囊。
      */
-    val posterTitleTopGap = 7.dp
+    val posterTitleTopGap = 6.dp
 
     /**
      * 播放历史卡片底部播放进度条距卡片底边的距离：10dp（档位表 10 档）。
