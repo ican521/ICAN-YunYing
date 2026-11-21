@@ -75,7 +75,7 @@ import com.ican.tvplay.ui.components.videoGridColumns
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterActionScrim
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
-import com.ican.tvplay.ui.theme.PosterTitleScrim
+import com.ican.tvplay.ui.theme.posterTitleScrimBrush
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.Icon
@@ -381,11 +381,7 @@ private fun FavoriteCard(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, PosterTitleScrim),
-                        ),
-                    )
+                    .background(posterTitleScrimBrush())
                     // 水平 10dp / 上下 8dp：汉字左侧字面约 1.3dp、基线下约 3.1dp，墨迹到左≈11.3dp、到底≈11.1dp，视觉齐平
                     .padding(
                         start = Spacing.posterTitlePaddingH,
@@ -705,12 +701,8 @@ private fun HistoryCard(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, PosterTitleScrim),
-                            ),
-                        )
-                        // 高度不变（上 8dp / 下 10dp）：纯黑 80% → 全透明渐变；
+                        .background(posterTitleScrimBrush())
+                        // 高度不变（上 8dp / 下 10dp）：黑区提前到 55% → 全透明渐变；
                         // 下内边距用 historyProgressBarGap(10dp)，让底部进度条距卡片底边正好 10dp
                         .padding(
                             start = Spacing.posterTitlePaddingH,

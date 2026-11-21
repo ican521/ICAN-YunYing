@@ -1,5 +1,6 @@
 package com.ican.tvplay.ui.theme
 
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // 品牌色
@@ -41,7 +42,17 @@ const val EpisodeSelectedFillAlpha = 0.25f
 // 海报卡片叠加层（首页/收藏/历史/搜索结果共用），保证各页海报视觉一致
 val PosterBadgeScrim = Color(0x66000000)   // 左上角站源/评分角标底
 val PosterBottomScrim = Color(0xE6000000)  // 底部标题渐变终点色
-val PosterTitleScrim = Color(0xCC000000)   // 底部标题渐变终点色（80% 黑）
+val PosterTitleScrim = Color(0xE6000000)   // 底部标题渐变终点色（90% 黑）
+val PosterTitleScrimMid = Color(0x99000000) // 底部标题渐变中段色（60% 黑，55% 位置）
+
+/** 海报卡片底部标题层渐变（搜索页海报卡 / 收藏卡 / 历史卡共用）：黑区提前出现、终点压到 90% 黑，抬高标题对比度 */
+fun posterTitleScrimBrush(): Brush = Brush.verticalGradient(
+    colorStops = arrayOf(
+        0.0f to Color.Transparent,
+        0.55f to PosterTitleScrimMid,
+        1.0f to PosterTitleScrim,
+    ),
+)
 val PosterActionScrim = Color(0x88000000)  // 编辑模式右上角删除圆钮底
 
 // 主题色板选中勾的背衬（半透明黑，保证勾在任意色点上都可见）

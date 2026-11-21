@@ -31,7 +31,7 @@ import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
-import com.ican.tvplay.ui.theme.PosterTitleScrim
+import com.ican.tvplay.ui.theme.posterTitleScrimBrush
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import com.ican.tvplay.util.posterModel
@@ -154,11 +154,7 @@ fun VideoCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, PosterTitleScrim),
-                            ),
-                        )
+                        .background(posterTitleScrimBrush())
                         // 水平 10dp / 上 6dp / 下 8dp：汉字左侧字面约 1.3dp、基线下约 3.1dp，墨迹到左≈11.3dp、到上≈9.3dp、到底≈11.1dp
                         .padding(
                             start = Spacing.posterTitlePaddingH,
