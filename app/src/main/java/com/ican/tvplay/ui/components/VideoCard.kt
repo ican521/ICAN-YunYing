@@ -168,7 +168,8 @@ fun VideoCard(
                 }
             }
 
-            // 卡片底部标题行：20% 黑底（卡片白底上呈浅灰）+ 白字，固定高度、单行、放不下结尾省略
+            // 卡片底部标题行：#E8E8E8 底（与首页搜索胶囊同色）+ 深色字，固定高度、单行、放不下结尾省略
+            // 底色是浅灰，白字几乎看不清，故文字回深色（LightOnSurface）
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -180,7 +181,7 @@ fun VideoCard(
                 Text(
                     text = video.title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = Color.White,
+                    color = LightOnSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
