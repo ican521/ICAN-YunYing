@@ -69,8 +69,8 @@ fun VideoCard(
     showRating: Boolean = true,
     topStartBadge: String? = null,
     tagLine: String? = null,
-    /** 整卡宽高比：默认 7:10 竖版（卡片底部固定一行标题，海报高度已扣出标题行）；传 4:3 即「横过来的宽卡」 */
-    aspectRatio: Float = 7f / 10f,
+    /** 整卡宽高比：默认 5:7 竖版（卡片底部固定一行标题，海报高度已扣出标题行）；传 4:3 即「横过来的宽卡」 */
+    aspectRatio: Float = 5f / 7f,
 ) {
     // 全局统一 16dp 连续曲率角（SquircleShape，与 miuix Card/弹窗同曲线风格，全 API 生效）
     val corner = Spacing.corner

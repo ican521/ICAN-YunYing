@@ -288,7 +288,7 @@ private fun UpdatesEntry(
     }
 }
 
-/** 收藏卡片：与首页 [VideoCard] 完全同款结构（整卡 7:10、标题在卡片底部固定一行、浅色无投影）；
+/** 收藏卡片：与首页 [VideoCard] 完全同款结构（整卡 5:7、标题在卡片底部固定一行、浅色无投影）；
  *  左上角站源胶囊，编辑模式下隐藏并在右上角显示删除叉号。 */
 @Composable
 private fun FavoriteCard(
@@ -301,7 +301,7 @@ private fun FavoriteCard(
     val corner = Spacing.corner
     Card(
         modifier = Modifier
-            .aspectRatio(7f / 10f)
+            .aspectRatio(5f / 7f)
             // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
             .pressable(
                 interactionSource = null,
@@ -575,7 +575,7 @@ fun HistoryScreen(
 }
 
 /**
- * 历史卡片：与首页 [VideoCard] 完全同款结构（整卡 7:10、标题在卡片底部固定一行）；
+ * 历史卡片：与首页 [VideoCard] 完全同款结构（整卡 5:7、标题在卡片底部固定一行）；
  * 左上角站源胶囊（编辑模式下隐藏），右上角编辑模式删除叉号；
  * 海报顶层自下而上：播放进度细条贴海报底 → 集数胶囊（进度条上方）。
  */
@@ -599,7 +599,7 @@ private fun HistoryCard(
     val corner = Spacing.corner
     Card(
         modifier = modifier
-            .aspectRatio(7f / 10f)
+            .aspectRatio(5f / 7f)
             // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
             .pressable(
                 interactionSource = null,

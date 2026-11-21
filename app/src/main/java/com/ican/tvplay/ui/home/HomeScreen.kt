@@ -1423,7 +1423,7 @@ private fun VideoCardItem(
         onClick = onClick,
         modifier = modifier,
         // 横版宽卡：样式完全沿用普通海报卡，只把 3:4 变成 4:3（等于「旋转 90 度」）
-        aspectRatio = if (wide) 4f / 3f else 7f / 10f,
+        aspectRatio = if (wide) 4f / 3f else 5f / 7f,
     )
 }
 
