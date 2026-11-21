@@ -40,8 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 
@@ -75,7 +73,6 @@ import com.ican.tvplay.ui.components.videoGridColumns
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterActionScrim
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
-import com.ican.tvplay.ui.theme.posterTitleScrimBrush
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.Icon
@@ -291,8 +288,8 @@ private fun UpdatesEntry(
     }
 }
 
-/** 收藏卡片：与首页 [VideoCard] 同款 miuix Card 容器 + SinkFeedback 按压形变；
- *  左上角站源胶囊，编辑模式下隐藏并在右上角显示删除叉号；底部渐变 + 标题。 */
+/** 收藏卡片：与首页 [VideoCard] 完全同款结构（整卡 7:10、标题在卡片底部固定一行、浅色无投影）；
+ *  左上角站源胶囊，编辑模式下隐藏并在右上角显示删除叉号。 */
 @Composable
 private fun FavoriteCard(
     entity: FavoriteEntity,
@@ -301,8 +298,10 @@ private fun FavoriteCard(
     onDelete: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    val corner = Spacing.corner
     Card(
         modifier = Modifier
+            .aspectRatio(7f / 10f)
             // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
             .pressable(
                 interactionSource = null,
@@ -310,91 +309,90 @@ private fun FavoriteCard(
                 delay = null,
             )
             .tvCardEffect(
-                    onClick = onClick,
-                    shape = SquircleShape(Spacing.corner),
-                    focusedScale = 1.03f,
-                    glow = false,
-                    onLongClick = onLongClick,
-                    // 按压蒙层固定浅色模式同款浅黑：收藏/历史卡片深色模式与浅色表现一致
-                    pressColor = LightOnSurface,
-                ),
+                onClick = onClick,
+                shape = SquircleShape(corner),
+                focusedScale = 1.03f,
+                glow = false,
+                onLongClick = onLongClick,
+                // 按压蒙层固定浅色模式同款浅黑：收藏/历史卡片深色模式与浅色表现一致
+                pressColor = LightOnSurface,
+            ),
+        cornerRadius = corner,
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(3f / 4f),
-        ) {
-            PosterImage(
-                title = entity.title,
-                cover = entity.cover,
-                modifier = Modifier.fillMaxSize(),
-            )
-
-            // 左上角：站源胶囊（编辑模式下隐藏，避免与右上角叉号冲突）
-            if (!editMode) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(Spacing.posterOverlayMargin)
-                        .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                        .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
-                ) {
-                    Text(
-                        text = entity.sourceName.ifBlank { "来源" },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-
-            // 右上角：编辑模式删除叉号
-            if (editMode) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(Spacing.posterOverlayMargin)
-                        .size(30.dp)
-                        .tvCardEffect(
-                            onClick = onDelete,
-                            shape = CircleShape,
-                            focusedScale = 1.10f,
-                            glow = false,
-                        )
-                        .background(PosterActionScrim, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = MiuixIcons.Demibold.Close,
-                        contentDescription = "删除",
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp),
-                    )
-                }
-            }
-
-            // 底部渐变 + 标题（高度不变：标题上下各 8dp（水平 10dp，墨迹四边约 11dp）；渐变从底部 80% 黑到顶部全透明）
+        Column(modifier = Modifier.fillMaxSize()) {
+            // 海报区：占满「整卡高度 - 标题行」
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .background(posterTitleScrimBrush())
-                    // 水平 10dp / 上下 8dp：汉字左侧字面约 1.3dp、基线下约 3.1dp，墨迹到左≈11.3dp、到底≈11.1dp，视觉齐平
-                    .padding(
-                        start = Spacing.posterTitlePaddingH,
-                        end = Spacing.posterTitlePaddingH,
-                        bottom = Spacing.posterTitleVisualGap,
-                        top = Spacing.posterTitleVisualGap,
-                    ),
+                    .weight(1f),
+            ) {
+                PosterImage(
+                    title = entity.title,
+                    cover = entity.cover,
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                // 左上角：站源胶囊（编辑模式下隐藏，避免与右上角叉号冲突）
+                if (!editMode) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(Spacing.posterOverlayMargin)
+                            .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
+                            .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
+                    ) {
+                        Text(
+                            text = entity.sourceName.ifBlank { "来源" },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+
+                // 右上角：编辑模式删除叉号
+                if (editMode) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(Spacing.posterOverlayMargin)
+                            .size(30.dp)
+                            .tvCardEffect(
+                                onClick = onDelete,
+                                shape = CircleShape,
+                                focusedScale = 1.10f,
+                                glow = false,
+                            )
+                            .background(PosterActionScrim, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.Demibold.Close,
+                            contentDescription = "删除",
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+            }
+
+            // 卡片底部标题行：与首页 [VideoCard] 一致（surfaceContainerHigh 底 + onSurface 字，单行省略）
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(Spacing.posterTitleBandHeight)
+                    .background(MiuixTheme.colorScheme.surfaceContainerHigh)
+                    .padding(horizontal = Spacing.posterTitlePaddingH),
+                contentAlignment = Alignment.CenterStart,
             ) {
                 Text(
                     text = entity.title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = Color.White,
-                    maxLines = 2,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -577,9 +575,9 @@ fun HistoryScreen(
 }
 
 /**
- * 历史卡片：与首页 [VideoCard] 同款 miuix Card 容器 + SinkFeedback 按压形变；
+ * 历史卡片：与首页 [VideoCard] 完全同款结构（整卡 7:10、标题在卡片底部固定一行）；
  * 左上角站源胶囊（编辑模式下隐藏），右上角编辑模式删除叉号；
- * 底部标签胶囊显示「看到的集数」（位于标题上方），标题下方保留播放进度细条。
+ * 海报顶层自下而上：播放进度细条贴海报底 → 集数胶囊（进度条上方）。
  */
 @Composable
 private fun HistoryCard(
@@ -596,8 +594,12 @@ private fun HistoryCard(
     } else {
         0f
     }
+    // 进度条高度与「胶囊到进度条」的间距：4dp 条高 + 8dp 常规叠加层边距
+    val progressBarHeight = 4.dp
+    val corner = Spacing.corner
     Card(
         modifier = modifier
+            .aspectRatio(7f / 10f)
             // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
             .pressable(
                 interactionSource = null,
@@ -605,87 +607,87 @@ private fun HistoryCard(
                 delay = null,
             )
             .tvCardEffect(
-                    onClick = onClick,
-                    shape = SquircleShape(Spacing.corner),
-                    focusedScale = 1.03f,
-                    glow = false,
-                    onLongClick = onLongClick,
-                    // 按压蒙层固定浅色模式同款浅黑：收藏/历史卡片深色模式与浅色表现一致
-                    pressColor = LightOnSurface,
-                ),
+                onClick = onClick,
+                shape = SquircleShape(corner),
+                focusedScale = 1.03f,
+                glow = false,
+                onLongClick = onLongClick,
+                // 按压蒙层固定浅色模式同款浅黑：收藏/历史卡片深色模式与浅色表现一致
+                pressColor = LightOnSurface,
+            ),
+        cornerRadius = corner,
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(3f / 4f),
-        ) {
-            PosterImage(
-                title = history.title,
-                // 错峰渐显轮到该卡片时才真正加载海报：把首屏 20 张海报的解码摊到错峰窗口内，
-                // 避免进入页面首帧同时解码全部封面造成掉帧（未轮到时显示 Card 自带底色）
-                cover = if (revealed) history.cover else null,
-                modifier = Modifier.fillMaxSize(),
-            )
-
-            // 左上角：站源胶囊（与收藏卡片同款，编辑模式下隐藏避免与右上角叉号冲突）
-            if (!editMode) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(Spacing.posterOverlayMargin)
-                        .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                        .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
-                ) {
-                    Text(
-                        text = history.sourceName.ifBlank { "来源" },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-
-            // 右上角：编辑模式删除叉号（与收藏卡片一致）
-            if (editMode) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(Spacing.posterOverlayMargin)
-                        .size(30.dp)
-                        .tvCardEffect(
-                            onClick = onDelete,
-                            shape = CircleShape,
-                            focusedScale = 1.10f,
-                            glow = false,
-                        )
-                        .background(PosterActionScrim, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = MiuixIcons.Demibold.Close,
-                        contentDescription = "删除",
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp),
-                    )
-                }
-            }
-
-            // 底部渐变只铺在「标题 + 播放进度条」这一块，不再向上盖住集数小标签
-            Column(
+        Column(modifier = Modifier.fillMaxSize()) {
+            // 海报区：占满「整卡高度 - 标题行」
+            Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .weight(1f),
             ) {
-                // 集数小标签：直接显示集标题（自带胶囊底，位于渐变层之上）
+                PosterImage(
+                    title = history.title,
+                    // 错峰渐显轮到该卡片时才真正加载海报：把首屏 20 张海报的解码摊到错峰窗口内，
+                    // 避免进入页面首帧同时解码全部封面造成掉帧（未轮到时显示 Card 自带底色）
+                    cover = if (revealed) history.cover else null,
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                // 左上角：站源胶囊（与收藏卡片同款，编辑模式下隐藏避免与右上角叉号冲突）
+                if (!editMode) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(Spacing.posterOverlayMargin)
+                            .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
+                            .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
+                    ) {
+                        Text(
+                            text = history.sourceName.ifBlank { "来源" },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+
+                // 右上角：编辑模式删除叉号（与收藏卡片一致）
+                if (editMode) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(Spacing.posterOverlayMargin)
+                            .size(30.dp)
+                            .tvCardEffect(
+                                onClick = onDelete,
+                                shape = CircleShape,
+                                focusedScale = 1.10f,
+                                glow = false,
+                            )
+                            .background(PosterActionScrim, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.Demibold.Close,
+                            contentDescription = "删除",
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+
+                // 集数胶囊：进度条上方（左边距与左上角站源胶囊的 8dp 对齐）
                 if (history.episodeTitle.isNotBlank()) {
                     Box(
                         modifier = Modifier
-                            // 底部不留间距：胶囊底边正好压在渐变 0% 透明分界线上（标题上方 8dp）
-                            // 左边距 8dp：与左上角站源胶囊的 8dp 对齐
-                            .padding(start = Spacing.posterOverlayMargin, end = Spacing.posterOverlayMargin, top = 4.dp)
+                            .align(Alignment.BottomStart)
+                            .padding(
+                                start = Spacing.posterOverlayMargin,
+                                end = Spacing.posterOverlayMargin,
+                                bottom = progressBarHeight + Spacing.posterOverlayMargin,
+                            )
                             .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
                             .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
                     ) {
@@ -698,42 +700,40 @@ private fun HistoryCard(
                         )
                     }
                 }
-                Column(
+
+                // 播放进度细条：贴海报最底部，通栏
+                Box(
                     modifier = Modifier
+                        .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .background(posterTitleScrimBrush())
-                        // 高度不变（上 8dp / 下 10dp）：黑区提前到 55% → 全透明渐变；
-                        // 下内边距用 historyProgressBarGap(10dp)，让底部进度条距卡片底边正好 10dp
-                        .padding(
-                            start = Spacing.posterTitlePaddingH,
-                            end = Spacing.posterTitlePaddingH,
-                            bottom = Spacing.historyProgressBarGap,
-                            top = Spacing.posterTitleVisualGap,
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                        .height(progressBarHeight)
+                        .background(Color(0x44FFFFFF)),
                 ) {
-                    Text(
-                        text = history.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    // 播放进度细条
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .background(Color(0x44FFFFFF), CircleShape),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(progress)
-                                .height(4.dp)
-                                .background(MiuixTheme.colorScheme.primary, CircleShape),
-                        )
-                    }
+                            .fillMaxWidth(progress)
+                            .height(progressBarHeight)
+                            .background(MiuixTheme.colorScheme.primary),
+                    )
                 }
+            }
+
+            // 卡片底部标题行：与首页 [VideoCard] 一致（surfaceContainerHigh 底 + onSurface 字，单行省略）
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(Spacing.posterTitleBandHeight)
+                    .background(MiuixTheme.colorScheme.surfaceContainerHigh)
+                    .padding(horizontal = Spacing.posterTitlePaddingH),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = history.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
