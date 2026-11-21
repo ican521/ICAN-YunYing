@@ -1,7 +1,6 @@
 package com.ican.tvplay.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -32,7 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
-import com.ican.tvplay.ui.theme.CardOutlineColor
+import com.ican.tvplay.ui.theme.CardShadowColor
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
@@ -83,17 +82,16 @@ fun VideoCard(
         modifier = modifier
             .then(if (width != null) Modifier.width(width) else Modifier)
             .aspectRatio(aspectRatio)
-            // 浅色模式：柔光投影 + 1dp 10% 黑极细描边，卡片边缘在纯白底上可辨；深色模式不加，避免灰雾
+            // 浅色模式：12dp 柔光投影（13% 黑），卡片浮起感更强；深色模式不加，避免灰雾
             .then(
                 if (isDark) Modifier else Modifier
                     .shadow(
                         elevation = Spacing.cardShadowElevation,
                         shape = shape,
                         clip = false,
-                        ambientColor = CardOutlineColor,
-                        spotColor = CardOutlineColor,
-                    )
-                    .border(Spacing.cardOutlineWidth, CardOutlineColor, shape),
+                        ambientColor = CardShadowColor,
+                        spotColor = CardShadowColor,
+                    ),
             )
             .pressable(
                 interactionSource = null,
