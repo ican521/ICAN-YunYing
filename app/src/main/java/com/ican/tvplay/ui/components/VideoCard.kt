@@ -104,11 +104,11 @@ fun VideoCard(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 左上角：站源/来源胶囊（跨站源搜索结果用）
+            // 右上角：站源/来源胶囊（跨站源搜索结果用；搜索卡片 showRating=false，不会与评分胶囊冲突）
             if (topStartBadge != null) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopStart)
+                        .align(Alignment.TopEnd)
                         .padding(Spacing.posterOverlayMargin)
                         .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
                         .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
