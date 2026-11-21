@@ -43,8 +43,6 @@ const val EpisodeSelectedFillAlpha = 0.25f
 val PosterBadgeScrim = Color(0x66000000)   // 左上角站源/评分角标底
 // 浅色模式卡片外圈投影色（30% 黑）
 val CardShadowColor = Color(0x4D000000)
-// 视频卡片按压下沉（SinkFeedback 缩到 0.94）时，卡片四周露出的底衬色（50% 黑）
-val CardPressUnderlay = Color(0x80000000)
 val PosterBottomScrim = Color(0xE6000000)  // 底部标题渐变终点色
 val PosterTitleScrim = Color(0xE6000000)   // 底部标题渐变终点色（90% 黑）
 val PosterTitleScrimMid = Color(0x99000000) // 底部标题渐变中段色（60% 黑，55% 位置）

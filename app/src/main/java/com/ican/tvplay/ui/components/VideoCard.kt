@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
-import com.ican.tvplay.ui.theme.CardPressUnderlay
 import com.ican.tvplay.ui.theme.CardShadowColor
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
@@ -44,8 +43,6 @@ import androidx.tv.material3.Text
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.SinkFeedback
-import top.yukonga.miuix.kmp.utils.pressable
 
 /**
  * 首页 / 搜索 / 收藏复用的视频卡片（海报 + 角标 + 标题）。
@@ -53,10 +50,8 @@ import top.yukonga.miuix.kmp.utils.pressable
  * 容器为 miuix Card（insideMargin=0，16dp 统一圆角：API 33+ 为 squircle shader 裁剪，
  * 低版本自动回退 RoundedCornerShape；底色由 Card colors 提供，兼作海报加载占位色）。
  *
- * 交互分两层，与 miuix Card 可点版内部结构同构：
- * - [pressable] + SinkFeedback：按压形变（缩放 0.94，spring(0.8f, 600f)，delay=null 立即下沉）。
- *   必须放在外层：缩放绘制作用于其后的全部内容，按压蒙层才跟随卡片一起缩小；
- * - [tvCardEffect]：焦点放大/发光描边 + MiuixIndication 按压蒙层（无水波纹）+ 遥控器点击。
+ * 交互由 [tvCardEffect] 统一负责：焦点放大/发光描边 + MiuixIndication 按压蒙层
+ * （无水波纹）+ 遥控器点击；不做下沉缩放，避免按压时卡片四周露出底衬。
  *
  * @param width 固定宽度；传 null 不限宽（跨站源搜索结果网格内撑满单元格）
  * @param showRating 是否显示右上角评分胶囊（跨站源搜索结果不显示）
@@ -93,15 +88,6 @@ fun VideoCard(
                         ambientColor = CardShadowColor,
                         spotColor = CardShadowColor,
                     ),
-            )
-            // 按压下沉（SinkFeedback 会整体缩到 0.94）时，卡片四周会露出底衬；底衬若不画，
-            // 露出的就是页面底色，长按看着像卡片底部多了一块白色矩形。
-            // 这一层放在 pressable 之外：它不跟随缩放，始终铺满卡片原始轮廓，露出的边就是 50% 黑。
-            .background(CardPressUnderlay, shape)
-            .pressable(
-                interactionSource = null,
-                indication = SinkFeedback(),
-                delay = null,
             )
             // 按压蒙层固定浅色模式同款浅黑(#15161D)：深色模式不再出现浅白按压块，两套模式完全一致
             // shape 用 SquircleShape 连续曲率角，与 Card 自带 squircleSurface 轮廓一致
