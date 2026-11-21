@@ -32,6 +32,7 @@ import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.ui.theme.CardTitleBandColor
 import com.ican.tvplay.ui.theme.LightOnSurface
+import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
@@ -78,6 +79,13 @@ fun VideoCard(
     val shape = SquircleShape(corner)
     // 卡片底色：Card 背景色，兼作海报加载占位色
     val cardColor = MiuixTheme.colorScheme.surfaceContainer
+    // 底部标题条：浅色沿用固定 #E8E8E8 + 深字；深色与搜索胶囊完全同源
+    // （miuix SearchBar 胶囊底 = surfaceContainerHigh，输入后文字 = onSurfaceContainerHigh）
+    val isDark = LocalDarkTheme.current
+    val bandColor =
+        if (isDark) MiuixTheme.colorScheme.surfaceContainerHigh else CardTitleBandColor
+    val bandTextColor =
+        if (isDark) MiuixTheme.colorScheme.onSurfaceContainerHigh else LightOnSurface
     Card(
         modifier = modifier
             .then(if (width != null) Modifier.width(width) else Modifier)
@@ -168,20 +176,20 @@ fun VideoCard(
                 }
             }
 
-            // 卡片底部标题行：#E8E8E8 底（与首页搜索胶囊同色）+ 深色字，固定高度、单行、放不下结尾省略
-            // 底色是浅灰，白字几乎看不清，故文字回深色（LightOnSurface）
+            // 卡片底部标题行：浅色 #E8E8E8 / 深色同搜索胶囊，文字取对应前景色，
+            // 固定高度、单行、放不下结尾省略
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(Spacing.posterTitleBandHeight)
-                    .background(CardTitleBandColor)
+                    .background(bandColor)
                     .padding(horizontal = Spacing.posterTitlePaddingH),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 Text(
                     text = video.title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = LightOnSurface,
+                    color = bandTextColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
