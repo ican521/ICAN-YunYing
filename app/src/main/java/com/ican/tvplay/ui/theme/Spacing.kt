@@ -155,6 +155,12 @@ object Spacing {
     val posterTagRowTopGap = 4.dp
 
     /**
+     * 卡片底部标题行固定高度：32dp（8dp 上衬 + 14sp 文字 + 8dp 下衬，另留 2dp 余量）。
+     * 整卡按 7:10 定高后，海报高度 = 卡高 - 该值，保证标题永远一行、卡片比例恒定。
+     */
+    val posterTitleBandHeight = 32.dp
+
+    /**
      * 搜索结果页专属网格间距：卡片横向、卡片纵向、左侧站源列表与卡片网格之间的间距统一用本值。
      * 搜索页内容密度高（左站源列表 + 右网格），间距独立于 [cardGapH]/[cardGapV]，不随主网格调整。
      */

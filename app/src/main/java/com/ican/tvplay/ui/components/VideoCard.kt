@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -31,7 +32,6 @@ import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
-import com.ican.tvplay.ui.theme.posterTitleScrimBrush
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import com.ican.tvplay.util.posterModel
@@ -56,8 +56,8 @@ import top.yukonga.miuix.kmp.utils.pressable
  *
  * @param width 固定宽度；传 null 不限宽（跨站源搜索结果网格内撑满单元格）
  * @param showRating 是否显示右上角评分胶囊（跨站源搜索结果不显示）
- * @param topStartBadge 左上角胶囊文字（跨站源搜索结果传站源名）；null 不显示
- * @param tagLine 标题上方的标签行文字（跨站源搜索结果传更新状态/备注）；null 不显示
+ * @param topStartBadge 海报右上角胶囊文字（跨站源搜索结果传站源名）；null 不显示
+ * @param tagLine 海报左下角标签文字（跨站源搜索结果传更新状态/备注）；null 不显示
  */
 @Composable
 fun VideoCard(
@@ -68,14 +68,15 @@ fun VideoCard(
     showRating: Boolean = true,
     topStartBadge: String? = null,
     tagLine: String? = null,
-    /** 海报区域的宽高比：默认 3:4 竖版；传 4:3 即「横过来的宽卡」（目录源 cover 卡，其余样式不变） */
-    aspectRatio: Float = 3f / 4f,
+    /** 整卡宽高比：默认 7:10 竖版（卡片底部固定一行标题，海报高度已扣出标题行）；传 4:3 即「横过来的宽卡」 */
+    aspectRatio: Float = 7f / 10f,
 ) {
     // 全局统一 16dp 连续曲率角（SquircleShape，与 miuix Card/弹窗同曲线风格，全 API 生效）
     val corner = Spacing.corner
     Card(
         modifier = modifier
             .then(if (width != null) Modifier.width(width) else Modifier)
+            .aspectRatio(aspectRatio)
             .pressable(
                 interactionSource = null,
                 indication = SinkFeedback(),
@@ -93,52 +94,44 @@ fun VideoCard(
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(aspectRatio),
-        ) {
-            PosterImage(
-                title = video.title,
-                cover = video.cover,
-                modifier = Modifier.fillMaxSize(),
-            )
-
-            // 右上角：站源/来源胶囊（跨站源搜索结果用；搜索卡片 showRating=false，不会与评分胶囊冲突）
-            if (topStartBadge != null) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(Spacing.posterOverlayMargin)
-                        .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                        .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
-                ) {
-                    Text(
-                        text = topStartBadge,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-
-            // 底部：可选标签行 + 渐变标题（水平 10dp、上 6dp、下 8dp；墨迹左侧≈11.3dp、顶部≈9.3dp、底部≈11.1dp；渐变从底部 80% 黑到顶部全透明）
-            Column(
+        Column(modifier = Modifier.fillMaxSize()) {
+            // 海报区：占满「整卡高度 - 标题行」，卡片仍是 7:10 整体比例
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.BottomCenter),
+                    .weight(1f),
             ) {
-                // 标签行（跨站源搜索结果用：全部标签文字合并进同一个胶囊，省空间）
+                PosterImage(
+                    title = video.title,
+                    cover = video.cover,
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                // 右上角：站源/来源胶囊（跨站源搜索结果用；搜索卡片 showRating=false，不会与评分胶囊冲突）
+                if (topStartBadge != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(Spacing.posterOverlayMargin)
+                            .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
+                            .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
+                    ) {
+                        Text(
+                            text = topStartBadge,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+
+                // 左下角：状态/备注标签（跨站源搜索结果用：全部标签文字合并进同一个胶囊）
                 if (tagLine != null) {
                     Box(
                         modifier = Modifier
-                            // 左右边距与左上角胶囊的 8dp 对齐
-                            .padding(
-                                start = Spacing.posterOverlayMargin,
-                                end = Spacing.posterOverlayMargin,
-                                top = Spacing.posterTagRowTopGap,
-                            )
+                            .align(Alignment.BottomStart)
+                            .padding(Spacing.posterOverlayMargin)
                             .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
                             .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
                     ) {
@@ -151,40 +144,37 @@ fun VideoCard(
                         )
                     }
                 }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(posterTitleScrimBrush())
-                        // 水平 10dp / 上 6dp / 下 8dp：汉字左侧字面约 1.3dp、基线下约 3.1dp，墨迹到左≈11.3dp、到上≈9.3dp、到底≈11.1dp
-                        .padding(
-                            start = Spacing.posterTitlePaddingH,
-                            end = Spacing.posterTitlePaddingH,
-                            bottom = Spacing.posterTitleVisualGap,
-                            top = Spacing.posterTitleTopGap,
-                        ),
-                ) {
+
+                // 右上角：评分胶囊
+                if (showRating) {
                     Text(
-                        text = video.title,
-                        style = MaterialTheme.typography.titleSmall,
+                        text = video.rating,
+                        style = MaterialTheme.typography.labelSmall,
                         color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(Spacing.posterOverlayMargin)
+                            .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
+                            .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
                     )
                 }
             }
 
-            // 右上角：评分胶囊
-            if (showRating) {
-            Text(
-                text = video.rating,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
+            // 卡片底部标题行：固定高度、单行、卡片底色上的黑字，放不下结尾省略
+            Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(Spacing.posterOverlayMargin)
-                    .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                    .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
-            )
+                    .fillMaxWidth()
+                    .height(Spacing.posterTitleBandHeight)
+                    .padding(horizontal = Spacing.posterTitlePaddingH),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = video.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
