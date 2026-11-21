@@ -30,9 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
-import com.ican.tvplay.ui.theme.CardTitleBandColor
 import com.ican.tvplay.ui.theme.LightOnSurface
-import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
@@ -79,13 +77,10 @@ fun VideoCard(
     val shape = SquircleShape(corner)
     // 卡片底色：Card 背景色，兼作海报加载占位色
     val cardColor = MiuixTheme.colorScheme.surfaceContainer
-    // 底部标题条：浅色沿用固定 #E8E8E8 + 深字；深色与搜索胶囊完全同源
-    // （miuix SearchBar 胶囊底 = surfaceContainerHigh，输入后文字 = onSurfaceContainerHigh）
-    val isDark = LocalDarkTheme.current
-    val bandColor =
-        if (isDark) MiuixTheme.colorScheme.surfaceContainerHigh else CardTitleBandColor
-    val bandTextColor =
-        if (isDark) MiuixTheme.colorScheme.onSurfaceContainerHigh else LightOnSurface
+    // 底部标题条：与搜索胶囊完全同源 —— 底 = surfaceContainerHigh（搜索胶囊底色），
+    // 字 = onSurface（InputField 输入文字的实际取色，深色下即白色）
+    val bandColor = MiuixTheme.colorScheme.surfaceContainerHigh
+    val bandTextColor = MiuixTheme.colorScheme.onSurface
     Card(
         modifier = modifier
             .then(if (width != null) Modifier.width(width) else Modifier)
@@ -176,7 +171,7 @@ fun VideoCard(
                 }
             }
 
-            // 卡片底部标题行：浅色 #E8E8E8 / 深色同搜索胶囊，文字取对应前景色，
+            // 卡片底部标题行：底 = surfaceContainerHigh（搜索胶囊同款），字 = onSurface，
             // 固定高度、单行、放不下结尾省略
             Box(
                 modifier = Modifier
