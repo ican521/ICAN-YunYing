@@ -91,15 +91,17 @@ fun VideoCard(
                 indication = SinkFeedback(),
                 delay = null,
             )
-            // 浅色模式：12dp 柔光投影（30% 黑），卡片浮起感更强；深色模式不加，避免灰雾
+            // 浅色模式：12dp 投影（80% 黑），卡片浮起感更强；深色模式不加，避免灰雾
             // 必须排在 pressable 之后（缩放层内），跟着卡片一起缩
+            // ambientColor 必须透明：环境光组件是全向散开的，会在卡片顶部和两个上角糊出一圈灰；
+            // 只留 spotColor（主光源自上而下，投影落在底部和两侧）
             .then(
                 if (isDark) Modifier else Modifier
                     .shadow(
                         elevation = Spacing.cardShadowElevation,
                         shape = shape,
                         clip = false,
-                        ambientColor = CardShadowColor,
+                        ambientColor = Color.Transparent,
                         spotColor = CardShadowColor,
                     ),
             )
