@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
+import com.ican.tvplay.ui.theme.CardTitleBandColor
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
 import com.ican.tvplay.ui.theme.Spacing
@@ -167,13 +168,12 @@ fun VideoCard(
                 }
             }
 
-            // 卡片底部标题行：底色与海报角标胶囊同色同透明度（PosterBadgeScrim 40% 黑）+ 白字，
-            // 固定高度、单行、放不下结尾省略
+            // 卡片底部标题行：20% 黑底（卡片白底上呈浅灰）+ 白字，固定高度、单行、放不下结尾省略
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(Spacing.posterTitleBandHeight)
-                    .background(PosterBadgeScrim)
+                    .background(CardTitleBandColor)
                     .padding(horizontal = Spacing.posterTitlePaddingH),
                 contentAlignment = Alignment.CenterStart,
             ) {
