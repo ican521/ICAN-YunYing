@@ -36,3 +36,6 @@ apk_check_tmp/
 /top/
 
 .work/
+
+# 过程截图与抓取稿（uiautomator dump / prefs 导出等），仅本地留档，不入库
+docs/tmp/
