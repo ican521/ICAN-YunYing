@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
+import com.ican.tvplay.ui.theme.CardPressUnderlay
 import com.ican.tvplay.ui.theme.CardShadowColor
 import com.ican.tvplay.ui.theme.LightOnSurface
 import com.ican.tvplay.ui.theme.LocalDarkTheme
@@ -93,6 +94,10 @@ fun VideoCard(
                         spotColor = CardShadowColor,
                     ),
             )
+            // 按压下沉（SinkFeedback 会整体缩到 0.94）时，卡片四周会露出底衬；底衬若不画，
+            // 露出的就是页面底色，长按看着像卡片底部多了一块白色矩形。
+            // 这一层放在 pressable 之外：它不跟随缩放，始终铺满卡片原始轮廓，露出的边就是 50% 黑。
+            .background(CardPressUnderlay, shape)
             .pressable(
                 interactionSource = null,
                 indication = SinkFeedback(),
