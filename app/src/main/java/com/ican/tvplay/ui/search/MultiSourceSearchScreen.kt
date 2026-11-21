@@ -199,9 +199,8 @@ fun MultiSourceSearchResults(
                         modifier = Modifier.fillMaxSize().imePadding(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = topPadding, bottom = Spacing.contentBottomInset),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.searchGridGap),
-                        verticalArrangement = Arrangement.spacedBy(
-                            if (wideCards) Spacing.searchChipGap else Spacing.searchGridGap,
-                        ),
+                        // 横卡与海报网格统一用 16dp 行距（卡片纵向间距与横向、右边距同基准）
+                        verticalArrangement = Arrangement.spacedBy(Spacing.searchGridGap),
                     ) {
                         itemsIndexed(
                             displayVideos,
