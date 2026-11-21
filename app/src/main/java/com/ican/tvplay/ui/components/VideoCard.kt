@@ -1,6 +1,7 @@
 package com.ican.tvplay.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -30,7 +32,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.ican.tvplay.data.model.Video
+import com.ican.tvplay.ui.theme.CardOutlineColor
 import com.ican.tvplay.ui.theme.LightOnSurface
+import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.PosterBadgeScrim
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
@@ -73,10 +77,24 @@ fun VideoCard(
 ) {
     // 全局统一 16dp 连续曲率角（SquircleShape，与 miuix Card/弹窗同曲线风格，全 API 生效）
     val corner = Spacing.corner
+    val isDark = LocalDarkTheme.current
+    val shape = SquircleShape(corner)
     Card(
         modifier = modifier
             .then(if (width != null) Modifier.width(width) else Modifier)
             .aspectRatio(aspectRatio)
+            // 浅色模式：柔光投影 + 1dp 10% 黑极细描边，卡片边缘在纯白底上可辨；深色模式不加，避免灰雾
+            .then(
+                if (isDark) Modifier else Modifier
+                    .shadow(
+                        elevation = Spacing.cardShadowElevation,
+                        shape = shape,
+                        clip = false,
+                        ambientColor = CardOutlineColor,
+                        spotColor = CardOutlineColor,
+                    )
+                    .border(Spacing.cardOutlineWidth, CardOutlineColor, shape),
+            )
             .pressable(
                 interactionSource = null,
                 indication = SinkFeedback(),

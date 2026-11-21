@@ -160,6 +160,12 @@ object Spacing {
      */
     val posterTitleBandHeight = 32.dp
 
+    /** 浅色模式下卡片外圈投影高度：6dp（只在浅色模式生效，边缘才看得出来） */
+    val cardShadowElevation = 6.dp
+
+    /** 浅色模式下卡片极细描边宽度：1dp（10% 黑） */
+    val cardOutlineWidth = 1.dp
+
     /**
      * 搜索结果页专属网格间距：卡片横向、卡片纵向、左侧站源列表与卡片网格之间的间距统一用本值。
      * 搜索页内容密度高（左站源列表 + 右网格），间距独立于 [cardGapH]/[cardGapV]，不随主网格调整。
