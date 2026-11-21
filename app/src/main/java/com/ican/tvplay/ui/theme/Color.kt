@@ -24,7 +24,7 @@ val DarkGlassTintStrong = Color(0x52FFFFFF)
 val DarkScrim = Color(0xCC07070D)
 
 // 浅色主题
-val LightBackground = Color(0xFFE6E6E6)
+val LightBackground = Color(0xFFF7F7F7)
 val LightSurface = Color(0xFFFFFFFF)
 val LightOnSurface = Color(0xFF15161D)
 val LightOnSurfaceMuted = Color(0xFF5C5E6E)
@@ -41,6 +41,8 @@ const val EpisodeSelectedFillAlpha = 0.25f
 
 // 海报卡片叠加层（首页/收藏/历史/搜索结果共用），保证各页海报视觉一致
 val PosterBadgeScrim = Color(0x66000000)   // 左上角站源/评分角标底
+// 视频卡片底部标题条底色（浅黑，深浅模式统一）：白字压在其上，卡片底缘一眼可辨
+val CardTitleBandColor = Color(0xFF26262B)
 val PosterBottomScrim = Color(0xE6000000)  // 底部标题渐变终点色
 val PosterTitleScrim = Color(0xE6000000)   // 底部标题渐变终点色（90% 黑）
 val PosterTitleScrimMid = Color(0x99000000) // 底部标题渐变中段色（60% 黑，55% 位置）
