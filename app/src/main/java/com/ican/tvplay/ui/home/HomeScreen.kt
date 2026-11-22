@@ -85,6 +85,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 
 import androidx.compose.ui.text.AnnotatedString
@@ -210,10 +211,13 @@ fun HomeScreen(
     // 首屏缓存版本：首页「推荐」卡片晚到（启动先读磁盘、网络随后刷新）时，页面靠它重取一次
     val homeCacheVersion by viewModel.homeCacheVersion.collectAsStateWithLifecycle()
     val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
+    // 首页列数自定义（null = 默认自适应）：普通卡 / 宽卡，横屏与竖屏各自一套
+    val posterColumnsLand by viewModel.posterColumnsLandscape.collectAsStateWithLifecycle()
+    val posterColumnsPort by viewModel.posterColumnsPortrait.collectAsStateWithLifecycle()
+    val wideColumnsLand by viewModel.wideColumnsLandscape.collectAsStateWithLifecycle()
+    val wideColumnsPort by viewModel.wideColumnsPortrait.collectAsStateWithLifecycle()
     // 当前站源 key：切站后即使新旧站分类 id 完全相同，也要强制各页重新取数（修复切站后首页内容不刷新）
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
-    // 网盘源才有「单列行」：直播/短视源的目录卡（一直播的虎牙/斗鱼频道）走 4:3 宽卡
-    val driveSite by viewModel.driveSite.collectAsStateWithLifecycle()
     // 站点声明的卡片样式（fongmi Site.style）：一直播整站宽卡就来自这个字段
     val siteStyle by viewModel.siteStyle.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -492,63 +496,52 @@ fun HomeScreen(
             val folderStack = remember(page, pageCategory?.id, currentSiteKey) {
                 mutableStateOf<List<Pair<String, String>>>(emptyList())
             }
-            // 卡片形状（对齐 OK猫 sortData.flag / vod_tag）：
-            // ① 分类自带 type_flag 首位 '1' → 文件夹模式：单列全宽行（driveStyle）
-            // ② 首位 '2'，或页面里出现 vod_tag=cover 的带缩略图目录 → 横版宽卡（coverStyle，样式同海报卡只是 4:3）
-            // ③ 其余 → 普通 3:4 海报网格
-            // 不能用 action 卡片判断 —— 「云盘配置」这个 tab 里放的就是配置卡片（action），
-            // 但它的卡片样式要保持原海报网格不变；只有内容里真出现目录卡才切样式
-            val catFlag = remember(page, pageCategory?.id) {
-                pageCategory?.typeFlag?.trim()?.firstOrNull()
+            // 卡片形状：完全按 fongmi 的语义，不做任何内容猜测。完整优先级链（逐行对应 fongmi）：
+            // ① TypeFragment.getStyle()：目录钻取页 → Style.list()；
+            // ② Site.getStyle(classStyle)：站点 style 优先，其次分类 style（bean/Class.getStyle），最后 Style.rect()；
+            // ③ Vod.getStyle(baseStyle)：本页首条自带的 style/land/circle/ratio 再覆盖上面两层；
+            // ④ setStyle()：isList() → 单列，isLand()（rect 且 ratio>1）→ 宽卡，其余 → 5:7 竖卡网格。
+            // 以前按 type_flag、目录卡、外链 id 去猜形状的规则全部删除 —— 那会把真影视内容误切成 4:3 宽卡
+            val folderPage = folderStack.value.isNotEmpty()
+            val categoryStyle = remember(pageCategory?.cardStyleType, pageCategory?.cardStyleRatio) {
+                pageCategory
+                    ?.takeIf { it.cardStyleType.isNotBlank() }
+                    ?.let { VodStyle(it.cardStyleType, it.cardStyleRatio.toDouble()) }
             }
-            val driveStyle = remember(page, pageCategory?.id, currentSiteKey) {
-                mutableStateOf(catFlag == '1')
+            val driveStyle = remember(page, pageCategory?.id, currentSiteKey, folderPage) {
+                mutableStateOf(folderPage)
             }
-            val coverStyle = remember(page, pageCategory?.id, currentSiteKey) {
-                mutableStateOf(catFlag == '2')
-            }
-            // 「频道卡」类目：条目 id 全是 http(s) 外链（没有站内 id）、且不是目录卡。
-            // 典型就是爱刷（csp_SsspGuard）这类短视源：每个卡是一个频道入口（其他随机/黑丝/抖音萌妹…），
-            // 采集数据里既无 type_flag 也无 vod_tag，普通源的 id 是站内数字串，所以这个判据不会误伤
-            fun isChannelCardList(list: List<Video>): Boolean {
-                if (list.isEmpty()) return false
-                return list.all { v ->
-                    val id = v.id.trim()
-                    (id.startsWith("http://") || id.startsWith("https://")) &&
-                        !v.isFolder && !v.isCoverFolder
-                }
+            val coverStyle = remember(page, pageCategory?.id, currentSiteKey, folderPage) {
+                mutableStateOf(false)
             }
 
-            // 数据回来后的兜底判定：type_flag 已定性的页面保持不变，其余按内容切换形状
             fun applyCardMode(list: List<Video>) {
-                if (driveStyle.value) return
-                // fongmi 样式优先级：本页首条自带 style / land / ratio 覆盖整页，其次站点 style
                 val itemStyle = list.firstOrNull()
                     ?.takeIf { it.cardStyleType.isNotBlank() }
                     ?.let { VodStyle(it.cardStyleType, it.cardStyleRatio.toDouble()) }
-                val declared = itemStyle ?: siteStyle
-                if (declared != null && com.ican.tvplay.BuildConfig.DEBUG) {
+                // fongmi 基线：目录钻取页恒 list；其它页 → 站点 style → 分类 style → 缺省 rect(0.75)
+                val base = when {
+                    folderPage -> VodStyle("list", 0.0)
+                    else -> siteStyle ?: categoryStyle ?: VodStyle("rect", 0.75)
+                }
+                val declared = itemStyle ?: base
+                if (com.ican.tvplay.BuildConfig.DEBUG) {
+                    val src = when {
+                        itemStyle != null -> "item"
+                        siteStyle != null -> "site"
+                        categoryStyle != null -> "category"
+                        else -> "default"
+                    }
                     android.util.Log.i(
                         "HomeCardMode",
-                        "cat=${pageCategory?.id} src=${if (itemStyle != null) "item" else "site"} " +
+                        "cat=${pageCategory?.id} src=$src " +
                             "type=${declared.normalizedType()} ratio=${declared.effectiveRatio()} " +
-                            "folders=${list.count { it.isFolder }}",
+                            "list=${declared.isList()} land=${declared.isLand()} " +
+                            "n=${list.size} folders=${list.count { it.isFolder }}",
                     )
                 }
-                when {
-                    // ① 分类 type_flag '1' 已在外层初始化成 driveStyle，这里只处理声明式样式
-                    declared != null && declared.isList() -> driveStyle.value = true
-                    declared != null && declared.normalizedType() == "rect" ->
-                        if (declared.effectiveRatio() > 1f) coverStyle.value = true
-                    // oval 圆形头像：沿用海报网格，不做特殊形状
-                    declared != null && declared.normalizedType() == "oval" -> Unit
-                    list.any { it.isCoverFolder } -> coverStyle.value = true
-                    // 目录卡：网盘源 → 单列行（真盘目录）；其它源（直播/短视的游戏频道等）→ 4:3 宽卡，
-                    // 与爱刷一致，点击仍然下钻（fongmi 里 folder 标签才 openFolder）
-                    list.any { it.isFolder } ->
-                        if (driveSite) driveStyle.value = true else coverStyle.value = true
-                    isChannelCardList(list) -> coverStyle.value = true
-                }
+                driveStyle.value = declared.isList()
+                coverStyle.value = declared.isLand()
             }
             // 已渐显的卡片索引：计时放在父层，卡片滑出屏幕被回收再滑回来不会重播。
             // 切站源 / 换分类 / 进出子目录都会重建该集合，从而重播一次逐个渐显
@@ -675,13 +668,23 @@ fun HomeScreen(
                     .fillMaxSize()
                     .background(MiuixTheme.colorScheme.surface),
             ) {
-                // 普通分类：列数由「设置-首页布局大小」驱动（收藏/历史页共用 videoGridColumns）：
-                // 手机（<600dp）小=3列/中=2列（大不开放），平板自适应最小卡宽：小≈7列、中≈5列、大≈3列
+                // 普通分类：列数由「设置-普通卡片列数（横屏/竖屏）」驱动（默认档 = 按屏幕宽度自适应）
+                // 横版宽卡（爱刷/易直播这类源）：由「设置-宽卡列数（横屏/竖屏）」驱动，默认档 = 普通卡列的 0.6 倍
                 // 网盘分类：单列固定 —— 行宽贴首页左右边距、屏宽越大整行越宽
+                val landscape = LocalConfiguration.current.orientation ==
+                    android.content.res.Configuration.ORIENTATION_LANDSCAPE
                 val gridCells = if (driveStyle.value) {
                     GridCells.Fixed(1)
+                } else if (coverStyle.value) {
+                    com.ican.tvplay.ui.components.wideCardGridColumns(
+                        homeLayoutSize,
+                        if (landscape) wideColumnsLand else wideColumnsPort,
+                    )
                 } else {
-                    com.ican.tvplay.ui.components.videoGridColumns(homeLayoutSize)
+                    com.ican.tvplay.ui.components.videoGridColumns(
+                        homeLayoutSize,
+                        if (landscape) posterColumnsLand else posterColumnsPort,
+                    )
                 }
                 LazyVerticalGrid(
                     state = gridState,
@@ -1024,7 +1027,19 @@ fun SitePickerDialog(
                     modifier = Modifier.padding(horizontal = Spacing.dialogContentMargin),
                 )
             } else {
+                // 打开即定位到当前已选站源（不从头开始滚，长列表也不用找）；
+                // 站点列表异步到达 / 当前项变化时再补一次定位
+                val listState = rememberLazyListState()
+                val currentIndex = remember(sites, currentKey) {
+                    sites.indexOfFirst { it.key == currentKey }
+                }
+                LaunchedEffect(show, currentIndex) {
+                    if (!show || currentIndex < 0) return@LaunchedEffect
+                    // 往上带两项：选中项落在列表中部附近，既能看到上方邻居也不会贴顶突然
+                    listState.scrollToItem((currentIndex - 2).coerceAtLeast(0))
+                }
                 LazyColumn(
+                    state = listState,
                     verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
                     // 左右 / 底部 16dp 随内容滚动，滑到底时末项仍与弹窗底缘留 16dp
                     contentPadding = PaddingValues(
@@ -1422,8 +1437,13 @@ private fun VideoCardItem(
         video = video,
         onClick = onClick,
         modifier = modifier,
-        // 横版宽卡：样式完全沿用普通海报卡，只把 3:4 变成 4:3（等于「旋转 90 度」）
+        // 横版宽卡：样式完全沿用普通海报卡，只把 5:7 变成 4:3（等于「旋转 90 度」）
         aspectRatio = if (wide) 4f / 3f else 5f / 7f,
+        // 首页使用海报内标题样式：标题 + 副标题压在海报底部 easeOut 渐变压暗上
+        titleOverlay = true,
+        // 右上角评分胶囊去掉，原「更新至高清」这类文字改到标题下方的副标题行
+        showRating = false,
+        tagLine = video.rating.ifBlank { null },
     )
 }
 

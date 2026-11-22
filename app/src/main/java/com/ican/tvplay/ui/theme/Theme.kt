@@ -26,10 +26,14 @@ import top.yukonga.miuix.kmp.theme.lightColorScheme as miuixLightColorScheme
 /** 当前是否为深色主题（跟随用户选择的 ThemeMode，而非仅系统设置） */
 val LocalDarkTheme = compositionLocalOf { false }
 
+/** 默认主题色上的文字/前景色：亮度阈值 0.30（高于它才取黑，否则取白），#007FFF 取白 */
+private val BrandPrimaryOnColor: Color =
+    if (BrandPrimaryDefault.luminance() > 0.30f) Color.Black else Color.White
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 private val TvDarkColors = darkColorScheme(
-    primary = BrandBlueDeep,
-    onPrimary = Color.White,
+    primary = BrandPrimaryDefault,
+    onPrimary = BrandPrimaryOnColor,
     secondary = BrandTeal,
     tertiary = BrandViolet,
     background = DarkBackground,
@@ -43,8 +47,8 @@ private val TvDarkColors = darkColorScheme(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 private val TvLightColors = lightColorScheme(
-    primary = BrandBlue,
-    onPrimary = Color.White,
+    primary = BrandPrimaryDefault,
+    onPrimary = BrandPrimaryOnColor,
     secondary = Color(0xFF009A89),
     tertiary = Color(0xFF7A52D6),
     background = LightBackground,
@@ -133,16 +137,34 @@ private fun inkTightTypography(): Typography = Typography().inkTight()
 @Composable
 fun appMiuixColors(themeColor: Int, isDark: Boolean): Colors {
     if (themeColor == 0) {
+        // 默认主题色：miuix 强调色系也取同一色值，保证设置页下拉、胶囊、开关、按钮与 Material 侧同色
         return if (isDark) {
-            miuixDarkColorScheme(surfaceContainer = DarkSurfaceVariant, windowDimming = PopupScrim)
+            miuixDarkColorScheme(
+                primary = BrandPrimaryDefault,
+                onPrimary = BrandPrimaryOnColor,
+                primaryVariant = BrandPrimaryDefault,
+                onPrimaryVariant = BrandPrimaryOnColor,
+                primaryContainer = BrandPrimaryDefault,
+                onPrimaryContainer = BrandPrimaryOnColor,
+                surfaceContainer = DarkSurfaceVariant,
+                windowDimming = PopupScrim,
+            )
         } else {
-            miuixLightColorScheme(surfaceContainer = LightSurface, windowDimming = PopupScrim)
+            miuixLightColorScheme(
+                primary = BrandPrimaryDefault,
+                onPrimary = BrandPrimaryOnColor,
+                primaryVariant = BrandPrimaryDefault,
+                onPrimaryVariant = BrandPrimaryOnColor,
+                primaryContainer = BrandPrimaryDefault,
+                onPrimaryContainer = BrandPrimaryOnColor,
+                surfaceContainer = LightSurface,
+                windowDimming = PopupScrim,
+            )
         }
     }
     val seed = Color(themeColor)
-    // 取黑/白中对比更高的一方：亮度 0.179 是两条对比曲线的交点，中亮度色（如 #2196F3）
-    // 用黑字约 7.6:1，比按 0.5 阈值取白字的约 2.9:1 可读性更好
-    val onSeed = if (seed.luminance() > 0.179f) Color.Black else Color.White
+    // 取黑/白阈值与默认主题色同一口径（0.30）：亮度高于它才取黑字，蓝色系一律用白字
+    val onSeed = if (seed.luminance() > 0.30f) Color.Black else Color.White
     return if (isDark) {
         miuixDarkColorScheme(
             primary = seed,

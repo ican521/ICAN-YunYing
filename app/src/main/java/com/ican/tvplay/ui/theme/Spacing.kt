@@ -113,16 +113,16 @@ object Spacing {
     val updateCardCorner = 10.dp
 
     /**
-     * 海报叠加层（左上/右上角标胶囊、编辑删除钮）距海报边缘的外边距：8dp（档位表 8 档）。
+     * 海报叠加层（左上/右上角标胶囊、编辑删除钮）距海报边缘的外边距：10dp（档位表 10 档）。
      * 胶囊底是绘制出来的，没有字形下沉，布局值即视觉值。
      */
-    val posterOverlayMargin = 8.dp
+    val posterOverlayMargin = 10.dp
 
     /** 海报角标内边距（水平） */
     val posterBadgePaddingH = 6.dp
 
-    /** 海报角标内边距（垂直） */
-    val posterBadgePaddingV = 2.dp
+    /** 海报角标内边距（垂直）：4dp（档位表 4 档） */
+    val posterBadgePaddingV = 4.dp
 
     /**
      * 海报底部标题层内边距（水平）：10dp（档位表 10 档）。
@@ -159,6 +159,10 @@ object Spacing {
      * 整卡按 7:10 定高后，海报高度 = 卡高 - 该值，保证标题永远一行、卡片比例恒定。
      */
     val posterTitleBandHeight = 32.dp
+    /** 海报内标题样式（标题直接压在海报上）的文字块内边距：左右 / 上 10dp */
+    val posterCaptionPadding = 10.dp
+    /** 文字块底边内边距：比左右小一档（8dp），用来抵消字体行框下方 descent 的空白，使视觉上与左边 10dp 齐平 */
+    val posterCaptionPaddingBottom = 8.dp
 
     /** 浅色模式下卡片外圈投影高度：12dp（只在浅色模式生效，卡片浮起感更强） */
     val cardShadowElevation = 12.dp

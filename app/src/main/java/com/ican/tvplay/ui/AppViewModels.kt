@@ -71,6 +71,14 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     val homeLayoutSize: StateFlow<com.ican.tvplay.data.HomeLayoutSize> =
         container.settingsRepository.homeLayoutSize
 
+    /** 首页普通卡片列数覆盖（横屏 / 竖屏；null = 默认自适应） */
+    val posterColumnsLandscape: StateFlow<Int?> = container.settingsRepository.posterColumnsLandscape
+    val posterColumnsPortrait: StateFlow<Int?> = container.settingsRepository.posterColumnsPortrait
+
+    /** 首页宽卡（4:3）列数覆盖（横屏 / 竖屏；null = 默认，即普通卡片列的 0.6 倍） */
+    val wideColumnsLandscape: StateFlow<Int?> = container.settingsRepository.wideColumnsLandscape
+    val wideColumnsPortrait: StateFlow<Int?> = container.settingsRepository.wideColumnsPortrait
+
     /** 分类列表：响应式，配置异步加载完成后自动推送 */
     val categories: StateFlow<List<VideoCategory>> = repo.categoriesFlow
 
@@ -611,6 +619,12 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
     val themeColor: StateFlow<Int> = settings.themeColor
     val homeLayoutSize: StateFlow<com.ican.tvplay.data.HomeLayoutSize> = settings.homeLayoutSize
+    /** 首页普通卡列数覆盖（横屏 / 竖屏；null = 默认自适应） */
+    val posterColumnsLandscape: StateFlow<Int?> = settings.posterColumnsLandscape
+    val posterColumnsPortrait: StateFlow<Int?> = settings.posterColumnsPortrait
+    /** 首页宽卡列数覆盖（横屏 / 竖屏；null = 默认） */
+    val wideColumnsLandscape: StateFlow<Int?> = settings.wideColumnsLandscape
+    val wideColumnsPortrait: StateFlow<Int?> = settings.wideColumnsPortrait
     val playerBackgroundPlay: StateFlow<Int> = settings.playerBackgroundPlay
     val configUrl: StateFlow<String> = settings.configUrl
     val favoriteUpdateCheckEnabled: StateFlow<Boolean> = settings.favoriteUpdateCheckEnabled
@@ -632,6 +646,11 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setThemeColor(color: Int) = settings.setThemeColor(color)
     fun setHomeLayoutSize(size: com.ican.tvplay.data.HomeLayoutSize) =
         settings.setHomeLayoutSize(size)
+    fun setPosterColumnsLandscape(columns: Int?) = settings.setPosterColumnsLandscape(columns)
+    fun setPosterColumnsPortrait(columns: Int?) = settings.setPosterColumnsPortrait(columns)
+    fun setWideColumnsLandscape(columns: Int?) = settings.setWideColumnsLandscape(columns)
+    fun setWideColumnsPortrait(columns: Int?) = settings.setWideColumnsPortrait(columns)
+
     fun setPlayerBackgroundPlay(mode: Int) = settings.setPlayerBackgroundPlay(mode)
     fun setFavoriteUpdateCheckEnabled(enabled: Boolean) =
         settings.setFavoriteUpdateCheckEnabled(enabled)

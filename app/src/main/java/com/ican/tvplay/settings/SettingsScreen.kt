@@ -40,6 +40,8 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 
@@ -73,6 +75,8 @@ import com.ican.tvplay.ui.components.ArcStretchSpinner
 import com.ican.tvplay.ui.components.MiuixBottomSheetDialog
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
 import com.ican.tvplay.ui.components.pageHorizontalPadding
+import com.ican.tvplay.ui.components.defaultPosterColumns
+import com.ican.tvplay.ui.components.defaultWideColumns
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.SelectionFillAlpha
 import com.ican.tvplay.ui.theme.Spacing
@@ -96,6 +100,11 @@ fun SettingsScreen(
     val favoriteUpdatePopupEveryLaunch by
         viewModel.favoriteUpdatePopupEveryLaunch.collectAsStateWithLifecycle()
     val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
+    // 首页列数自定义（null = 默认自动）：横屏 / 竖屏各自一套
+    val posterColumnsLand by viewModel.posterColumnsLandscape.collectAsStateWithLifecycle()
+    val posterColumnsPort by viewModel.posterColumnsPortrait.collectAsStateWithLifecycle()
+    val wideColumnsLand by viewModel.wideColumnsLandscape.collectAsStateWithLifecycle()
+    val wideColumnsPort by viewModel.wideColumnsPortrait.collectAsStateWithLifecycle()
     val configUrl by viewModel.configUrl.collectAsStateWithLifecycle()
     val siteName by viewModel.siteName.collectAsStateWithLifecycle()
     val currentSiteKey by viewModel.currentSiteKey.collectAsStateWithLifecycle()
@@ -149,12 +158,6 @@ fun SettingsScreen(
     }
 
     val horizontal = pageHorizontalPadding()
-    // 手机（<600dp）只提供小/中两档；平板额外提供大（约3列）
-    val layoutOptions = if (LocalContext.current.resources.configuration.screenWidthDp >= 600) {
-        listOf("小", "中", "大")
-    } else {
-        listOf("小", "中")
-    }
     // 固定居中大标题顶栏（不透明 surface 底色）
     val barColor = MiuixTheme.colorScheme.surface
 
@@ -194,6 +197,22 @@ fun SettingsScreen(
         ) {
         item {
         Card(modifier = Modifier.fillMaxWidth()) {
+            ArrowPreference(
+                title = "导入配置",
+                summary = configUrl.ifEmpty { "未设置" },
+                onClick = { showConfigDialog = true },
+            )
+            ArrowPreference(
+                title = "首页站源",
+                summary = siteName,
+                onClick = { showSiteDialog = true },
+            )
+        }
+        }
+
+        item {
+        // KernelSU 同款：miuix Card + preference 行组，卡片内无标题；外观两项（主题模式 / 主题色板）合并同一张卡
+        Card(modifier = Modifier.fillMaxWidth()) {
             OverlayDropdownPreference(
                 title = "主题模式",
                 items = listOf("跟随系统", "浅色", "深色"),
@@ -212,39 +231,9 @@ fun SettingsScreen(
                     )
                 },
             )
-        }
-        }
-
-        item {
-        Card(modifier = Modifier.fillMaxWidth()) {
-            OverlayDropdownPreference(
-                title = "首页网格大小",
-                items = layoutOptions,
-                selectedIndex = when (homeLayoutSize) {
-                    HomeLayoutSize.SMALL -> 0
-                    HomeLayoutSize.MEDIUM -> 1
-                    HomeLayoutSize.LARGE -> 2
-                }.coerceAtMost(layoutOptions.lastIndex),
-                onSelectedIndexChange = { index ->
-                    viewModel.setHomeLayoutSize(
-                        when (index) {
-                            0 -> HomeLayoutSize.SMALL
-                            1 -> HomeLayoutSize.MEDIUM
-                            else -> HomeLayoutSize.LARGE
-                        },
-                    )
-                },
-            )
-        }
-        }
-
-        item {
-        // KernelSU 同款：miuix Card + preference 行组，卡片内无标题
-        Card(modifier = Modifier.fillMaxWidth()) {
             ArrowPreference(
-                title = "主题色板",
-                summary = if (themeColor == 0) "默认" else "自定义",
-                startAction = {
+                title = "主题色",
+                endActions = {
                     Box(
                         modifier = Modifier
                             .padding(end = 6.dp)
@@ -262,38 +251,63 @@ fun SettingsScreen(
 
         item {
         Card(modifier = Modifier.fillMaxWidth()) {
-            ArrowPreference(
-                title = "导入配置",
-                summary = configUrl.ifEmpty { "未设置" },
-                onClick = { showConfigDialog = true },
-            )
-            ArrowPreference(
-                title = "站源",
-                summary = siteName,
-                onClick = { showSiteDialog = true },
-            )
-        }
-        }
+            // 默认档的实际列数（随屏幕/布局档位自动变化）：候选列表在此基础上下各加 3 档，最小 2 列
+            val conf = LocalConfiguration.current
+            val isLandscape = conf.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val widthLand = if (isLandscape) conf.screenWidthDp else conf.screenHeightDp
+            val widthPort = if (isLandscape) conf.screenHeightDp else conf.screenWidthDp
+            val defaultPosterLand = defaultPosterColumns(widthLand, homeLayoutSize)
+            val defaultPosterPort = defaultPosterColumns(widthPort, homeLayoutSize)
+            val defaultWideLand = defaultWideColumns(widthLand, homeLayoutSize)
+            val defaultWidePort = defaultWideColumns(widthPort, homeLayoutSize)
+            val posterLandItems = columnOptions(defaultPosterLand)
+            val posterPortItems = columnOptions(defaultPosterPort)
+            val wideLandItems = columnOptions(defaultWideLand)
+            val widePortItems = columnOptions(defaultWidePort)
 
-        item {
-        Card(modifier = Modifier.fillMaxWidth()) {
-            ArrowPreference(
-                title = "备份数据",
-                summary = "导出设置、收藏、历史到 JSON 文件",
-                onClick = {
-                    val name = "tvplay_backup_${java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())}.json"
-                    backupLauncher.launch(name)
+            OverlayDropdownPreference(
+                title = "普通卡片列数（横屏）",
+                items = posterLandItems,
+                selectedIndex = posterLandItems
+                    .indexOf(posterColumnsLand?.toString() ?: "默认").coerceAtLeast(0),
+                onSelectedIndexChange = { index ->
+                    viewModel.setPosterColumnsLandscape(
+                        if (index == 0) null else posterLandItems[index].toIntOrNull(),
+                    )
                 },
             )
-            ArrowPreference(
-                title = "恢复数据",
-                summary = "从 JSON 文件导入设置、收藏、历史",
-                onClick = { restoreLauncher.launch(arrayOf("application/json", "*/*")) },
+            OverlayDropdownPreference(
+                title = "普通卡片列数（竖屏）",
+                items = posterPortItems,
+                selectedIndex = posterPortItems
+                    .indexOf(posterColumnsPort?.toString() ?: "默认").coerceAtLeast(0),
+                onSelectedIndexChange = { index ->
+                    viewModel.setPosterColumnsPortrait(
+                        if (index == 0) null else posterPortItems[index].toIntOrNull(),
+                    )
+                },
             )
-            ArrowPreference(
-                title = "收藏同步",
-                summary = "局域网设备间同步收藏（双向/上传/下载）",
-                onClick = { showSyncDialog = true },
+            OverlayDropdownPreference(
+                title = "宽卡列数（横屏）",
+                items = wideLandItems,
+                selectedIndex = wideLandItems
+                    .indexOf(wideColumnsLand?.toString() ?: "默认").coerceAtLeast(0),
+                onSelectedIndexChange = { index ->
+                    viewModel.setWideColumnsLandscape(
+                        if (index == 0) null else wideLandItems[index].toIntOrNull(),
+                    )
+                },
+            )
+            OverlayDropdownPreference(
+                title = "宽卡列数（竖屏）",
+                items = widePortItems,
+                selectedIndex = widePortItems
+                    .indexOf(wideColumnsPort?.toString() ?: "默认").coerceAtLeast(0),
+                onSelectedIndexChange = { index ->
+                    viewModel.setWideColumnsPortrait(
+                        if (index == 0) null else widePortItems[index].toIntOrNull(),
+                    )
+                },
             )
         }
         }
@@ -359,6 +373,29 @@ fun SettingsScreen(
                         }
                     }
                 },
+            )
+        }
+        }
+
+        item {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            ArrowPreference(
+                title = "备份数据",
+                summary = "导出设置、收藏、历史到 JSON 文件",
+                onClick = {
+                    val name = "tvplay_backup_${java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())}.json"
+                    backupLauncher.launch(name)
+                },
+            )
+            ArrowPreference(
+                title = "恢复数据",
+                summary = "从 JSON 文件导入设置、收藏、历史",
+                onClick = { restoreLauncher.launch(arrayOf("application/json", "*/*")) },
+            )
+            ArrowPreference(
+                title = "收藏同步",
+                summary = "局域网设备间同步收藏（双向/上传/下载）",
+                onClick = { showSyncDialog = true },
             )
         }
         }
@@ -714,4 +751,14 @@ private fun FavoriteSyncDialog(
                 }
             }
     }
+}
+
+/**
+ * 「普通卡片列数」/「宽卡列数」的候选列表：首项固定「默认」（自动按屏幕宽度算），
+ * 其余为默认值上下各 3 档，最小 2 列。
+ */
+private fun columnOptions(default: Int): List<String> {
+    val from = (default - 3).coerceAtLeast(2)
+    val to = default + 3
+    return listOf("默认") + (from..to).map { it.toString() }
 }

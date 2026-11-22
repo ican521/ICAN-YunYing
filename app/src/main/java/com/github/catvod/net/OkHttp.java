@@ -156,7 +156,58 @@ public class OkHttp {
     }
 
     private static OkHttpClient.Builder getBuilder() {
-        return new OkHttpClient.Builder().connectTimeout(TIMEOUT, TimeUnit.MILLISECONDS).readTimeout(TIMEOUT, TimeUnit.MILLISECONDS).writeTimeout(TIMEOUT, TimeUnit.MILLISECONDS).dns(dns()).hostnameVerifier((hostname, session) -> true).sslSocketFactory(getSSLContext().getSocketFactory(), trustAllCertificates()).followRedirects(false);
+        // 跳转必须跟随：fongmi 的 client 虽然是 followRedirects(false)，但它挂了 ProxyRedirectInterceptor
+        // 自己逐跳重发 30x（最多 20 跳）。我们没移植那个拦截器，所以直接交给 OkHttp 跟随；
+        // 否则蜘蛛拿 301/302 的空响应体去解析，就会出现「jar 调通了但列表永远空」。
+        return new OkHttpClient.Builder()
+            .connectTimeout(TIMEOUT, TimeUnit.MILLISECONDS)
+            .readTimeout(TIMEOUT, TimeUnit.MILLISECONDS)
+            .writeTimeout(TIMEOUT, TimeUnit.MILLISECONDS)
+            .dns(dns())
+            .hostnameVerifier((hostname, session) -> true)
+            .sslSocketFactory(getSSLContext().getSocketFactory(), trustAllCertificates())
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .addNetworkInterceptor(new ResponseFixInterceptor());
+    }
+
+    /**
+     * 对齐 fongmi ResponseInterceptor 的两件事：
+     * ① 服务器回 Content-Encoding: deflate（raw deflate，OkHttp 只认 gzip）时自己解压，否则蜘蛛拿到乱码正文；
+     * ② DEBUG 下打印蜘蛛发出的每个请求与响应体积，定位「请求失败还是解析失败」。
+     */
+    private static class ResponseFixInterceptor implements okhttp3.Interceptor {
+        @androidx.annotation.NonNull
+        @Override
+        public Response intercept(@androidx.annotation.NonNull Chain chain) throws java.io.IOException {
+            Request request = chain.request();
+            Response response = chain.proceed(request);
+            String encoding = response.header("Content-Encoding");
+            if (encoding != null && encoding.equalsIgnoreCase("deflate")) {
+                java.io.InputStream is = new java.util.zip.InflaterInputStream(
+                    response.body().byteStream(), new java.util.zip.Inflater(true));
+                byte[] bytes = readAll(is);
+                response = response.newBuilder()
+                    .removeHeader("Content-Encoding")
+                    .removeHeader("Content-Length")
+                    .body(okhttp3.ResponseBody.create(bytes, response.body().contentType()))
+                    .build();
+            }
+            if (com.ican.tvplay.BuildConfig.DEBUG) {
+                int code = response.code();
+                android.util.Log.d("CatvodNet", "req " + request.method() + " " + request.url() + " -> " + code +
+                    " len=" + response.body().contentLength() + " enc=" + encoding);
+            }
+            return response;
+        }
+
+        private static byte[] readAll(java.io.InputStream is) throws java.io.IOException {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = is.read(buf)) != -1) out.write(buf, 0, n);
+            return out.toByteArray();
+        }
     }
 
     private static SSLContext getSSLContext() {

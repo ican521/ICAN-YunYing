@@ -3,6 +3,7 @@ package com.ican.tvplay.data.remote
 import android.content.Context
 import android.util.Log
 import dalvik.system.DexClassLoader
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
@@ -167,7 +168,16 @@ class SpiderManager(private val appContext: Context) {
         Log.d(TAG, "prewarmJars done count=${specs.size}")
     }
 
-    /** homeContent(boolean filter) → JSON {class, list, filters}；超时/取消时丢弃实例，避免僵尸调用占锁 */
+    /**
+     * homeContent(boolean filter) → JSON {class, list, filters}
+     *
+     * 错误处理完全照抄 fongmi 这一条链（ViewModelTaskRunner.execute → SiteViewModel.handleError）：
+     * ① 调用带超时（fongmi Constant.TIMEOUT_VOD），超时就丢弃实例，避免僵尸调用一直占着 jar 的串行锁；
+     * ② jar 抛出的任何 Throwable 都不许外抛 —— 记录后返回空串，上层按「空结果」渲染（fongmi post Result.empty()）；
+     * ③ 被新任务顶掉（协程取消）的旧调用静默丢弃（fongmi：error instanceof CancellationException 直接 return）。
+     * 之前这里在「协程已不活跃」分支里 rethrow 了原异常，等于把 jar 内部的 JSONException
+     * 抛到主线程 → FATAL EXCEPTION 闪退。
+     */
     suspend fun homeContent(spider: Any, filter: Boolean = true): String = withContext(Dispatchers.IO) {
         try {
             lockOf(spider).withLock {
@@ -187,14 +197,12 @@ class SpiderManager(private val appContext: Context) {
                     Log.w(TAG, "homeContent timeout(${HOME_CONTENT_TIMEOUT_MS}ms), spider discarded")
                     ""
                 }
-                t is kotlinx.coroutines.CancellationException ||
-                    !kotlinx.coroutines.currentCoroutineContext().isActive -> {
-                    discardSpider(spider)
-                    Log.w(TAG, "homeContent cancelled, spider discarded")
-                    throw t
+                t is CancellationException -> {
+                    Log.w(TAG, "homeContent superseded by newer request, dropped")
+                    ""
                 }
                 else -> {
-                    Log.e(TAG, "homeContent fail", t)
+                    Log.e(TAG, "homeContent fail: ${spiderErrorText(t)}")
                     ""
                 }
             }
@@ -206,6 +214,12 @@ class SpiderManager(private val appContext: Context) {
         spiders.entries.removeAll { it.value === spider }
         spiderLocks.remove(spider)
         Log.w(TAG, "spider instance discarded from cache")
+    }
+
+    /** 把反射包装层剥掉，日志里直接看到 jar 内部真正的失败原因 */
+    private fun spiderErrorText(t: Throwable): String {
+        val cause = (t as? java.lang.reflect.InvocationTargetException)?.targetException ?: t
+        return "${cause.javaClass.simpleName}: ${cause.message}"
     }
 
     /** categoryContent(tid, pg, filter, HashMap extend) → JSON {list, page, pagecount, ...} */
@@ -224,8 +238,20 @@ class SpiderManager(private val appContext: Context) {
                     Boolean::class.javaPrimitiveType,
                     HashMap::class.java,
                 ).invoke(spider, tid, pg.toString(), filter, HashMap<String, String>()) as? String ?: ""
+            }.onSuccess { res ->
+                // 排查「jar 调通了但这页是空的」：记录原始返回体，判断是 jar 返回空还是我们解析丢了
+                Log.d(TAG, "categoryContent tid=$tid pg=$pg bytes=${res.length} head=${res.take(240)}")
+            }.onFailure {
+                // 方法签名不匹配时把 jar 里所有 categoryContent 重载打出来，便于定位真实签名
+                val overloads = spider.javaClass.methods
+                    .filter { it.name == "categoryContent" }
+                    .joinToString(" | ") { m -> m.parameterTypes.joinToString(",") { p -> p.simpleName } }
+                Log.e(
+                    TAG,
+                    "categoryContent fail tid=$tid pg=$pg overloads=[$overloads]: ${spiderErrorText(it)}",
+                )
             }
-        }.onFailure { Log.e(TAG, "categoryContent fail tid=$tid pg=$pg", it) }.getOrDefault("")
+        }.getOrDefault("")
     }
 
     /** detailContent(List ids) → JSON {list} */
@@ -266,6 +292,22 @@ class SpiderManager(private val appContext: Context) {
                 }
             }.onFailure { Log.e(TAG, "playerContent fail flag=$flag id=$id", it) }.getOrDefault("")
         }
+
+    /**
+     * homeVideoContent() → JSON {list}：fongmi SiteApi.homeContent 对 type 3 站源会额外调它
+     * （首页 class 由 homeContent 给，推荐卡片常在 homeVideoContent 里，list 非空就覆盖首页列表）。
+     */
+    suspend fun homeVideoContent(spider: Any): String = withContext(Dispatchers.IO) {
+        runCatching {
+            spider.javaClass.getMethod("homeVideoContent")
+                .invoke(spider) as? String ?: ""
+        }.onSuccess { res ->
+            Log.d(TAG, "homeVideoContent bytes=${res.length} head=${res.take(160)}")
+        }.onFailure {
+            // 有的 jar 没实现这个方法，属正常情况
+            Log.d(TAG, "homeVideoContent unavailable: ${spiderErrorText(it)}")
+        }.getOrDefault("")
+    }
 
     /**
      * action(String) → jar 自定义操作（fongmi SiteApi.action 同款）：

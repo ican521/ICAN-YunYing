@@ -248,6 +248,8 @@ fun MultiSourceSearchResults(
                                         showRating = false,
                                         topStartBadge = badge,
                                         tagLine = tags,
+                                        // 与首页同款海报内标题样式：标题 + 标签文字压在底部渐变压暗上
+                                        titleOverlay = true,
                                     )
                                 }
                             }
@@ -312,16 +314,16 @@ private fun SiteSourceChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    // 统一使用 MiuixTheme.colorScheme：
-    // 选中态用 primary（实心主题色底）+ onPrimary（按亮度自适应的黑/白字），对比度高于默认 primaryContainer；
-    // 未选中态用 surfaceContainer（表面容器）+ onSurfaceContainer（容器上的正文色，保证可读性）。
+    // 与「选择站源」弹窗内的站源项颜色一致：
+    // 选中态 = primary 实心底 + onPrimary（按亮度自适应黑/白）；
+    // 未选中态 = surfaceContainerHigh 底（顶栏搜索胶囊同款底色，深/浅色两种模式同步）+ onSurface 正文色。
     val bg = if (selected) {
         MiuixTheme.colorScheme.primary
     } else {
-        MiuixTheme.colorScheme.surfaceContainer
+        MiuixTheme.colorScheme.surfaceContainerHigh
     }
     val fg = if (selected) MiuixTheme.colorScheme.onPrimary
-    else MiuixTheme.colorScheme.onSurfaceContainer
+    else MiuixTheme.colorScheme.onSurface
     val shape = RoundedCornerShape(percent = 50)
 
     // 固定宽度：所有胶囊等宽，不因名字长短变化；无水平外边距，左缘与返回圆钮（页面边距 16dp）精确对齐。

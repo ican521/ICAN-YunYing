@@ -59,7 +59,9 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
+import com.ican.tvplay.ui.components.PosterCaption
 import com.ican.tvplay.ui.components.PosterImage
+import com.ican.tvplay.ui.components.posterCaptionScrim
 import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.ui.CollectionViewModel
@@ -264,32 +266,13 @@ private fun UpdatesEntry(
                 todayCount > 0 -> "今日更新 $todayCount 部 · 待看 $total 部"
                 else -> "有 $total 部已更新未看"
             },
-            endActions = {
-                if (total > 0) {
-                    // 最小 22×22：1~2 位数字保持正圆；超过 99 显示 99+，宽度自适应撑成胶囊
-                    Box(
-                        modifier = Modifier
-                            .sizeIn(minWidth = 22.dp, minHeight = 22.dp)
-                            .background(MiuixTheme.colorScheme.primary, CircleShape)
-                            .padding(horizontal = 4.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = if (total > 99) "99+" else "$total",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MiuixTheme.colorScheme.onPrimary,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            },
             onClick = onClick,
         )
     }
 }
 
-/** 收藏卡片：与首页 [VideoCard] 完全同款结构（整卡 5:7、标题在卡片底部固定一行、浅色无投影）；
- *  左上角站源胶囊，编辑模式下隐藏并在右上角显示删除叉号。 */
+/** 收藏卡片：与首页 [VideoCard] 海报内标题样式完全同款（整卡 5:7、海报铺满整卡、
+ *  标题 + 副标题压在底部渐变压暗上）；左上角站源胶囊，编辑模式下隐藏并在右上角显示删除叉号。 */
 @Composable
 private fun FavoriteCard(
     entity: FavoriteEntity,
@@ -377,23 +360,17 @@ private fun FavoriteCard(
                         )
                     }
                 }
-            }
 
-            // 卡片底部标题行：与首页 [VideoCard] 一致（surfaceContainerHigh 底 + onSurface 字，单行省略）
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(Spacing.posterTitleBandHeight)
-                    .background(MiuixTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = Spacing.posterTitlePaddingH),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Text(
-                    text = entity.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MiuixTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                // 海报内标题样式（与首页 VideoCard 同款）：底部渐变压暗 + 标题 / 副标题
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(posterCaptionScrim()),
+                )
+                PosterCaption(
+                    title = entity.title,
+                    subtitle = if (entity.episodeCount > 0) "共 ${entity.episodeCount} 集" else null,
+                    modifier = Modifier.align(Alignment.BottomStart),
                 )
             }
         }
@@ -575,9 +552,10 @@ fun HistoryScreen(
 }
 
 /**
- * 历史卡片：与首页 [VideoCard] 完全同款结构（整卡 5:7、标题在卡片底部固定一行）；
+ * 历史卡片：与首页 / 收藏页同款海报内标题样式（整卡 5:7、海报铺满整卡、
+ * 标题 + 副标题压在底部渐变压暗上，副标题即当前集数，去掉了原来的集数胶囊）；
  * 左上角站源胶囊（编辑模式下隐藏），右上角编辑模式删除叉号；
- * 海报顶层自下而上：播放进度细条贴海报底 → 集数胶囊（进度条上方）。
+ * 海报顶层自下而上：播放进度细条仍贴海报最底 → 标题 / 副标题。
  */
 @Composable
 private fun HistoryCard(
@@ -678,30 +656,19 @@ private fun HistoryCard(
                     }
                 }
 
-                // 集数胶囊：进度条上方（左边距与左上角站源胶囊的 8dp 对齐）
-                if (history.episodeTitle.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(
-                                start = Spacing.posterOverlayMargin,
-                                end = Spacing.posterOverlayMargin,
-                                bottom = progressBarHeight + Spacing.posterOverlayMargin,
-                            )
-                            .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                            .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
-                    ) {
-                        Text(
-                            text = history.episodeTitle,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
+                // 海报内标题样式（与首页同款）：底部渐变压暗 + 标题 / 副标题（副标题 = 当前集数）
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(posterCaptionScrim()),
+                )
+                PosterCaption(
+                    title = history.title,
+                    subtitle = history.episodeTitle.takeIf { it.isNotBlank() },
+                    modifier = Modifier.align(Alignment.BottomStart),
+                )
 
-                // 播放进度细条：贴海报最底部，通栏
+                // 播放进度细条：贴海报最底部，通栏（画在渐变压暗之上，保证进度色不被压暗）
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -716,24 +683,6 @@ private fun HistoryCard(
                             .background(MiuixTheme.colorScheme.primary),
                     )
                 }
-            }
-
-            // 卡片底部标题行：与首页 [VideoCard] 一致（surfaceContainerHigh 底 + onSurface 字，单行省略）
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(Spacing.posterTitleBandHeight)
-                    .background(MiuixTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = Spacing.posterTitlePaddingH),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Text(
-                    text = history.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MiuixTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
         }
     }

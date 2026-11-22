@@ -9,6 +9,9 @@ val BrandBlueDeep = Color(0xFF277AF7)
 val BrandTeal = Color(0xFF00E0C8)
 val BrandViolet = Color(0xFFB48CFF)
 
+/** 默认主题色（未选主题色板时全 App 的强调色）：深色 / 浅色模式同色 #FF007FFF */
+val BrandPrimaryDefault = Color(0xFF007FFF)
+
 // 深色主题（全局背景纯黑）
 val DarkBackground = Color(0xFF000000)
 // 深色模式板块/弹窗统一容器色 rgb(36,36,36)（设置板块、各类 Dialog、关闭毛玻璃时的底栏胶囊均引用此色）
@@ -41,6 +44,8 @@ const val EpisodeSelectedFillAlpha = 0.25f
 
 // 海报卡片叠加层（首页/收藏/历史/搜索结果共用），保证各页海报视觉一致
 val PosterBadgeScrim = Color(0x66000000)   // 左上角站源/评分角标底
+// 海报内标题样式的副标题文字色（标题下方的更新时间/状态小字，无胶囊底）
+val PosterCaptionText = Color(0xFFE8E8E8)
 val PosterBottomScrim = Color(0xE6000000)  // 底部标题渐变终点色
 val PosterTitleScrim = Color(0xE6000000)   // 底部标题渐变终点色（90% 黑）
 val PosterTitleScrimMid = Color(0x99000000) // 底部标题渐变中段色（60% 黑，55% 位置）

@@ -9,6 +9,9 @@ data class VideoCategory(
     val name: String,
     /** 采集站 class 里的 type_flag（OK猫 sortData.flag）：'1' 文件夹模式、'2' 带缩略图文件夹模式，空=普通分类 */
     val typeFlag: String = "",
+    /** 分类自带的卡片样式（fongmi Class.getStyle 的 land/circle/ratio 折算），空 = 无信号 */
+    val cardStyleType: String = "",
+    val cardStyleRatio: Float = 0f,
 )
 
 /** 单集（电影通常只有一个「正片」） */

@@ -89,14 +89,24 @@ data class TvBoxSite(
     }.getOrDefault(emptyMap())
 }
 
-/** 分类（ac=class 返回的 class 数组元素） */
+/** 分类（ac=class 返回的 class 数组元素；对齐 fongmi bean/Class 的全部字段） */
 @Serializable
 data class VodClass(
+    /** fongmi: @SerializedName(value="type_id", alternate="id") */
     @SerialName("type_id") val typeId: String = "",
+    /** fongmi: @SerializedName(value="type_name", alternate="name") */
     @SerialName("type_name") val typeName: String = "",
     /** 页面模式标记（OK猫 sortData.flag）：'1' 文件夹模式、'2' 带缩略图文件夹模式 */
     @SerialName("type_flag") val typeFlag: String = "",
-)
+    /** 分类自带样式（fongmi Class.getStyle）：land/circle/ratio 或 style 字段 */
+    val style: JsonElement? = null,
+    val land: Int? = null,
+    val circle: Int? = null,
+    val ratio: Double? = null,
+) {
+    /** fongmi Class.getStyle()：本分类声明的卡片样式，无信号返回 null */
+    fun cardStyle(): VodStyle? = style?.let { parseStyle(it) } ?: styleOf(land, circle, ratio)
+}
 
 /** 列表项（ac=videolist 返回的 list 数组元素，字段缺省容忍） */
 @Serializable
@@ -127,10 +137,10 @@ data class VodItem(
     /** fongmi Vod.ratio：宽高比，0.75 = 3:4 海报，1.33 = 4:3 宽卡 */
     val ratio: Double? = null,
 ) {
-    /** fongmi Vod.isFolder()：vod_tag == "folder"/"cover" 或带 cate 目录元数据 */
-    fun isFolderItem(): Boolean = vodTag == "folder" || vodTag == "cover" || (cate != null && cate.toString() != "null")
+    /** fongmi Vod.isFolder()：只有 vod_tag == "folder" 或带 cate 目录元数据，点击后进子目录 */
+    fun isFolderItem(): Boolean = vodTag == "folder" || (cate != null && cate.toString() != "null")
 
-    /** 带缩略图的目录（vod_tag == "cover"）：OK猫 flag '2' 的横版宽卡 */
+    /** vod_tag == "cover"：带缩略图的目录，fongmi 里不参与目录判定，仅用于区分展示 */
     fun isCoverItem(): Boolean = vodTag == "cover"
 }
 

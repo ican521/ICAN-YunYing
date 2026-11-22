@@ -77,6 +77,59 @@ class SettingsRepository(context: Context) {
         _homeLayoutSize.value = size
     }
 
+    private fun readOptionalColumns(key: String): Int? =
+        if (prefs.contains(key)) prefs.getInt(key, 0).takeIf { it > 0 } else null
+
+    private fun writeOptionalColumns(key: String, columns: Int?) {
+        prefs.edit().apply {
+            if (columns == null) remove(key) else putInt(key, columns)
+        }.apply()
+    }
+
+    /** 首页普通卡片列数（横屏）：null = 默认（按屏幕宽度自适应） */
+    private val _posterColumnsLandscape = MutableStateFlow(
+        readOptionalColumns(KEY_POSTER_COLUMNS_LANDSCAPE),
+    )
+    val posterColumnsLandscape: StateFlow<Int?> = _posterColumnsLandscape.asStateFlow()
+
+    fun setPosterColumnsLandscape(columns: Int?) {
+        writeOptionalColumns(KEY_POSTER_COLUMNS_LANDSCAPE, columns)
+        _posterColumnsLandscape.value = columns
+    }
+
+    /** 首页普通卡片列数（竖屏）：null = 默认 */
+    private val _posterColumnsPortrait = MutableStateFlow(
+        readOptionalColumns(KEY_POSTER_COLUMNS_PORTRAIT),
+    )
+    val posterColumnsPortrait: StateFlow<Int?> = _posterColumnsPortrait.asStateFlow()
+
+    fun setPosterColumnsPortrait(columns: Int?) {
+        writeOptionalColumns(KEY_POSTER_COLUMNS_PORTRAIT, columns)
+        _posterColumnsPortrait.value = columns
+    }
+
+    /** 首页宽卡（4:3）列数（横屏）：null = 默认（普通卡列的 0.6 倍） */
+    private val _wideColumnsLandscape = MutableStateFlow(
+        readOptionalColumns(KEY_WIDE_COLUMNS_LANDSCAPE),
+    )
+    val wideColumnsLandscape: StateFlow<Int?> = _wideColumnsLandscape.asStateFlow()
+
+    fun setWideColumnsLandscape(columns: Int?) {
+        writeOptionalColumns(KEY_WIDE_COLUMNS_LANDSCAPE, columns)
+        _wideColumnsLandscape.value = columns
+    }
+
+    /** 首页宽卡（4:3）列数（竖屏）：null = 默认 */
+    private val _wideColumnsPortrait = MutableStateFlow(
+        readOptionalColumns(KEY_WIDE_COLUMNS_PORTRAIT),
+    )
+    val wideColumnsPortrait: StateFlow<Int?> = _wideColumnsPortrait.asStateFlow()
+
+    fun setWideColumnsPortrait(columns: Int?) {
+        writeOptionalColumns(KEY_WIDE_COLUMNS_PORTRAIT, columns)
+        _wideColumnsPortrait.value = columns
+    }
+
     /** 跨站源搜索结果卡片样式（默认竖版海报网格） */
     private val _searchCardStyle = MutableStateFlow(
         runCatching {
@@ -378,6 +431,10 @@ class SettingsRepository(context: Context) {
                 prefs.getString(KEY_HOME_LAYOUT_SIZE, null) ?: HomeLayoutSize.MEDIUM.name,
             )
         }.getOrDefault(HomeLayoutSize.MEDIUM)
+        _posterColumnsLandscape.value = readOptionalColumns(KEY_POSTER_COLUMNS_LANDSCAPE)
+        _posterColumnsPortrait.value = readOptionalColumns(KEY_POSTER_COLUMNS_PORTRAIT)
+        _wideColumnsLandscape.value = readOptionalColumns(KEY_WIDE_COLUMNS_LANDSCAPE)
+        _wideColumnsPortrait.value = readOptionalColumns(KEY_WIDE_COLUMNS_PORTRAIT)
         _searchCardStyle.value = runCatching {
             SearchCardStyle.valueOf(
                 prefs.getString(KEY_SEARCH_CARD_STYLE, null) ?: SearchCardStyle.POSTER.name,
@@ -427,6 +484,14 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_BACKGROUND = "player_background"
         const val KEY_PLAYER_SUBTITLE_SCALE = "player_subtitle_scale"
         const val KEY_PLAYER_SUBTITLE_POSITION = "player_subtitle_position"
+        /** 首页普通卡片列数覆盖（横屏；缺省 = 默认自适应） */
+        const val KEY_POSTER_COLUMNS_LANDSCAPE = "home_poster_columns_land"
+        /** 首页普通卡片列数覆盖（竖屏；缺省 = 默认自适应） */
+        const val KEY_POSTER_COLUMNS_PORTRAIT = "home_poster_columns_port"
+        /** 首页宽卡（4:3）列数覆盖（横屏；缺省 = 默认） */
+        const val KEY_WIDE_COLUMNS_LANDSCAPE = "home_wide_columns_land"
+        /** 首页宽卡（4:3）列数覆盖（竖屏；缺省 = 默认） */
+        const val KEY_WIDE_COLUMNS_PORTRAIT = "home_wide_columns_port"
         const val KEY_SYNC_MODE = "sync_mode"
         const val KEY_FAVORITE_UPDATE_CHECK = "favorite_update_check"
         const val KEY_FAVORITE_UPDATE_INTERVAL = "favorite_update_interval"

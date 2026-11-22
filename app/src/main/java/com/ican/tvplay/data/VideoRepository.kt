@@ -289,12 +289,10 @@ class VideoRepository(
             val homeJson = spiderManager.homeContent(spider, filter = true)
             val classes = parseClasses(homeJson)
             Log.d("Startup", "reload: homeContent done classes=${classes.size}")
-            val rec = parseRecVideos(homeJson)
+            val rec = homeRecVideos(spider, homeJson)
             // 分类就绪后把上次落盘的首页数据读回内存（冷启动秒出）；先读盘再发布，避免旧的推荐卡片覆盖新抓的
             loadDiskCacheIntoMemory(loaded.site.key)
-            publishCategories(loaded.site.key, classes.map {
-                VideoCategory(id = it.typeId, name = it.typeName, typeFlag = it.typeFlag)
-            }, rec)
+            publishCategories(loaded.site.key, classes.map { it.toCategory() }, rec)
             Log.d("Startup", "reload: categories published size=${_categories.value.size} rec=${rec.size}")
         } else {
             // HTTP 采集站
@@ -304,9 +302,7 @@ class VideoRepository(
                 it.toVideo(VideoCategory(HOME_REC_CATEGORY_ID, HOME_REC_CATEGORY_NAME))
             }
             loadDiskCacheIntoMemory(loaded.site.key)
-            publishCategories(loaded.site.key, classes.map {
-                VideoCategory(id = it.typeId, name = it.typeName, typeFlag = it.typeFlag)
-            }, rec)
+            publishCategories(loaded.site.key, classes.map { it.toCategory() }, rec)
         }
         persistConfigCache(loaded)
     }
@@ -329,6 +325,19 @@ class VideoRepository(
     }
 
     fun getCategories(): List<VideoCategory> = _categories.value
+
+    /**
+     * 首页推荐列表，对齐 fongmi SiteApi.homeContent 的两段式：
+     * homeContent 给 class（分类）+ list（部分源有推荐）；很多「Guard」采集站（如 新6V）首页只给 class，
+     * 卡片全在 homeVideoContent() 里 —— 这里补一次，list 非空就用它（fongmi：video list 非空则覆盖 home list）。
+     */
+    private suspend fun homeRecVideos(spider: Any, homeJson: String): List<Video> {
+        val base = parseRecVideos(homeJson)
+        if (base.isNotEmpty()) return base
+        val videoJson = spiderManager.homeVideoContent(spider)
+        if (videoJson.isBlank()) return base
+        return parseRecVideos(videoJson)
+    }
 
     /** homeContent 自带 list → 「推荐」卡片（对标 OK猫 my0「主页」，随分类同一次请求返回） */
     private fun parseRecVideos(json: String): List<Video> {
@@ -549,9 +558,9 @@ class VideoRepository(
             Log.d("Startup", "switch: homeContent begin")
             val homeJson = spiderManager.homeContent(spider, filter = true)
             if (!isLatestSiteLoad(gen)) return false
-            val cats = parseClasses(homeJson).map { VideoCategory(id = it.typeId, name = it.typeName, typeFlag = it.typeFlag) }
+            val cats = parseClasses(homeJson).map { it.toCategory() }
             // 首页推荐卡片：和分类同一次请求拿到，切源不必再等一次 categoryContent
-            val rec = parseRecVideos(homeJson)
+            val rec = homeRecVideos(spider, homeJson)
             // 空分类且无推荐卡片视为该源不可用：不写回分类，也不覆盖配置缓存，下次启动仍回到上一个可用源
             if (cats.isEmpty() && rec.isEmpty()) return false
             commitLatestSiteLoad(gen) {
@@ -566,7 +575,7 @@ class VideoRepository(
         } else {
             val (classes, recList) = apiClient.homeClassesAndList(loaded.site)
             if (!isLatestSiteLoad(gen)) return false
-            val cats = classes.map { VideoCategory(id = it.typeId, name = it.typeName, typeFlag = it.typeFlag) }
+            val cats = classes.map { it.toCategory() }
             val rec = recList.map { it.toVideo(VideoCategory(HOME_REC_CATEGORY_ID, HOME_REC_CATEGORY_NAME)) }
             if (cats.isEmpty() && rec.isEmpty()) return false
             commitLatestSiteLoad(gen) {
@@ -998,20 +1007,47 @@ class VideoRepository(
         )
     }
 
-    /** spider homeContent 返回 JSON 中的 class 数组 */
+    /**
+     * spider homeContent 返回 JSON 中的 class 数组。
+     * 对齐 fongmi bean/Class 的字段容错：type_id 可写成 id、type_name 可写成 name（用 @SerializedName alternate 的原意），
+     * 并保留 land/circle/ratio/style —— 这些是「分类自带卡片样式」，fongmi 用它决定该分类的卡片形状。
+     */
     private fun parseClasses(json: String): List<VodClass> {
         if (json.isBlank()) return emptyList()
         return runCatching {
             val root = rawJson.parseToJsonElement(json).jsonObject
             val arr = root["class"]?.jsonArray ?: return emptyList()
             arr.mapNotNull { el ->
-                runCatching { rawJson.decodeFromJsonElement(VodClass.serializer(), el) }.getOrNull()
+                val obj = el as? JsonObject ?: return@mapNotNull null
+                fun s(vararg keys: String): String = keys.firstNotNullOfOrNull { k ->
+                    (obj[k] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                }.orEmpty()
+                VodClass(
+                    typeId = s("type_id", "id"),
+                    typeName = s("type_name", "name"),
+                    typeFlag = s("type_flag"),
+                    style = obj["style"],
+                    land = (obj["land"] as? JsonPrimitive)?.content?.toIntOrNull(),
+                    circle = (obj["circle"] as? JsonPrimitive)?.content?.toIntOrNull(),
+                    ratio = (obj["ratio"] as? JsonPrimitive)?.content?.toDoubleOrNull(),
+                )
             }
         }.onFailure { Log.e(REPO_TAG, "parseClasses fail", it) }.getOrDefault(emptyList())
     }
 
-    /** 把采集站返回的 VodItem 映射为项目 Video 模型 */
-    private fun VodItem.toVideo(category: VideoCategory, withEpisodes: Boolean = false): Video {
+    /** 分类模型映射：带上 fongmi Class.getStyle 的卡片样式（分类自己声明的样式优先于站点样式之外的那一层） */
+    private fun VodClass.toCategory(): VideoCategory {
+        val st = cardStyle()
+        return VideoCategory(
+            id = typeId,
+            name = typeName,
+            typeFlag = typeFlag,
+            cardStyleType = st?.normalizedType().orEmpty(),
+            cardStyleRatio = st?.effectiveRatio() ?: 0f,
+        )
+    }
+
+    /** 把采集站返回的 VodItem 映射为项目 Video 模型 */    private fun VodItem.toVideo(category: VideoCategory, withEpisodes: Boolean = false): Video {
         val playSources = if (withEpisodes && vodPlayUrl.isNotBlank()) {
             parsePlayLines(vodPlayFrom, vodPlayUrl)
         } else {
@@ -1044,24 +1080,31 @@ class VideoRepository(
     }
 
     /**
-     * 解析 vod_play_from / vod_play_url：
-     * 多线路用 $$$ 分隔（两者一一对应），单线路内选集用 # 分隔，
-     * 每集格式 `第01集$https://...m3u8`。
-     * 线路数多于选集组时以选集组为准；线路名为空时回退为「线路N」。
+     * 解析 vod_play_from / vod_play_url（逐条照抄 fongmi bean/Flag.setEpisodes）：
+     * ① 多线路用 $$$ 分隔，两串一一对应；
+     * ② 单线路内选集用 # 分隔（整串没有 # 时整串就是唯一一集）；
+     * ③ 每集按首个 $ 切成「集名$地址」，地址里允许再出现 $（因此只切 2 段）；
+     * ④ 没有 $ 的段落 fongmi 不丢弃，按「第N集 + 整段作为地址」保留 —— 之前我们会把它漏掉；
+     * ⑤ 完全相同的选集去重。
      */
     private fun parsePlayLines(playFrom: String, playUrl: String): List<PlayLine> {
         val flags = playFrom.split("$$$").map { it.trim() }
         val urlGroups = playUrl.split("$$$")
         return urlGroups.mapIndexedNotNull { groupIndex, group ->
-            val episodes = group.split("#")
-                .mapIndexedNotNull { index, segment ->
-                    val parts = segment.split("$")
-                    if (parts.size < 2) return@mapIndexedNotNull null
-                    val title = parts[0].trim().ifBlank { "第${index + 1}集" }
-                    val url = parts.subList(1, parts.size).joinToString("$").trim()
-                    if (url.isEmpty()) return@mapIndexedNotNull null
-                    Episode(index = index, title = title, playUrl = url)
-                }
+            val segments = if (group.contains("#")) group.split("#") else listOf(group)
+            val episodes = mutableListOf<Episode>()
+            segments.forEachIndexed { index, segment ->
+                val pair = segment.split("$", limit = 2)
+                val title = pair.getOrNull(0)?.trim().orEmpty()
+                val url = if (pair.size > 1) pair[1].trim() else segment.trim()
+                if (url.isEmpty()) return@forEachIndexed
+                val episode = Episode(
+                    index = index,
+                    title = title.ifBlank { "第${index + 1}集" },
+                    playUrl = url,
+                )
+                if (episodes.none { it.playUrl == episode.playUrl }) episodes.add(episode)
+            }
             if (episodes.isEmpty()) return@mapIndexedNotNull null
             val flag = flags.getOrNull(groupIndex)?.takeIf { it.isNotBlank() }
                 ?: "线路${groupIndex + 1}"
