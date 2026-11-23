@@ -1,6 +1,8 @@
 package com.ican.tvplay.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -348,9 +350,9 @@ fun CircleVideoCard(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .padding(Spacing.posterOverlayMargin)
-            .tvCardEffect(onClick = onClick, shape = CircleShape, glow = false),
+        // 注意：这里绝不能再套 tvCardEffect(shape = CircleShape) —— 它内部是 .clip(shape)，
+        // 会把图下方的标题一起裁进圆里（文字被切成半截）。圆形裁剪与点击/按压/聚焦都下沉到图片那一层。
+        modifier = modifier.padding(Spacing.posterOverlayMargin),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -358,7 +360,8 @@ fun CircleVideoCard(
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(CircleShape)
-                .background(MiuixTheme.colorScheme.surfaceContainerHigh),
+                .background(MiuixTheme.colorScheme.surfaceContainerHigh)
+                .tvCardEffect(onClick = onClick, shape = CircleShape, glow = false),
         ) {
             PosterImage(
                 title = video.title,
@@ -376,7 +379,13 @@ fun CircleVideoCard(
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = Spacing.posterTagRowTopGap),
+                .padding(top = Spacing.posterTagRowTopGap)
+                // 图下的标题区域也要能点：无按压蒙层，点击直接透传到同一个 onClick
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick,
+                ),
         )
     }
 }
