@@ -748,6 +748,19 @@ object Players {
     }
 
     /**
+     * 换片（进新的详情页 / 自动换站源）时把画面比例退回 16:9 默认值。
+     *
+     * 播放器实例是全局复用的，videoAspectRatio 会留着上一部片的尺寸；
+     * 新片首帧解码出 VideoSize 之前，竖屏预览小窗会先按上一部片的高度显示，
+     * 等 onVideoSizeChanged 再动画变过去（观感就是「先显示上一部片的高度」）。
+     * 只有换片要重置：同一部片切集/切线路/切画质属于同一画面尺寸，不重置以免闪一下。
+     */
+    fun resetVideoAspectRatio() {
+        if (_state.value.videoAspectRatio == DEFAULT_VIDEO_ASPECT_RATIO) return
+        _state.value = _state.value.copy(videoAspectRatio = DEFAULT_VIDEO_ASPECT_RATIO)
+    }
+
+    /**
      * 只支持 BT/磁力协议的播放地址（magnet:/ed2k:/thunder:）：
      * 本机没有 BT 引擎，交给 MPV 只会黑屏，这里停掉当前播放并进入静态提示态。
      * 与 [notifyError] 的区别是不留 buffering/switching，避免提示上还叠着一个转圈；

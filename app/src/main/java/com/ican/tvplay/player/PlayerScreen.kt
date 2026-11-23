@@ -91,6 +91,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -155,6 +156,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
@@ -331,6 +333,11 @@ fun PlayerScreen(
     val savedSubtitlePosition by settings.subtitlePosition.collectAsStateWithLifecycle()
 
     var video by remember { mutableStateOf<Video?>(null) }
+    // 换片（新详情页 / 自动换站源）时先把画面比例退回 16:9：
+    // 播放器实例全局复用，不清的话小窗会先沿用上一部片的高度，等新片首帧解码才变过去
+    LaunchedEffect(video?.id) {
+        if (video != null) Players.resetVideoAspectRatio()
+    }
     var episodeIndex by remember { mutableIntStateOf(startEpisode) }
     var initialized by remember { mutableStateOf(false) }
     // 本地历史读取完成前禁止写历史：慢站源进页要异步拉详情（几秒到十几秒），
@@ -1476,48 +1483,35 @@ fun PlayerScreen(
             }
             Players.ScaleMode.FILL -> Pair(boxW, boxH)
         }
-        // 预览内容矩形按「目标高度」算（不是逐帧动画值），与下方高度动画同一套 300ms，
-        // 两者同步收敛；否则内容矩形再叠一层动画会追着框走、看起来发飘
-        val (previewContentW, previewContentH) = contentSizeFor(screenW, portraitPreviewTargetH)
-        val (fullContentW, fullContentH) = contentSizeFor(screenW, screenH)
-        // 竖屏小窗↔竖屏全屏缩放：与横屏同一套做法（宽/高/顶部/圆角连续插值，PlayerView 不重建）。
-        // 起点 = 预览小窗（满宽 + 16:9、状态栏以下、16dp 圆角），
-        // 终点 = 铺满整屏（顶部 0、高 = 屏高、圆角 = 设备屏幕圆角），
-        // 收敛后由 fullscreen 分支接管，最后一帧与全屏布局完全重合，不会跳变
+        // 竖屏小窗↔竖屏全屏缩放：起点 = 预览小窗（满宽、按片源比例的高度、状态栏以下），
+        // 终点 = 铺满整屏（顶部 0、高 = 屏高），收敛后由 fullscreen 分支接管。
+        // 关键：几何全部只由一个进度值 pExpand 驱动，画面内容矩形每帧都从「当前框高」
+        // 按片源比例重新推导（contentSizeFor 是纯函数），动画全程画面比例恒等于片源。
+        // 此前宽/高各自独立插值，中间帧的矩形比例会跑偏，竖屏片源双击放大时
+        // 表现为画面/黑框轻微跳动（竖屏片源宽高变化幅度最大，最明显）。
         val portraitTransition = updateTransition(
             targetState = portraitFullscreen,
             label = "portraitPlayerExpand",
         )
-        val pAnimWidth = portraitTransition.animateDp(
+        val pExpand = portraitTransition.animateFloat(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
-            label = "pAnimWidth",
-        ) { screenW }
-        // 高度单独用 animateDpAsState（而不是 transition 的 lambda）：预览高度由视频比例驱动，
-        // 比例一变（开播/切集/切画质）就要重新定目标值，transition 的 targetValue lambda
-        // 只在 targetState 变化时求值，外部比例变化拿不到 → 会停在旧高度。
-        // 时长/缓动与 fongmi changeHeight 的 300ms 减速一致（LinearOutSlowInEasing ≈ Decelerate）
-        val pAnimHeight = animateDpAsState(
-            targetValue = if (portraitFullscreen) screenH else portraitPreviewTargetH,
-            animationSpec = tween(300, easing = LinearOutSlowInEasing),
-            label = "pAnimHeight",
-        )
-        val pAnimTop = portraitTransition.animateDp(
-            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
-            label = "pAnimTop",
-        ) { expanded -> if (expanded) 0.dp else statusBarTop }
-        // 画面内容矩形单独插值（宽 + 高），居中贴在黑框里：
-        // 黑框继续按上面那组值铺满/退出，画面只在 previewContent 与 fullContent 之间长大，
-        // 顶边 = 框顶 + (框高 - 内容高)/2，全程不会越过状态栏
-        val pContentWidth = animateDpAsState(
-            targetValue = if (portraitFullscreen) fullContentW else previewContentW,
-            animationSpec = tween(300, easing = LinearOutSlowInEasing),
-            label = "pContentWidth",
-        )
-        val pContentHeight = animateDpAsState(
-            targetValue = if (portraitFullscreen) fullContentH else previewContentH,
-            animationSpec = tween(300, easing = LinearOutSlowInEasing),
-            label = "pContentHeight",
-        )
+            label = "pExpand",
+        ) { expanded -> if (expanded) 1f else 0f }
+        // 以下几何值一律走 derivedStateOf：只在布局/绘制阶段读取时求值，
+        // 动画逐帧不会触发重组（与原先 State<Dp> 的用法一致）
+        val pAnimWidth = remember(screenW) { derivedStateOf { screenW } }
+        val pAnimHeight = remember(portraitPreviewTargetH, screenH) {
+            derivedStateOf { lerp(portraitPreviewTargetH, screenH, pExpand.value) }
+        }
+        val pAnimTop = remember(statusBarTop) {
+            derivedStateOf { lerp(statusBarTop, 0.dp, pExpand.value) }
+        }
+        val pContentWidth = remember(pAnimHeight, playerState.scaleMode, videoRatio) {
+            derivedStateOf { contentSizeFor(screenW, pAnimHeight.value).first }
+        }
+        val pContentHeight = remember(pAnimHeight, playerState.scaleMode, videoRatio) {
+            derivedStateOf { contentSizeFor(screenW, pAnimHeight.value).second }
+        }
         // 竖屏预览小窗无圆角（用户要求直角满宽铺），缩放期间也不插值圆角：
         // 收敛后由 fullscreen 分支按设备屏幕圆角裁剪，圆角落在黑边上本来就看不见
 
