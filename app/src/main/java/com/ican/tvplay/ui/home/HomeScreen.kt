@@ -557,8 +557,15 @@ fun HomeScreen(
             var revealedCards by remember(page, pageCategory?.id, currentSiteKey, folderStack.value) {
                 mutableStateOf<Set<Int>>(emptySet())
             }
-            // 该页是否正在加载：显示居中等待动画，数据到达后关闭
-            var pageLoading by remember(page, pageCategory?.id, currentSiteKey, folderStack.value) {
+            // 目录层级数据缓存（key = 目录栈拼成的路径，根目录为 ""）：
+            // 按返回键退回上一级时直接复用已经加载过的列表，不再重新请求 ——
+            // 否则退栈会让 LaunchedEffect 重跑，先转一下圈才把上一页内容铺出来
+            val levelCache = remember(page, pageCategory?.id, currentSiteKey) {
+                mutableStateMapOf<String, List<Video>>()
+            }
+            // 该页是否正在加载：显示居中等待动画，数据到达后关闭。
+            // 不能用 folderStack 做 key：退栈会把它重置成 true，于是返回时必转一次圈
+            var pageLoading by remember(page, pageCategory?.id, currentSiteKey) {
                 mutableStateOf(true)
             }
             // 空态「重新加载」的触发计数：自增后重跑下方加载 LaunchedEffect
@@ -590,10 +597,22 @@ fun HomeScreen(
                     return@LaunchedEffect
                 }
                 val folder = folderStack.value.lastOrNull()
+                val pathKey = folderStack.value.joinToString("/") { it.first }
+                // 目录层级缓存优先（退栈返回时命中）：直接铺卡片，连等待动画都不出现
+                val levelCached = levelCache[pathKey]
+                if (levelCached != null) {
+                    revealedCards = levelCached.indices.toSet()
+                    pageVideos.value = levelCached
+                    pageLoading = false
+                    if (page == 0 && folder == null) firstPageReady = true
+                    return@LaunchedEffect
+                }
                 // 命中启动预取缓存：直接铺卡片，不显示等待动画
                 if (folder == null) {
                     val cached = viewModel.cachedCategoryVideos(pageCategory.id)
                     if (cached != null) {
+                        levelCache[pathKey] = cached
+                        revealedCards = cached.indices.toSet()
                         pageVideos.value = cached
                         pageLoading = false
                         // 首屏第一页命中缓存即视为「卡片就绪」，切站缓冲据此结束
@@ -613,6 +632,8 @@ fun HomeScreen(
                     // 最短展示时长：数据来得太快时也让等待动画完整走一小段，避免闪烁
                     val remain = LOADING_MIN_SHOW_MILLIS - (System.currentTimeMillis() - startedAt)
                     if (remain > 0) delay(remain)
+                    // 记进层级缓存：下次从子目录退回这一层时直接复用，不重新请求
+                    levelCache[pathKey] = list
                     pageVideos.value = list
                     // 有内容且要播逐条渐显时，等第一张卡片淡入完成再收起等待动画
                     if (list.isNotEmpty() && animateNewCards) {
