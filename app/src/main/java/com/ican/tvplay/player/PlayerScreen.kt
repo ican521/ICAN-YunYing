@@ -1295,12 +1295,49 @@ fun PlayerScreen(
         // PiP 理论上只在播放中（current 非空）进入；极端时序下给纯黑兜底，
         // 避免空数据把错误页/信息流投进画中画
         if (inPip || !initialized) {
-            Box(
-                modifier = Modifier.fillMaxSize().background(Color.Black),
-                contentAlignment = Alignment.Center,
+            if (isLandscape) {
+                // 横屏 / 转屏挂起期：沿用原来的整屏黑兜底
+                Box(
+                    modifier = Modifier.fillMaxSize().background(Color.Black),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (!inPip) {
+                        ArcStretchSpinner(size = 36.dp, strokeWidth = 3.dp, color = Color.White)
+                    }
+                }
+                return
+            }
+            // 竖屏加载期骨架：与详情页同款（状态栏黑条 + 满宽 16:9 黑窗 + 下方主题色信息区），
+            // 转圈画在黑窗里。此前这里是整屏黑过渡页，详情回来后整块黑"收成小窗"，
+            // 观感上像预览区先铺满整屏再缩回去；改成骨架后首帧小窗就是最终尺寸。
+            BoxWithConstraints(
+                modifier = Modifier.fillMaxSize().background(MiuixTheme.colorScheme.surface),
             ) {
-                if (!inPip) {
-                    ArcStretchSpinner(size = 36.dp, strokeWidth = 3.dp, color = Color.White)
+                val density = LocalDensity.current
+                val screenW = maxWidth
+                val screenH = maxHeight
+                val topInset = rememberStatusBarTopDp()
+                val previewH = with(density) {
+                    (screenW.toPx() * (1f / Players.DEFAULT_VIDEO_ASPECT_RATIO)).toDp()
+                }.coerceIn(150.dp, (screenH - topInset) / 2f)
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(topInset)
+                            .background(Color.Black),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(previewH)
+                            .background(Color.Black),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (!inPip) {
+                            ArcStretchSpinner(size = 36.dp, strokeWidth = 3.dp, color = Color.White)
+                        }
+                    }
                 }
             }
             return
@@ -1357,20 +1394,7 @@ fun PlayerScreen(
         // Compose 的 WindowInsets 在页面首次组合时可能仍为 0（inset 回调晚一帧），
         // 那会让小窗先贴顶、随后再下落到正确位置。这里直接读窗口度量里的状态栏 inset：
         // 组合期即同步可用，且与系统栏可见性无关（全屏隐藏状态栏也不影响），值恒定。
-        val statusBarTop = remember(density) {
-            val px = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                runCatching {
-                    context.getSystemService(android.view.WindowManager::class.java)
-                        .currentWindowMetrics.windowInsets
-                        .getInsets(android.view.WindowInsets.Type.statusBars()).top
-                }.getOrDefault(0)
-            } else {
-                // API 29 及以下没有 WindowMetrics.windowInsets，退回资源里的状态栏高度
-                val id = context.resources.getIdentifier("status_bar_height", "dimen", "android")
-                if (id > 0) context.resources.getDimensionPixelSize(id) else 0
-            }
-            with(density) { px.toDp() }
-        }
+        val statusBarTop = rememberStatusBarTopDp()
         // 视频宽高比：播放器 onVideoSizeChanged 报出（宽/高），未就绪时按 16:9 兜底
         val videoRatio = playerState.videoAspectRatio.takeIf { it > 0f }
             ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
@@ -1500,8 +1524,15 @@ fun PlayerScreen(
         // 以下几何值一律走 derivedStateOf：只在布局/绘制阶段读取时求值，
         // 动画逐帧不会触发重组（与原先 State<Dp> 的用法一致）
         val pAnimWidth = remember(screenW) { derivedStateOf { screenW } }
-        val pAnimHeight = remember(portraitPreviewTargetH, screenH) {
-            derivedStateOf { lerp(portraitPreviewTargetH, screenH, pExpand.value) }
+        // 目标高度平滑过渡：片源比例报出后（16:9 → 竖屏 9:16 等）小窗"长高/变矮"而不是跳一下，
+        // 对齐 fongmi VideoActivity.changeHeight 的 300ms 动画
+        val animatedPreviewTargetH = animateDpAsState(
+            targetValue = portraitPreviewTargetH,
+            animationSpec = tween(PREVIEW_HEIGHT_ANIM_MS, easing = LinearOutSlowInEasing),
+            label = "previewTargetH",
+        )
+        val pAnimHeight = remember(animatedPreviewTargetH, screenH) {
+            derivedStateOf { lerp(animatedPreviewTargetH.value, screenH, pExpand.value) }
         }
         val pAnimTop = remember(statusBarTop) {
             derivedStateOf { lerp(statusBarTop, 0.dp, pExpand.value) }
@@ -2157,6 +2188,34 @@ private const val LAND_PLAYER_WIDTH_FRACTION = 0.38f
 
 /** 横屏小窗↔全屏放大/缩回动画时长（对齐 fongmi ChangeBounds 150ms） */
 private const val LAND_ZOOM_DURATION_MS = 150
+
+/** 竖屏预览小窗高度随片源比例变化时的过渡时长（对齐 fongmi VideoActivity changeHeight 的 300ms） */
+private const val PREVIEW_HEIGHT_ANIM_MS = 300
+
+/**
+ * 状态栏高度（Dp）。直接读窗口度量里的 statusBar inset：组合期同步可用，
+ * 与系统栏可见性无关（全屏隐藏状态栏也不影响），值恒定。
+ * 详情页小窗起点与加载期骨架共用同一来源，保证首帧位置一致。
+ */
+@Composable
+private fun rememberStatusBarTopDp(): Dp {
+    val density = LocalDensity.current
+    val context = LocalContext.current
+    return remember(density) {
+        val px = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            runCatching {
+                context.getSystemService(android.view.WindowManager::class.java)
+                    .currentWindowMetrics.windowInsets
+                    .getInsets(android.view.WindowInsets.Type.statusBars()).top
+            }.getOrDefault(0)
+        } else {
+            // API 29 及以下没有 WindowMetrics.windowInsets，退回资源里的状态栏高度
+            val id = context.resources.getIdentifier("status_bar_height", "dimen", "android")
+            if (id > 0) context.resources.getDimensionPixelSize(id) else 0
+        }
+        with(density) { px.toDp() }
+    }
+}
 
 /** 外挂字幕文件选择器的 MIME 过滤：覆盖 srt/ass/ssa/vtt/ttml，以及文件管理器把字幕标成 octet-stream 的情况 */
 private val SUBTITLE_MIME_TYPES = arrayOf(
