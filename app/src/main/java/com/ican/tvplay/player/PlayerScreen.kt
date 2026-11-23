@@ -333,11 +333,9 @@ fun PlayerScreen(
     val savedSubtitlePosition by settings.subtitlePosition.collectAsStateWithLifecycle()
 
     var video by remember { mutableStateOf<Video?>(null) }
-    // 换片（新详情页 / 自动换站源）时先把画面比例退回 16:9：
-    // 播放器实例全局复用，不清的话小窗会先沿用上一部片的高度，等新片首帧解码才变过去
-    LaunchedEffect(video?.id) {
-        if (video != null) Players.resetVideoAspectRatio()
-    }
+    // 画面比例的重置放在下面的 LaunchedEffect(videoId) 里（加载入口、续播分支之后）：
+    // 不能在 video?.id 变化时重置——那是详情拉完才赋值，会让进页面先按上一部片的比例
+    // 撑高小窗、再缩回 16:9 来回跳两帧。
     var episodeIndex by remember { mutableIntStateOf(startEpisode) }
     var initialized by remember { mutableStateOf(false) }
     // 本地历史读取完成前禁止写历史：慢站源进页要异步拉详情（几秒到十几秒），
@@ -601,6 +599,11 @@ fun PlayerScreen(
             playbackStarted = true
             return@LaunchedEffect
         }
+        // 开新片：把播放器实例里上一部片的画面比例退回 16:9（播放器全局复用，不清的话
+        // 详情页第一帧会沿用上一部片的高度，随后再缩回默认值，观感是"变高→缩回"跳两帧）。
+        // 放在加载入口而不是 video 赋值之后：进页第一帧的小窗高度就与 16:9 的加载骨架一致。
+        // 后台续播（上方提前 return）不重置，沿用播放器已报出的比例。
+        Players.resetVideoAspectRatio()
         // 每次重新进入观看视频：倍速重置为 1 倍速（用户要求），不沿用上次会话的设定值；
         // 同步写回设置，保证全屏长按快进松手恢复的 playbackSpeed（实时读取设置）与此一致；
         // 切集（videoId 不变）与后台续播返回（上方提前 return）不受影响
