@@ -20,6 +20,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDp
@@ -1363,16 +1364,17 @@ fun PlayerScreen(
             }
             with(density) { px.toDp() }
         }
-        // 竖屏预览小窗尺寸：照抄 OK猫 activity_detail.xml 的 previewPlayer——
-        // 「满宽 + 固定 16:9 高」，视频由 PlayerView 自身 resizeMode 在盒内自适应，
-        // 不再按视频比例去收缩容器宽度（旧做法用 fillMaxWidth 叠加 width 会被约束吃掉，
-        // 导致画面溢出容器、控件与画面错位）。
-        // 常量：宽与高同一来源（屏幕宽），保证底层 PlayerView 与覆盖层占位盒像素完全一致
-        // 高度按「宽度像素 × 9/16」取整（与 PortraitPlayLayout 占位盒的 aspectRatio 像素一致），
-        // 保证竖屏全屏缩放首尾两帧与静止态严格对齐，不会有一像素的错位
-        val portraitPreviewH = with(density) {
-            (screenW.toPx() * (9f / 16f)).roundToInt().toDp()
-        }
+        // 视频宽高比：播放器 onVideoSizeChanged 报出（宽/高），未就绪时按 16:9 兜底
+        val videoRatio = playerState.videoAspectRatio.takeIf { it > 0f }
+            ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
+        // 竖屏预览小窗高度照抄 fongmi VideoActivity.changeHeight（app/src/mobile/.../VideoActivity.java）：
+        //   高 = 屏宽 ×（视频高 / 视频宽），夹在 [150dp, (屏高 - 状态栏) / 2]；宽度恒满屏，只改高度。
+        // 效果：16:9 = 屏宽×0.5625；2.35:1 银幕变矮不再留上下黑边；
+        // 竖屏片源（9:16）算出来超上限就压到半屏高，画面在满宽黑框里居中、左右留黑边。
+        // 触发时机等价 fongmi 的 onSizeChanged → changeHeight()：比例一变就重算。
+        val portraitPreviewTargetH = with(density) {
+            (screenW.toPx() * (1f / videoRatio)).toDp()
+        }.coerceIn(150.dp, (screenH - statusBarTop) / 2f)
 
         // 横屏小窗↔全屏放大/缩回过渡：宽/高/顶部偏移连续插值，
         // PlayerView 全程不重建，只有画面在放大，不挂任何控制层
@@ -1457,9 +1459,6 @@ fun PlayerScreen(
                 }
             }
         }
-        // 视频层宽高比：竖屏缩放期间必须让视频层比例恒等于片源（见下方 letterboxed 说明）
-        val videoRatio = playerState.videoAspectRatio.takeIf { it > 0f }
-            ?: Players.DEFAULT_VIDEO_ASPECT_RATIO
         // 竖屏画面内容的尺寸由我们自己算，不看 media3 的 resizeMode：
         // media3 在「裁剪」下会把内层 AspectRatioFrameLayout 撑到 1880x3342（比小窗高 3 倍）
         // 这类「铺满不留边」的尺寸，溢出部分没有被裁剪，直接画到信息流上（实测画面到 2290px）。
@@ -1477,7 +1476,9 @@ fun PlayerScreen(
             }
             Players.ScaleMode.FILL -> Pair(boxW, boxH)
         }
-        val (previewContentW, previewContentH) = contentSizeFor(screenW, portraitPreviewH)
+        // 预览内容矩形按「目标高度」算（不是逐帧动画值），与下方高度动画同一套 300ms，
+        // 两者同步收敛；否则内容矩形再叠一层动画会追着框走、看起来发飘
+        val (previewContentW, previewContentH) = contentSizeFor(screenW, portraitPreviewTargetH)
         val (fullContentW, fullContentH) = contentSizeFor(screenW, screenH)
         // 竖屏小窗↔竖屏全屏缩放：与横屏同一套做法（宽/高/顶部/圆角连续插值，PlayerView 不重建）。
         // 起点 = 预览小窗（满宽 + 16:9、状态栏以下、16dp 圆角），
@@ -1491,10 +1492,15 @@ fun PlayerScreen(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "pAnimWidth",
         ) { screenW }
-        val pAnimHeight = portraitTransition.animateDp(
-            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+        // 高度单独用 animateDpAsState（而不是 transition 的 lambda）：预览高度由视频比例驱动，
+        // 比例一变（开播/切集/切画质）就要重新定目标值，transition 的 targetValue lambda
+        // 只在 targetState 变化时求值，外部比例变化拿不到 → 会停在旧高度。
+        // 时长/缓动与 fongmi changeHeight 的 300ms 减速一致（LinearOutSlowInEasing ≈ Decelerate）
+        val pAnimHeight = animateDpAsState(
+            targetValue = if (portraitFullscreen) screenH else portraitPreviewTargetH,
+            animationSpec = tween(300, easing = LinearOutSlowInEasing),
             label = "pAnimHeight",
-        ) { expanded -> if (expanded) screenH else portraitPreviewH }
+        )
         val pAnimTop = portraitTransition.animateDp(
             transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
             label = "pAnimTop",
@@ -1502,14 +1508,16 @@ fun PlayerScreen(
         // 画面内容矩形单独插值（宽 + 高），居中贴在黑框里：
         // 黑框继续按上面那组值铺满/退出，画面只在 previewContent 与 fullContent 之间长大，
         // 顶边 = 框顶 + (框高 - 内容高)/2，全程不会越过状态栏
-        val pContentWidth = portraitTransition.animateDp(
-            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+        val pContentWidth = animateDpAsState(
+            targetValue = if (portraitFullscreen) fullContentW else previewContentW,
+            animationSpec = tween(300, easing = LinearOutSlowInEasing),
             label = "pContentWidth",
-        ) { expanded -> if (expanded) fullContentW else previewContentW }
-        val pContentHeight = portraitTransition.animateDp(
-            transitionSpec = { tween(LAND_ZOOM_DURATION_MS, easing = FastOutSlowInEasing) },
+        )
+        val pContentHeight = animateDpAsState(
+            targetValue = if (portraitFullscreen) fullContentH else previewContentH,
+            animationSpec = tween(300, easing = LinearOutSlowInEasing),
             label = "pContentHeight",
-        ) { expanded -> if (expanded) fullContentH else previewContentH }
+        )
         // 竖屏预览小窗无圆角（用户要求直角满宽铺），缩放期间也不插值圆角：
         // 收敛后由 fullscreen 分支按设备屏幕圆角裁剪，圆角落在黑边上本来就看不见
 
