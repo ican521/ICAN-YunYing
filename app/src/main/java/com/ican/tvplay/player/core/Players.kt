@@ -748,6 +748,27 @@ object Players {
     }
 
     /**
+     * 只支持 BT/磁力协议的播放地址（magnet:/ed2k:/thunder:）：
+     * 本机没有 BT 引擎，交给 MPV 只会黑屏，这里停掉当前播放并进入静态提示态。
+     * 与 [notifyError] 的区别是不留 buffering/switching，避免提示上还叠着一个转圈；
+     * error 里也写上原因，供「已有影片信息」的兜底错误页复用。
+     */
+    fun showUnsupported(message: String) {
+        Log.w(TAG, "showUnsupported: $message")
+        probeJob?.cancel()
+        offsetApplyJob?.cancel()
+        startToken++
+        player?.stop()
+        _state.value = _state.value.copy(
+            playing = false,
+            buffering = false,
+            switching = false,
+            ready = false,
+            error = message,
+        )
+    }
+
+    /**
      * 清除错误状态（不清播放）：用于丢弃「已被替换的旧源」迟到的错误事件。
      * 旧源（如秒判失败的死代理地址）的错误到达时新源往往已在正常播放，
      * 若不丢弃会把正在播放的好源切走，并引发换线/换站循环。

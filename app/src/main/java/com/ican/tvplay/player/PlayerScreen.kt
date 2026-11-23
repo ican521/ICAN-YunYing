@@ -718,6 +718,10 @@ fun PlayerScreen(
     // 触发后把当前集重新解析一遍（mVod.refresh() 同义），刷新期间亮圈，解析结束收圈
     var refreshNonce by remember { mutableIntStateOf(0) }
     var errorRefreshing by remember { mutableStateOf(false) }
+    // 「该站源只给磁力/BT 地址」的提示态：非空时预览区画提示卡，并且不启动播放器、
+    // 不触发自动换线/换站兜底（换多少条线路都还是磁力链接，只有换站源才有意义，
+    // 交给用户自己决定，免得在坏源之间反复解析烧内存）
+    var btBlockedMsg by remember { mutableStateOf<String?>(null) }
     val onRefreshErrorPlayback: () -> Unit = {
         if (!errorRefreshing) {
             errorRefreshing = true
@@ -773,6 +777,15 @@ fun PlayerScreen(
             // 画质行数据（fongmi renderQuality：values.size > 1 才 setQualityVisible(true)）
             qualities = source.qualities
             qualityPosition = source.qualityPosition
+            // 磁力/BT 源拦截（本机没有 BT 引擎，magnet 交给 MPV 必然黑屏）：
+            // 停在提示态，不创建播放器实例，也不走下面的开播/写历史逻辑
+            if (isTorrentOnlyLink(source.url)) {
+                btBlockedMsg = "该站源为磁力/BT 源，当前版本暂不支持播放\n请切换其他线路，或在其他站源中观看"
+                android.util.Log.w("PlayerScreen", "unsupported bt link: ${source.url}")
+                Players.showUnsupported(btBlockedMsg.orEmpty())
+                return@LaunchedEffect
+            }
+            btBlockedMsg = null
             val spec = PlaySpec(url = source.url, headers = source.headers)
             // 注册播放上下文：通知栏展示 / 上一集下一集 / 后台片尾自动切集依赖
             Players.playbackContext = Players.PlaybackContext(
@@ -811,6 +824,8 @@ fun PlayerScreen(
 
     LaunchedEffect(playerState.error) {
         if (playerState.error == null || fallbackInProgress) return@LaunchedEffect
+        // 磁力/BT 提示态：不是解码/网络失败，换线换站兜底只会反复解析同一批磁力链接
+        if (btBlockedMsg != null) return@LaunchedEffect
         // 当前已在正常播放：错误必来自「已被替换的旧源」的迟到事件（如死代理地址秒判失败后
         // 其 mpv EndFile 错误晚到），直接丢弃——否则会把正在播放的好源切走，
         // 并触发换线/换站连锁循环
@@ -1982,6 +1997,39 @@ private fun PortraitPlayLayout(
             onEnterFullscreen = onEnterFullscreen,
             onSeekDragChange = onSeekDragChange,
         )
+        // 磁力/BT 源提示：盖在预览区上（PreviewPlayerArea 只画转圈/控制层，不放文本），
+        // 纯黑底 + 白字，缩放动画期间不画（和转圈一样的时机处理）
+        btBlockedMsg?.let { msg ->
+            if (!zooming) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                    ) {
+                        Text(
+                            text = msg.substringBefore('\n'),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                        msg.substringAfter('\n', "").takeIf { it.isNotEmpty() }?.let { sub ->
+                            Text(
+                                text = sub,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.72f),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // === 详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===
@@ -4898,6 +4946,18 @@ private const val CONTROL_FADE_DURATION_MS = 200
 private const val DOUBLE_TAP_TIMEOUT_MS = 200L
 
 // ========== 视频加载失败全屏错误态 ==========
+
+/**
+ * 判断解析出来的播放地址是否只有 BT/磁力一种形态（magnet: / ed2k: / thunder://）。
+ *
+ * 这些地址不是可直接拉流的 HTTP 资源，fongmi 靠外挂的 Thunder 插件（闭源动态模块）
+ * 先下载再做本地 http 服务；本项目没有 BT 引擎，送入 MPV 只会卡在黑屏，
+ * 因此由播放页直接给提示。
+ */
+private fun isTorrentOnlyLink(url: String): Boolean {
+    val u = url.trim().lowercase()
+    return u.startsWith("magnet:") || u.startsWith("ed2k:") || u.startsWith("thunder:")
+}
 
 /**
  * 当 VideoRepository.getVideo + Players.consumeCachedVideo 都查不到时，
