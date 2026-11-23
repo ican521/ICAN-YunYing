@@ -167,8 +167,6 @@ import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.PullToRefresh
-import com.ican.tvplay.ui.components.REFRESH_DONE_HINT_MILLIS
-import com.ican.tvplay.ui.components.RefreshDoneHint
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -720,8 +718,8 @@ fun PlayerScreen(
     // 触发后把当前集重新解析一遍（mVod.refresh() 同义），刷新期间亮圈，解析结束收圈
     var refreshNonce by remember { mutableIntStateOf(0) }
     var errorRefreshing by remember { mutableStateOf(false) }
-    // 「刷新完成」提示：Miuix 内置完成态只停留 200ms（看不见字），改由 RefreshDoneHint 接管
-    var refreshDoneVisible by remember { mutableStateOf(false) }
+    // 「刷新完成」停留阶段（Miuix 内置完成态只有 200ms，看不清那四个字）
+    var refreshDoneHold by remember { mutableStateOf(false) }
     // 「该站源只给磁力/BT 地址」的提示态：非空时预览区画提示卡，并且不启动播放器、
     // 不触发自动换线/换站兜底（换多少条线路都还是磁力链接，只有换站源才有意义，
     // 交给用户自己决定，免得在坏源之间反复解析烧内存）
@@ -729,6 +727,7 @@ fun PlayerScreen(
     val onRefreshErrorPlayback: () -> Unit = {
         if (!errorRefreshing) {
             errorRefreshing = true
+            refreshDoneHold = false
             // 记住当前位置，在原位置续播（fongmi refresh 也是保留进度重解析）
             pendingPosition = Players.progress.value.positionMs
             // 清掉当前线路的失败标记，否则刷新成功后可能立刻被自动兜底再切走
@@ -817,16 +816,17 @@ fun PlayerScreen(
             // 错误态下拉刷新的收圈时机：解析跑完（成功或失败）就收（对齐 fongmi 在回调里 setRefreshing(false)）；
             // 被取消（用户又拉了一次）时不收，交给新一轮自己的收尾
             if (errorRefreshing && currentCoroutineContext().isActive) {
-                errorRefreshing = false
-                refreshDoneVisible = true
+                // 进入「完成」停留阶段；由下方 hold effect 负责到时收回
+                refreshDoneHold = true
             }
         }
     }
-    // 「刷新完成」提示自动淡出
-    LaunchedEffect(refreshDoneVisible) {
-        if (!refreshDoneVisible) return@LaunchedEffect
-        delay(REFRESH_DONE_HINT_MILLIS)
-        refreshDoneVisible = false
+    // 「刷新完成」停留：保持在展开态让文案看得清，到时再松开指示器
+    LaunchedEffect(refreshDoneHold) {
+        if (!refreshDoneHold) return@LaunchedEffect
+        delay(REFRESH_COMPLETE_HOLD_MILLIS)
+        errorRefreshing = false
+        refreshDoneHold = false
     }
 
     // ---- 播放失败自动切换（fongmi VodFallbackPolicy：先换线路，再换站源）----
@@ -1832,7 +1832,7 @@ fun PlayerScreen(
             lineFlag = playLine?.flag ?: lineFlag,
             playerState = playerState,
             refreshing = errorRefreshing,
-            refreshDoneVisible = refreshDoneVisible,
+            refreshDoneHold = refreshDoneHold,
             onRefreshError = onRefreshErrorPlayback,
             // 视频占位区（含状态栏黑条）的顶部/高度交给缩放动画驱动：
             // 放大时占位区撑满整屏、信息流被顶出屏幕；缩小时反过来滑回原位。
@@ -1933,8 +1933,8 @@ private fun PortraitPlayLayout(
     playerState: Players.PlayerState,
     /** 错误态下拉刷新的转圈状态（只在 playerState.error != null 时才会变成 true） */
     refreshing: Boolean,
-    /** 「刷新完成」提示是否可见（刷新结束后停留一小段时间再淡出） */
-    refreshDoneVisible: Boolean,
+    /** 「刷新完成」停留阶段：指示器保持展开、文案切成完成态 */
+    refreshDoneHold: Boolean,
     /** 错误态下拉刷新：重解析当前集（等价 fongmi mVod.refresh() → RefreshEvent.Type.PLAYER） */
     onRefreshError: () -> Unit,
     /** 视频占位区顶部（静止=状态栏高度，全屏=0），由小窗↔全屏缩放动画驱动 */
@@ -2029,37 +2029,30 @@ private fun PortraitPlayLayout(
     // `|| refreshing`：刷新一开始 beginSwitch 会把错误态清掉，这时必须继续挂着这层包裹，
     // 否则圆点会连同容器一起消失（刷新过程中途"闪没"）
     if (playerState.error != null || refreshing) {
-        Box(
+        PullToRefresh(
+            isRefreshing = refreshing,
+            onRefresh = onRefreshError,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
+            // 停留阶段四段文案统一换成「刷新完成」（此时指示器仍在展开态，显示第 3 段）
+            refreshTexts = if (refreshDoneHold) {
+                List(4) { "刷新完成" }
+            } else {
+                listOf("下拉刷新", "松开刷新", "正在刷新", "刷新完成")
+            },
         ) {
-            PullToRefresh(
-                isRefreshing = refreshing,
-                onRefresh = onRefreshError,
+            DetailInfoColumn(
                 modifier = Modifier.fillMaxSize(),
-                // 第 4 段（完成态）留空：内置完成态只有 200ms、字看不清，
-                // 改由 RefreshDoneHint 在同一位置把「刷新完成」显示够久
-                refreshTexts = listOf("下拉刷新", "松开刷新", "正在刷新", ""),
-            ) {
-                DetailInfoColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    current = current,
-                    lineFlag = lineFlag,
-                    qualities = qualities,
-                    qualityPosition = qualityPosition,
-                    onQualityChange = onQualityChange,
-                    lineEpisodes = lineEpisodes,
-                    episodeIndex = episodeIndex,
-                    onEpisodeSelect = onEpisodeSelect,
-                    onLineChange = onLineChange,
-                )
-            }
-            RefreshDoneHint(
-                visible = refreshDoneVisible,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = Spacing.pageTop),
+                current = current,
+                lineFlag = lineFlag,
+                qualities = qualities,
+                qualityPosition = qualityPosition,
+                onQualityChange = onQualityChange,
+                lineEpisodes = lineEpisodes,
+                episodeIndex = episodeIndex,
+                onEpisodeSelect = onEpisodeSelect,
+                onLineChange = onLineChange,
             )
         }
     } else {
@@ -2177,6 +2170,13 @@ private fun DetailInfoColumn(
 }
 
 // ========== 横屏（平板）布局：对齐 fongmi activity_detail_land ==========
+
+/**
+ * 「刷新完成」停留时长（毫秒）：
+ * Miuix 内置完成态写死 200ms（动画跑完立刻回弹收起），四个字看不清；
+ * 数据回来后先把指示器保持在展开态并换文案，停留这么久再松开
+ */
+private const val REFRESH_COMPLETE_HOLD_MILLIS = 1200L
 
 /** 横版播放器占屏宽比例（fongmi 38:62） */
 private const val LAND_PLAYER_WIDTH_FRACTION = 0.38f
