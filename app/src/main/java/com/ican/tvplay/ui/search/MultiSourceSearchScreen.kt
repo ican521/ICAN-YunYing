@@ -36,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
@@ -46,7 +47,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
@@ -77,6 +82,12 @@ private const val CARD_FADE_MAX_STAGGER_INDEX = 6
 /** 淡入时长（毫秒），只做 0 → 1，不做淡出 */
 private const val ITEM_FADE_IN_MILLIS = 200
 
+/**
+ * 下拉刷新指示器最短展示时长（毫秒）：搜索回得再快也让圆内小点转够一圈多一点，
+ * 之后才交给 Miuix 播「刷新完成」回落，否则松手后只闪一下像没刷新
+ */
+private const val MIN_REFRESH_INDICATOR_MILLIS = 1200L
+
 /** 站源胶囊逐个淡入的间隔（毫秒） */
 private const val SITE_CHIP_FADE_STAGGER_MILLIS = 60
 
@@ -104,6 +115,11 @@ fun MultiSourceSearchResults(
     // 结果卡片样式（右上角切换钮持久化）：POSTER=竖版海报网格 / WIDE=长条横卡
     val cardStyle by vm.cardStyle.collectAsStateWithLifecycle()
     val wideCards = cardStyle == com.ican.tvplay.data.SearchCardStyle.WIDE
+
+    // 下拉刷新状态：只由「下拉手势 + 搜索 loading 回落」驱动，
+    // 首次搜索 / 切站源 / 选站点都不显示指示器，避免每次搜索都无缘无故弹一个圆
+    var refreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     // 已淡入的元素 key 集合：由父层统一计时，元素滑出屏幕被回收再滑回来时不会重播动画
     var revealedChips by remember(searchedQuery) { mutableStateOf<Set<String>>(emptySet()) }
@@ -201,7 +217,35 @@ fun MultiSourceSearchResults(
                 if (displayVideos.isEmpty()) {
                     // 搜索结束仍无结果 → 空状态；加载中保持空白，等卡片直接渐显
                     if (!loading) EmptyState(text = "没有找到相关影片")
-                } else {
+                }
+                // 下拉刷新（Miuix 自带指示器）：重跑当前关键词的跨源搜索。
+                // 只包住网格，空态仍在外层叠加；contentPadding 只让指示器下移顶栏高度，不改内容布局
+                PullToRefresh(
+                    isRefreshing = refreshing,
+                    onRefresh = {
+                        val kw = searchedQuery
+                        // 已在刷新中不再重复触发，避免多次下拉把上一轮收尾逻辑打断
+                        if (kw.isNotBlank() && !refreshing) {
+                            val startedAt = System.currentTimeMillis()
+                            refreshing = true
+                            vm.searchAll(kw)
+                            scope.launch {
+                                // 等 loading 真的亮起再等它落下，避免「刚置 true 又立刻判空」闪一下就没
+                                withTimeoutOrNull(30_000) {
+                                    vm.loading.first { it }
+                                    vm.loading.first { !it }
+                                }
+                                // 数据回得再快也让指示器转够时长，否则松手后只闪一下就到「刷新完成」
+                                val remain = MIN_REFRESH_INDICATOR_MILLIS - (System.currentTimeMillis() - startedAt)
+                                if (remain > 0) delay(remain)
+                                refreshing = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = topPadding),
+                    refreshTexts = listOf("下拉刷新", "松开刷新", "正在刷新", "刷新完成"),
+                ) {
                     LazyVerticalGrid(
                         columns = columns,
                         // imePadding：键盘弹出时网格底部内容不被遮挡，可滚动到键盘上方
@@ -256,9 +300,9 @@ fun MultiSourceSearchResults(
                         }
                     }
                 }
+                }
             }
     }
-}
 
 
 

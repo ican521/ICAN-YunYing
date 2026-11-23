@@ -99,6 +99,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
@@ -127,9 +128,11 @@ import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -156,6 +159,13 @@ private const val CARD_FADE_IN_MILLIS = 200
 
 /** 首页等待动画最短展示时长（毫秒）：网络过快时不至于一闪而过 */
 private const val LOADING_MIN_SHOW_MILLIS = 350L
+
+/**
+ * 下拉刷新指示器最短展示时长（毫秒）：
+ * 数据回得再快也让圆内小点完整转够一圈多一点，之后才交给 Miuix 播「刷新完成」回落，
+ * 否则松手后只闪一下就显示完成，看起来像没刷新
+ */
+private const val MIN_REFRESH_INDICATOR_MILLIS = 1200L
 
 /** pager 是否已停稳：不在滚动，且偏移已归位。拖动中 / 松手回弹中都为 false */
 private fun PagerState.isIdle(): Boolean =
@@ -572,6 +582,25 @@ fun HomeScreen(
             var reloadToken by remember(page, pageCategory?.id, currentSiteKey) {
                 mutableStateOf(0)
             }
+            // 下拉刷新：Miuix PullToRefresh 的 isRefreshing 是唯一真相源。
+            // 注意不能把「置回 false」写在加载 effect 的 finally 里：reloadToken 自增会让旧协程被取消，
+            // 取消同样走 finally，于是指示器刚亮起就被判成刷新完成（只闪一下）。
+            // 改成用独立的 refreshDoneToken + 最短展示时长来收尾。
+            var refreshing by remember(page, pageCategory?.id, currentSiteKey) {
+                mutableStateOf(false)
+            }
+            // 本次刷新开始时刻（用于保证指示器完整转够时长）
+            var refreshStartedAt by remember(page, pageCategory?.id, currentSiteKey) {
+                mutableStateOf(0L)
+            }
+            // 一次生效的强制加载真正跑完时自增，由下方独立 effect 收掉指示器
+            var refreshDoneToken by remember(page, pageCategory?.id, currentSiteKey) {
+                mutableStateOf(0)
+            }
+            // 本次加载是否必须绕过缓存（下拉刷新 / 空态重试都要真的重新请求，不能吃旧缓存）
+            var bypassCache by remember(page, pageCategory?.id, currentSiteKey) {
+                mutableStateOf(false)
+            }
             LaunchedEffect(pageVideos.value, animateNewCards) {
                 // 非首次加载（分类 Tab 切换）不留动画：直接标记全部已显示
                 if (!animateNewCards) {
@@ -594,33 +623,42 @@ fun HomeScreen(
             LaunchedEffect(pageCategory?.id, currentSiteKey, siteStyle, folderStack.value, reloadToken, homeCacheVersion) {
                 if (pageCategory == null) {
                     pageLoading = false
+                    refreshing = false
                     return@LaunchedEffect
                 }
+                // 本次是否强制走网络：下拉刷新 / 空态重试都置了这个标记，消费一次即清
+                val forceNetwork = bypassCache
+                bypassCache = false
                 val folder = folderStack.value.lastOrNull()
                 val pathKey = folderStack.value.joinToString("/") { it.first }
+                // 主动刷新时把该层旧数据作废（含之前写进去的空列表），保证重试 / 刷新真的重新请求
+                if (forceNetwork) levelCache.remove(pathKey)
                 // 目录层级缓存优先（退栈返回时命中）：直接铺卡片，连等待动画都不出现
-                val levelCached = levelCache[pathKey]
+                val levelCached = if (forceNetwork) null else levelCache[pathKey]
                 if (levelCached != null) {
                     revealedCards = levelCached.indices.toSet()
                     pageVideos.value = levelCached
                     pageLoading = false
+                    refreshing = false
                     if (page == 0 && folder == null) firstPageReady = true
                     return@LaunchedEffect
                 }
                 // 命中启动预取缓存：直接铺卡片，不显示等待动画
-                if (folder == null) {
+                if (folder == null && !forceNetwork) {
                     val cached = viewModel.cachedCategoryVideos(pageCategory.id)
                     if (cached != null) {
                         levelCache[pathKey] = cached
                         revealedCards = cached.indices.toSet()
                         pageVideos.value = cached
                         pageLoading = false
+                        refreshing = false
                         // 首屏第一页命中缓存即视为「卡片就绪」，切站缓冲据此结束
                         if (page == 0) firstPageReady = true
                         return@LaunchedEffect
                     }
                 }
-                pageLoading = true
+                // 下拉刷新时不清空、不盖居中转圈：旧卡片留在原地，指示器已经说明在刷新
+                if (!forceNetwork) pageLoading = true
                 val startedAt = System.currentTimeMillis()
                 try {
                     val list = if (folder == null) {
@@ -631,19 +669,38 @@ fun HomeScreen(
                     // 内容判定与缓存分支共用同一套规则（目录卡优先，其次频道卡）
                     // 最短展示时长：数据来得太快时也让等待动画完整走一小段，避免闪烁
                     val remain = LOADING_MIN_SHOW_MILLIS - (System.currentTimeMillis() - startedAt)
-                    if (remain > 0) delay(remain)
-                    // 记进层级缓存：下次从子目录退回这一层时直接复用，不重新请求
-                    levelCache[pathKey] = list
+                    if (remain > 0 && !forceNetwork) delay(remain)
+                    // 记进层级缓存：下次从子目录退回这一层时直接复用，不重新请求。
+                    // 空结果不入缓存 —— 否则空态「重新加载」会命中空缓存，点多少次都不重试
+                    if (list.isEmpty()) {
+                        levelCache.remove(pathKey)
+                    } else {
+                        levelCache[pathKey] = list
+                    }
                     pageVideos.value = list
-                    // 有内容且要播逐条渐显时，等第一张卡片淡入完成再收起等待动画
-                    if (list.isNotEmpty() && animateNewCards) {
+                    // 有内容且要播逐条渐显时，等第一张卡片淡入完成再收起等待动画；
+                    // 下拉刷新不重播渐显（旧卡片本来就在屏上，重播会闪）
+                    if (forceNetwork) {
+                        revealedCards = list.indices.toSet()
+                    } else if (list.isNotEmpty() && animateNewCards) {
                         delay(CARD_FADE_IN_MILLIS.toLong())
                     }
                 } finally {
                     pageLoading = false
+                    // 只有「真正跑完」的强制加载才通知收尾；被取消（用户又拉了一次）时不通知，
+                    // 否则新一次的指示器会被上一轮的收尾提前掐掉
+                    if (forceNetwork && currentCoroutineContext().isActive) refreshDoneToken++
                     // 首屏第一页的数据（含空结果）一落地就算就绪
                     if (page == 0 && folder == null) firstPageReady = true
                 }
+            }
+            // 下拉刷新的收尾：与加载协程解耦，保证指示器至少完整转完 MIN_REFRESH_INDICATOR_MILLIS，
+            // 之后再交给 Miuix 播「刷新完成」并回落
+            LaunchedEffect(refreshDoneToken) {
+                if (!refreshing) return@LaunchedEffect
+                val remain = MIN_REFRESH_INDICATOR_MILLIS - (System.currentTimeMillis() - refreshStartedAt)
+                if (remain > 0) delay(remain)
+                refreshing = false
             }
             // 子目录内按返回键退回上一级（fongmi FolderFragment.goBack → popBackStack）
             BackHandler(enabled = folderStack.value.isNotEmpty()) {
@@ -714,82 +771,103 @@ fun HomeScreen(
                             if (landscape) posterColumnsLand else posterColumnsPort,
                         )
                 }
-                LazyVerticalGrid(
-                    state = gridState,
-                    columns = gridCells,
-                    // 折叠量跟随网格真实滚动增量（任意位置双向同步，见 gridScrollSync）
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .nestedScroll(gridScrollSync),
-                    contentPadding = pageContentPadding,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
-                ) {
-                    gridItemsIndexed(
-                        pageVideos.value,
-                        // key 必须唯一：部分源首页推荐位的 vod_id 为空或重复，纯 id 做 key 会直接抛
-                        // 「Key "" was already used」把整个首页打崩，所以拼上索引兜底
-                        key = { index, v -> "${v.id}#$index" },
-                        contentType = { _, _ ->
-                            when (cardShape) {
-                                HomeCardShape.LIST -> "drive"
-                                HomeCardShape.WIDE -> "cover"
-                                HomeCardShape.OVAL -> "oval"
-                                HomeCardShape.GRID -> "video"
-                            }
-                        },
-                    ) { index, video ->
-                        // 逐个渐显：alpha 只挂在卡片自身的 modifier 上，不新增布局层，尺寸/位置/间距不变
-                        val cardAlpha by animateFloatAsState(
-                            targetValue = if (animateNewCards && index !in revealedCards) 0f else 1f,
-                            animationSpec = tween(CARD_FADE_IN_MILLIS),
-                            label = "homeCardFade",
-                        )
-                        when (cardShape) {
-                            HomeCardShape.LIST -> DriveRowItem(
-                                video = video,
-                                onClick = { onItemClick(video) },
-                                modifier = Modifier.alpha(cardAlpha),
-                            )
-                            HomeCardShape.OVAL -> com.ican.tvplay.ui.components.CircleVideoCard(
-                                video = video,
-                                onClick = { onItemClick(video) },
-                                modifier = Modifier.alpha(cardAlpha),
-                            )
-                            else -> VideoCardItem(
-                                video = video,
-                                onClick = { onItemClick(video) },
-                                modifier = Modifier.alpha(cardAlpha),
-                                wide = cardShape == HomeCardShape.WIDE,
-                            )
+                // 下拉刷新（Miuix 自带指示器：一个圆 + 圆内小点转圈）：
+                // 只包住可滚动网格本身，空态 / 居中等待动画仍在外层，互不干扰。
+                // contentPadding 在 Miuix 里只用于把指示器整体下移（不改变内容布局）——
+                // 这里传顶栏高度，让圆点落在毛玻璃顶区下沿，不会被挡住。
+                PullToRefresh(
+                    isRefreshing = refreshing,
+                    onRefresh = {
+                        // 立刻置 true：指示器唯一真相源，晚一帧就会出现「松手了却还在弹回」的错位
+                        // 已在刷新中就不再重复触发（避免多次下拉把加载协程连环取消）
+                        if (!refreshing) {
+                            refreshing = true
+                            refreshStartedAt = System.currentTimeMillis()
+                            bypassCache = true
+                            reloadToken++
                         }
-                    }
-                    // 网盘文件夹页短列表兜底：让「最大可上滑距离」恰好 = 搜索行最大折叠量（48dp）。
-                    // 完全上滑后第一行贴着分类 Tab 下缘完整显示，不能再往上滑。
-                    // 纯确定性计算（不读 layoutInfo，避免与 Spacer 高度互相循环）：
-                    //   内容总高 = 项数×行高 + (项数-1)×行间距
-                    //   网格可视区高 = BoxWithConstraints.maxHeight（外层容器高，不含 contentPadding）
-                    //   顶栏占位 = topBarHeightPx（contentPadding.top），底部占位 = contentPadding.bottom
-                    //   可滚距离 = (内容总高 + Spacer高 + cardGapV) - (可视区高 - 顶栏占位 - 底部占位)
-                    //   令其 = searchRowMaxCollapsePx，反解 Spacer 高
-                    if (cardShape == HomeCardShape.LIST && pageVideos.value.isNotEmpty()) {
-                        item(key = "drive_bottom_spacer", contentType = "spacer", span = { GridItemSpan(maxLineSpan) }) {
-                            val itemCount = pageVideos.value.size
-                            val rowHeightPx = with(density) { 64.dp.toPx() }
-                            val gapPx = with(density) { Spacing.cardGapV.toPx() }
-                            val topPadPx = with(density) { pageContentPadding.calculateTopPadding().toPx() }
-                            val bottomPadPx = with(density) { pageContentPadding.calculateBottomPadding().toPx() }
-                            // constraints 来自 BoxWithConstraints 作用域
-                            val viewportPx = constraints.maxHeight.toFloat()
-                            val contentHeightPx = itemCount * rowHeightPx + (itemCount - 1).coerceAtLeast(0) * gapPx
-                            val spacerPx =
-                                (searchRowMaxCollapsePx + viewportPx - topPadPx - bottomPadPx - contentHeightPx - gapPx)
-                                    .coerceAtLeast(0f)
-                            Spacer(
-                                Modifier
-                                    .height(with(density) { spacerPx.toDp() })
-                                    .fillMaxWidth(),
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = with(density) { topBarHeightPx.toDp() }),
+                    refreshTexts = listOf("下拉刷新", "松开刷新", "正在刷新", "刷新完成"),
+                ) {
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = gridCells,
+                        // 折叠量跟随网格真实滚动增量（任意位置双向同步，见 gridScrollSync）
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScroll(gridScrollSync),
+                        contentPadding = pageContentPadding,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.cardGapH),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
+                    ) {
+                        gridItemsIndexed(
+                            pageVideos.value,
+                            // key 必须唯一：部分源首页推荐位的 vod_id 为空或重复，纯 id 做 key 会直接抛
+                            // 「Key "" was already used」把整个首页打崩，所以拼上索引兜底
+                            key = { index, v -> "${v.id}#$index" },
+                            contentType = { _, _ ->
+                                when (cardShape) {
+                                    HomeCardShape.LIST -> "drive"
+                                    HomeCardShape.WIDE -> "cover"
+                                    HomeCardShape.OVAL -> "oval"
+                                    HomeCardShape.GRID -> "video"
+                                }
+                            },
+                        ) { index, video ->
+                            // 逐个渐显：alpha 只挂在卡片自身的 modifier 上，不新增布局层，尺寸/位置/间距不变
+                            val cardAlpha by animateFloatAsState(
+                                targetValue = if (animateNewCards && index !in revealedCards) 0f else 1f,
+                                animationSpec = tween(CARD_FADE_IN_MILLIS),
+                                label = "homeCardFade",
                             )
+                            when (cardShape) {
+                                HomeCardShape.LIST -> DriveRowItem(
+                                    video = video,
+                                    onClick = { onItemClick(video) },
+                                    modifier = Modifier.alpha(cardAlpha),
+                                )
+                                HomeCardShape.OVAL -> com.ican.tvplay.ui.components.CircleVideoCard(
+                                    video = video,
+                                    onClick = { onItemClick(video) },
+                                    modifier = Modifier.alpha(cardAlpha),
+                                )
+                                else -> VideoCardItem(
+                                    video = video,
+                                    onClick = { onItemClick(video) },
+                                    modifier = Modifier.alpha(cardAlpha),
+                                    wide = cardShape == HomeCardShape.WIDE,
+                                )
+                            }
+                        }
+                        // 网盘文件夹页短列表兜底：让「最大可上滑距离」恰好 = 搜索行最大折叠量（48dp）。
+                        // 完全上滑后第一行贴着分类 Tab 下缘完整显示，不能再往上滑。
+                        // 纯确定性计算（不读 layoutInfo，避免与 Spacer 高度互相循环）：
+                        //   内容总高 = 项数×行高 + (项数-1)×行间距
+                        //   网格可视区高 = BoxWithConstraints.maxHeight（外层容器高，不含 contentPadding）
+                        //   顶栏占位 = topBarHeightPx（contentPadding.top），底部占位 = contentPadding.bottom
+                        //   可滚距离 = (内容总高 + Spacer高 + cardGapV) - (可视区高 - 顶栏占位 - 底部占位)
+                        //   令其 = searchRowMaxCollapsePx，反解 Spacer 高
+                        if (cardShape == HomeCardShape.LIST && pageVideos.value.isNotEmpty()) {
+                            item(key = "drive_bottom_spacer", contentType = "spacer", span = { GridItemSpan(maxLineSpan) }) {
+                                val itemCount = pageVideos.value.size
+                                val rowHeightPx = with(density) { 64.dp.toPx() }
+                                val gapPx = with(density) { Spacing.cardGapV.toPx() }
+                                val topPadPx = with(density) { pageContentPadding.calculateTopPadding().toPx() }
+                                val bottomPadPx = with(density) { pageContentPadding.calculateBottomPadding().toPx() }
+                                // constraints 来自 BoxWithConstraints 作用域
+                                val viewportPx = constraints.maxHeight.toFloat()
+                                val contentHeightPx = itemCount * rowHeightPx + (itemCount - 1).coerceAtLeast(0) * gapPx
+                                val spacerPx =
+                                    (searchRowMaxCollapsePx + viewportPx - topPadPx - bottomPadPx - contentHeightPx - gapPx)
+                                        .coerceAtLeast(0f)
+                                Spacer(
+                                    Modifier
+                                        .height(with(density) { spacerPx.toDp() })
+                                        .fillMaxWidth(),
+                                )
+                            }
                         }
                     }
                 }
@@ -804,7 +882,11 @@ fun HomeScreen(
                         action = {
                             TextButton(
                                 text = "重新加载",
-                                onClick = { reloadToken++ },
+                                onClick = {
+                                    // 重试必须真的重新请求：先作废该层缓存，再触发加载
+                                    bypassCache = true
+                                    reloadToken++
+                                },
                             )
                         },
                     )
