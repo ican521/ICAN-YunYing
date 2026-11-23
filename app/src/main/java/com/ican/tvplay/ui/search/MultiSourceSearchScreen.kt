@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.pressable
@@ -105,10 +104,6 @@ fun MultiSourceSearchResults(
     // 结果卡片样式（右上角切换钮持久化）：POSTER=竖版海报网格 / WIDE=长条横卡
     val cardStyle by vm.cardStyle.collectAsStateWithLifecycle()
     val wideCards = cardStyle == com.ican.tvplay.data.SearchCardStyle.WIDE
-
-    // 下拉刷新状态：照抄 fongmi 的两个时点 —— 下手时置 true，整轮搜索跑完的回调里置 false，
-    // 不额外加最短时长 / 超时 / 轮询。首次搜索、切站源、选站点都不会亮圈
-    var refreshing by remember { mutableStateOf(false) }
 
     // 已淡入的元素 key 集合：由父层统一计时，元素滑出屏幕被回收再滑回来时不会重播动画
     var revealedChips by remember(searchedQuery) { mutableStateOf<Set<String>>(emptySet()) }
@@ -206,23 +201,7 @@ fun MultiSourceSearchResults(
                 if (displayVideos.isEmpty()) {
                     // 搜索结束仍无结果 → 空状态；加载中保持空白，等卡片直接渐显
                     if (!loading) EmptyState(text = "没有找到相关影片")
-                }
-                // 下拉刷新（Miuix 自带指示器）：重跑当前关键词的跨源搜索。
-                // 只包住网格，空态仍在外层叠加；contentPadding 只让指示器下移顶栏高度，不改内容布局
-                PullToRefresh(
-                    isRefreshing = refreshing,
-                    onRefresh = {
-                        val kw = searchedQuery
-                        // 照抄 fongmi：下手置 true + 重跑搜索；整轮搜索结束的回调里置 false
-                        if (kw.isNotBlank() && !refreshing) {
-                            refreshing = true
-                            vm.searchAll(kw) { refreshing = false }
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = topPadding),
-                    refreshTexts = listOf("下拉刷新", "松开刷新", "正在刷新", "刷新完成"),
-                ) {
+                } else {
                     LazyVerticalGrid(
                         columns = columns,
                         // imePadding：键盘弹出时网格底部内容不被遮挡，可滚动到键盘上方
@@ -277,9 +256,9 @@ fun MultiSourceSearchResults(
                         }
                     }
                 }
-                }
             }
     }
+}
 
 
 
