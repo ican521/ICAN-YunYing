@@ -116,6 +116,8 @@ import com.ican.tvplay.ui.HomeViewModel
 import com.ican.tvplay.ui.appViewModel
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.ArcStretchSpinner
+import com.ican.tvplay.ui.components.REFRESH_DONE_HINT_MILLIS
+import com.ican.tvplay.ui.components.RefreshDoneHint
 import com.ican.tvplay.ui.components.EmptyState
 import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.pageHorizontalPadding
@@ -580,6 +582,11 @@ fun HomeScreen(
             var refreshing by remember(page, pageCategory?.id, currentSiteKey) {
                 mutableStateOf(false)
             }
+            // 「刷新完成」提示：Miuix 内置完成态只停留 200ms，看不见字，
+            // 所以完成文案改由 RefreshDoneHint 接管（停留 REFRESH_DONE_HINT_MILLIS 再淡出）
+            var refreshDoneVisible by remember(page, pageCategory?.id, currentSiteKey) {
+                mutableStateOf(false)
+            }
             // 本次加载是否必须绕过缓存（下拉刷新 / 空态重试都要真的重新请求，不能吃旧缓存）
             var bypassCache by remember(page, pageCategory?.id, currentSiteKey) {
                 mutableStateOf(false)
@@ -673,10 +680,20 @@ fun HomeScreen(
                     // fongmi setAdapter → swipeLayout.setRefreshing(false)：
                     // 只有本次刷新真正跑完才收圈；被取消（用户又拉了一次）时不收，
                     // 交给新一轮刷新自己收，避免上一轮的收尾把这一轮掐掉
-                    if (forceNetwork && currentCoroutineContext().isActive) refreshing = false
+                    if (forceNetwork && currentCoroutineContext().isActive) {
+                        refreshing = false
+                        // 数据回落 = 刷新完成：由自己的提示组件把「刷新完成」停留够久再淡出
+                        refreshDoneVisible = true
+                    }
                     // 首屏第一页的数据（含空结果）一落地就算就绪
                     if (page == 0 && folder == null) firstPageReady = true
                 }
+            }
+            // 「刷新完成」提示自动淡出：停留够时长再隐藏，避免看不见就收回
+            LaunchedEffect(refreshDoneVisible) {
+                if (!refreshDoneVisible) return@LaunchedEffect
+                delay(REFRESH_DONE_HINT_MILLIS)
+                refreshDoneVisible = false
             }
             // 子目录内按返回键退回上一级（fongmi FolderFragment.goBack → popBackStack）
             BackHandler(enabled = folderStack.value.isNotEmpty()) {
@@ -764,7 +781,9 @@ fun HomeScreen(
                     },
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(top = with(density) { topBarHeightPx.toDp() }),
-                    refreshTexts = listOf("下拉刷新", "松开刷新", "正在刷新", "刷新完成"),
+                    // 第 4 段（完成态）留空：内置完成态只有 200ms、字看不清，
+                    // 改由下方 RefreshDoneHint 在同一个位置把「刷新完成」显示够久
+                    refreshTexts = listOf("下拉刷新", "松开刷新", "正在刷新", ""),
                 ) {
                     LazyVerticalGrid(
                         state = gridState,
@@ -875,6 +894,13 @@ fun HomeScreen(
                         ArcStretchSpinner()
                     }
                 }
+                // 「刷新完成」提示：落在下拉指示器同一个位置（顶栏下沿居中），停留够久再淡出
+                RefreshDoneHint(
+                    visible = refreshDoneVisible,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = with(density) { topBarHeightPx.toDp() }),
+                )
             }
         }
 
