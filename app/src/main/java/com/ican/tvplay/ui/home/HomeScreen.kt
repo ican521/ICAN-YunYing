@@ -508,27 +508,32 @@ fun HomeScreen(
                     ?.takeIf { it.cardStyleType.isNotBlank() }
                     ?.let { VodStyle(it.cardStyleType, it.cardStyleRatio.toDouble()) }
             }
-            // 卡片形状四态（对齐 fongmi Style → ViewType）：竖卡网格 / 横版宽卡 / 单行列表 / 圆形卡
-            val cardShape = remember(page, pageCategory?.id, currentSiteKey, folderPage) {
-                mutableStateOf(if (folderPage) HomeCardShape.LIST else HomeCardShape.GRID)
+            // fongmi Class.isFolder()：分类自己声明 type_flag == "1" 时它本身就是目录型分类，
+            // FolderFragment 以 folder=true 建 TypeFragment，getStyle() 直接返回 Style.list()，
+            // 站点级 style（我的云盘那种 oval）会被跳过
+            val classIsFolder = pageCategory?.typeFlag?.trim() == "1"
+            // 卡片形状在组合阶段直接推导，不再存成独立 State：
+            // 存状态时 remember 的 key 带 folderPage，按返回键退栈会让它重建回默认 GRID，
+            // 而 pageVideos 里的旧列表还在 —— 于是先用海报网格画一帧、LaunchedEffect 再把形状改回 list，
+            // 表现就是返回时闪一下（图一）。推导值永远和「声明 + 当前列表」同帧一致，没有中间帧。
+            val itemStyle = pageVideos.value.firstOrNull()
+                ?.takeIf { it.cardStyleType.isNotBlank() }
+                ?.let { VodStyle(it.cardStyleType, it.cardStyleRatio.toDouble()) }
+            val baseStyle = when {
+                folderPage || classIsFolder -> VodStyle("list", 0.0)
+                else -> siteStyle ?: categoryStyle ?: VodStyle("rect", 0.75)
             }
-
-            fun applyCardMode(list: List<Video>) {
-                val itemStyle = list.firstOrNull()
-                    ?.takeIf { it.cardStyleType.isNotBlank() }
-                    ?.let { VodStyle(it.cardStyleType, it.cardStyleRatio.toDouble()) }
-                // fongmi Class.isFolder()：分类自己声明 type_flag == "1" 时，它本身就是目录型分类，
-                // 打开时 FolderFragment 以 folder=true 建 TypeFragment，getStyle() 直接返回 Style.list()。
-                // 我们以前只把「点文件夹下钻」当成 list，漏了这一层，站点级 style=oval（我的云盘）就盖住了，
-                // 结果「嘟嘟」这类目录型分类整页被渲染成圆卡
-                val classIsFolder = pageCategory?.typeFlag?.trim() == "1"
-                // fongmi 基线：目录页（分类声明 folder 或已下钻）恒 list；其它页 → 站点 style → 分类 style → 缺省 rect(0.75)
-                val base = when {
-                    folderPage || classIsFolder -> VodStyle("list", 0.0)
-                    else -> siteStyle ?: categoryStyle ?: VodStyle("rect", 0.75)
-                }
-                val declared = itemStyle ?: base
-                if (com.ican.tvplay.BuildConfig.DEBUG) {
+            // fongmi Result.getStyle(base)：本页首条自带 style 覆盖基线
+            val declared = itemStyle ?: baseStyle
+            // 四态（对齐 fongmi Style → ViewType）：竖卡网格 / 横版宽卡 / 单行列表 / 圆形卡
+            val cardShape = when {
+                declared.isList() -> HomeCardShape.LIST
+                declared.isOval() -> HomeCardShape.OVAL
+                declared.isLand() -> HomeCardShape.WIDE
+                else -> HomeCardShape.GRID
+            }
+            if (com.ican.tvplay.BuildConfig.DEBUG) {
+                LaunchedEffect(pageCategory?.id, cardShape, pageVideos.value.size) {
                     val src = when {
                         itemStyle != null -> "item"
                         folderPage || classIsFolder -> "folder"
@@ -543,14 +548,8 @@ fun HomeScreen(
                             "type=${declared.normalizedType()} ratio=${declared.effectiveRatio()} " +
                             "list=${declared.isList()} oval=${declared.isOval()} " +
                             "land=${declared.isLand()} " +
-                            "n=${list.size} folders=${list.count { it.isFolder }}",
+                            "n=${pageVideos.value.size} folders=${pageVideos.value.count { it.isFolder }}",
                     )
-                }
-                cardShape.value = when {
-                    declared.isList() -> HomeCardShape.LIST
-                    declared.isOval() -> HomeCardShape.OVAL
-                    declared.isLand() -> HomeCardShape.WIDE
-                    else -> HomeCardShape.GRID
                 }
             }
             // 已渐显的卡片索引：计时放在父层，卡片滑出屏幕被回收再滑回来不会重播。
@@ -595,7 +594,6 @@ fun HomeScreen(
                 if (folder == null) {
                     val cached = viewModel.cachedCategoryVideos(pageCategory.id)
                     if (cached != null) {
-                        applyCardMode(cached)
                         pageVideos.value = cached
                         pageLoading = false
                         // 首屏第一页命中缓存即视为「卡片就绪」，切站缓冲据此结束
@@ -612,7 +610,6 @@ fun HomeScreen(
                         viewModel.getFolderVideos(folder.first)
                     }
                     // 内容判定与缓存分支共用同一套规则（目录卡优先，其次频道卡）
-                    applyCardMode(list)
                     // 最短展示时长：数据来得太快时也让等待动画完整走一小段，避免闪烁
                     val remain = LOADING_MIN_SHOW_MILLIS - (System.currentTimeMillis() - startedAt)
                     if (remain > 0) delay(remain)
@@ -684,7 +681,7 @@ fun HomeScreen(
                 // 网盘分类：单列固定 —— 行宽贴首页左右边距、屏宽越大整行越宽
                 val landscape = LocalConfiguration.current.orientation ==
                     android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                val gridCells = when (cardShape.value) {
+                val gridCells = when (cardShape) {
                     HomeCardShape.LIST -> GridCells.Fixed(1)
                     HomeCardShape.WIDE -> com.ican.tvplay.ui.components.wideCardGridColumns(
                         homeLayoutSize,
@@ -713,7 +710,7 @@ fun HomeScreen(
                         // 「Key "" was already used」把整个首页打崩，所以拼上索引兜底
                         key = { index, v -> "${v.id}#$index" },
                         contentType = { _, _ ->
-                            when (cardShape.value) {
+                            when (cardShape) {
                                 HomeCardShape.LIST -> "drive"
                                 HomeCardShape.WIDE -> "cover"
                                 HomeCardShape.OVAL -> "oval"
@@ -727,7 +724,7 @@ fun HomeScreen(
                             animationSpec = tween(CARD_FADE_IN_MILLIS),
                             label = "homeCardFade",
                         )
-                        when (cardShape.value) {
+                        when (cardShape) {
                             HomeCardShape.LIST -> DriveRowItem(
                                 video = video,
                                 onClick = { onItemClick(video) },
@@ -742,7 +739,7 @@ fun HomeScreen(
                                 video = video,
                                 onClick = { onItemClick(video) },
                                 modifier = Modifier.alpha(cardAlpha),
-                                wide = cardShape.value == HomeCardShape.WIDE,
+                                wide = cardShape == HomeCardShape.WIDE,
                             )
                         }
                     }
@@ -754,7 +751,7 @@ fun HomeScreen(
                     //   顶栏占位 = topBarHeightPx（contentPadding.top），底部占位 = contentPadding.bottom
                     //   可滚距离 = (内容总高 + Spacer高 + cardGapV) - (可视区高 - 顶栏占位 - 底部占位)
                     //   令其 = searchRowMaxCollapsePx，反解 Spacer 高
-                    if (cardShape.value == HomeCardShape.LIST && pageVideos.value.isNotEmpty()) {
+                    if (cardShape == HomeCardShape.LIST && pageVideos.value.isNotEmpty()) {
                         item(key = "drive_bottom_spacer", contentType = "spacer", span = { GridItemSpan(maxLineSpan) }) {
                             val itemCount = pageVideos.value.size
                             val rowHeightPx = with(density) { 64.dp.toPx() }
