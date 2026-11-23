@@ -160,13 +160,6 @@ private const val CARD_FADE_IN_MILLIS = 200
 /** 首页等待动画最短展示时长（毫秒）：网络过快时不至于一闪而过 */
 private const val LOADING_MIN_SHOW_MILLIS = 350L
 
-/**
- * 下拉刷新指示器最短展示时长（毫秒）：
- * 数据回得再快也让圆内小点完整转够一圈多一点，之后才交给 Miuix 播「刷新完成」回落，
- * 否则松手后只闪一下就显示完成，看起来像没刷新
- */
-private const val MIN_REFRESH_INDICATOR_MILLIS = 1200L
-
 /** pager 是否已停稳：不在滚动，且偏移已归位。拖动中 / 松手回弹中都为 false */
 private fun PagerState.isIdle(): Boolean =
     !isScrollInProgress && abs(currentPageOffsetFraction) < 0.01f
@@ -582,20 +575,10 @@ fun HomeScreen(
             var reloadToken by remember(page, pageCategory?.id, currentSiteKey) {
                 mutableStateOf(0)
             }
-            // 下拉刷新：Miuix PullToRefresh 的 isRefreshing 是唯一真相源。
-            // 注意不能把「置回 false」写在加载 effect 的 finally 里：reloadToken 自增会让旧协程被取消，
-            // 取消同样走 finally，于是指示器刚亮起就被判成刷新完成（只闪一下）。
-            // 改成用独立的 refreshDoneToken + 最短展示时长来收尾。
+            // 下拉刷新：照抄 fongmi TypeFragment —— 动手时 setRefreshing(true)（见 onRefresh），
+            // 数据回落时 setRefreshing(false)（见加载 effect 的 finally）。中间不做任何额外计时。
             var refreshing by remember(page, pageCategory?.id, currentSiteKey) {
                 mutableStateOf(false)
-            }
-            // 本次刷新开始时刻（用于保证指示器完整转够时长）
-            var refreshStartedAt by remember(page, pageCategory?.id, currentSiteKey) {
-                mutableStateOf(0L)
-            }
-            // 一次生效的强制加载真正跑完时自增，由下方独立 effect 收掉指示器
-            var refreshDoneToken by remember(page, pageCategory?.id, currentSiteKey) {
-                mutableStateOf(0)
             }
             // 本次加载是否必须绕过缓存（下拉刷新 / 空态重试都要真的重新请求，不能吃旧缓存）
             var bypassCache by remember(page, pageCategory?.id, currentSiteKey) {
@@ -687,20 +670,13 @@ fun HomeScreen(
                     }
                 } finally {
                     pageLoading = false
-                    // 只有「真正跑完」的强制加载才通知收尾；被取消（用户又拉了一次）时不通知，
-                    // 否则新一次的指示器会被上一轮的收尾提前掐掉
-                    if (forceNetwork && currentCoroutineContext().isActive) refreshDoneToken++
+                    // fongmi setAdapter → swipeLayout.setRefreshing(false)：
+                    // 只有本次刷新真正跑完才收圈；被取消（用户又拉了一次）时不收，
+                    // 交给新一轮刷新自己收，避免上一轮的收尾把这一轮掐掉
+                    if (forceNetwork && currentCoroutineContext().isActive) refreshing = false
                     // 首屏第一页的数据（含空结果）一落地就算就绪
                     if (page == 0 && folder == null) firstPageReady = true
                 }
-            }
-            // 下拉刷新的收尾：与加载协程解耦，保证指示器至少完整转完 MIN_REFRESH_INDICATOR_MILLIS，
-            // 之后再交给 Miuix 播「刷新完成」并回落
-            LaunchedEffect(refreshDoneToken) {
-                if (!refreshing) return@LaunchedEffect
-                val remain = MIN_REFRESH_INDICATOR_MILLIS - (System.currentTimeMillis() - refreshStartedAt)
-                if (remain > 0) delay(remain)
-                refreshing = false
             }
             // 子目录内按返回键退回上一级（fongmi FolderFragment.goBack → popBackStack）
             BackHandler(enabled = folderStack.value.isNotEmpty()) {
@@ -778,11 +754,10 @@ fun HomeScreen(
                 PullToRefresh(
                     isRefreshing = refreshing,
                     onRefresh = {
-                        // 立刻置 true：指示器唯一真相源，晚一帧就会出现「松手了却还在弹回」的错位
-                        // 已在刷新中就不再重复触发（避免多次下拉把加载协程连环取消）
+                        // 照抄 fongmi onRefresh → getVideo()：先亮圈，再重拉当前层数据；
+                        // 已在刷新中就不重复触发（避免连环取消）
                         if (!refreshing) {
                             refreshing = true
-                            refreshStartedAt = System.currentTimeMillis()
                             bypassCache = true
                             reloadToken++
                         }

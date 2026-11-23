@@ -136,13 +136,18 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
     /**
      * 跨全部站点并行搜索，结果流式上屏：每个站点一返回立即合入列表（fongmi 式"边搜边出"），
      * 慢站/坏站不拖住其他站点结果的展示。
+     *
+     * [onDone] 照抄 fongmi `setAdapter(result) → swipeLayout.setRefreshing(false)` 的语义：
+     * 整轮搜索真正结束（含失败 / 空结果）时回调一次，下拉刷新的指示器就靠它收圈，
+     * 不在 UI 层另造超时或最短展示时长。
      */
-    fun searchAll(keyword: String) {
+    fun searchAll(keyword: String, onDone: (() -> Unit)? = null) {
         val key = keyword.trim()
         _query.value = key
         if (key.isEmpty()) {
             _sites.value = emptyList()
             _displayVideos.value = emptyList()
+            onDone?.invoke()
             return
         }
         // 记录搜索历史（搜索首页提交 / 结果页改词搜索都会走这里）
@@ -202,6 +207,7 @@ class MultiSourceSearchViewModel(appContext: Context) : ViewModel() {
                 collector.join()
             } finally {
                 _loading.value = false
+                onDone?.invoke()
             }
         }
     }
