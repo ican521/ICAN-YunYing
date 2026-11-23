@@ -69,6 +69,10 @@ android {
                 "proguard-rules.pro"
             )
         }
+        // 调试包也用正式版 keystore 签名：可直接覆盖安装到已装正式版的设备，保留数据与登录态
+        debug {
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
 
     compileOptions {

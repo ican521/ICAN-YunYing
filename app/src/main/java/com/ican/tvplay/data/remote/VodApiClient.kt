@@ -164,6 +164,9 @@ data class VodStyle(
 
     fun isList(): Boolean = normalizedType() == "list"
 
+    /** 圆形卡（fongmi Style.isOval / ViewType.OVAL）：1:1 圆图 + 图下居中标题 */
+    fun isOval(): Boolean = normalizedType() == "oval"
+
     /** 横版宽卡：矩形且宽高比 > 1（fongmi Style.isLand） */
     fun isLand(): Boolean = normalizedType() == "rect" && effectiveRatio() > 1.0f
 }

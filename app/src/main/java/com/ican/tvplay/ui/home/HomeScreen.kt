@@ -508,11 +508,9 @@ fun HomeScreen(
                     ?.takeIf { it.cardStyleType.isNotBlank() }
                     ?.let { VodStyle(it.cardStyleType, it.cardStyleRatio.toDouble()) }
             }
-            val driveStyle = remember(page, pageCategory?.id, currentSiteKey, folderPage) {
-                mutableStateOf(folderPage)
-            }
-            val coverStyle = remember(page, pageCategory?.id, currentSiteKey, folderPage) {
-                mutableStateOf(false)
+            // 卡片形状四态（对齐 fongmi Style → ViewType）：竖卡网格 / 横版宽卡 / 单行列表 / 圆形卡
+            val cardShape = remember(page, pageCategory?.id, currentSiteKey, folderPage) {
+                mutableStateOf(if (folderPage) HomeCardShape.LIST else HomeCardShape.GRID)
             }
 
             fun applyCardMode(list: List<Video>) {
@@ -536,12 +534,17 @@ fun HomeScreen(
                         "HomeCardMode",
                         "cat=${pageCategory?.id} src=$src " +
                             "type=${declared.normalizedType()} ratio=${declared.effectiveRatio()} " +
-                            "list=${declared.isList()} land=${declared.isLand()} " +
+                            "list=${declared.isList()} oval=${declared.isOval()} " +
+                            "land=${declared.isLand()} " +
                             "n=${list.size} folders=${list.count { it.isFolder }}",
                     )
                 }
-                driveStyle.value = declared.isList()
-                coverStyle.value = declared.isLand()
+                cardShape.value = when {
+                    declared.isList() -> HomeCardShape.LIST
+                    declared.isOval() -> HomeCardShape.OVAL
+                    declared.isLand() -> HomeCardShape.WIDE
+                    else -> HomeCardShape.GRID
+                }
             }
             // 已渐显的卡片索引：计时放在父层，卡片滑出屏幕被回收再滑回来不会重播。
             // 切站源 / 换分类 / 进出子目录都会重建该集合，从而重播一次逐个渐显
@@ -670,21 +673,21 @@ fun HomeScreen(
             ) {
                 // 普通分类：列数由「设置-普通卡片列数（横屏/竖屏）」驱动（默认档 = 按屏幕宽度自适应）
                 // 横版宽卡（爱刷/易直播这类源）：由「设置-宽卡列数（横屏/竖屏）」驱动，默认档 = 普通卡列的 0.6 倍
+                // 圆形卡（站点声明 circle:1）：列数与竖卡一致（fongmi Product.getColumn 只在 isLand 时减列）
                 // 网盘分类：单列固定 —— 行宽贴首页左右边距、屏宽越大整行越宽
                 val landscape = LocalConfiguration.current.orientation ==
                     android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                val gridCells = if (driveStyle.value) {
-                    GridCells.Fixed(1)
-                } else if (coverStyle.value) {
-                    com.ican.tvplay.ui.components.wideCardGridColumns(
+                val gridCells = when (cardShape.value) {
+                    HomeCardShape.LIST -> GridCells.Fixed(1)
+                    HomeCardShape.WIDE -> com.ican.tvplay.ui.components.wideCardGridColumns(
                         homeLayoutSize,
                         if (landscape) wideColumnsLand else wideColumnsPort,
                     )
-                } else {
-                    com.ican.tvplay.ui.components.videoGridColumns(
-                        homeLayoutSize,
-                        if (landscape) posterColumnsLand else posterColumnsPort,
-                    )
+                    HomeCardShape.GRID, HomeCardShape.OVAL ->
+                        com.ican.tvplay.ui.components.videoGridColumns(
+                            homeLayoutSize,
+                            if (landscape) posterColumnsLand else posterColumnsPort,
+                        )
                 }
                 LazyVerticalGrid(
                     state = gridState,
@@ -703,10 +706,11 @@ fun HomeScreen(
                         // 「Key "" was already used」把整个首页打崩，所以拼上索引兜底
                         key = { index, v -> "${v.id}#$index" },
                         contentType = { _, _ ->
-                            when {
-                                driveStyle.value -> "drive"
-                                coverStyle.value -> "cover"
-                                else -> "video"
+                            when (cardShape.value) {
+                                HomeCardShape.LIST -> "drive"
+                                HomeCardShape.WIDE -> "cover"
+                                HomeCardShape.OVAL -> "oval"
+                                HomeCardShape.GRID -> "video"
                             }
                         },
                     ) { index, video ->
@@ -716,18 +720,22 @@ fun HomeScreen(
                             animationSpec = tween(CARD_FADE_IN_MILLIS),
                             label = "homeCardFade",
                         )
-                        if (driveStyle.value) {
-                            DriveRowItem(
+                        when (cardShape.value) {
+                            HomeCardShape.LIST -> DriveRowItem(
                                 video = video,
                                 onClick = { onItemClick(video) },
                                 modifier = Modifier.alpha(cardAlpha),
                             )
-                        } else {
-                            VideoCardItem(
+                            HomeCardShape.OVAL -> com.ican.tvplay.ui.components.CircleVideoCard(
                                 video = video,
                                 onClick = { onItemClick(video) },
                                 modifier = Modifier.alpha(cardAlpha),
-                                wide = coverStyle.value,
+                            )
+                            else -> VideoCardItem(
+                                video = video,
+                                onClick = { onItemClick(video) },
+                                modifier = Modifier.alpha(cardAlpha),
+                                wide = cardShape.value == HomeCardShape.WIDE,
                             )
                         }
                     }
@@ -739,7 +747,7 @@ fun HomeScreen(
                     //   顶栏占位 = topBarHeightPx（contentPadding.top），底部占位 = contentPadding.bottom
                     //   可滚距离 = (内容总高 + Spacer高 + cardGapV) - (可视区高 - 顶栏占位 - 底部占位)
                     //   令其 = searchRowMaxCollapsePx，反解 Spacer 高
-                    if (driveStyle.value && pageVideos.value.isNotEmpty()) {
+                    if (cardShape.value == HomeCardShape.LIST && pageVideos.value.isNotEmpty()) {
                         item(key = "drive_bottom_spacer", contentType = "spacer", span = { GridItemSpan(maxLineSpan) }) {
                             val itemCount = pageVideos.value.size
                             val rowHeightPx = with(density) { 64.dp.toPx() }
@@ -1425,6 +1433,13 @@ private fun UnderlineTabRow(
         }
     }
 }
+
+/**
+ * 首页分类页的卡片形状（完全对齐 fongmi Style → ViewType）：
+ * [GRID] 竖卡网格（默认 rect 0.75）、[WIDE] 横版宽卡（rect 且 ratio>1）、
+ * [LIST] 单行列表（网盘目录行）、[OVAL] 圆形卡（站点声明 circle:1）
+ */
+private enum class HomeCardShape { GRID, WIDE, LIST, OVAL }
 
 @Composable
 private fun VideoCardItem(

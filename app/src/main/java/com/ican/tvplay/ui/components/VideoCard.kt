@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -328,3 +330,54 @@ private fun PosterTextFallback() {
         )
     }
 }
+
+/**
+ * 圆形卡（完全对齐 fongmi `adapter_vod_oval.xml` + `VodOvalHolder`）：
+ * 站点声明 `circle:1`（Style.isOval）时整页用它，不用白底卡片、不压暗、不加角标。
+ *
+ * - 外层 8dp 内边距（fongmi RelativeLayout margin 8dp + image margin 8dp），
+ *   所以圆图比同列竖卡的海报窄一档，列数仍与竖卡相同（`Product.getColumn` 只在 isLand 时减列）
+ * - 图 1:1 裁成圆形（ShapeableImageView + Vod.Circle），加载中/失败底色沿用卡片占位色
+ * - 名字在图正下方居中单行（fongmi mobile 版 14sp、无上距；深色底上是白字，
+ *   我们是浅色页面，改用主题 onSurface 保持可读）
+ */
+@Composable
+fun CircleVideoCard(
+    video: Video,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .padding(Spacing.posterOverlayMargin)
+            .tvCardEffect(onClick = onClick, shape = CircleShape, glow = false),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(CircleShape)
+                .background(MiuixTheme.colorScheme.surfaceContainerHigh),
+        ) {
+            PosterImage(
+                title = video.title,
+                cover = video.cover,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Text(
+            text = video.title,
+            color = MiuixTheme.colorScheme.onSurface,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = Spacing.posterTagRowTopGap),
+        )
+    }
+}
+
