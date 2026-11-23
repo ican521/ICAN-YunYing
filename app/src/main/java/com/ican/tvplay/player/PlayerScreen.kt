@@ -166,6 +166,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -209,6 +210,7 @@ import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameMillis
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
@@ -711,8 +713,27 @@ fun PlayerScreen(
     // 本会话已自动兜底次数（换线路 + 换站源合计），用于给解析开销封顶
     var autoFallbackCount by remember { mutableIntStateOf(0) }
 
+    // 错误态下拉刷新（fongmi VideoActivity：正常播放 swipeLayout=disabled，
+    // 只有 resetPlaybackForError / showEmpty 才启用）：
+    // 触发后把当前集重新解析一遍（mVod.refresh() 同义），刷新期间亮圈，解析结束收圈
+    var refreshNonce by remember { mutableIntStateOf(0) }
+    var errorRefreshing by remember { mutableStateOf(false) }
+    val onRefreshErrorPlayback: () -> Unit = {
+        if (!errorRefreshing) {
+            errorRefreshing = true
+            // 记住当前位置，在原位置续播（fongmi refresh 也是保留进度重解析）
+            pendingPosition = Players.progress.value.positionMs
+            // 清掉当前线路的失败标记，否则刷新成功后可能立刻被自动兜底再切走
+            val curFlag = playLine?.flag ?: video?.playFrom.orEmpty()
+            failedFlags.value = failedFlags.value - curFlag
+            // 先停当前画面进入加载态（与切线路同款），避免解析期间旧错误画面继续挂着
+            Players.beginSwitch()
+            refreshNonce++
+        }
+    }
+
     // 解析并播放（video 变化也触发：自动换站源后整片替换重解析）
-    LaunchedEffect(initialized, video, episodeIndex, lineFlag, qualityRequest) {
+    LaunchedEffect(initialized, video, episodeIndex, lineFlag, qualityRequest, refreshNonce) {
         if (!initialized) return@LaunchedEffect
         if (resumeFromBackground) {
             // 后台续播接管：播放器已在播，无需重新解析
@@ -775,6 +796,10 @@ fun PlayerScreen(
             if (t is kotlinx.coroutines.CancellationException) throw t
             android.util.Log.e("PlayerScreen", "resolve/play fail: ${v.id} ep=$episodeIndex", t)
             Players.notifyError("播放地址解析失败，该站源可能不支持此影片，请切换线路或站源重试")
+        } finally {
+            // 错误态下拉刷新的收圈时机：解析跑完（成功或失败）就收（对齐 fongmi 在回调里 setRefreshing(false)）；
+            // 被取消（用户又拉了一次）时不收，交给新一轮自己的收尾
+            if (errorRefreshing && currentCoroutineContext().isActive) errorRefreshing = false
         }
     }
 
@@ -1777,6 +1802,8 @@ fun PlayerScreen(
             // 同 LandscapePlayLayout：解析后的实际播放线路，保证初始就有选中高亮
             lineFlag = playLine?.flag ?: lineFlag,
             playerState = playerState,
+            refreshing = errorRefreshing,
+            onRefreshError = onRefreshErrorPlayback,
             // 视频占位区（含状态栏黑条）的顶部/高度交给缩放动画驱动：
             // 放大时占位区撑满整屏、信息流被顶出屏幕；缩小时反过来滑回原位。
             // 布局全程挂载不卸载，避免「信息流整块瞬间消失/出现」造成的跳动
@@ -1873,6 +1900,10 @@ private fun PortraitPlayLayout(
     lineEpisodes: List<Episode>,
     lineFlag: String,
     playerState: Players.PlayerState,
+    /** 错误态下拉刷新的转圈状态（只在 playerState.error != null 时才会变成 true） */
+    refreshing: Boolean,
+    /** 错误态下拉刷新：重解析当前集（等价 fongmi mVod.refresh() → RefreshEvent.Type.PLAYER） */
+    onRefreshError: () -> Unit,
     /** 视频占位区顶部（静止=状态栏高度，全屏=0），由小窗↔全屏缩放动画驱动 */
     playerTop: State<Dp>,
     /** 视频占位区高度（静止=满宽 16:9，全屏=屏高），同上 */
@@ -1953,14 +1984,92 @@ private fun PortraitPlayLayout(
         )
     }
 
-    // === 可滚动详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===
+    // === 详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===
     // 详情加载期间整屏遮罩转圈统一显示（见根 Box），此处不再分区域转圈
+    //
+    // 下拉刷新只在「播放错误」态启用 —— 对齐 fongmi mobile VideoActivity：
+    // swipeLayout 在 initView / prepareSource 里都是 setEnabled(false)，
+    // 只有 resetPlaybackForError / showEmpty 才 setEnabled(true)，即正常播放时详情区根本拉不动。
+    // `|| refreshing`：刷新一开始 beginSwitch 会把错误态清掉，这时必须继续挂着这层包裹，
+    // 否则圆点会连同容器一起消失（刷新过程中途"闪没"）
+    if (playerState.error != null || refreshing) {
+        PullToRefresh(
+            isRefreshing = refreshing,
+            onRefresh = onRefreshError,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            refreshTexts = listOf("下拉刷新", "松开刷新", "正在刷新", "刷新完成"),
+        ) {
+            DetailInfoColumn(
+                modifier = Modifier.fillMaxSize(),
+                current = current,
+                lineFlag = lineFlag,
+                qualities = qualities,
+                qualityPosition = qualityPosition,
+                onQualityChange = onQualityChange,
+                lineEpisodes = lineEpisodes,
+                episodeIndex = episodeIndex,
+                onEpisodeSelect = onEpisodeSelect,
+                onLineChange = onLineChange,
+            )
+        }
+    } else {
+        DetailInfoColumn(
+            modifier = Modifier.weight(1f),
+            current = current,
+            lineFlag = lineFlag,
+            qualities = qualities,
+            qualityPosition = qualityPosition,
+            onQualityChange = onQualityChange,
+            lineEpisodes = lineEpisodes,
+            episodeIndex = episodeIndex,
+            onEpisodeSelect = onEpisodeSelect,
+            onLineChange = onLineChange,
+        )
+    }
+
+    // === 对话框（常驻组合：内部按 show 做「底部滑入 / 原路滑回」动画） ===
+    OptionDialog(showSpeed, "倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
+    OptionDialog(showScale, "画面缩放", Players.ScaleMode.entries, playerState.scaleMode, { it.label }, { onScaleChange(it); showScale = false }) { showScale = false }
+    OptionDialog(showBuffer, "缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
+    OptionDialog(showAudio, "音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }) { showAudio = false }
+    SubtitleDialog(
+        show = showText,
+        tracks = playerState.textTracks,
+        textDisabled = playerState.textDisabled,
+        onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
+        onAddSubtitle = { showText = false; onAddSubtitle() },
+        onSettings = { showText = false; onOpenSubtitleSettings() },
+        onDismiss = { showText = false },
+    )
+    } // Column 根结束
+}
+
+/**
+ * 竖屏详情信息流本体（标题/线路/画质/选集/简介）。
+ * 抽成独立组件是为了让它可以被「错误态下拉刷新」的 PullToRefresh 包裹，
+ * 又不必在两处分支里重复这段内容。
+ *
+ * 水平边距下放到各 Section 内部（首页顶部分类 Tab 同款结构性通栏）：
+ * 线路/选集横向列表需天然占满全宽，靠自身 contentPadding 对齐基准线并支持贴边横滑。
+ */
+@Composable
+private fun DetailInfoColumn(
+    modifier: Modifier,
+    current: Video?,
+    lineFlag: String,
+    qualities: List<com.ican.tvplay.data.remote.PlayQuality>,
+    qualityPosition: Int,
+    onQualityChange: (Int) -> Unit,
+    lineEpisodes: List<Episode>,
+    episodeIndex: Int,
+    onEpisodeSelect: (Int) -> Unit,
+    onLineChange: (String) -> Unit,
+) {
     Column(
-        modifier = Modifier
-            .weight(1f)
+        modifier = modifier
             .verticalScroll(rememberScrollState())
-            // 水平边距下放到各 Section 内部（首页顶部分类 Tab 同款结构性通栏）：
-            // 线路/选集横向列表需天然占满全宽，靠自身 contentPadding 对齐基准线并支持贴边横滑
             // 顶部 3dp：标题行被 48dp 收藏钮撑高，文字居中已含约 8dp 留白，视觉间距约 16dp
             .padding(top = Spacing.videoTitleRowTopGap, bottom = Spacing.titleContentGap),
     ) {
@@ -2017,22 +2126,6 @@ private fun PortraitPlayLayout(
 
         Spacer(modifier = Modifier.height(60.dp))
     }
-
-    // === 对话框（常驻组合：内部按 show 做「底部滑入 / 原路滑回」动画） ===
-    OptionDialog(showSpeed, "倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
-    OptionDialog(showScale, "画面缩放", Players.ScaleMode.entries, playerState.scaleMode, { it.label }, { onScaleChange(it); showScale = false }) { showScale = false }
-    OptionDialog(showBuffer, "缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
-    OptionDialog(showAudio, "音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }) { showAudio = false }
-    SubtitleDialog(
-        show = showText,
-        tracks = playerState.textTracks,
-        textDisabled = playerState.textDisabled,
-        onSelect = { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_TEXT); showText = false },
-        onAddSubtitle = { showText = false; onAddSubtitle() },
-        onSettings = { showText = false; onOpenSubtitleSettings() },
-        onDismiss = { showText = false },
-    )
-    } // Column 根结束
 }
 
 // ========== 横屏（平板）布局：对齐 fongmi activity_detail_land ==========
