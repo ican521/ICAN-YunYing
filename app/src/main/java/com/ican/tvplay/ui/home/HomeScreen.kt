@@ -517,15 +517,21 @@ fun HomeScreen(
                 val itemStyle = list.firstOrNull()
                     ?.takeIf { it.cardStyleType.isNotBlank() }
                     ?.let { VodStyle(it.cardStyleType, it.cardStyleRatio.toDouble()) }
-                // fongmi 基线：目录钻取页恒 list；其它页 → 站点 style → 分类 style → 缺省 rect(0.75)
+                // fongmi Class.isFolder()：分类自己声明 type_flag == "1" 时，它本身就是目录型分类，
+                // 打开时 FolderFragment 以 folder=true 建 TypeFragment，getStyle() 直接返回 Style.list()。
+                // 我们以前只把「点文件夹下钻」当成 list，漏了这一层，站点级 style=oval（我的云盘）就盖住了，
+                // 结果「嘟嘟」这类目录型分类整页被渲染成圆卡
+                val classIsFolder = pageCategory?.typeFlag?.trim() == "1"
+                // fongmi 基线：目录页（分类声明 folder 或已下钻）恒 list；其它页 → 站点 style → 分类 style → 缺省 rect(0.75)
                 val base = when {
-                    folderPage -> VodStyle("list", 0.0)
+                    folderPage || classIsFolder -> VodStyle("list", 0.0)
                     else -> siteStyle ?: categoryStyle ?: VodStyle("rect", 0.75)
                 }
                 val declared = itemStyle ?: base
                 if (com.ican.tvplay.BuildConfig.DEBUG) {
                     val src = when {
                         itemStyle != null -> "item"
+                        folderPage || classIsFolder -> "folder"
                         siteStyle != null -> "site"
                         categoryStyle != null -> "category"
                         else -> "default"
@@ -533,6 +539,7 @@ fun HomeScreen(
                     android.util.Log.i(
                         "HomeCardMode",
                         "cat=${pageCategory?.id} src=$src " +
+                            "flag=${pageCategory?.typeFlag} " +
                             "type=${declared.normalizedType()} ratio=${declared.effectiveRatio()} " +
                             "list=${declared.isList()} oval=${declared.isOval()} " +
                             "land=${declared.isLand()} " +
