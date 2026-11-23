@@ -748,8 +748,14 @@ fun PlayerScreen(
     }
 
     // 解析并播放（video 变化也触发：自动换站源后整片替换重解析）
-    LaunchedEffect(initialized, video, episodeIndex, lineFlag, qualityRequest, refreshNonce) {
+    LaunchedEffect(
+        initialized, historyLoaded, video, episodeIndex, lineFlag, qualityRequest, refreshNonce,
+    ) {
         if (!initialized) return@LaunchedEffect
+        // 历史进度/所选线路还没还原就解析，会先用「第 0 集 + 空线路」白解析一次，
+        // 等历史回来再重启解析——网盘类 jar 被连调两次，第一次弹出的扫码窗会被第二次
+        // 关掉重建，表现为进详情页时闪一下扫码弹窗。这里等历史落定后再解析，只解析一次。
+        if (!historyLoaded) return@LaunchedEffect
         if (resumeFromBackground) {
             // 后台续播接管：播放器已在播，无需重新解析
             resumeFromBackground = false
@@ -2707,16 +2713,26 @@ private fun VideoMetaSection(
  * 已收藏心形粉色，点击切换收藏并携带站源信息。
  * 动画（移植自 React Like 组件）：收藏时心形先消失再弹簧回弹（过冲放大），
  * 同时迸射绽放粒子；取消收藏时心形轻微收缩再恢复。 */
+/**
+ * 收藏态缓存（videoId → 是否已收藏）。
+ * 详情信息流会因「错误态/刷新态切换」而整块重建（PullToRefresh 分支变化），
+ * FavoriteButton 的 remember 状态随之清零；用这份缓存兜住重建后的首帧，
+ * 避免切集/切源时收藏钮先画空心、查库回来才变红的闪动。
+ */
+private val favoriteStateCache = mutableMapOf<String, Boolean>()
+
 @Composable
 private fun FavoriteButton(v: Video) {
     val container = appContainer()
     val scope = rememberCoroutineScope()
-    var isFav by remember { mutableStateOf(false) }
+    var isFav by remember { mutableStateOf(favoriteStateCache[v.id] ?: false) }
     // 每次点击收藏自增，作为粒子动画重播的 key；初始 -1 表示页面加载时不播动画
     var beat by remember { mutableIntStateOf(-1) }
 
     LaunchedEffect(v.id) {
-        isFav = container.favoriteDao.isFavorite(v.id)
+        val fav = container.favoriteDao.isFavorite(v.id)
+        favoriteStateCache[v.id] = fav
+        isFav = fav
     }
 
     // 心形弹出动画：收藏时 snap 到 0 再弹簧回弹（过冲），取消收藏时轻微收缩再恢复
@@ -2735,6 +2751,7 @@ private fun FavoriteButton(v: Video) {
                 onClick = {
                     val newFav = !isFav
                     isFav = newFav
+                    favoriteStateCache[v.id] = newFav
                     if (newFav) beat++
                     // 心形动画仅在点击时触发
                     scope.launch {
