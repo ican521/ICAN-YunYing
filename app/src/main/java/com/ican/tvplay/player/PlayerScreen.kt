@@ -1807,6 +1807,7 @@ fun PlayerScreen(
                 qualityPosition = qualityPosition,
                 onQualityChange = requestQualityChange,
                 onSeekDragChange = { seekDragging = it },
+                blockedMessage = btBlockedMsg,
             )
         } else {
         // 竖屏手机 / 退全屏旋转过渡期：统一竖屏布局
@@ -1892,6 +1893,7 @@ fun PlayerScreen(
             onSeekDragChange = { seekDragging = it },
             onOpenSubtitleSettings = { showSubtitleSettings = true },
             onAddSubtitle = { launchSubtitlePicker() },
+            blockedMessage = btBlockedMsg,
         )
         }
         }
@@ -1947,6 +1949,8 @@ private fun PortraitPlayLayout(
     onSeekDragChange: (Boolean) -> Unit,
     onOpenSubtitleSettings: () -> Unit,
     onAddSubtitle: () -> Unit,
+    /** 非空时代表当前源是磁力/BT 地址（播不了），预览区画提示文案 */
+    blockedMessage: String? = null,
 ) {
     var showSpeed by remember { mutableStateOf(false) }
     var showScale by remember { mutableStateOf(false) }
@@ -1987,6 +1991,7 @@ private fun PortraitPlayLayout(
             // 进详情页即转圈（首次画面就绪前，无网速）；ready 后只随缓冲转。
             // 缩放动画期间不画覆盖层（转圈跟着放大缩小会很怪）
             showLoading = !zooming && !playerState.ready && playerState.error == null,
+            blockedMessage = blockedMessage,
             controlsVisible = controlsVisible && !zooming,
             locked = locked,
             onToggleControls = onToggleControls,
@@ -1997,39 +2002,6 @@ private fun PortraitPlayLayout(
             onEnterFullscreen = onEnterFullscreen,
             onSeekDragChange = onSeekDragChange,
         )
-        // 磁力/BT 源提示：盖在预览区上（PreviewPlayerArea 只画转圈/控制层，不放文本），
-        // 纯黑底 + 白字，缩放动画期间不画（和转圈一样的时机处理）
-        btBlockedMsg?.let { msg ->
-            if (!zooming) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(horizontal = 24.dp),
-                    ) {
-                        Text(
-                            text = msg.substringBefore('\n'),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        )
-                        msg.substringAfter('\n', "").takeIf { it.isNotEmpty() }?.let { sub ->
-                            Text(
-                                text = sub,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.72f),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            )
-                        }
-                    }
-                }
-            }
-        }
     }
 
     // === 详情信息流（左右边距对齐全局规范；板块主间距统一 sectionSpacing） ===
@@ -2234,6 +2206,8 @@ private fun LandscapePlayLayout(
     qualityPosition: Int,
     onQualityChange: (Int) -> Unit,
     onSeekDragChange: (Boolean) -> Unit,
+    /** 非空时代表当前源是磁力/BT 地址（播不了），预览区画提示文案 */
+    blockedMessage: String? = null,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // 播放器覆盖层：与底层常驻 PlayerView 同位同尺寸（尺寸由根 AndroidView 动画值驱动）
@@ -2265,6 +2239,7 @@ private fun LandscapePlayLayout(
             playerState = playerState,
             // 进详情页即转圈（首次画面就绪前，无网速）；ready 后只随缓冲转
             showLoading = !playerState.ready && playerState.error == null,
+            blockedMessage = blockedMessage,
             controlsVisible = controlsVisible,
             locked = locked,
             onToggleControls = onToggleControls,
@@ -2394,6 +2369,8 @@ private fun PreviewPlayerArea(
     playerState: Players.PlayerState,
     /** 详情未就绪时强制显示转圈（fongmi 进页面即 showProgress），就绪后跟播放器 buffering 状态 */
     showLoading: Boolean = false,
+    /** 非空时代表当前源是磁力/BT 地址（播不了），在预览区画提示文案 */
+    blockedMessage: String? = null,
     controlsVisible: Boolean,
     locked: Boolean,
     onToggleControls: () -> Unit,
@@ -2473,6 +2450,38 @@ private fun PreviewPlayerArea(
                             .align(Alignment.Center)
                             .offset(y = 40.dp),
                     )
+                }
+            }
+        }
+
+        // 磁力/BT 源提示：地址只有 magnet:/ed2k:/thunder: 时本机播不了，
+        // 用黑底提示盖住预览区（放在控制层下面，返回/选集按钮仍可点）
+        blockedMessage?.let { msg ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                ) {
+                    Text(
+                        text = msg.substringBefore('\n'),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                    msg.substringAfter('\n', "").takeIf { it.isNotEmpty() }?.let { sub ->
+                        Text(
+                            text = sub,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.72f),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                    }
                 }
             }
         }
