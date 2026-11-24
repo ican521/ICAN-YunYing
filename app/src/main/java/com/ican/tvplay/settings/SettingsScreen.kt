@@ -597,6 +597,7 @@ private fun FavoriteSyncDialog(
                         else -> 2
                     },
                     fillWidth = false,
+                    compact = true,
                     onSelect = { index ->
                         viewModel.setSyncMode(
                             when (index) {
