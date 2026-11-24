@@ -4578,15 +4578,48 @@ private fun SubtitleSettingSideSheet(
         ) {
             // 侧栏固定深色底，miuix 滑杆强制使用深色色板，避免浅色主题下滑杆轨道看不清
             MiuixTheme(colors = darkColorScheme()) {
-            Text(
-                text = "字幕设置",
-                style = MaterialTheme.typography.titleMedium,
-                color = DarkOnSurface,
-                textAlign = TextAlign.Center,
+            // 排版对齐 fongmi dialog_subtitle_setting：顶部标题 + 右侧「重置」，下面一排 Tab 按钮
+            var subtitleTab by remember { mutableIntStateOf(0) }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = Spacing.titleContentGap),
+            ) {
+                Text(
+                    text = "字幕设置",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DarkOnSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "重置",
+                    fontSize = 13.sp,
+                    color = DarkOnSurfaceMuted,
+                    modifier = Modifier
+                        .clip(SquircleShape(Spacing.corner))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), SquircleShape(Spacing.corner))
+                        .clickable {
+                            // 对齐 fongmi：短按重置当前 Tab
+                            when (subtitleTab) {
+                                0 -> settings.resetSubtitleStyle()
+                                1 -> {
+                                    settings.setSubtitleScale(1f)
+                                    settings.setSubtitlePosition(0f)
+                                }
+                                else -> Players.setSubtitleOffset(0)
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+            SubtitleStyleChips(
+                labels = listOf("外观", "调节", "偏移"),
+                selectedIndex = subtitleTab,
+                onSelect = { subtitleTab = it },
+                modifier = Modifier.padding(bottom = Spacing.sectionSpacing),
             )
+            if (subtitleTab == 0) {
             Text(
                 text = "字幕样式",
                 fontSize = 14.sp,
@@ -4714,20 +4747,9 @@ private fun SubtitleSettingSideSheet(
                         },
                     )
                 }
-                Text(
-                    text = "恢复默认样式",
-                    fontSize = 13.sp,
-                    color = DarkOnSurfaceMuted,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = Spacing.sectionSpacing)
-                        .clip(SquircleShape(Spacing.corner))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), SquircleShape(Spacing.corner))
-                        .clickable { settings.resetSubtitleStyle() }
-                        .padding(vertical = 10.dp),
-                )
             }
+            }
+            if (subtitleTab == 1) {
             Text(
                 text = "字幕大小",
                 fontSize = 14.sp,
@@ -4803,6 +4825,8 @@ private fun SubtitleSettingSideSheet(
                 hapticEffect = SliderDefaults.SliderHapticEffect.None,
                 modifier = Modifier.fillMaxWidth(),
             )
+            }
+            if (subtitleTab == 2) {
             Text(
                 text = "字幕偏移",
                 fontSize = 14.sp,
@@ -4823,6 +4847,7 @@ private fun SubtitleSettingSideSheet(
             )
             }
         }
+    }
     }
 }
 
