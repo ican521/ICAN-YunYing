@@ -1,6 +1,7 @@
 package com.ican.tvplay.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -41,15 +42,16 @@ fun SegmentedTabs(
 ) {
     val height = if (compact) 26.dp else 38.dp
     val horizontalPadding = if (compact) 10.dp else 12.dp
-    val shape = RoundedCornerShape(percent = 50)
+    val shade = RoundedCornerShape(percent = 50)
     val accent = MiuixTheme.colorScheme.primary
+    // 外框与段间分隔线同色同宽（照 fongmi PlaybackDialogTabs 的 M3 outlined 分段按钮）
+    val outline = MiuixTheme.colorScheme.outline
     val rowModifier = if (fillWidth) modifier.fillMaxWidth() else modifier
     Row(
         modifier = rowModifier
             .height(height)
-            .clip(shape)
-            // 外框不用主题色描边（深色底上像一圈蓝光），只留极淡中性底把整条区分出来
-            .background(Color.White.copy(alpha = 0.06f)),
+            .clip(shade)
+            .border(1.dp, outline, shade),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         labels.forEachIndexed { index, label ->
@@ -58,7 +60,7 @@ fun SegmentedTabs(
                     modifier = Modifier
                         .width(1.dp)
                         .fillMaxHeight()
-                        .background(Color.White.copy(alpha = 0.12f)),
+                        .background(outline),
                 )
             }
             val selected = index == selectedIndex
