@@ -655,10 +655,10 @@ object Players {
             Log.d(TAG, "applySubtitleScale scale=$subtitleScale view=$view cues=$cues")
         }
         if (view == null) return
-        // media3 默认 applyEmbeddedFontSizes=true，SSA/ASS 等带内嵌样式字幕的 textSize
-        // 会覆盖 setFractionalTextSize 设置的 defaultTextSize。
-        // 非默认字号时禁用内嵌字体大小，让 defaultTextSize 对所有字幕格式生效。
-        view.setApplyEmbeddedFontSizes(subtitleScale == 1.0f)
+        // 之前只有 100% 时保留内嵌字号、非 100% 时禁用，导致「100% → 105%」反而变小
+        // （ASS/SSA 内嵌字号往往比默认 fractional 字号大）。这里统一禁用内嵌字号，
+        // 让所有比例都基于同一个基准字号缩放，保证调大就是变大、单调可预期。
+        view.setApplyEmbeddedFontSizes(false)
         view.setFractionalTextSize(
             SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * subtitleScale,
         )
