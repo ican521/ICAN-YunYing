@@ -4873,15 +4873,24 @@ private fun SubtitleStyleChips(
                 modifier = Modifier
                     .weight(1f)
                     .clip(shape)
+                    // 选中态照选集弹窗 EpisodeChip：主题色 25% 填充 + 主题色描边
                     .background(
-                        if (selected) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.06f),
+                        if (selected) {
+                            MiuixTheme.colorScheme.primary.copy(alpha = EpisodeSelectedFillAlpha)
+                        } else {
+                            Color.Transparent
+                        },
                     )
                     .border(
-                        1.dp,
-                        if (selected) Color.White.copy(alpha = 0.55f) else Color.Transparent,
-                        shape,
+                        width = 1.dp,
+                        color = if (selected) MiuixTheme.colorScheme.primary
+                        else Color.White.copy(alpha = 0.12f),
+                        shape = shape,
                     )
-                    .clickable { onSelect(index) }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onSelect(index) }
                     .padding(vertical = 9.dp),
             ) {
                 Text(
