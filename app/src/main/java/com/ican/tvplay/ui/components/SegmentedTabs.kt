@@ -43,7 +43,9 @@ fun SegmentedTabs(
     val height = if (compact) 26.dp else 38.dp
     val horizontalPadding = if (compact) 10.dp else 12.dp
     val shade = RoundedCornerShape(percent = 50)
-    val accent = MiuixTheme.colorScheme.primary
+    // 选中态不用主题色（深色弹窗里太跳）：用主题内的次级容器色（深色=深灰、浅色=浅灰），
+    // 只靠明度差区分，不引入任何色相，深浅两套主题都成立
+    val selectedFill = MiuixTheme.colorScheme.secondaryVariant
     // 外框与段间分隔线同色同宽（照 fongmi PlaybackDialogTabs 的 M3 outlined 分段按钮）
     val outline = MiuixTheme.colorScheme.outline
     val rowModifier = if (fillWidth) modifier.fillMaxWidth() else modifier
@@ -68,7 +70,7 @@ fun SegmentedTabs(
                 contentAlignment = Alignment.Center,
                 modifier = (if (fillWidth) Modifier.weight(1f) else Modifier)
                     .fillMaxHeight()
-                    .background(if (selected) accent else Color.Transparent)
+                    .background(if (selected) selectedFill else Color.Transparent)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -80,7 +82,11 @@ fun SegmentedTabs(
                     style = MaterialTheme.typography.labelMedium,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
-                    color = if (selected) Color.White else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    color = if (selected) {
+                        MiuixTheme.colorScheme.onSurface
+                    } else {
+                        MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    },
                 )
             }
         }
