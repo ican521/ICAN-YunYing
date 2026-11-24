@@ -4638,7 +4638,7 @@ private fun SubtitleSettingSideSheet(
             if (subtitleStyle.mode == SubtitleStyle.MODE_CUSTOM) {
                 Text(
                     text = "文字颜色",
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     color = DarkOnSurfaceMuted,
                     modifier = Modifier.padding(top = Spacing.sectionSpacing),
                 )
@@ -4671,7 +4671,7 @@ private fun SubtitleSettingSideSheet(
                 )
                 Text(
                     text = "描边样式",
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     color = DarkOnSurfaceMuted,
                     modifier = Modifier.padding(top = Spacing.sectionSpacing),
                 )
@@ -4686,7 +4686,7 @@ private fun SubtitleSettingSideSheet(
                 if (subtitleStyle.edgeType != SubtitleStyle.EDGE_NONE) {
                     Text(
                         text = "描边颜色",
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         color = DarkOnSurfaceMuted,
                         modifier = Modifier.padding(top = Spacing.sectionSpacing),
                     )
@@ -4714,7 +4714,7 @@ private fun SubtitleSettingSideSheet(
                 }
                 Text(
                     text = "背景颜色",
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     color = DarkOnSurfaceMuted,
                     modifier = Modifier.padding(top = Spacing.sectionSpacing),
                 )
@@ -4852,7 +4852,8 @@ private fun SubtitleSettingSideSheet(
 }
 
 /**
- * 字幕样式选项行（仿 fongmi 的 ChipGroup：等宽药丸按钮，选中高亮）。
+ * 字幕样式选项行：与「收藏页同步」的模式切换同款分段按钮
+ * （整条 secondaryVariant 胶囊，选中段 primaryContainer 底 + onPrimaryContainer 文字）。
  */
 @Composable
 private fun SubtitleStyleChips(
@@ -4861,44 +4862,39 @@ private fun SubtitleStyleChips(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val segmentShape = RoundedCornerShape(percent = 50)
     Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(segmentShape)
+            .background(MiuixTheme.colorScheme.secondaryVariant, segmentShape),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         labels.forEachIndexed { index, label ->
             val selected = index == selectedIndex
-            val shape = SquircleShape(Spacing.corner)
-            Box(
-                contentAlignment = Alignment.Center,
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                color = if (selected) {
+                    MiuixTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MiuixTheme.colorScheme.onSurfaceVariantSummary
+                },
                 modifier = Modifier
                     .weight(1f)
-                    .clip(shape)
-                    // 选中态照选集弹窗 EpisodeChip：主题色 25% 填充 + 主题色描边
+                    .clip(segmentShape)
                     .background(
-                        if (selected) {
-                            MiuixTheme.colorScheme.primary.copy(alpha = EpisodeSelectedFillAlpha)
-                        } else {
-                            Color.Transparent
-                        },
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = if (selected) MiuixTheme.colorScheme.primary
-                        else Color.White.copy(alpha = 0.12f),
-                        shape = shape,
+                        if (selected) MiuixTheme.colorScheme.primaryContainer else Color.Transparent,
+                        segmentShape,
                     )
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                     ) { onSelect(index) }
-                    .padding(vertical = 9.dp),
-            ) {
-                Text(
-                    text = label,
-                    fontSize = 13.sp,
-                    color = if (selected) Color.White else DarkOnSurfaceMuted,
-                )
-            }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            )
         }
     }
 }
@@ -4948,7 +4944,7 @@ private fun SubtitleStyleSliderRow(
 ) {
     Text(
         text = title,
-        fontSize = 13.sp,
+        fontSize = 14.sp,
         color = DarkOnSurfaceMuted,
         modifier = Modifier
             .fillMaxWidth()
@@ -4956,7 +4952,7 @@ private fun SubtitleStyleSliderRow(
     )
     Text(
         text = display,
-        fontSize = 18.sp,
+        fontSize = 20.sp,
         color = Color.White,
         modifier = Modifier
             .fillMaxWidth()
