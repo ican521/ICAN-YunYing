@@ -30,8 +30,8 @@ data class SubtitleStyle(
     /** 背景色叠透明度 */
     val background: Int get() = applyOpacity(backgroundColor, backgroundOpacity)
 
-    /** 描边色叠透明度 */
-    val edge: Int get() = applyOpacity(edgeColor, edgeOpacity)
+    /** 描边色叠透明度（再乘文字透明度：文字全透明时描边也一起消失，不然只剩黑色轮廓） */
+    val edge: Int get() = applyOpacity(edgeColor, edgeOpacity * textOpacity)
 
     /** 是否强制覆盖字幕自带样式（原样模式下不覆盖） */
     val forcesStyle: Boolean get() = mode != MODE_ORIGINAL

@@ -736,6 +736,10 @@ object Players {
         // 样式只影响颜色/描边/背景，字号与位置仍走既有逻辑
         applySubtitleScale()
         applySubtitlePosition()
+        // media3 的 setStyle / setApplyEmbeddedStyles / setApplyEmbeddedFontSizes 只在下一次
+        // setCues 时生效：不把当前 cue 重灌一遍，改颜色/透明度/背景要等下一句字幕才更新
+        //（看起来就是「拖了不生效」），所以缩放后再灌一次当前 cue。
+        player?.currentCues?.cues?.let { view.setCues(it) }
         view.invalidate()
     }
 
