@@ -4247,6 +4247,13 @@ private fun EpisodeSideSheet(
     }
     // 返回键先收起弹窗（原为 Popup 的 dismissOnBackPress）
     BackHandler(onBack = dismissWithAnim)
+    // 面板形状：只在左上/左下圆角，必须同时 clip，否则列表内容会画到圆角外（溢出面板）
+    val panelShape = SquircleShape(
+        topStart = com.ican.tvplay.ui.theme.Spacing.sideSheetCorner,
+        topEnd = 0.dp,
+        bottomEnd = 0.dp,
+        bottomStart = com.ican.tvplay.ui.theme.Spacing.sideSheetCorner,
+    )
     Box(modifier = Modifier.fillMaxSize()) {
             // 统一遮罩层：PopupScrim（黑色 40%）+ 200ms 渐显渐隐，点击收起面板
             FadingScrim(
@@ -4259,10 +4266,8 @@ private fun EpisodeSideSheet(
                     .offset { IntOffset(sheetSlideX.roundToPx(), 0) }
                     .fillMaxHeight()
                     .width(panelWidth)
-                    .background(
-                        DarkSurfaceElevated,
-                        SquircleShape(topStart = com.ican.tvplay.ui.theme.Spacing.sideSheetCorner, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = com.ican.tvplay.ui.theme.Spacing.sideSheetCorner),
-                    )
+                    .clip(panelShape)
+                    .background(DarkSurfaceElevated, panelShape)
                     // 面板本体消费点击，避免点面板空白处误触发外层收起
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -4553,6 +4558,13 @@ private fun SubtitleSettingSideSheet(
         }
     }
     BackHandler(onBack = dismissWithAnim)
+    // 面板形状：只在左上/左下圆角，clip 与 background 同形状，内容才不会画到圆角外
+    val panelShape = SquircleShape(
+        topStart = Spacing.sideSheetCorner,
+        topEnd = 0.dp,
+        bottomEnd = 0.dp,
+        bottomStart = Spacing.sideSheetCorner,
+    )
     Box(modifier = Modifier.fillMaxSize()) {
         FadingScrim(visible = sheetShown, onClick = dismissWithAnim)
         Column(
@@ -4561,10 +4573,8 @@ private fun SubtitleSettingSideSheet(
                 .offset { IntOffset(sheetSlideX.roundToPx(), 0) }
                 .fillMaxHeight()
                 .width(panelWidth)
-                .background(
-                    DarkSurfaceElevated,
-                    SquircleShape(topStart = Spacing.sideSheetCorner, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = Spacing.sideSheetCorner),
-                )
+                .clip(panelShape)
+                .background(DarkSurfaceElevated, panelShape)
                 .then(if (statusBarInset) Modifier.statusBarsPadding() else Modifier)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
