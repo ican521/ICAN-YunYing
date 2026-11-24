@@ -4881,10 +4881,12 @@ private fun SubtitleColorSwatches(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    // 色点用 FlowRow 自动换行：侧栏最窄 280dp、除去边距只剩 248dp，
+    // 10 个 24dp 色点 + 间距一行放不下，之前会溢出到面板外面
+    FlowRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         colors.forEach { color ->
             val isSelected = color == selected

@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -75,13 +76,14 @@ fun SegmentedTabs(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                     ) { onSelect(index) }
-                    .padding(horizontal = horizontalPadding),
+                    .padding(horizontal = if (fillWidth) 8.dp else horizontalPadding),
             ) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelMedium,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     color = if (selected) {
                         MiuixTheme.colorScheme.onSurface
                     } else {
