@@ -52,6 +52,12 @@ const val ChipTintedFillAlphaLight = 0.14f
 /** 深色档选中底色：主题色 22% 叠在深色容器底上 */
 const val ChipTintedFillAlphaDark = 0.22f
 
+/** 分段按钮选中态切换纯淡化时长（ms）：无滑块位移，背景与文字色交叉淡化 */
+const val SegmentedTabsFadeMs = 150
+
+/** 分段按钮外框与段间分隔线透明度（深色叠白 / 浅色叠黑） */
+const val SegmentedTabsOutlineAlpha = 0.10f
+
 /** 浅色档选中文字起步主色占比（其余压向 [ChipTintedTextAnchorLight]），对比度不足时再按守护步长推远 */
 private const val ChipTintedTextPrimaryRatioLight = 0.74f
 
