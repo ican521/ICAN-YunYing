@@ -17,7 +17,6 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -3554,8 +3553,6 @@ private fun FullscreenPlayLayout(
     }
     // 锁定状态下的解锁按钮显隐（单击唤出，2.5s 自动隐藏）
     var unlockHint by remember { mutableStateOf(false) }
-    // 点击「解锁」瞬间跳过 exit 动画直接移除；下次上锁时复位
-    var skipUnlockExit by remember { mutableStateOf(false) }
     LaunchedEffect(unlockHint) {
         if (unlockHint) {
             delay(2500)
@@ -3592,7 +3589,6 @@ private fun FullscreenPlayLayout(
             speedUpHint = false
             sliderSeekFraction = null
             adjustType = null
-            skipUnlockExit = false
         }
     }
 
@@ -3967,9 +3963,11 @@ private fun FullscreenPlayLayout(
         }
 
         // 右侧居中（fongmi: view_control_right 48dp 纯图标无背景 + marginEnd 4dp）
-        // 属于控制层的一部分，跟随控制层一起淡入淡出
+        // 未锁态属于控制层的一部分，跟随控制层淡入淡出；锁定态由 unlockHint 单独控制。
+        // 两态合并在同一个容器里：解锁时 visible 由 unlockHint 切到 controlsVisible，前后都为 true，
+        // 因此不触发进出场动画，只是把锁形图标直接换成开启锁形，不会跟控制栏一起 200ms 渐显。
         AnimatedVisibility(
-            visible = !locked && controlsVisible,
+            visible = if (locked) unlockHint else controlsVisible,
             enter = fadeIn(tween(CONTROL_FADE_DURATION_MS)),
             exit = fadeOut(tween(CONTROL_FADE_DURATION_MS)),
             modifier = Modifier.align(Alignment.CenterEnd),
@@ -3978,26 +3976,21 @@ private fun FullscreenPlayLayout(
                 modifier = Modifier
                     .padding(end = 4.dp)
                     .size(48.dp)
-                    .tvCardEffect(onClick = { onLockToggle() }, shape = CircleShape, focusedScale = 1.10f, glow = false, pressEffect = false),
+                    .tvCardEffect(
+                        onClick = { if (locked) onUnlock() else onLockToggle() },
+                        shape = CircleShape,
+                        focusedScale = 1.10f,
+                        glow = false,
+                        pressEffect = false,
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(AppIcons.LockOpen, "锁屏", tint = Color.White, modifier = Modifier.size(24.dp))
-            }
-        }
-        AnimatedVisibility(
-            visible = locked && unlockHint,
-            enter = fadeIn(tween(CONTROL_FADE_DURATION_MS)),
-            exit = if (skipUnlockExit) ExitTransition.None else fadeOut(tween(CONTROL_FADE_DURATION_MS)),
-            modifier = Modifier.align(Alignment.CenterEnd),
-        ) {
-            Box(
-                modifier = Modifier
-                    .padding(end = 4.dp)
-                    .size(48.dp)
-                    .tvCardEffect(onClick = { skipUnlockExit = true; onUnlock() }, shape = CircleShape, focusedScale = 1.10f, glow = false, pressEffect = false),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(AppIcons.Lock, "解锁", tint = Color.White, modifier = Modifier.size(24.dp))
+                Icon(
+                    if (locked) AppIcons.Lock else AppIcons.LockOpen,
+                    if (locked) "解锁" else "锁屏",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp),
+                )
             }
         }
 
