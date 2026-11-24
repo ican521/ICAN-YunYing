@@ -9,8 +9,8 @@ val BrandBlueDeep = Color(0xFF277AF7)
 val BrandTeal = Color(0xFF00E0C8)
 val BrandViolet = Color(0xFFB48CFF)
 
-/** 默认主题色（未选主题色板时全 App 的强调色）：深色 / 浅色模式同色 #FF007FFF */
-val BrandPrimaryDefault = Color(0xFF007FFF)
+/** 默认主题色（未选主题色板时全 App 的强调色）：深色 / 浅色模式同色 #007AFF */
+val BrandPrimaryDefault = Color(0xFF007AFF)
 
 // 深色主题（全局背景纯黑）
 val DarkBackground = Color(0xFF000000)
