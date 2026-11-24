@@ -668,19 +668,22 @@ object Players {
     private fun applySubtitlePosition() {
         val view = resolveSubtitleView()
         if (com.ican.tvplay.BuildConfig.DEBUG) {
-            Log.d(TAG, "applySubtitlePosition position=$subtitlePosition view=$view")
+            Log.d(TAG, "applySubtitlePosition position=$subtitlePosition view=$view h=${view?.height}")
         }
         if (view == null) return
-        // 用 media3 官方 bottomPaddingFraction 控制字幕垂直位置：
-        // 默认 0.08（距底部 8%），范围 0~1。
-        // position: -100(贴底) ~ 0(默认) ~ +100(顶部)
+        // media3 的 bottomPaddingFraction 只对「没有自带 line/position」的字幕 cue 生效，
+        // 站源下发的 ASS/SSA 字幕大多自带行位置，调了也纹丝不动。
+        // 改为整体位移 SubtitleView：对文字/图形字幕都生效，且与字号缩放互相独立。
         val defaultFraction = SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION
-        val fraction = if (subtitlePosition >= 0f) {
-            defaultFraction + (subtitlePosition / 100f) * (1.0f - defaultFraction)
+        view.setBottomPaddingFraction(defaultFraction)
+        val height = view.height.toFloat()
+        if (height <= 1f) return   // 布局还没完成，等 onLayoutChange 回调再应用
+        // position: -100(贴底) ~ 0(默认) ~ +100(顶部)
+        view.translationY = if (subtitlePosition >= 0f) {
+            -(subtitlePosition / 100f) * height * (1f - defaultFraction)
         } else {
-            defaultFraction + (subtitlePosition / 100f) * defaultFraction
+            -(subtitlePosition / 100f) * height * defaultFraction
         }
-        view.setBottomPaddingFraction(fraction.coerceIn(0f, 1f))
         view.invalidate()
     }
 
@@ -774,8 +777,23 @@ object Players {
         if (subtitleViewRef !== view) {
             subtitleViewRef = view
         }
-        // 按当前字幕样式（原样/跟随系统/自定义）应用，再叠加字号/位置
-        if (view != null) applySubtitleStyle()
+        if (view != null) {
+            ensureSubtitleLayoutListener(view)
+            applySubtitleStyle()
+        }
+    }
+
+    /** SubtitleView 尺寸变化（首帧布局/旋转/进出全屏）后重算字幕位移，高度为 0 时无法换算 */
+    private var layoutListenerView: SubtitleView? = null
+    private val subtitleLayoutListener = android.view.View.OnLayoutChangeListener {
+        _, _, _, _, _, _, _, _, _ -> applySubtitlePosition()
+    }
+
+    private fun ensureSubtitleLayoutListener(view: SubtitleView) {
+        if (layoutListenerView === view) return
+        layoutListenerView?.removeOnLayoutChangeListener(subtitleLayoutListener)
+        view.addOnLayoutChangeListener(subtitleLayoutListener)
+        layoutListenerView = view
     }
 
     /** 外挂字幕时间偏移（ms）：重新解析字幕并保持当前播放位置 */
