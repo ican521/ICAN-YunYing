@@ -700,6 +700,8 @@ object Players {
         val view = resolveSubtitleView() ?: return
         when (subtitleStyle.mode) {
             SubtitleStyle.MODE_ORIGINAL -> {
+                // 先复位全局样式：无内嵌样式的字幕（如 SRT）不再沿用上一档的颜色/描边/背景
+                view.setStyle(androidx.media3.ui.CaptionStyleCompat.DEFAULT)
                 view.setApplyEmbeddedStyles(true)
             }
             SubtitleStyle.MODE_SYSTEM -> {

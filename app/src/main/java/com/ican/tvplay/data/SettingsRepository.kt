@@ -345,7 +345,12 @@ class SettingsRepository(context: Context) {
         _subtitleStyle.value = value
     }
 
-    fun resetSubtitleStyle() = setSubtitleStyle(com.ican.tvplay.player.core.SubtitleStyle.DEFAULT)
+    // 重置后样式档默认停在「原样」（DEFAULT.mode 是 MODE_CUSTOM，直接恢复会停在自定义档）
+    fun resetSubtitleStyle() = setSubtitleStyle(
+        com.ican.tvplay.player.core.SubtitleStyle.DEFAULT.copy(
+            mode = com.ican.tvplay.player.core.SubtitleStyle.MODE_ORIGINAL,
+        ),
+    )
 
     private fun readSubtitleStyle(): com.ican.tvplay.player.core.SubtitleStyle {
         val d = com.ican.tvplay.player.core.SubtitleStyle.DEFAULT

@@ -36,10 +36,11 @@ val LightGlassTintStrong = Color(0x99FFFFFF)
 val LightScrim = Color(0xB3101018)
 
 // 选中项填充透明度（全 App 统一）：主题色叠加在选项底色上的选中高亮，禁止各页面再写 0.15/0.16/0.2 之类的魔法数。
-// 唯一例外是播放页选集选中态（主题色 25%），见 [EpisodeSelectedFillAlpha]。
 const val SelectionFillAlpha = 0.18f
 
-// 播放页选集选中态填充透明度：全屏侧边选集弹窗与竖屏「更多」弹窗共用，主题色 25%
+// 播放页选集旧版选中态填充透明度（主题色 25%）：现已无引用。
+// 全屏侧边选集弹窗已改为与字幕设置分段单选同款配色（secondaryVariant 实底），
+// 竖屏横滑选集与「更多」弹窗走 EpisodeChip 的 primary / secondaryVariant 实底。常量保留以备回溯。
 const val EpisodeSelectedFillAlpha = 0.25f
 
 // 海报卡片叠加层（首页/收藏/历史/搜索结果共用），保证各页海报视觉一致

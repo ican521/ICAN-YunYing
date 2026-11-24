@@ -210,7 +210,6 @@ import com.ican.tvplay.ui.theme.BrandPink
 import com.ican.tvplay.ui.theme.DarkOnSurface
 import com.ican.tvplay.ui.theme.DarkOnSurfaceMuted
 import com.ican.tvplay.ui.theme.DarkSurfaceElevated
-import com.ican.tvplay.ui.theme.EpisodeSelectedFillAlpha
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
@@ -4274,20 +4273,13 @@ private fun EpisodeSideSheet(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                     ) {}
-                    // 左右边距 = 全局弹窗内容边距；顶部间距 = titleContentGap（与底部弹窗标题同款）
-                    .padding(horizontal = Spacing.dialogContentMargin)
-                    .padding(top = Spacing.titleContentGap),
+                    // 左右边距 = 全局弹窗内容边距；顶部不再用固定内边距，
+                    // 顶部留白改由列表 contentPadding 承担，内容可一路滑到面板最顶缘
+                    .padding(horizontal = Spacing.dialogContentMargin),
             ) {
-                // 标题（深色配色，居中）：距面板顶 = 距下方列表 = titleContentGap
-                Text(
-                    text = "选集",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = DarkOnSurface,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = Spacing.titleContentGap),
-                )
+                // 侧栏固定深色底：色板强制深色（与字幕设置侧栏同款），
+                // 选中/未选中配色与字幕设置的分段单选按钮完全同源
+                MiuixTheme(colors = darkColorScheme()) {
                 // 弹出前就定位到当前集（首帧就位，无滚动动画）：
                 // initialFirstVisibleItemIndex 让当前集作为第一个可见 item 出现在顶部。
                 val listState = rememberLazyListState(
@@ -4296,8 +4288,12 @@ private fun EpisodeSideSheet(
                 LazyColumn(
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
-                    // 底部边距随内容滚动：列表可一直滑到面板最底缘，静止时末项距底 = 全局弹窗内容边距（与左右一致）
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = Spacing.dialogContentMargin),
+                    // 顶部留白随内容滚动：列表可滑到面板最顶缘，静止时首项距顶 = dialogContentMargin（与左右/底部一致）
+                    // 底边距同样随内容滚动，末项距底 = 全局弹窗内容边距
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        top = Spacing.dialogContentMargin,
+                        bottom = Spacing.dialogContentMargin,
+                    ),
                     modifier = Modifier.weight(1f),
                 ) {
                     itemsIndexed(episodes, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { idx, ep ->
@@ -4309,14 +4305,14 @@ private fun EpisodeSideSheet(
                                 .fillMaxWidth()
                                 .clip(shape)
                                 .background(
-                                    // 选中填充跟主题色（不再固定品牌蓝），与横滑选集/线路同一色系
-                                    if (selected) MiuixTheme.colorScheme.primary.copy(alpha = EpisodeSelectedFillAlpha)
+                                    // 与字幕设置分段单选一致：选中 = secondaryVariant（深灰实底），未选中 = 透明
+                                    if (selected) MiuixTheme.colorScheme.secondaryVariant
                                     else Color.Transparent,
                                 )
                                 .border(
+                                    // 外框统一 outline，不随选中态换色（与字幕设置分段单选同款）
                                     width = 1.dp,
-                                    color = if (selected) MiuixTheme.colorScheme.primary
-                                    else Color.White.copy(alpha = 0.12f),
+                                    color = MiuixTheme.colorScheme.outline,
                                     shape = shape,
                                 )
                                 // 选集列表自带选中态：去掉按压/点击涟漪，选中色即反馈
@@ -4329,13 +4325,15 @@ private fun EpisodeSideSheet(
                             Text(
                                 text = ep.title,
                                 fontSize = 14.sp,
-                                color = if (selected) Color.White
-                                else DarkOnSurfaceMuted,
+                                // 与字幕设置分段单选文字一致：选中 onSurface，未选中 onSurfaceVariantSummary
+                                color = if (selected) MiuixTheme.colorScheme.onSurface
+                                else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
+                }
                 }
             }
         }
