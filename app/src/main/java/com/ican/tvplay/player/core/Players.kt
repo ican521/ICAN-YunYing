@@ -171,6 +171,9 @@ object Players {
     /** 字幕位置百分比（正数上移，0 为默认贴底） */
     private var subtitlePosition = 0f
 
+    /** 字幕样式（原样/跟随系统/自定义；对齐 fongmi SubtitleSetting） */
+    private var subtitleStyle: SubtitleStyle = SubtitleStyle.DEFAULT
+
     /** 添加外挂字幕后，需要在 onTracksChanged 中强制选中该外挂字幕轨道 */
     private var pendingSelectExternalSubtitle = false
 
@@ -646,8 +649,7 @@ object Players {
         applyMpvSubtitleOptions()
     }
 
-    private fun applySubtitleScale() {
-        val view = resolveSubtitleView()
+    private fun applySubtitleScale() {        val view = resolveSubtitleView()
         if (com.ican.tvplay.BuildConfig.DEBUG) {
             val cues = player?.currentCues?.cues?.size ?: -1
             Log.d(TAG, "applySubtitleScale scale=$subtitleScale view=$view cues=$cues")
@@ -679,6 +681,58 @@ object Players {
             defaultFraction + (subtitlePosition / 100f) * defaultFraction
         }
         view.setBottomPaddingFraction(fraction.coerceIn(0f, 1f))
+        view.invalidate()
+    }
+
+    /**
+     * 字幕样式（对齐 fongmi SubtitleSetting.applyStyle）：
+     * 原样 = 尊重字幕文件自带样式；跟随系统 = 读系统无障碍字幕样式；自定义 = 用我们的颜色/透明度。
+     */
+    fun setSubtitleStyle(style: SubtitleStyle) {
+        subtitleStyle = style
+        applySubtitleStyle()
+    }
+
+    private fun applySubtitleStyle() {
+        val view = resolveSubtitleView() ?: return
+        when (subtitleStyle.mode) {
+            SubtitleStyle.MODE_ORIGINAL -> {
+                view.setApplyEmbeddedStyles(true)
+            }
+            SubtitleStyle.MODE_SYSTEM -> {
+                view.setApplyEmbeddedStyles(false)
+                val manager = appContext?.getSystemService(Context.CAPTIONING_SERVICE)
+                    as? android.view.accessibility.CaptioningManager
+                val systemStyle = manager?.userStyle
+                view.setStyle(
+                    if (systemStyle != null) {
+                        androidx.media3.ui.CaptionStyleCompat.createFromCaptionStyle(systemStyle)
+                    } else {
+                        androidx.media3.ui.CaptionStyleCompat.DEFAULT
+                    },
+                )
+            }
+            else -> {
+                view.setApplyEmbeddedStyles(false)
+                val s = subtitleStyle
+                view.setStyle(
+                    androidx.media3.ui.CaptionStyleCompat(
+                        s.foreground,
+                        s.background,
+                        android.graphics.Color.TRANSPARENT,
+                        s.edgeType,
+                        s.edge,
+                        null,
+                    ),
+                )
+            }
+        }
+        if (com.ican.tvplay.BuildConfig.DEBUG) {
+            Log.d(TAG, "applySubtitleStyle mode=${subtitleStyle.mode} fg=${subtitleStyle.foreground} bg=${subtitleStyle.background} edgeType=${subtitleStyle.edgeType} edge=${subtitleStyle.edge}")
+        }
+        // 样式只影响颜色/描边/背景，字号与位置仍走既有逻辑
+        applySubtitleScale()
+        applySubtitlePosition()
         view.invalidate()
     }
 
@@ -715,16 +769,13 @@ object Players {
         return sv
     }
 
-    /** 绑定 PlayerView 内部的 SubtitleView，并立即应用字号/位置设置（样式固定用字幕原始样式） */
+    /** 绑定 PlayerView 内部的 SubtitleView，并立即应用字幕样式/字号/位置 */
     private fun attachSubtitleView(view: SubtitleView?) {
         if (subtitleViewRef !== view) {
             subtitleViewRef = view
         }
-        // EXO 不追 ASS 原生字体/特效：固定回系统字幕样式，再应用我们的字号/位置。
-        view?.setApplyEmbeddedStyles(false)
-        view?.setUserDefaultStyle()
-        applySubtitleScale()
-        applySubtitlePosition()
+        // 按当前字幕样式（原样/跟随系统/自定义）应用，再叠加字号/位置
+        if (view != null) applySubtitleStyle()
     }
 
     /** 外挂字幕时间偏移（ms）：重新解析字幕并保持当前播放位置 */

@@ -32,6 +32,14 @@ const val SUBTITLE_OFFSET_STEP_MS = 100L
 const val SUBTITLE_MIN_POSITION = -100f
 const val SUBTITLE_MAX_POSITION = 100f
 
+/** 字幕自定义样式参数范围（仿 fongmi SubtitleSetting 的 MIN/MAX） */
+const val SUBTITLE_MIN_OPACITY = 0f
+const val SUBTITLE_MAX_OPACITY = 1f
+const val SUBTITLE_MIN_EDGE_WIDTH = 0f
+const val SUBTITLE_MAX_EDGE_WIDTH = 6f
+const val SUBTITLE_MIN_SHADOW = 0f
+const val SUBTITLE_MAX_SHADOW = 8f
+
 /**
  * 应用设置。初始骨架阶段使用 SharedPreferences 持久化，
  * 后续新增设置项可继续在此扩展。
@@ -297,6 +305,69 @@ class SettingsRepository(context: Context) {
         _subtitlePosition.value = value
     }
 
+    /**
+     * 字幕样式（仿 fongmi SubtitleSetting）：
+     * 原样 / 跟随系统 / 自定义，自定义含文字色+透明度、描边样式/色/透明度/粗细、阴影、背景色+透明度。
+     */
+    private val _subtitleStyle = MutableStateFlow(readSubtitleStyle())
+    val subtitleStyle: StateFlow<com.ican.tvplay.player.core.SubtitleStyle> =
+        _subtitleStyle.asStateFlow()
+
+    fun setSubtitleStyle(style: com.ican.tvplay.player.core.SubtitleStyle) {
+        val value = style.copy(
+            mode = style.mode.coerceIn(
+                com.ican.tvplay.player.core.SubtitleStyle.MODE_ORIGINAL,
+                com.ican.tvplay.player.core.SubtitleStyle.MODE_CUSTOM,
+            ),
+            textOpacity = style.textOpacity.coerceIn(SUBTITLE_MIN_OPACITY, SUBTITLE_MAX_OPACITY),
+            edgeType = style.edgeType.coerceIn(
+                com.ican.tvplay.player.core.SubtitleStyle.EDGE_NONE,
+                com.ican.tvplay.player.core.SubtitleStyle.EDGE_SHADOW,
+            ),
+            edgeOpacity = style.edgeOpacity.coerceIn(SUBTITLE_MIN_OPACITY, SUBTITLE_MAX_OPACITY),
+            edgeWidth = style.edgeWidth.coerceIn(SUBTITLE_MIN_EDGE_WIDTH, SUBTITLE_MAX_EDGE_WIDTH),
+            shadow = style.shadow.coerceIn(SUBTITLE_MIN_SHADOW, SUBTITLE_MAX_SHADOW),
+            backgroundOpacity = style.backgroundOpacity
+                .coerceIn(SUBTITLE_MIN_OPACITY, SUBTITLE_MAX_OPACITY),
+        )
+        prefs.edit()
+            .putInt(KEY_SUBTITLE_STYLE_MODE, value.mode)
+            .putInt(KEY_SUBTITLE_TEXT_COLOR, value.textColor)
+            .putFloat(KEY_SUBTITLE_TEXT_OPACITY, value.textOpacity)
+            .putInt(KEY_SUBTITLE_EDGE_TYPE, value.edgeType)
+            .putInt(KEY_SUBTITLE_EDGE_COLOR, value.edgeColor)
+            .putFloat(KEY_SUBTITLE_EDGE_OPACITY, value.edgeOpacity)
+            .putFloat(KEY_SUBTITLE_EDGE_WIDTH, value.edgeWidth)
+            .putFloat(KEY_SUBTITLE_SHADOW, value.shadow)
+            .putInt(KEY_SUBTITLE_BG_COLOR, value.backgroundColor)
+            .putFloat(KEY_SUBTITLE_BG_OPACITY, value.backgroundOpacity)
+            .apply()
+        _subtitleStyle.value = value
+    }
+
+    fun resetSubtitleStyle() = setSubtitleStyle(com.ican.tvplay.player.core.SubtitleStyle.DEFAULT)
+
+    private fun readSubtitleStyle(): com.ican.tvplay.player.core.SubtitleStyle {
+        val d = com.ican.tvplay.player.core.SubtitleStyle.DEFAULT
+        return com.ican.tvplay.player.core.SubtitleStyle(
+            mode = prefs.getInt(KEY_SUBTITLE_STYLE_MODE, d.mode),
+            textColor = prefs.getInt(KEY_SUBTITLE_TEXT_COLOR, d.textColor),
+            textOpacity = prefs.getFloat(KEY_SUBTITLE_TEXT_OPACITY, d.textOpacity)
+                .coerceIn(SUBTITLE_MIN_OPACITY, SUBTITLE_MAX_OPACITY),
+            edgeType = prefs.getInt(KEY_SUBTITLE_EDGE_TYPE, d.edgeType),
+            edgeColor = prefs.getInt(KEY_SUBTITLE_EDGE_COLOR, d.edgeColor),
+            edgeOpacity = prefs.getFloat(KEY_SUBTITLE_EDGE_OPACITY, d.edgeOpacity)
+                .coerceIn(SUBTITLE_MIN_OPACITY, SUBTITLE_MAX_OPACITY),
+            edgeWidth = prefs.getFloat(KEY_SUBTITLE_EDGE_WIDTH, d.edgeWidth)
+                .coerceIn(SUBTITLE_MIN_EDGE_WIDTH, SUBTITLE_MAX_EDGE_WIDTH),
+            shadow = prefs.getFloat(KEY_SUBTITLE_SHADOW, d.shadow)
+                .coerceIn(SUBTITLE_MIN_SHADOW, SUBTITLE_MAX_SHADOW),
+            backgroundColor = prefs.getInt(KEY_SUBTITLE_BG_COLOR, d.backgroundColor),
+            backgroundOpacity = prefs.getFloat(KEY_SUBTITLE_BG_OPACITY, d.backgroundOpacity)
+                .coerceIn(SUBTITLE_MIN_OPACITY, SUBTITLE_MAX_OPACITY),
+        )
+    }
+
     /** 收藏同步模式（fongmi Setting.sync_mode）：0=双向 1=上传 2=下载 */
     private val _syncMode = MutableStateFlow(prefs.getInt(KEY_SYNC_MODE, 0))
     val syncMode: StateFlow<Int> = _syncMode.asStateFlow()
@@ -453,6 +524,7 @@ class SettingsRepository(context: Context) {
             .coerceIn(SUBTITLE_MIN_SCALE, SUBTITLE_MAX_SCALE)
         _subtitlePosition.value = prefs.getFloat(KEY_PLAYER_SUBTITLE_POSITION, 0f)
             .coerceIn(SUBTITLE_MIN_POSITION, SUBTITLE_MAX_POSITION)
+        _subtitleStyle.value = readSubtitleStyle()
         _syncMode.value = prefs.getInt(KEY_SYNC_MODE, 0)
         _favoriteUpdateCheckEnabled.value = prefs.getBoolean(KEY_FAVORITE_UPDATE_CHECK, true)
         _favoriteUpdateIntervalHours.value = prefs.getInt(KEY_FAVORITE_UPDATE_INTERVAL, 0)
@@ -484,6 +556,17 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_BACKGROUND = "player_background"
         const val KEY_PLAYER_SUBTITLE_SCALE = "player_subtitle_scale"
         const val KEY_PLAYER_SUBTITLE_POSITION = "player_subtitle_position"
+        // 字幕样式（对齐 fongmi SubtitleSetting 的 Prefers key 语义，前缀区分本项目）
+        const val KEY_SUBTITLE_STYLE_MODE = "subtitle_style_mode"
+        const val KEY_SUBTITLE_TEXT_COLOR = "subtitle_text_color"
+        const val KEY_SUBTITLE_TEXT_OPACITY = "subtitle_text_opacity"
+        const val KEY_SUBTITLE_EDGE_TYPE = "subtitle_edge_type"
+        const val KEY_SUBTITLE_EDGE_COLOR = "subtitle_edge_color"
+        const val KEY_SUBTITLE_EDGE_OPACITY = "subtitle_edge_opacity"
+        const val KEY_SUBTITLE_EDGE_WIDTH = "subtitle_edge_width"
+        const val KEY_SUBTITLE_SHADOW = "subtitle_shadow"
+        const val KEY_SUBTITLE_BG_COLOR = "subtitle_background_color"
+        const val KEY_SUBTITLE_BG_OPACITY = "subtitle_background_opacity"
         /** 首页普通卡片列数覆盖（横屏；缺省 = 默认自适应） */
         const val KEY_POSTER_COLUMNS_LANDSCAPE = "home_poster_columns_land"
         /** 首页普通卡片列数覆盖（竖屏；缺省 = 默认自适应） */

@@ -194,6 +194,7 @@ import com.ican.tvplay.player.core.PlaybackService
 import com.ican.tvplay.player.core.PlaySpec
 import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.player.core.SubItem
+import com.ican.tvplay.player.core.SubtitleStyle
 import com.ican.tvplay.player.core.MediaItemFactory
 import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.components.AppIcons
@@ -332,6 +333,7 @@ fun PlayerScreen(
     val savedBuffer by settings.playerBuffer.collectAsStateWithLifecycle()
     val savedSubtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
     val savedSubtitlePosition by settings.subtitlePosition.collectAsStateWithLifecycle()
+    val savedSubtitleStyle by settings.subtitleStyle.collectAsStateWithLifecycle()
 
     var video by remember { mutableStateOf<Video?>(null) }
     // 画面比例的重置放在下面的 LaunchedEffect(videoId) 里（加载入口、续播分支之后）：
@@ -497,6 +499,7 @@ fun PlayerScreen(
     // 字幕字号/位置（持久化，仿 fongmi SubtitleSetting）：修改后实时作用到当前 Player
     LaunchedEffect(savedSubtitleScale) { Players.setSubtitleScale(savedSubtitleScale) }
     LaunchedEffect(savedSubtitlePosition) { Players.setSubtitlePosition(savedSubtitlePosition) }
+    LaunchedEffect(savedSubtitleStyle) { Players.setSubtitleStyle(savedSubtitleStyle) }
 
     // 后台播放（设置三态：关闭/开启/画中画）：非关闭时退出播放页转交前台服务后台续播
     var backgroundMode by remember { mutableIntStateOf(BACKGROUND_OFF) }
@@ -4521,6 +4524,7 @@ private fun SubtitleSettingSideSheet(
     val playerState by Players.state.collectAsStateWithLifecycle()
     val subtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
     val subtitlePosition by settings.subtitlePosition.collectAsStateWithLifecycle()
+    val subtitleStyle by settings.subtitleStyle.collectAsStateWithLifecycle()
     // 默认点震动：记录上一次是否处于吸附区，仅在“进入”时震动一次
     val haptic = LocalHapticFeedback.current
     var scaleAtKeyPoint by remember { mutableStateOf(abs(subtitleScale - 1f) < 0.02f) }
@@ -4583,6 +4587,147 @@ private fun SubtitleSettingSideSheet(
                     .fillMaxWidth()
                     .padding(bottom = Spacing.titleContentGap),
             )
+            Text(
+                text = "字幕样式",
+                fontSize = 14.sp,
+                color = DarkOnSurfaceMuted,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            // 三档样式（对齐 fongmi SubtitleSetting：原样 / 跟随系统 / 自定义）
+            SubtitleStyleChips(
+                labels = listOf("原样", "跟随系统", "自定义"),
+                selectedIndex = subtitleStyle.mode,
+                onSelect = { index ->
+                    settings.setSubtitleStyle(subtitleStyle.copy(mode = index))
+                },
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            if (subtitleStyle.mode == SubtitleStyle.MODE_CUSTOM) {
+                Text(
+                    text = "文字颜色",
+                    fontSize = 13.sp,
+                    color = DarkOnSurfaceMuted,
+                    modifier = Modifier.padding(top = Spacing.sectionSpacing),
+                )
+                SubtitleColorSwatches(
+                    colors = listOf(
+                        SubtitleStyle.COLOR_WHITE,
+                        SubtitleStyle.COLOR_YELLOW,
+                        SubtitleStyle.COLOR_CYAN,
+                        SubtitleStyle.COLOR_GREEN,
+                        SubtitleStyle.COLOR_ORANGE,
+                        SubtitleStyle.COLOR_PINK,
+                        SubtitleStyle.COLOR_RED,
+                        SubtitleStyle.COLOR_BLUE,
+                        SubtitleStyle.COLOR_GRAY,
+                        SubtitleStyle.COLOR_BLACK,
+                    ),
+                    selected = subtitleStyle.textColor,
+                    onSelect = { color ->
+                        settings.setSubtitleStyle(subtitleStyle.copy(textColor = color))
+                    },
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                SubtitleStyleSliderRow(
+                    title = "文字透明度",
+                    value = subtitleStyle.textOpacity,
+                    display = "${(subtitleStyle.textOpacity * 100).roundToInt()}%",
+                    onChange = { opacity ->
+                        settings.setSubtitleStyle(subtitleStyle.copy(textOpacity = opacity))
+                    },
+                )
+                Text(
+                    text = "描边样式",
+                    fontSize = 13.sp,
+                    color = DarkOnSurfaceMuted,
+                    modifier = Modifier.padding(top = Spacing.sectionSpacing),
+                )
+                SubtitleStyleChips(
+                    labels = listOf("无", "描边", "投影"),
+                    selectedIndex = subtitleStyle.edgeType,
+                    onSelect = { type ->
+                        settings.setSubtitleStyle(subtitleStyle.copy(edgeType = type))
+                    },
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                if (subtitleStyle.edgeType != SubtitleStyle.EDGE_NONE) {
+                    Text(
+                        text = "描边颜色",
+                        fontSize = 13.sp,
+                        color = DarkOnSurfaceMuted,
+                        modifier = Modifier.padding(top = Spacing.sectionSpacing),
+                    )
+                    SubtitleColorSwatches(
+                        colors = listOf(
+                            SubtitleStyle.COLOR_BLACK,
+                            SubtitleStyle.COLOR_WHITE,
+                            SubtitleStyle.COLOR_GRAY,
+                            SubtitleStyle.COLOR_YELLOW,
+                        ),
+                        selected = subtitleStyle.edgeColor,
+                        onSelect = { color ->
+                            settings.setSubtitleStyle(subtitleStyle.copy(edgeColor = color))
+                        },
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    SubtitleStyleSliderRow(
+                        title = "描边透明度",
+                        value = subtitleStyle.edgeOpacity,
+                        display = "${(subtitleStyle.edgeOpacity * 100).roundToInt()}%",
+                        onChange = { opacity ->
+                            settings.setSubtitleStyle(subtitleStyle.copy(edgeOpacity = opacity))
+                        },
+                    )
+                }
+                Text(
+                    text = "背景颜色",
+                    fontSize = 13.sp,
+                    color = DarkOnSurfaceMuted,
+                    modifier = Modifier.padding(top = Spacing.sectionSpacing),
+                )
+                SubtitleStyleChips(
+                    labels = listOf("透明", "半透明", "黑色", "深灰"),
+                    selectedIndex = when (subtitleStyle.backgroundColor) {
+                        SubtitleStyle.BACKGROUND_DIM -> 1
+                        SubtitleStyle.BACKGROUND_BLACK -> 2
+                        SubtitleStyle.BACKGROUND_GRAY -> 3
+                        else -> 0
+                    },
+                    onSelect = { index ->
+                        val color = when (index) {
+                            1 -> SubtitleStyle.BACKGROUND_DIM
+                            2 -> SubtitleStyle.BACKGROUND_BLACK
+                            3 -> SubtitleStyle.BACKGROUND_GRAY
+                            else -> SubtitleStyle.COLOR_TRANSPARENT
+                        }
+                        settings.setSubtitleStyle(subtitleStyle.copy(backgroundColor = color))
+                    },
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                if (android.graphics.Color.alpha(subtitleStyle.backgroundColor) > 0) {
+                    SubtitleStyleSliderRow(
+                        title = "背景透明度",
+                        value = subtitleStyle.backgroundOpacity,
+                        display = "${(subtitleStyle.backgroundOpacity * 100).roundToInt()}%",
+                        onChange = { opacity ->
+                            settings.setSubtitleStyle(subtitleStyle.copy(backgroundOpacity = opacity))
+                        },
+                    )
+                }
+                Text(
+                    text = "恢复默认样式",
+                    fontSize = 13.sp,
+                    color = DarkOnSurfaceMuted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = Spacing.sectionSpacing)
+                        .clip(SquircleShape(Spacing.corner))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), SquircleShape(Spacing.corner))
+                        .clickable { settings.resetSubtitleStyle() }
+                        .padding(vertical = 10.dp),
+                )
+            }
             Text(
                 text = "字幕大小",
                 fontSize = 14.sp,
@@ -4679,6 +4824,117 @@ private fun SubtitleSettingSideSheet(
             }
         }
     }
+}
+
+/**
+ * 字幕样式选项行（仿 fongmi 的 ChipGroup：等宽药丸按钮，选中高亮）。
+ */
+@Composable
+private fun SubtitleStyleChips(
+    labels: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        labels.forEachIndexed { index, label ->
+            val selected = index == selectedIndex
+            val shape = SquircleShape(Spacing.corner)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(shape)
+                    .background(
+                        if (selected) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.06f),
+                    )
+                    .border(
+                        1.dp,
+                        if (selected) Color.White.copy(alpha = 0.55f) else Color.Transparent,
+                        shape,
+                    )
+                    .clickable { onSelect(index) }
+                    .padding(vertical = 9.dp),
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    color = if (selected) Color.White else DarkOnSurfaceMuted,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 字幕颜色色板（仿 fongmi 的颜色 chip，改用圆点色块，选中加白圈）。
+ */
+@Composable
+private fun SubtitleColorSwatches(
+    colors: List<Int>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        colors.forEach { color ->
+            val isSelected = color == selected
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(Color(color))
+                    .border(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) Color.White else Color.White.copy(alpha = 0.25f),
+                        shape = CircleShape,
+                    )
+                    .clickable { onSelect(color) },
+            )
+        }
+    }
+}
+
+/**
+ * 字幕样式里的百分比滑杆行（标题 + 当前值 + 滑杆），步进 5%。
+ */
+@Composable
+private fun SubtitleStyleSliderRow(
+    title: String,
+    value: Float,
+    display: String,
+    onChange: (Float) -> Unit,
+) {
+    Text(
+        text = title,
+        fontSize = 13.sp,
+        color = DarkOnSurfaceMuted,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = Spacing.sectionSpacing),
+    )
+    Text(
+        text = display,
+        fontSize = 18.sp,
+        color = Color.White,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+    )
+    Slider(
+        value = value,
+        onValueChange = onChange,
+        valueRange = 0f..1f,
+        steps = 19,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 /**
