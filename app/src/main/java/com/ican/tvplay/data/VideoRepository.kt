@@ -66,6 +66,10 @@ data class PlaySource(
     val qualities: List<com.ican.tvplay.data.remote.PlayQuality> = emptyList(),
     /** 当前选中的画质下标（fongmi Url.position） */
     val qualityPosition: Int = 0,
+    /** 站点随播放一起下发的字幕（fongmi Result.subs）：音乐源常见「歌词字幕」，直接挂成外挂字幕轨 */
+    val subs: List<com.ican.tvplay.player.core.SubItem> = emptyList(),
+    /** 站点随播放一起下发的封面（fongmi Result.artwork）：纯音频源没有视频轨，由 PlayerView 把封面画成画面 */
+    val artwork: String = "",
 )
 
 /**

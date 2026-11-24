@@ -381,7 +381,11 @@ object Players {
         playbackContext = ctx.copy(episodeIndex = targetIndex)
         val act = appContext ?: return
         // 后台切集同样跳过片头
-        start(act, PlaySpec(url = source.url, headers = source.headers), startPositionMs = ctx.openingMs)
+        start(
+            act,
+            PlaySpec(url = source.url, headers = source.headers, subs = source.subs),
+            startPositionMs = ctx.openingMs,
+        )
         // 后台切集：把新集锚点写进历史（进度从 0 开始计）
         val dao = container.historyDao
         val index = targetIndex

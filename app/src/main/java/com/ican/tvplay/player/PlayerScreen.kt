@@ -100,6 +100,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import coil3.asDrawable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -364,6 +365,8 @@ fun PlayerScreen(
     // 画质切换请求：-1 表示不指定（按 playerContent 返回体自带的 position）。
     // 单独作为重解析的触发键，避免「解析结果回写 qualityPosition」再触发一次重解析（网盘 jar 重解析很贵）
     var qualityRequest by remember { mutableIntStateOf(-1) }
+    // 播放中显示用的封面（纯音频源靠它顶替画面）：站点下发的 artwork 优先，回退详情页封面
+    var artworkUrl by remember { mutableStateOf("") }
 
     // 控制层状态：进入播放页默认隐藏，用户单击预览小窗后才呼出
     var controlsVisible by remember { mutableStateOf(false) }
@@ -441,7 +444,34 @@ fun PlayerScreen(
         }
     }
     DisposableEffect(Unit) {
-        onDispose { Players.unbindPlayerView(sharedPlayerView) }
+        onDispose {
+            Players.unbindPlayerView(sharedPlayerView)
+            sharedPlayerView.setDefaultArtwork(null)
+        }
+    }
+
+    // 纯音频源（音乐站源等）没有视频轨：照 fongmi VideoActivity.setArtwork 做法，
+    // 把封面设成 PlayerView 的 defaultArtwork。media3 只在「没有视频轨」时画这张图，
+    // 有视频轨的片子完全不受影响。
+    LaunchedEffect(artworkUrl) {
+        val url = artworkUrl.trim()
+        if (url.isEmpty()) {
+            sharedPlayerView.setDefaultArtwork(null)
+            return@LaunchedEffect
+        }
+        val model = com.ican.tvplay.util.posterModel(context, url)
+        if (model == null) {
+            sharedPlayerView.setDefaultArtwork(null)
+            return@LaunchedEffect
+        }
+        val drawable = withContext(Dispatchers.IO) {
+            runCatching {
+                val request = coil3.request.ImageRequest.Builder(context).data(model).build()
+                coil3.SingletonImageLoader.get(context).execute(request).image
+                    ?.asDrawable(context.resources)
+            }.getOrNull()
+        }
+        if (drawable != null) sharedPlayerView.setDefaultArtwork(drawable)
     }
 
     // 应用持久化设置到 Players
@@ -604,6 +634,8 @@ fun PlayerScreen(
         // 放在加载入口而不是 video 赋值之后：进页第一帧的小窗高度就与 16:9 的加载骨架一致。
         // 后台续播（上方提前 return）不重置，沿用播放器已报出的比例。
         Players.resetVideoAspectRatio()
+        // 同上：换片时先清掉上一部片的封面，避免加载期先闪一下旧封面
+        artworkUrl = ""
         // 每次重新进入观看视频：倍速重置为 1 倍速（用户要求），不沿用上次会话的设定值；
         // 同步写回设置，保证全屏长按快进松手恢复的 playbackSpeed（实时读取设置）与此一致；
         // 切集（videoId 不变）与后台续播返回（上方提前 return）不受影响
@@ -803,7 +835,10 @@ fun PlayerScreen(
                 return@LaunchedEffect
             }
             btBlockedMsg = null
-            val spec = PlaySpec(url = source.url, headers = source.headers)
+            // 站点下发的字幕（fongmi Result.subs，音乐源的歌词）随播放一起挂上；
+            // artwork 决定纯音频源显示什么画面（没有则回退详情页封面）
+            artworkUrl = source.artwork.ifBlank { v.cover }
+            val spec = PlaySpec(url = source.url, headers = source.headers, subs = source.subs)
             // 注册播放上下文：通知栏展示 / 上一集下一集 / 后台片尾自动切集依赖
             Players.playbackContext = Players.PlaybackContext(
                 video = v,

@@ -16,6 +16,11 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
@@ -410,6 +415,11 @@ class SpiderManager(private val appContext: Context) {
             val rawUrl = parsePlayerUrl(obj["url"], pos).ifBlank { playUrl }
             val headers = mutableMapOf<String, String>()
             obj["header"]?.let { el -> parseHeaderElement(el, headers) }
+            // 站点随播放下发的字幕与封面（fongmi Result.subs / Result.artwork）：
+            // 音乐源（如易听）只有音频轨，靠这两样才有「画面 + 歌词」。
+            val subs = parseSubs(obj["subs"])
+            val artwork = obj["artwork"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+                ?.trim().orEmpty()
             val parse = obj["parse"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             val jx = obj["jx"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             Log.d(TAG, "resolvePlayUrl rawUrl=$rawUrl parse=$parse jx=$jx pos=$pos/${qualities.size} headers=${headers.keys}")
@@ -427,6 +437,8 @@ class SpiderManager(private val appContext: Context) {
                 headers = headers,
                 qualities = fixedQualities,
                 qualityPosition = pos,
+                subs = subs,
+                artwork = artwork,
             )
         }.getOrNull()?.let { source ->
             // 网盘分享描述（形如 {"pg":"1","sToken":...}）不是可播放地址：
@@ -444,6 +456,49 @@ class SpiderManager(private val appContext: Context) {
             }
             source
         } ?: com.ican.tvplay.data.PlaySource(playUrl)
+    }
+
+    /**
+     * 解析 jar 返回的 subs（对齐 fongmi Result.subs / bean.Sub）：
+     * 1. 对象数组：[{"url":"...","name":"歌词","lang":"zh","format":"application/x-subrip"}]
+     * 2. 字符串数组：["https://.../a.ass"]
+     * 3. 单个字符串："https://.../a.srt"
+     * 缺 name 时按序号补，保证字幕轨有可读标签。
+     */
+    private fun parseSubs(el: JsonElement?): List<com.ican.tvplay.player.core.SubItem> {
+        if (el == null) return emptyList()
+        val out = mutableListOf<com.ican.tvplay.player.core.SubItem>()
+        fun addFromObject(o: JsonObject) {
+            val url = runCatching { o["url"]?.jsonPrimitive?.contentOrNull }.getOrNull()?.trim().orEmpty()
+            if (url.isEmpty()) return
+            val name = runCatching { o["name"]?.jsonPrimitive?.contentOrNull }.getOrNull()?.trim()
+            val lang = runCatching { o["lang"]?.jsonPrimitive?.contentOrNull }.getOrNull()?.trim()
+            val format = runCatching { o["format"]?.jsonPrimitive?.contentOrNull }.getOrNull()?.trim()
+            out += com.ican.tvplay.player.core.SubItem(
+                name = name?.takeIf { it.isNotEmpty() } ?: "字幕${out.size + 1}",
+                url = url,
+                mimeType = format?.takeIf { it.isNotEmpty() },
+                lang = lang?.takeIf { it.isNotEmpty() },
+            )
+        }
+        fun addFromString(s: String) {
+            val url = s.trim()
+            if (url.isEmpty()) return
+            out += com.ican.tvplay.player.core.SubItem(name = "字幕${out.size + 1}", url = url)
+        }
+        when (el) {
+            is JsonArray -> el.forEach { item ->
+                when (item) {
+                    is JsonObject -> addFromObject(item)
+                    is JsonPrimitive -> item.contentOrNull?.let { addFromString(it) }
+                    else -> Unit
+                }
+            }
+            is JsonObject -> addFromObject(el)
+            is JsonPrimitive -> el.contentOrNull?.let { addFromString(it) }
+            else -> Unit
+        }
+        return out
     }
 
     /**
