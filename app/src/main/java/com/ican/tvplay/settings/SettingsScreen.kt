@@ -74,6 +74,7 @@ import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.ArcStretchSpinner
 import com.ican.tvplay.ui.components.MiuixBottomSheetDialog
 import com.ican.tvplay.ui.components.MiuixConfirmDialog
+import com.ican.tvplay.ui.components.SegmentedTabs
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.defaultPosterColumns
 import com.ican.tvplay.ui.components.defaultWideColumns
@@ -587,40 +588,25 @@ private fun FavoriteSyncDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 同步模式分段按钮：双向 / 上传 / 下载（选中段主题色，高度沿用原胶囊）
-                val segmentShape = RoundedCornerShape(percent = 50)
-                Row(
-                    modifier = Modifier.background(
-                        MiuixTheme.colorScheme.secondaryVariant,
-                        segmentShape,
-                    ),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    listOf(
-                        com.ican.tvplay.data.FavoriteSync.MODE_TWO_WAY to "双向",
-                        com.ican.tvplay.data.FavoriteSync.MODE_UPLOAD to "上传",
-                        com.ican.tvplay.data.FavoriteSync.MODE_DOWNLOAD to "下载",
-                    ).forEach { (mode, label) ->
-                        val selected = syncMode == mode
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (selected) {
-                                MiuixTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MiuixTheme.colorScheme.onSurfaceVariantSummary
+                // 同步模式分段按钮：双向 / 上传 / 下载（与播放页字幕设置共用 SegmentedTabs 样式）
+                SegmentedTabs(
+                    labels = listOf("双向", "上传", "下载"),
+                    selectedIndex = when (syncMode) {
+                        com.ican.tvplay.data.FavoriteSync.MODE_TWO_WAY -> 0
+                        com.ican.tvplay.data.FavoriteSync.MODE_UPLOAD -> 1
+                        else -> 2
+                    },
+                    fillWidth = false,
+                    onSelect = { index ->
+                        viewModel.setSyncMode(
+                            when (index) {
+                                0 -> com.ican.tvplay.data.FavoriteSync.MODE_TWO_WAY
+                                1 -> com.ican.tvplay.data.FavoriteSync.MODE_UPLOAD
+                                else -> com.ican.tvplay.data.FavoriteSync.MODE_DOWNLOAD
                             },
-                            modifier = Modifier
-                                .clip(segmentShape)
-                                .background(
-                                    if (selected) MiuixTheme.colorScheme.primaryContainer
-                                    else Color.Transparent,
-                                )
-                                .clickable { viewModel.setSyncMode(mode) }
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
                         )
-                    }
-                }
+                    },
+                )
                 Spacer(modifier = Modifier.width(Spacing.titleContentGap))
                 IconButton(
                     onClick = {

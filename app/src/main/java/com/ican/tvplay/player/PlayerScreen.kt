@@ -200,6 +200,7 @@ import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.ArcStretchSpinner
 import com.ican.tvplay.ui.components.FadingScrim
+import com.ican.tvplay.ui.components.SegmentedTabs
 import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
@@ -4852,8 +4853,8 @@ private fun SubtitleSettingSideSheet(
 }
 
 /**
- * 字幕样式选项行：与「收藏页同步」的模式切换同款分段按钮
- * （整条 secondaryVariant 胶囊，选中段 primaryContainer 底 + onPrimaryContainer 文字）。
+ * 字幕样式选项行：fongmi PlaybackDialogTabs 同款「连通外框 + 选中段主题色填充」分段按钮，
+ * 与设置页「收藏同步」共用 [SegmentedTabs]。
  */
 @Composable
 private fun SubtitleStyleChips(
@@ -4862,41 +4863,12 @@ private fun SubtitleStyleChips(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val segmentShape = RoundedCornerShape(percent = 50)
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(segmentShape)
-            .background(MiuixTheme.colorScheme.secondaryVariant, segmentShape),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        labels.forEachIndexed { index, label ->
-            val selected = index == selectedIndex
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                color = if (selected) {
-                    MiuixTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MiuixTheme.colorScheme.onSurfaceVariantSummary
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(segmentShape)
-                    .background(
-                        if (selected) MiuixTheme.colorScheme.primaryContainer else Color.Transparent,
-                        segmentShape,
-                    )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onSelect(index) }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            )
-        }
-    }
+    SegmentedTabs(
+        labels = labels,
+        selectedIndex = selectedIndex,
+        onSelect = onSelect,
+        modifier = modifier,
+    )
 }
 
 /**
