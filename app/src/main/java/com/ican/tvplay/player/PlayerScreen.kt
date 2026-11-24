@@ -44,6 +44,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -4575,27 +4576,36 @@ private fun SubtitleSettingSideSheet(
                 .width(panelWidth)
                 .clip(panelShape)
                 .background(DarkSurfaceElevated, panelShape)
-                .then(if (statusBarInset) Modifier.statusBarsPadding() else Modifier)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                 ) {}
-                // 左右边距 = 全局弹窗内容边距；顶部间距 = titleContentGap；
+                // 左右边距 = 全局弹窗内容边距；顶部内边距不再放在滚动容器上
+                //（放上去会在面板上方形成一条硬截断带，内容永远滑不到面板最顶端），
+                // 改由标题自身带上顶部留白，内容可一直滚到面板顶缘。
                 // 底部边距移到 verticalScroll 之后随内容滚动：列表可滑到面板最底缘，不再被固定内边距遮挡
                 .padding(horizontal = Spacing.dialogContentMargin)
-                .padding(top = Spacing.titleContentGap)
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = Spacing.dialogContentMargin),
         ) {
             // 侧栏固定深色底，miuix 滑杆强制使用深色色板，避免浅色主题下滑杆轨道看不清
             MiuixTheme(colors = darkColorScheme()) {
+            // 竖屏非全屏时给状态栏让位：作为可滚动内容的顶部留白（而不是容器内边距）
+            val statusBarTopPadding = if (statusBarInset) {
+                WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            } else {
+                0.dp
+            }
             // 排版对齐 fongmi dialog_subtitle_setting：顶部标题 + 右侧「重置」，下面一排 Tab 按钮
             var subtitleTab by remember { mutableIntStateOf(0) }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = Spacing.titleContentGap),
+                    .padding(
+                        top = Spacing.titleContentGap + statusBarTopPadding,
+                        bottom = Spacing.titleContentGap,
+                    ),
             ) {
                 Text(
                     text = "字幕设置",
