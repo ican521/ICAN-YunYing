@@ -212,6 +212,8 @@ import com.ican.tvplay.ui.theme.DarkOnSurface
 import com.ican.tvplay.ui.theme.DarkOnSurfaceMuted
 import com.ican.tvplay.ui.theme.DarkSurfaceElevated
 import com.ican.tvplay.ui.theme.LocalDarkTheme
+import com.ican.tvplay.ui.theme.chipTintedFill
+import com.ican.tvplay.ui.theme.chipTintedText
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.compose.runtime.snapshotFlow
@@ -2967,6 +2969,7 @@ private fun LineSection(
     onLineChange: (String) -> Unit,
     horizontalPadding: Dp,
 ) {
+    val darkMode = LocalDarkTheme.current
     // 当前选中线路在列表中的索引
     val selectedIdx = v.playSources.indexOfFirst { it.flag == lineFlag }.coerceAtLeast(0)
     val listState = rememberLazyListState(
@@ -3009,6 +3012,9 @@ private fun LineSection(
         items(v.playSources, key = { it.flag }, contentType = { "line" }) { source ->
             val selected = source.flag == lineFlag
             val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
+            val primary = MiuixTheme.colorScheme.primary
+            val tintedFill = remember(primary, darkMode) { chipTintedFill(primary, darkMode) }
+            val tintedText = remember(primary, darkMode) { chipTintedText(primary, darkMode) }
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -3021,8 +3027,8 @@ private fun LineSection(
                         pressEffect = false,
                     )
                     .background(
-                        // 与搜索页站源胶囊、选集 EpisodeChip 选中态一致：primary 主题色底 + onPrimary 自适应文字
-                        if (selected) MiuixTheme.colorScheme.primary
+                        // 选中：primary 派生 tinted 底；未选中 secondaryVariant
+                        if (selected) tintedFill
                         else MiuixTheme.colorScheme.secondaryVariant,
                         shape,
                     )
@@ -3031,8 +3037,9 @@ private fun LineSection(
                 Text(
                     text = source.flag,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (selected) MiuixTheme.colorScheme.onPrimary
+                    color = if (selected) tintedText
                     else MiuixTheme.colorScheme.onSecondaryVariant,
+                    fontWeight = if (selected) FontWeight.SemiBold else null,
                     maxLines = 1,
                 )
             }
@@ -3053,6 +3060,7 @@ private fun QualityRow(
     onQualityChange: (Int) -> Unit,
     horizontalPadding: Dp,
 ) {
+    val darkMode = LocalDarkTheme.current
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = qualityPosition.coerceAtLeast(0))
     LaunchedEffect(qualityPosition) {
         if (qualityPosition !in qualities.indices) return@LaunchedEffect
@@ -3086,6 +3094,9 @@ private fun QualityRow(
         itemsIndexed(qualities, key = { idx, q -> "$idx|${q.name}|${q.url.take(40)}" }, contentType = { _, _ -> "quality" }) { idx, q ->
             val selected = idx == qualityPosition
             val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
+            val primary = MiuixTheme.colorScheme.primary
+            val tintedFill = remember(primary, darkMode) { chipTintedFill(primary, darkMode) }
+            val tintedText = remember(primary, darkMode) { chipTintedText(primary, darkMode) }
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -3096,7 +3107,7 @@ private fun QualityRow(
                         pressEffect = false,
                     )
                     .background(
-                        if (selected) MiuixTheme.colorScheme.primary
+                        if (selected) tintedFill
                         else MiuixTheme.colorScheme.secondaryVariant,
                         shape,
                     )
@@ -3106,8 +3117,9 @@ private fun QualityRow(
                     // 名称为空时兜底成位置（fongmi Url.n(position)，数组形态才有名称）
                     text = q.name.ifBlank { "画质${idx + 1}" },
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (selected) MiuixTheme.colorScheme.onPrimary
+                    color = if (selected) tintedText
                     else MiuixTheme.colorScheme.onSecondaryVariant,
+                    fontWeight = if (selected) FontWeight.SemiBold else null,
                     maxLines = 1,
                 )
             }
@@ -4169,6 +4181,10 @@ private fun EpisodeChip(
     enforceMinHeight: Boolean = true,
 ) {
     val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
+    val darkMode = LocalDarkTheme.current
+    val primary = MiuixTheme.colorScheme.primary
+    val tintedFill = remember(primary, darkMode) { chipTintedFill(primary, darkMode) }
+    val tintedText = remember(primary, darkMode) { chipTintedText(primary, darkMode) }
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -4179,9 +4195,9 @@ private fun EpisodeChip(
             )
             // 选集列表自带选中态：整列表（含未选中项）统一不要按压/点击蒙层，选中色即反馈
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false, pressEffect = false)
-            // 选中：primary 主题色底 + onPrimary 自适应文字；未选中 secondaryVariant（浅 #F0F0F0 / 深 #434343）
+            // 选中：primary 派生 tinted 底；未选中 secondaryVariant（浅 #F0F0F0 / 深 #434343）
             .background(
-                if (selected) MiuixTheme.colorScheme.primary
+                if (selected) tintedFill
                 else MiuixTheme.colorScheme.secondaryVariant,
                 shape,
             )
@@ -4190,8 +4206,9 @@ private fun EpisodeChip(
         Text(
             text = title,
             style = MaterialTheme.typography.labelMedium,
-            color = if (selected) MiuixTheme.colorScheme.onPrimary
+            color = if (selected) tintedText
             else MiuixTheme.colorScheme.onSecondaryVariant,
+            fontWeight = if (selected) FontWeight.SemiBold else null,
             maxLines = 1,
         )
     }
@@ -4301,14 +4318,18 @@ private fun EpisodeSideSheet(
                     itemsIndexed(episodes, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { idx, ep ->
                         val selected = idx == currentIndex
                         val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
+                        val primary = MiuixTheme.colorScheme.primary
+                        // 面板固定深色，选中态按深色档派生
+                        val tintedFill = remember(primary) { chipTintedFill(primary, dark = true) }
+                        val tintedText = remember(primary) { chipTintedText(primary, dark = true) }
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(shape)
                                 .background(
-                                    // 与字幕设置分段单选一致：选中 = secondaryVariant（深灰实底），未选中 = 透明
-                                    if (selected) MiuixTheme.colorScheme.secondaryVariant
+                                    // 选中 = primary 派生 tinted 底；未选中 = 透明
+                                    if (selected) tintedFill
                                     else Color.Transparent,
                                 )
                                 .border(
@@ -4327,9 +4348,10 @@ private fun EpisodeSideSheet(
                             Text(
                                 text = ep.title,
                                 fontSize = 14.sp,
-                                // 与字幕设置分段单选文字一致：选中 onSurface，未选中 onSurfaceVariantSummary
-                                color = if (selected) MiuixTheme.colorScheme.onSurface
+                                // 选中 tinted 文字；未选中 onSurfaceVariantSummary
+                                color = if (selected) tintedText
                                 else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                fontWeight = if (selected) FontWeight.SemiBold else null,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )

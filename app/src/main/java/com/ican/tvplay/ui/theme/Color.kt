@@ -43,6 +43,89 @@ const val SelectionFillAlpha = 0.18f
 // 竖屏横滑选集与「更多」弹窗走 EpisodeChip 的 primary / secondaryVariant 实底。常量保留以备回溯。
 const val EpisodeSelectedFillAlpha = 0.25f
 
+// 详情页「线路 / 画质 / 选集」选中态 tinted（方案 G+）：选中底 + 选中文字，禁止页面内联算色。
+// 页面传入的 primary 已是主题色压深/提亮后的档位值（见 ThemePalettes 的 seed 派生），这里不再做 HSV 偏移。
+
+/** 浅色档选中底色：主题色 14% 叠在浅色容器底上 */
+const val ChipTintedFillAlphaLight = 0.14f
+
+/** 深色档选中底色：主题色 22% 叠在深色容器底上 */
+const val ChipTintedFillAlphaDark = 0.22f
+
+/** 浅色档选中文字起步主色占比（其余压向 [ChipTintedTextAnchorLight]），对比度不足时再按守护步长推远 */
+private const val ChipTintedTextPrimaryRatioLight = 0.74f
+
+/** 深色档选中文字起步主色占比（其余压向白），对比度不足时再按守护步长推远 */
+private const val ChipTintedTextPrimaryRatioDark = 0.55f
+
+/** 浅色档选中文字的压深锚色 */
+private val ChipTintedTextAnchorLight = Color(0xFF001018)
+
+/** 文字-底色对比度守护阈值（WCAG AA 正文 4.5:1） */
+private const val ChipTintedTextContrastTarget = 4.5
+
+/** 对比度守护：向锚色方向推远的单步步长（主色占比每次递减 0.01） */
+private const val ChipTintedTextGuardStep = 0.01f
+
+/**
+ * 选中态底色：sRGB 通道线性插值 base→primary（等价 CSS `color-mix(in srgb, primary X%, base)`），返回不透明结果色。
+ * @param dark true 叠在 [DarkSurface] 上用 [ChipTintedFillAlphaDark]；false 叠在 [LightSurface] 上用 [ChipTintedFillAlphaLight]
+ */
+fun chipTintedFill(primary: Color, dark: Boolean): Color {
+    val base = if (dark) DarkSurface else LightSurface
+    val ratio = if (dark) ChipTintedFillAlphaDark else ChipTintedFillAlphaLight
+    return srgbMix(base, primary, ratio)
+}
+
+/**
+ * 选中态文字：以 primary 为起点向锚色混合（浅色锚 [ChipTintedTextAnchorLight]、深色锚白），
+ * 起步主色占比 [ChipTintedTextPrimaryRatioLight] / [ChipTintedTextPrimaryRatioDark]；
+ * 与 [chipTintedFill] 的 WCAG 对比度不足 [ChipTintedTextContrastTarget] 时，按 [ChipTintedTextGuardStep]
+ * 继续向锚色方向推远，直到达标（锚色占比上限 1.0）。
+ */
+fun chipTintedText(primary: Color, dark: Boolean): Color {
+    val anchor = if (dark) Color.White else ChipTintedTextAnchorLight
+    var primaryRatio = if (dark) ChipTintedTextPrimaryRatioDark else ChipTintedTextPrimaryRatioLight
+    val fill = chipTintedFill(primary, dark)
+    var text = srgbMix(anchor, primary, primaryRatio)
+    while (contrastRatio(text, fill) < ChipTintedTextContrastTarget && primaryRatio > 0f) {
+        primaryRatio -= ChipTintedTextGuardStep
+        text = srgbMix(anchor, primary, primaryRatio)
+    }
+    return text
+}
+
+/** sRGB 通道线性插值：start*(1-f) + stop*f；两端均不透明，按 ARGB Long 组装 */
+private fun srgbMix(start: Color, stop: Color, fraction: Float): Color {
+    fun channel(a: Float, b: Float): Int = Math.round(
+        (a + (b - a) * fraction).coerceIn(0f, 1f) * 255f,
+    )
+    val r = channel(start.red, stop.red)
+    val g = channel(start.green, stop.green)
+    val b = channel(start.blue, stop.blue)
+    val argb = (0xFFL shl 24) or (r.toLong() shl 16) or (g.toLong() shl 8) or b.toLong()
+    return Color(argb)
+}
+
+/** WCAG 2.x 相对亮度（sRGB→线性，权重 0.2126 / 0.7152 / 0.0722） */
+private fun relativeLuminance(color: Color): Float {
+    fun linear(c: Float): Float =
+        if (c <= 0.03928f) c / 12.92f else Math.pow(((c + 0.055f) / 1.055f).toDouble(), 2.4).toFloat()
+    val r = linear(color.red)
+    val g = linear(color.green)
+    val b = linear(color.blue)
+    return 0.2126f * r + 0.7152f * g + 0.0722f * b
+}
+
+/** WCAG 对比度 (L1+0.05)/(L2+0.05)，其中 L1 ≥ L2 */
+private fun contrastRatio(a: Color, b: Color): Double {
+    val la = relativeLuminance(a).toDouble()
+    val lb = relativeLuminance(b).toDouble()
+    val lighter = maxOf(la, lb)
+    val darker = minOf(la, lb)
+    return (lighter + 0.05) / (darker + 0.05)
+}
+
 // 海报卡片叠加层（首页/收藏/历史/搜索结果共用），保证各页海报视觉一致
 val PosterBadgeScrim = Color(0x66000000)   // 左上角站源/评分角标底
 // 海报内标题样式的副标题文字色（标题下方的更新时间/状态小字，无胶囊底）
