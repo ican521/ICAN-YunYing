@@ -17,6 +17,7 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -42,6 +43,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.asPaddingValues
@@ -3552,6 +3554,8 @@ private fun FullscreenPlayLayout(
     }
     // 锁定状态下的解锁按钮显隐（单击唤出，2.5s 自动隐藏）
     var unlockHint by remember { mutableStateOf(false) }
+    // 点击「解锁」瞬间跳过 exit 动画直接移除；下次上锁时复位
+    var skipUnlockExit by remember { mutableStateOf(false) }
     LaunchedEffect(unlockHint) {
         if (unlockHint) {
             delay(2500)
@@ -3588,6 +3592,7 @@ private fun FullscreenPlayLayout(
             speedUpHint = false
             sliderSeekFraction = null
             adjustType = null
+            skipUnlockExit = false
         }
     }
 
@@ -3979,13 +3984,17 @@ private fun FullscreenPlayLayout(
                 Icon(AppIcons.LockOpen, "锁屏", tint = Color.White, modifier = Modifier.size(24.dp))
             }
         }
-        if (locked && unlockHint) {
+        AnimatedVisibility(
+            visible = locked && unlockHint,
+            enter = fadeIn(tween(CONTROL_FADE_DURATION_MS)),
+            exit = if (skipUnlockExit) ExitTransition.None else fadeOut(tween(CONTROL_FADE_DURATION_MS)),
+            modifier = Modifier.align(Alignment.CenterEnd),
+        ) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
                     .padding(end = 4.dp)
                     .size(48.dp)
-                    .tvCardEffect(onClick = { onUnlock() }, shape = CircleShape, focusedScale = 1.10f, glow = false, pressEffect = false),
+                    .tvCardEffect(onClick = { skipUnlockExit = true; onUnlock() }, shape = CircleShape, focusedScale = 1.10f, glow = false, pressEffect = false),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(AppIcons.Lock, "解锁", tint = Color.White, modifier = Modifier.size(24.dp))
@@ -4520,6 +4529,7 @@ private fun SubtitleDialog(
 }
 
 /** 字幕设置侧边栏：与 EpisodeSideSheet 同款右侧滑入面板 */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun SubtitleSettingSideSheet(
     statusBarInset: Boolean,
@@ -4613,22 +4623,31 @@ private fun SubtitleSettingSideSheet(
                 )
                 Text(
                     text = "重置",
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     color = DarkOnSurfaceMuted,
                     modifier = Modifier
                         .clip(SquircleShape(Spacing.corner))
                         .border(1.dp, Color.White.copy(alpha = 0.15f), SquircleShape(Spacing.corner))
-                        .clickable {
+                        .combinedClickable(
                             // 对齐 fongmi：短按重置当前 Tab
-                            when (subtitleTab) {
-                                0 -> settings.resetSubtitleStyle()
-                                1 -> {
-                                    settings.setSubtitleScale(1f)
-                                    settings.setSubtitlePosition(0f)
+                            onClick = {
+                                when (subtitleTab) {
+                                    0 -> settings.resetSubtitleStyle()
+                                    1 -> {
+                                        settings.setSubtitleScale(1f)
+                                        settings.setSubtitlePosition(0f)
+                                    }
+                                    else -> Players.setSubtitleOffset(0)
                                 }
-                                else -> Players.setSubtitleOffset(0)
-                            }
-                        }
+                            },
+                            // 长按全重置（fongmi resetAll 同款）：不切 Tab、不加 toast/snackbar 提示
+                            onLongClick = {
+                                settings.resetSubtitleStyle()
+                                settings.setSubtitleScale(1f)
+                                settings.setSubtitlePosition(0f)
+                                Players.setSubtitleOffset(0)
+                            },
+                        )
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
@@ -4639,26 +4658,19 @@ private fun SubtitleSettingSideSheet(
                 modifier = Modifier.padding(bottom = Spacing.sectionSpacing),
             )
             if (subtitleTab == 0) {
-            Text(
-                text = "字幕样式",
-                fontSize = 14.sp,
-                color = DarkOnSurfaceMuted,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            // 三档样式（对齐 fongmi SubtitleSetting：原样 / 跟随系统 / 自定义）
+            SideSheetSectionTitle("字幕样式")
+            // 两档样式（对齐 fongmi SubtitleSetting：系统 / 自定义）
             SubtitleStyleChips(
-                labels = listOf("原样", "跟随系统", "自定义"),
-                selectedIndex = subtitleStyle.mode,
+                labels = listOf("系统", "自定义"),
+                selectedIndex = if (subtitleStyle.mode == SubtitleStyle.MODE_CUSTOM) 1 else 0,
                 onSelect = { index ->
-                    settings.setSubtitleStyle(subtitleStyle.copy(mode = index))
+                    settings.setSubtitleStyle(subtitleStyle.copy(mode = if (index == 1) SubtitleStyle.MODE_CUSTOM else SubtitleStyle.MODE_SYSTEM))
                 },
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
             )
             if (subtitleStyle.mode == SubtitleStyle.MODE_CUSTOM) {
-                Text(
+                SideSheetSectionTitle(
                     text = "文字颜色",
-                    fontSize = 14.sp,
-                    color = DarkOnSurfaceMuted,
                     modifier = Modifier.padding(top = Spacing.sectionSpacing),
                 )
                 SubtitleColorSwatches(
@@ -4678,7 +4690,7 @@ private fun SubtitleSettingSideSheet(
                     onSelect = { color ->
                         settings.setSubtitleStyle(subtitleStyle.copy(textColor = color))
                     },
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
                 )
                 SubtitleStyleSliderRow(
                     title = "文字透明度",
@@ -4688,10 +4700,8 @@ private fun SubtitleSettingSideSheet(
                         settings.setSubtitleStyle(subtitleStyle.copy(textOpacity = opacity))
                     },
                 )
-                Text(
+                SideSheetSectionTitle(
                     text = "描边样式",
-                    fontSize = 14.sp,
-                    color = DarkOnSurfaceMuted,
                     modifier = Modifier.padding(top = Spacing.sectionSpacing),
                 )
                 SubtitleStyleChips(
@@ -4700,13 +4710,11 @@ private fun SubtitleSettingSideSheet(
                     onSelect = { type ->
                         settings.setSubtitleStyle(subtitleStyle.copy(edgeType = type))
                     },
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
                 )
                 if (subtitleStyle.edgeType != SubtitleStyle.EDGE_NONE) {
-                    Text(
+                    SideSheetSectionTitle(
                         text = "描边颜色",
-                        fontSize = 14.sp,
-                        color = DarkOnSurfaceMuted,
                         modifier = Modifier.padding(top = Spacing.sectionSpacing),
                     )
                     SubtitleColorSwatches(
@@ -4720,7 +4728,7 @@ private fun SubtitleSettingSideSheet(
                         onSelect = { color ->
                             settings.setSubtitleStyle(subtitleStyle.copy(edgeColor = color))
                         },
-                        modifier = Modifier.padding(top = 8.dp),
+                        modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
                     )
                     SubtitleStyleSliderRow(
                         title = "描边透明度",
@@ -4731,10 +4739,8 @@ private fun SubtitleSettingSideSheet(
                         },
                     )
                 }
-                Text(
+                SideSheetSectionTitle(
                     text = "背景颜色",
-                    fontSize = 14.sp,
-                    color = DarkOnSurfaceMuted,
                     modifier = Modifier.padding(top = Spacing.sectionSpacing),
                 )
                 SubtitleStyleChips(
@@ -4754,7 +4760,7 @@ private fun SubtitleSettingSideSheet(
                         }
                         settings.setSubtitleStyle(subtitleStyle.copy(backgroundColor = color))
                     },
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
                 )
                 if (android.graphics.Color.alpha(subtitleStyle.backgroundColor) > 0) {
                     SubtitleStyleSliderRow(
@@ -4769,19 +4775,14 @@ private fun SubtitleSettingSideSheet(
             }
             }
             if (subtitleTab == 1) {
-            Text(
-                text = "字幕大小",
-                fontSize = 14.sp,
-                color = DarkOnSurfaceMuted,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            SideSheetSectionTitle("字幕大小")
             Text(
                 text = "${(subtitleScale * 100).roundToInt()}%",
                 fontSize = 20.sp,
                 color = Color.White,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp),
+                    .padding(top = Spacing.titleToValueGap),
             )
             Slider(
                 value = subtitleScale,
@@ -4803,10 +4804,8 @@ private fun SubtitleSettingSideSheet(
                 hapticEffect = SliderDefaults.SliderHapticEffect.None,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text(
+            SideSheetSectionTitle(
                 text = "字幕位置（正值上移）",
-                fontSize = 14.sp,
-                color = DarkOnSurfaceMuted,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = Spacing.sectionSpacing),
@@ -4821,7 +4820,7 @@ private fun SubtitleSettingSideSheet(
                 color = Color.White,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp),
+                    .padding(top = Spacing.titleToValueGap),
             )
             Slider(
                 value = subtitlePosition,
@@ -4846,28 +4845,34 @@ private fun SubtitleSettingSideSheet(
             )
             }
             if (subtitleTab == 2) {
-            Text(
-                text = "字幕偏移",
-                fontSize = 14.sp,
-                color = DarkOnSurfaceMuted,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = Spacing.sectionSpacing),
-            )
+            SideSheetSectionTitle("字幕偏移")
             OffsetAdjustRow(
                 offsetMs = playerState.subtitleOffsetMs,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
             )
             Text(
                 text = "正数延后显示，负数提前显示，单位秒；仅对外挂字幕生效",
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = DarkOnSurfaceMuted,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
             )
             }
         }
     }
     }
+}
+
+/**
+ * 字幕设置侧栏标题：14.sp / DarkOnSurfaceMuted / 通栏；段内标题通过 modifier 传 sectionSpacing 顶部间距。
+ */
+@Composable
+private fun SideSheetSectionTitle(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        fontSize = 14.sp,
+        color = DarkOnSurfaceMuted,
+        modifier = modifier.fillMaxWidth(),
+    )
 }
 
 /**
@@ -4934,10 +4939,8 @@ private fun SubtitleStyleSliderRow(
     display: String,
     onChange: (Float) -> Unit,
 ) {
-    Text(
+    SideSheetSectionTitle(
         text = title,
-        fontSize = 14.sp,
-        color = DarkOnSurfaceMuted,
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = Spacing.sectionSpacing),
@@ -4948,7 +4951,7 @@ private fun SubtitleStyleSliderRow(
         color = Color.White,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 4.dp),
+            .padding(top = Spacing.titleToValueGap),
     )
     Slider(
         value = value,

@@ -171,7 +171,7 @@ object Players {
     /** 字幕位置百分比（正数上移，0 为默认贴底） */
     private var subtitlePosition = 0f
 
-    /** 字幕样式（原样/跟随系统/自定义；对齐 fongmi SubtitleSetting） */
+    /** 字幕样式（跟随系统/自定义；对齐 fongmi SubtitleSetting） */
     private var subtitleStyle: SubtitleStyle = SubtitleStyle.DEFAULT
 
     /** 添加外挂字幕后，需要在 onTracksChanged 中强制选中该外挂字幕轨道 */
@@ -689,7 +689,7 @@ object Players {
 
     /**
      * 字幕样式（对齐 fongmi SubtitleSetting.applyStyle）：
-     * 原样 = 尊重字幕文件自带样式；跟随系统 = 读系统无障碍字幕样式；自定义 = 用我们的颜色/透明度。
+     * 跟随系统 = 读系统无障碍字幕样式；自定义 = 用我们的颜色/透明度。
      */
     fun setSubtitleStyle(style: SubtitleStyle) {
         subtitleStyle = style
@@ -699,19 +699,25 @@ object Players {
     private fun applySubtitleStyle() {
         val view = resolveSubtitleView() ?: return
         when (subtitleStyle.mode) {
-            SubtitleStyle.MODE_ORIGINAL -> {
-                // 先复位全局样式：无内嵌样式的字幕（如 SRT）不再沿用上一档的颜色/描边/背景
-                view.setStyle(androidx.media3.ui.CaptionStyleCompat.DEFAULT)
-                view.setApplyEmbeddedStyles(true)
-            }
             SubtitleStyle.MODE_SYSTEM -> {
                 view.setApplyEmbeddedStyles(false)
                 val manager = appContext?.getSystemService(Context.CAPTIONING_SERVICE)
                     as? android.view.accessibility.CaptioningManager
-                val systemStyle = manager?.userStyle
+                val systemCaptionStyle = manager?.userStyle?.let {
+                    androidx.media3.ui.CaptionStyleCompat.createFromCaptionStyle(it)
+                }
                 view.setStyle(
-                    if (systemStyle != null) {
-                        androidx.media3.ui.CaptionStyleCompat.createFromCaptionStyle(systemStyle)
+                    if (systemCaptionStyle != null) {
+                        // 保留系统前景色/描边类型/描边色/字体；背景与窗口色强制透明，
+                        // 不跟随系统无障碍字幕的底框
+                        androidx.media3.ui.CaptionStyleCompat(
+                            systemCaptionStyle.foregroundColor,
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT,
+                            systemCaptionStyle.edgeType,
+                            systemCaptionStyle.edgeColor,
+                            systemCaptionStyle.typeface,
+                        )
                     } else {
                         androidx.media3.ui.CaptionStyleCompat.DEFAULT
                     },

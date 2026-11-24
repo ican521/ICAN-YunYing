@@ -17,7 +17,7 @@ import top.yukonga.miuix.kmp.utils.getRoundedCorner
  * | 档位 | 用途 | 对应常量 |
  * | ---- | ---- | ---- |
  * | 2dp | 极小元素内部微调（角标上下、分类 Tab 上下） | [categoryTabVertical]、[posterBadgePaddingV] |
- * | 4dp | 小元素内部 / 胶囊内衬 / 横卡文字区上下内衬 | [posterTagRowTopGap]、[bottomBarInnerPadding]、[searchWideCardPaddingV] |
+ * | 4dp | 小元素内部 / 胶囊内衬 / 横卡文字区上下内衬 / 小标题↔紧邻控件 | [posterTagRowTopGap]、[bottomBarInnerPadding]、[searchWideCardPaddingV]、[titleToValueGap] |
  * | 6dp | 角标级别左右内边距、卡片标题层顶部 | [posterBadgePaddingH]、[posterTitleTopGap] |
  * | 8dp | 相邻元素（标题↔chips 或正文、列表项、胶囊流式排列、叠加层外边距、卡片标题层底部） | [videoTitleContentGap]、[videoTitleToMetaGap]、[dialogItemGap]、[searchChipGap]、[siteListItemGap]、[posterOverlayMargin]、[posterTitleVisualGap]
  * | 10dp | 卡片标题层水平、历史卡片进度条底距（紧贴卡片边） | [posterTitlePaddingH]、[historyProgressBarGap] |
@@ -153,6 +153,9 @@ object Spacing {
 
     /** 海报标签行（标题上方胶囊）与上方内容的间距 */
     val posterTagRowTopGap = 4.dp
+
+    /** 小标题与紧邻控件（数值 / 滑杆当前值等）之间：4dp（档位表 4 档） */
+    val titleToValueGap = 4.dp
 
     /**
      * 卡片底部标题行固定高度：32dp（8dp 上衬 + 14sp 文字 + 8dp 下衬，另留 2dp 余量）。

@@ -307,7 +307,7 @@ class SettingsRepository(context: Context) {
 
     /**
      * 字幕样式（仿 fongmi SubtitleSetting）：
-     * 原样 / 跟随系统 / 自定义，自定义含文字色+透明度、描边样式/色/透明度/粗细、阴影、背景色+透明度。
+     * 跟随系统 / 自定义，自定义含文字色+透明度、描边样式/色/透明度/粗细、阴影、背景色+透明度。
      */
     private val _subtitleStyle = MutableStateFlow(readSubtitleStyle())
     val subtitleStyle: StateFlow<com.ican.tvplay.player.core.SubtitleStyle> =
@@ -316,7 +316,7 @@ class SettingsRepository(context: Context) {
     fun setSubtitleStyle(style: com.ican.tvplay.player.core.SubtitleStyle) {
         val value = style.copy(
             mode = style.mode.coerceIn(
-                com.ican.tvplay.player.core.SubtitleStyle.MODE_ORIGINAL,
+                com.ican.tvplay.player.core.SubtitleStyle.MODE_SYSTEM,
                 com.ican.tvplay.player.core.SubtitleStyle.MODE_CUSTOM,
             ),
             textOpacity = style.textOpacity.coerceIn(SUBTITLE_MIN_OPACITY, SUBTITLE_MAX_OPACITY),
@@ -345,17 +345,21 @@ class SettingsRepository(context: Context) {
         _subtitleStyle.value = value
     }
 
-    // 重置后样式档默认停在「原样」（DEFAULT.mode 是 MODE_CUSTOM，直接恢复会停在自定义档）
+    // 重置后样式档回到默认（跟随系统）
     fun resetSubtitleStyle() = setSubtitleStyle(
-        com.ican.tvplay.player.core.SubtitleStyle.DEFAULT.copy(
-            mode = com.ican.tvplay.player.core.SubtitleStyle.MODE_ORIGINAL,
-        ),
+        com.ican.tvplay.player.core.SubtitleStyle.DEFAULT,
     )
 
     private fun readSubtitleStyle(): com.ican.tvplay.player.core.SubtitleStyle {
         val d = com.ican.tvplay.player.core.SubtitleStyle.DEFAULT
+        var mode = prefs.getInt(KEY_SUBTITLE_STYLE_MODE, d.mode)
+        // 旧存档的「原样」(MODE_ORIGINAL=0) 归一为「跟随系统」(MODE_SYSTEM)，并写回 prefs 完成一次性迁移
+        if (mode == com.ican.tvplay.player.core.SubtitleStyle.MODE_ORIGINAL) {
+            mode = com.ican.tvplay.player.core.SubtitleStyle.MODE_SYSTEM
+            prefs.edit().putInt(KEY_SUBTITLE_STYLE_MODE, mode).apply()
+        }
         return com.ican.tvplay.player.core.SubtitleStyle(
-            mode = prefs.getInt(KEY_SUBTITLE_STYLE_MODE, d.mode),
+            mode = mode,
             textColor = prefs.getInt(KEY_SUBTITLE_TEXT_COLOR, d.textColor),
             textOpacity = prefs.getFloat(KEY_SUBTITLE_TEXT_OPACITY, d.textOpacity)
                 .coerceIn(SUBTITLE_MIN_OPACITY, SUBTITLE_MAX_OPACITY),

@@ -6,13 +6,13 @@ import android.graphics.Color
  * 字幕样式（功能对齐 fongmi SubtitleSetting + media3 CaptionStyleCompat）。
  *
  * fongmi 的能力拆解：
- * - 三种模式：原样（尊重字幕文件自带样式）/ 跟随系统（读系统无障碍字幕设置）/ 自定义；
+ * - 两种模式：跟随系统（读系统无障碍字幕设置）/ 自定义（自绘颜色/描边/背景）；
  * - 自定义可调：文字颜色 + 透明度、描边样式（无/描边/投影）+ 颜色 + 透明度 + 粗细、
  *   阴影偏移、背景色 + 透明度、字号、位置。
  * 这里保留同一套参数，UI 与色板按本项目风格自绘。
  */
 data class SubtitleStyle(
-    val mode: Int = MODE_CUSTOM,
+    val mode: Int = MODE_SYSTEM,
     val textColor: Int = COLOR_WHITE,
     val textOpacity: Float = 1f,
     val edgeType: Int = EDGE_OUTLINE,
@@ -33,11 +33,12 @@ data class SubtitleStyle(
     /** 描边色叠透明度（再乘文字透明度：文字全透明时描边也一起消失，不然只剩黑色轮廓） */
     val edge: Int get() = applyOpacity(edgeColor, edgeOpacity * textOpacity)
 
-    /** 是否强制覆盖字幕自带样式（原样模式下不覆盖） */
-    val forcesStyle: Boolean get() = mode != MODE_ORIGINAL
+    /** 是否强制覆盖字幕自带样式（仅自定义模式覆盖） */
+    val forcesStyle: Boolean get() = mode == MODE_CUSTOM
 
     companion object {
         // 模式（与 fongmi SubtitleSetting.STYLE_* 同值）
+        /** 仅用于兼容旧存档（读档时会把 0 归一为系统档） */
         const val MODE_ORIGINAL = 0
         const val MODE_SYSTEM = 1
         const val MODE_CUSTOM = 2
