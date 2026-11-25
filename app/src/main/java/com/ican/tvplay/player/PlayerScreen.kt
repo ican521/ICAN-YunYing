@@ -2083,9 +2083,9 @@ private fun PortraitPlayLayout(
             modifier = Modifier.fillMaxSize(),
             playerState = playerState,
             // 进详情页即转圈（首次画面就绪前，无网速）；ready 后只随缓冲转。
-            // 刷新期间也在视频区正中转圈（刷新动画落在黑区，不在内容顶缘分界处）；
+            // 刷新态只由 miuix 圆圈在内容区顶部表达，预览小窗不再叠加第二个缓冲转圈。
             // 缩放动画期间不画覆盖层（转圈跟着放大缩小会很怪）
-            showLoading = !zooming && (!playerState.ready || refreshing) && playerState.error == null,
+            showLoading = !zooming && !playerState.ready && playerState.error == null,
             blockedMessage = blockedMessage,
             controlsVisible = controlsVisible && !zooming,
             locked = locked,
@@ -2116,6 +2116,9 @@ private fun PortraitPlayLayout(
                 .fillMaxWidth(),
             refreshTexts = listOf("", "", "", ""),
             refreshTextStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 0.sp),
+            // miuix 指示器圆心位于 (circleSize+36dp)/2 时居中，故用 contentPadding 顶边内边距把刷新圆圈下移 16dp；
+            // contentPadding 只 offset RefreshHeader，不影响 DetailInfoColumn 布局
+            contentPadding = PaddingValues(top = 16.dp),
         ) {
             DetailInfoColumn(
                 modifier = Modifier.fillMaxSize(),
