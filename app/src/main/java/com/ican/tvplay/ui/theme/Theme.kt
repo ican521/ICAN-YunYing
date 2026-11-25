@@ -130,10 +130,9 @@ private fun Typography.inkTight(): Typography = copy(
 private fun inkTightTypography(): Typography = Typography().inkTight()
 
 /**
- * 全屏播放页弹窗专用：固定深色色板，不跟随 App 浅/深主题切换。
- * 表面色取项目既定深色档（surfaceContainer #242424、secondaryVariant 深灰胶囊、onSecondaryVariant 浅字、
- * onBackground 近白）；强调色家族仍跟随用户主题色板（themeColor），windowDimming 沿用统一 PopupScrim。
- * 仅用于全屏布局内的 OptionDialog / SubtitleDialog 等浮层，竖屏详情信息流不受影响。
+ * 全屏播放页弹窗专用：固定使用「App 切到深色模式时」的现成 miuix 色板，不跟随当前浅/深主题切换。
+ * 表面色 / 行底色 / 文字色一律取深色档默认值，不在此处另配颜色；强调色家族仍跟随主题色板，
+ * windowDimming 沿用统一 PopupScrim。仅用于全屏布局内的 OptionDialog / SubtitleDialog 等浮层。
  */
 @Composable
 fun playerDarkMiuixColors(themeColor: Int): Colors {
@@ -146,10 +145,6 @@ fun playerDarkMiuixColors(themeColor: Int): Colors {
         onPrimaryVariant = onSeed,
         primaryContainer = seed,
         onPrimaryContainer = onSeed,
-        surfaceContainer = DarkSurfaceVariant,
-        secondaryVariant = DarkSurfaceElevated,
-        onSecondaryVariant = DarkOnSurfaceMuted,
-        onBackground = DarkOnSurface,
         windowDimming = PopupScrim,
     )
 }
