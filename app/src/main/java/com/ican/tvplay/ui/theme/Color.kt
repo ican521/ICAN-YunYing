@@ -22,21 +22,6 @@ val DarkSurfaceVariant = Color(0xFF242424)
 val DarkSurfaceElevated = Color(0xFF2C2C2C)
 val DarkOnSurface = Color(0xFFEDEDF5)
 val DarkOnSurfaceMuted = Color(0xFFA6A6BA)
-
-// 右侧滑出面板（字幕设置 + 选集）fongmi 深色默认配色
-/** 侧栏面板底（fongmi 深色默认） */
-val SideSheetBackground = Color(0xFF191C22)
-/** 侧栏强调实心底：Tab 选中段 / 选集选中 chip / 重置按钮 */
-val SideSheetChipActive = Color(0xFF384857)
-/** 侧栏未选中 chip 底 */
-val SideSheetChipIdle = Color(0xFF24303A)
-/** 侧栏未选中 chip 边框 */
-val SideSheetBorder = Color(0xFF2F3A47)
-/** 侧栏主文字 */
-val SideSheetTextPrimary = Color(0xFFE0E2E6)
-/** 侧栏次要文字：小标题 / 未选集名 */
-val SideSheetTextSecondary = Color(0xFF8C8F97)
-
 val DarkGlassTint = Color(0x33FFFFFF)
 val DarkGlassTintStrong = Color(0x52FFFFFF)
 val DarkScrim = Color(0xCC07070D)

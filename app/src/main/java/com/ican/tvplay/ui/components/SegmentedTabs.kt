@@ -50,14 +50,6 @@ fun SegmentedTabs(
     modifier: Modifier = Modifier,
     fillWidth: Boolean = true,
     compact: Boolean = false,
-    /** 选中段填充色（null = 由主题 primary 派生 tinted 底） */
-    selectedFill: Color? = null,
-    /** 选中段文字色（null = 由主题 primary 派生 tinted 文字） */
-    selectedText: Color? = null,
-    /** 外框与段间分隔线颜色（null = 深色叠白 / 浅色叠黑 alpha 描边） */
-    containerBorder: Color? = null,
-    /** 未选中段文字色（null = onSurfaceVariantSummary） */
-    idleText: Color? = null,
 ) {
     val height = if (compact) 26.dp else 38.dp
     val horizontalPadding = if (compact) 10.dp else 12.dp
@@ -65,14 +57,11 @@ fun SegmentedTabs(
     val primary = MiuixTheme.colorScheme.primary
     // 深浅按容器底色明度判定（字幕侧栏强制套深色主题，不能用系统深浅）
     val dark = MiuixTheme.colorScheme.surface.luminance() < 0.5f
-    // 外框与段间分隔线同色同宽（1dp）：参数优先；缺省深色叠白、浅色叠黑
-    val outlineColor = containerBorder ?: if (dark) Color.White.copy(alpha = SegmentedTabsOutlineAlpha)
+    // 外框与段间分隔线同色同宽（1dp）：深色叠白、浅色叠黑
+    val outlineColor = if (dark) Color.White.copy(alpha = SegmentedTabsOutlineAlpha)
         else Color.Black.copy(alpha = SegmentedTabsOutlineAlpha)
-    val themeFill = remember(primary, dark) { chipTintedFill(primary, dark) }
-    val themeText = remember(primary, dark) { chipTintedText(primary, dark) }
-    val tintedFill = selectedFill ?: themeFill
-    val tintedText = selectedText ?: themeText
-    val idleTextColor = idleText ?: MiuixTheme.colorScheme.onSurfaceVariantSummary
+    val tintedFill = remember(primary, dark) { chipTintedFill(primary, dark) }
+    val tintedText = remember(primary, dark) { chipTintedText(primary, dark) }
     val rowModifier = if (fillWidth) modifier.fillMaxWidth() else modifier
     Row(
         modifier = rowModifier
@@ -97,7 +86,7 @@ fun SegmentedTabs(
                 label = "SegmentedTabsFill",
             )
             val animatedText by animateColorAsState(
-                targetValue = if (selected) tintedText else idleTextColor,
+                targetValue = if (selected) tintedText else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 animationSpec = tween(SegmentedTabsFadeMs, easing = FastOutSlowInEasing),
                 label = "SegmentedTabsText",
             )

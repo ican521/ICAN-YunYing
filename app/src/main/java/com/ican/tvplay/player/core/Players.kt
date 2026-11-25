@@ -1189,10 +1189,11 @@ object Players {
         val backBytes = (32L * 1024 * 1024 * tier.multiplier).toString()
         // mpv.conf 只在 native 初始化时读取，必须在 builder.build() 之前写好，晚写等于不生效；
         // 每次覆盖写，仅 [hdr] 条件 profile；写失败只告警，不阻断后续 builder 构建
+        // auto_profiles 条件里属性名含 "/" 不能直接写进 Lua 表达式，必须用脚本注入的全局 get("…") 取值；判 pq/hlg/smpte2084 三种 HDR 取值
         try {
             java.io.File(mpvDir, "mpv.conf").writeText(
                 "[hdr]\n" +
-                    "profile-cond=video-params/gamma == \"pq\" or video-params/gamma == \"hlg\"\n" +
+                    "profile-cond=get(\"video-params/gamma\") == \"pq\" or get(\"video-params/gamma\") == \"hlg\" or get(\"video-params/gamma\") == \"smpte2084\"\n" +
                     "profile-restore=copy\n" +
                     "target-colorspace-hint=yes\n",
                 java.nio.charset.StandardCharsets.UTF_8,
@@ -1206,7 +1207,7 @@ object Players {
             .addPreInitStringOption("demuxer-max-bytes", forwardBytes)
             .addPreInitStringOption("demuxer-max-back-bytes", backBytes)
             // HDR：不用 pre-init 强行 tone map（那会把 HDR 一律压成 SDR，也会让 PQ 数据被当 SDR 渲染而偏暗），
-            // 改为按内容条件启用 surface 色彩空间下发：只有 video-params/gamma 为 pq/hlg 时才套 [hdr] profile，
+            // 改为按内容条件启用 surface 色彩空间下发：只有 video-params/gamma 为 pq/hlg/smpte2084 时才套 [hdr] profile，
             // SDR（bt1886/bt709）不命中 profile 因此不会被系统当 PQ 解释（修 1.0.170 的过曝）；tone mapping 交给 libmpv 默认
             // mpv 日志落 filesDir/mpv/mpv.log（绝对路径，便于 adb pull 验证 HDR 路径）；
             // 本版 libmpv 无 log-level 选项，日志级别走原生 msg-level
