@@ -164,8 +164,8 @@ fun SearchHomeScreen(
                         },
                         modifier = Modifier
                             .weight(1f)
-                            // 距返回钮 16dp（右侧距屏幕保持 pageHorizontalPadding 16dp 不变）
-                            .padding(start = 16.dp),
+                            // 距返回钮的间距（右侧距屏幕保持 pageHorizontalPadding 16dp 不变）
+                            .padding(start = Spacing.topBarItemGap),
                     )
 
                     // 右上角：结果卡片样式切换钮（竖版海报网格 ↔ 长条横卡），值持久化到设置

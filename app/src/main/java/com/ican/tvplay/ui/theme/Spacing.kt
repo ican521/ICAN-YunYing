@@ -21,8 +21,8 @@ import top.yukonga.miuix.kmp.utils.getRoundedCorner
  * | 6dp | 角标级别左右内边距、卡片标题层顶部 | [posterBadgePaddingH]、[posterTitleTopGap] |
  * | 8dp | 相邻元素（标题↔chips 或正文、列表项、胶囊流式排列、叠加层外边距、卡片标题层底部） | [videoTitleContentGap]、[videoTitleToMetaGap]、[dialogItemGap]、[searchChipGap]、[siteListItemGap]、[posterOverlayMargin]、[posterTitleVisualGap]
  * | 10dp | 卡片标题层水平、历史卡片进度条底距（紧贴卡片边） | [posterTitlePaddingH]、[historyProgressBarGap] |
- * | 12dp | 页面骨架次级（页面顶部、板块标题↔内容、顶栏组件之间、横卡文字区内衬） | [pageTop]、[titleContentGap]、[topBarItemGap]、[searchWideCardPadding] |
- * | 16dp | 页面骨架主级（页面左右、板块之间、卡片网格、弹窗边距与标题、底栏上下） | [pageHorizontal]、[sectionSpacing]、[cardGapH]、[cardGapV]、[dialogContentMargin]、[dialogTitleGap]、[dialogItemPadding]、[bottomBarGap]、[contentBottomInset] 等 |
+ * | 12dp | 页面骨架次级（页面顶部、板块标题↔内容、横卡文字区内衬） | [pageTop]、[titleContentGap]、[searchWideCardPadding] |
+ * | 16dp | 页面骨架主级（页面左右、板块之间、卡片网格、弹窗边距与标题、底栏上下、顶栏组件之间） | [pageHorizontal]、[sectionSpacing]、[cardGapH]、[cardGapV]、[dialogContentMargin]、[dialogTitleGap]、[dialogItemPadding]、[bottomBarGap]、[contentBottomInset]、[topBarItemGap] 等 |
  *
  * 尺寸类（非间距，按内容或控件固定高度取值）：[chipHeight]、[episodeChipHeight]、[circleButton]、[topBarHeight]、[centeredTopBarHeight]、[bottomBarHeight]、[searchWideCardHeight]。
  *
@@ -215,7 +215,7 @@ object Spacing {
     val topBarHeight = 48.dp
 
     /** 顶栏内部组件之间的间距（搜索栏 ↔ 返回钮、站源钮、历史钮等） */
-    val topBarItemGap = 12.dp
+    val topBarItemGap = 16.dp
 
     /**
      * 底部内容避让悬浮胶囊导航的高度（保证底部卡片距底栏顶部恰好 [bottomBarGap]）：
