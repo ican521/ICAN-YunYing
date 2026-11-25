@@ -1,0 +1,793 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>详情页线路 / 选集 选中态配色预览（不依赖主题色方案）</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --primary: #007AFF;
+    --on-primary: #FFFFFF;
+  }
+  body {
+    margin: 0; padding: 30px;
+    background: #ECECEF;
+    font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #1C1D24;
+  }
+  .page-head { max-width: 1080px; margin: 0 auto 20px; }
+  .page-head h1 { font-size: 22px; margin: 0 0 6px; }
+  .page-head p { margin: 0; font-size: 13px; color: #5C5E6E; line-height: 1.7; }
+  .swatches { display: flex; gap: 10px; align-items: center; margin-top: 13px; flex-wrap: wrap; }
+  .swatches span { font-size: 12px; color: #6B6D7C; margin-right: 2px; }
+  .sw { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.12); }
+  .sw.on { box-shadow: 0 0 0 2px #1C1D24; }
+  .wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+
+  .group { background: #fff; border-radius: 18px; padding: 18px 20px 22px; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.05); }
+  .group-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .group-head h2 { font-size: 16px; margin: 0; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: #EAF2FF; color: #0B63CE; }
+  .tag.warn { background: #FFF0E6; color: #A85612; }
+  .tag.neutral { background: #F0F0F3; color: #5C5E6E; }
+  .tag.fixed { background: #EDF7EE; color: #1D7A33; }
+  .group-head p { margin: 0; font-size: 12px; color: #6B6D7C; width: 100%; line-height: 1.65; }
+
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 860px) { .pair { grid-template-columns: 1fr; } }
+
+  .phone { border-radius: 22px; padding: 18px 16px 16px; }
+  .phone.light { background: #FFFFFF; border: 1px solid #E4E4E9; }
+  .phone.dark  { background: #242424; border: 1px solid #333338; }
+  .phone-label { font-size: 11px; letter-spacing: .3px; margin-bottom: 12px; }
+  .phone.light .phone-label { color: #8A8C9A; }
+  .phone.dark  .phone-label { color: #7C7C90; }
+
+  .section { margin-bottom: 15px; }
+  .section:last-child { margin-bottom: 0; }
+  .sec-title { font-size: 12px; font-weight: 600; margin: 0 0 8px; }
+  .phone.light .sec-title { color: #15161D; }
+  .phone.dark  .sec-title { color: #EDEDF5; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .chip {
+    min-width: 40px; padding: 10px 12px; border-radius: 16px;
+    font-size: 12px; font-weight: 500; line-height: 1.2; text-align: center;
+    white-space: nowrap; border: 1px solid transparent;
+  }
+  .meta { font-size: 10.5px; margin-left: 4px; font-weight: 400; }
+  .phone.light .meta { color: #8A8C9A; }
+  .phone.dark  .meta { color: #7C7C90; }
+
+  /* 未选中 */
+  .off-l { background: #F0F0F0; color: #5C5E6E; }
+  .off-d { background: #3A3A3C; color: #D8D8E0; }
+
+  /* 现状：primary 实底（跟随主题色） */
+  .now-sel { background: var(--primary); color: var(--on-primary); }
+
+  /* A：tonal（跟随主题色） */
+  .tonal-l { background: color-mix(in srgb, var(--primary) 14%, #FFFFFF); color: color-mix(in srgb, var(--primary) 72%, #001018); border-color: color-mix(in srgb, var(--primary) 40%, transparent); font-weight: 600; }
+  .tonal-d { background: color-mix(in srgb, var(--primary) 22%, #242424); color: color-mix(in srgb, var(--primary) 55%, #FFFFFF); border-color: color-mix(in srgb, var(--primary) 45%, transparent); font-weight: 600; }
+
+  /* C：中性反转（不跟主题色） */
+  .neu-inv-l { background: #1C1D24; color: #FFFFFF; font-weight: 600; }
+  .neu-inv-d { background: #EDEDF5; color: #15161D; font-weight: 600; }
+
+  /* D：固定品牌蓝（不跟主题色） */
+  .fixed-l { background: #0062CC; color: #FFFFFF; font-weight: 600; }
+  .fixed-d { background: #0A84FF; color: #08121F; font-weight: 600; }
+
+  /* E：中性冷灰蓝（不跟主题色） */
+  .cool-l { background: #E7EDF5; color: #243244; border-color: #C3D0E0; font-weight: 600; }
+  .cool-d { background: #2B3542; color: #D3DFF0; border-color: #4C5D73; font-weight: 600; }
+
+  /* F：iOS 分段控件浮块（systemGray6 槽 + systemBackground 选中块） */
+  .seg-row { background: #F2F2F7; border-radius: 20px; padding: 4px; }
+  .seg-row-d { background: #1C1C1E; }
+  .seg-sel-l { background: #FFFFFF; color: #000000; border-color: #E0E0E6; font-weight: 600; }
+  .seg-sel-d { background: #636366; color: #FFFFFF; font-weight: 600; }
+  .seg-off-l { background: transparent; color: #8A8A8E; }
+  .seg-off-d { background: transparent; color: #98989F; }
+
+  /* G：iOS tinted（systemBlue 15% 底 + 蓝字） */
+  .tint-l { background: #D8E8FF; color: #0062CC; font-weight: 600; }
+  .tint-d { background: #1B3149; color: #409CFF; font-weight: 600; }
+
+  /* G+：tinted 但跟随主题色 */
+  .tintp-l { background: color-mix(in srgb, var(--primary) 14%, #FFFFFF); color: color-mix(in srgb, var(--primary) 74%, #001018); font-weight: 600; }
+  .tintp-d { background: color-mix(in srgb, var(--primary) 22%, #242424); color: color-mix(in srgb, var(--primary) 55%, #FFFFFF); font-weight: 600; }
+
+  /* H：iOS 描边胶囊（systemBlue 1.5pt 描边） */
+  .oline-l { background: #FFFFFF; color: #0062CC; border: 1.5px solid #007AFF; font-weight: 600; }
+  .oline-d { background: #242424; color: #409CFF; border: 1.5px solid #0A84FF; font-weight: 600; }
+  .h-off-l { background: #F2F2F7; color: #8E8E93; }
+  .h-off-d { background: #2C2C2E; color: #AEAEB2; }
+
+  /* I：iOS 系统灰浮块（Gray5 / Gray3 + 字重） */
+  .gray-sel-l { background: #E5E5EA; color: #1C1C1E; font-weight: 600; }
+  .gray-sel-d { background: #48484A; color: #FFFFFF; font-weight: 600; }
+  .gray-off-l { background: #F2F2F7; color: #8E8E93; }
+  .gray-off-d { background: #2C2C2E; color: #AEAEB2; }
+
+  .note { max-width: 1080px; margin: 24px auto 0; font-size: 12px; color: #5C5E6E; line-height: 1.9; background: #fff; border-radius: 14px; padding: 16px 20px; }
+  .note b { color: #1C1D24; }
+  .note code { background: #F2F2F5; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1>详情页「线路 / 画质 / 选集」选中态 · 不依赖主题色的方案</h1>
+  <p>线路、画质、选集三处统一用同一套方案。下面的色点只会影响「现状」「方案 A」和「G+」；C 到 I 里除 G+ 外都是固定配色，切主题色不会变。F 到 I 按 Apple HIG 的 systemGray / systemBlue 取值。</p>
+  <div class="swatches">
+    <span>主题色</span>
+    <div class="sw on" data-c="#007AFF" style="background:#007AFF"></div>
+    <div class="sw" data-c="#34C759" style="background:#34C759"></div>
+    <div class="sw" data-c="#FF9500" style="background:#FF9500"></div>
+    <div class="sw" data-c="#FF3B30" style="background:#FF3B30"></div>
+    <div class="sw" data-c="#B48CFF" style="background:#B48CFF"></div>
+    <div class="sw" data-c="#00C7BE" style="background:#00C7BE"></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- 现状 -->
+  <div class="group">
+    <div class="group-head">
+      <h2>现状</h2><span class="tag neutral">primary 实底 · 跟随主题色</span><span class="tag warn">白字对比 4.02:1 · 未过 AA</span>
+      <p>选中整块满饱和主题色，未选中中性灰。浅色下蓝色块最抢眼；主题色一换，选中色跟着全变。</p>
+    </div>
+    <div class="pair">
+      <div class="phone light">
+        <div class="phone-label">浅色模式 · 页面 #FFFFFF</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip now-sel" data-calc>线路一</div>
+            <div class="chip off-l">线路二</div>
+            <div class="chip off-l">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">画质</p>
+          <div class="row">
+            <div class="chip off-l">720P</div>
+            <div class="chip now-sel" data-calc>1080P</div>
+            <div class="chip off-l">4K</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip now-sel" data-calc>第 3 集</div>
+            <div class="chip off-l">第 4 集</div>
+            <div class="chip off-l">第 5 集</div>
+            <div class="chip off-l">第 6 集</div>
+            <div class="chip off-l">第 7 集</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone dark">
+        <div class="phone-label">深色模式 · 页面 #242424</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip now-sel" data-calc>线路一</div>
+            <div class="chip off-d">线路二</div>
+            <div class="chip off-d">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">画质</p>
+          <div class="row">
+            <div class="chip off-d">720P</div>
+            <div class="chip now-sel" data-calc>1080P</div>
+            <div class="chip off-d">4K</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip now-sel" data-calc>第 3 集</div>
+            <div class="chip off-d">第 4 集</div>
+            <div class="chip off-d">第 5 集</div>
+            <div class="chip off-d">第 6 集</div>
+            <div class="chip off-d">第 7 集</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- A -->
+  <div class="group">
+    <div class="group-head">
+      <h2>方案 A · 主题色淡底</h2><span class="tag">淡底 + 主题色文字 + 描边 · 跟随主题色</span>
+      <p>柔和、有品牌感，选中块不压画面；但选中色会随主题色变化，换到绿/橙时整排也跟着换色。对比度浅 5.32:1 / 深 5.72:1。</p>
+    </div>
+    <div class="pair">
+      <div class="phone light">
+        <div class="phone-label">浅色模式</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip tonal-l" data-calc>线路一</div>
+            <div class="chip off-l">线路二</div>
+            <div class="chip off-l">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">画质</p>
+          <div class="row">
+            <div class="chip off-l">720P</div>
+            <div class="chip tonal-l" data-calc>1080P</div>
+            <div class="chip off-l">4K</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip tonal-l" data-calc>第 3 集</div>
+            <div class="chip off-l">第 4 集</div>
+            <div class="chip off-l">第 5 集</div>
+            <div class="chip off-l">第 6 集</div>
+            <div class="chip off-l">第 7 集</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone dark">
+        <div class="phone-label">深色模式</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip tonal-d" data-calc>线路一</div>
+            <div class="chip off-d">线路二</div>
+            <div class="chip off-d">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">画质</p>
+          <div class="row">
+            <div class="chip off-d">720P</div>
+            <div class="chip tonal-d" data-calc>1080P</div>
+            <div class="chip off-d">4K</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip tonal-d" data-calc>第 3 集</div>
+            <div class="chip off-d">第 4 集</div>
+            <div class="chip off-d">第 5 集</div>
+            <div class="chip off-d">第 6 集</div>
+            <div class="chip off-d">第 7 集</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C -->
+  <div class="group">
+    <div class="group-head">
+      <h2>方案 C · 中性反转</h2><span class="tag neutral">深/浅中性实底 · 不跟主题色</span>
+      <p>浅色模式选中 = 近黑底白字，深色模式选中 = 近白底黑字。选中指示最强、完全不偏色，任何主题色下都自洽；代价是深色模式里这块亮白存在感偏强。</p>
+    </div>
+    <div class="pair">
+      <div class="phone light">
+        <div class="phone-label">浅色模式 · 选中 #1C1D24</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip neu-inv-l" data-calc>线路一</div>
+            <div class="chip off-l">线路二</div>
+            <div class="chip off-l">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">画质</p>
+          <div class="row">
+            <div class="chip off-l">720P</div>
+            <div class="chip neu-inv-l" data-calc>1080P</div>
+            <div class="chip off-l">4K</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip neu-inv-l" data-calc>第 3 集</div>
+            <div class="chip off-l">第 4 集</div>
+            <div class="chip off-l">第 5 集</div>
+            <div class="chip off-l">第 6 集</div>
+            <div class="chip off-l">第 7 集</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone dark">
+        <div class="phone-label">深色模式 · 选中 #EDEDF5</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip neu-inv-d" data-calc>线路一</div>
+            <div class="chip off-d">线路二</div>
+            <div class="chip off-d">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">画质</p>
+          <div class="row">
+            <div class="chip off-d">720P</div>
+            <div class="chip neu-inv-d" data-calc>1080P</div>
+            <div class="chip off-d">4K</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip neu-inv-d" data-calc>第 3 集</div>
+            <div class="chip off-d">第 4 集</div>
+            <div class="chip off-d">第 5 集</div>
+            <div class="chip off-d">第 6 集</div>
+            <div class="chip off-d">第 7 集</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- D -->
+  <div class="group">
+    <div class="group-head">
+      <h2>方案 D · 固定品牌蓝</h2><span class="tag fixed">锁定 #0062CC / #0A84FF · 不跟主题色</span>
+      <p>保留品牌蓝，但不再受用户换色影响：浅色压深一档、深色提亮一档，白字/深字都过 AA。缺点是你把主题色换成绿/橙后，选中态仍是蓝，会和导航、按钮分成两套色。</p>
+    </div>
+    <div class="pair">
+      <div class="phone light">
+        <div class="phone-label">浅色模式 · 选中 #0062CC</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip fixed-l" data-calc>线路一</div>
+            <div class="chip off-l">线路二</div>
+            <div class="chip off-l">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">画质</p>
+          <div class="row">
+            <div class="chip off-l">720P</div>
+            <div class="chip fixed-l" data-calc>1080P</div>
+            <div class="chip off-l">4K</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip fixed-l" data-calc>第 3 集</div>
+            <div class="chip off-l">第 4 集</div>
+            <div class="chip off-l">第 5 集</div>
+            <div class="chip off-l">第 6 集</div>
+            <div class="chip off-l">第 7 集</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone dark">
+        <div class="phone-label">深色模式 · 选中 #0A84FF</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip fixed-d" data-calc>线路一</div>
+            <div class="chip off-d">线路二</div>
+            <div class="chip off-d">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">画质</p>
+          <div class="row">
+            <div class="chip off-d">720P</div>
+            <div class="chip fixed-d" data-calc>1080P</div>
+            <div class="chip off-d">4K</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip fixed-d" data-calc>第 3 集</div>
+            <div class="chip off-d">第 4 集</div>
+            <div class="chip off-d">第 5 集</div>
+            <div class="chip off-d">第 6 集</div>
+            <div class="chip off-d">第 7 集</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- E -->
+  <div class="group">
+    <div class="group-head">
+      <h2>方案 E · 中性冷灰蓝（推荐不跟主题色时用）</h2><span class="tag neutral">低饱和 · 不跟主题色</span>
+      <p>选中用一档偏冷的灰蓝底 + 近黑/近白文字 + 细描边，既不像 C 那样一块黑白那么重，也不像 D 那样和主题色打架。深浅两侧对比都在 8:1 以上。</p>
+    </div>
+    <div class="pair">
+      <div class="phone light">
+        <div class="phone-label">浅色模式 · 选中 #E7EDF5</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip cool-l" data-calc>线路一</div>
+            <div class="chip off-l">线路二</div>
+            <div class="chip off-l">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">画质</p>
+          <div class="row">
+            <div class="chip off-l">720P</div>
+            <div class="chip cool-l" data-calc>1080P</div>
+            <div class="chip off-l">4K</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip cool-l" data-calc>第 3 集</div>
+            <div class="chip off-l">第 4 集</div>
+            <div class="chip off-l">第 5 集</div>
+            <div class="chip off-l">第 6 集</div>
+            <div class="chip off-l">第 7 集</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone dark">
+        <div class="phone-label">深色模式 · 选中 #2B3542</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip cool-d" data-calc>线路一</div>
+            <div class="chip off-d">线路二</div>
+            <div class="chip off-d">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">画质</p>
+          <div class="row">
+            <div class="chip off-d">720P</div>
+            <div class="chip cool-d" data-calc>1080P</div>
+            <div class="chip off-d">4K</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip cool-d" data-calc>第 3 集</div>
+            <div class="chip off-d">第 4 集</div>
+            <div class="chip off-d">第 5 集</div>
+            <div class="chip off-d">第 6 集</div>
+            <div class="chip off-d">第 7 集</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- F -->
+  <div class="group">
+    <div class="group-head">
+      <h2>方案 F · iOS 分段控件浮块</h2><span class="tag">systemGray6 槽 + systemBackground 选中块 · Apple HIG</span>
+      <p>整排放进灰槽，选中项浮一块白（深色 systemGray2），靠明度层次而不是色相区分，最接近 iOS 原生 UISegmentedControl。落地代价最大：每行要多一层槽底色。</p>
+    </div>
+    <div class="pair">
+      <div class="phone light">
+        <div class="phone-label">浅色模式 · 槽 #F2F2F7 / 选中 #FFFFFF</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row seg-row">
+            <div class="chip seg-sel-l" data-calc>线路一</div>
+            <div class="chip seg-off-l">线路二</div>
+            <div class="chip seg-off-l">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row seg-row">
+            <div class="chip seg-sel-l" data-calc>第 3 集</div>
+            <div class="chip seg-off-l">第 4 集</div>
+            <div class="chip seg-off-l">第 5 集</div>
+            <div class="chip seg-off-l">第 6 集</div>
+            <div class="chip seg-off-l">第 7 集</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone dark">
+        <div class="phone-label">深色模式 · 槽 #1C1C1E / 选中 #636366</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row seg-row seg-row-d">
+            <div class="chip seg-sel-d" data-calc>线路一</div>
+            <div class="chip seg-off-d">线路二</div>
+            <div class="chip seg-off-d">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row seg-row seg-row-d">
+            <div class="chip seg-sel-d" data-calc>第 3 集</div>
+            <div class="chip seg-off-d">第 4 集</div>
+            <div class="chip seg-off-d">第 5 集</div>
+            <div class="chip seg-off-d">第 6 集</div>
+            <div class="chip seg-off-d">第 7 集</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- G -->
+  <div class="group">
+    <div class="group-head">
+      <h2>方案 G · iOS Tinted（系统蓝淡底 + 蓝字）</h2><span class="tag">systemBlue 15% 底 + tint 文字 · Apple HIG</span>
+      <p>iOS 设置里 tinted 按钮的常用做法：底是系统蓝去饱和后的淡底，文字压深一档保证小字可读。和主题色无关，始终是系统蓝。</p>
+    </div>
+    <div class="pair">
+      <div class="phone light">
+        <div class="phone-label">浅色模式 · 底 #D8E8FF / 字 #0062CC</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip tint-l" data-calc>线路一</div>
+            <div class="chip off-l">线路二</div>
+            <div class="chip off-l">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip tint-l" data-calc>第 3 集</div>
+            <div class="chip off-l">第 4 集</div>
+            <div class="chip off-l">第 5 集</div>
+            <div class="chip off-l">第 6 集</div>
+            <div class="chip off-l">第 7 集</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone dark">
+        <div class="phone-label">深色模式 · 底 #1B3149 / 字 #409CFF</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip tint-d" data-calc>线路一</div>
+            <div class="chip off-d">线路二</div>
+            <div class="chip off-d">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip tint-d" data-calc>第 3 集</div>
+            <div class="chip off-d">第 4 集</div>
+            <div class="chip off-d">第 5 集</div>
+            <div class="chip off-d">第 6 集</div>
+            <div class="chip off-d">第 7 集</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- G+ -->
+  <div class="group">
+    <div class="group-head">
+      <h2>方案 G+ · Tinted 跟随主题色</h2><span class="tag">主题色 14% 底 + 同色文字 · 无描边</span>
+      <p>把 G 的固定系统蓝换成主题色派生：淡底取主题色 14%（深色 22%），文字浅色压深、深色提亮，不加描边。比方案 A 少一圈边框，更接近 iOS 设置里的 tinted 按钮；代价是主题色换绿/橙时整排跟着变色。</p>
+    </div>
+    <div class="pair">
+      <div class="phone light">
+        <div class="phone-label">浅色模式 · 主题色 14% 底 + 压深文字</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip tintp-l" data-calc>线路一</div>
+            <div class="chip off-l">线路二</div>
+            <div class="chip off-l">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip tintp-l" data-calc>第 3 集</div>
+            <div class="chip off-l">第 4 集</div>
+            <div class="chip off-l">第 5 集</div>
+            <div class="chip off-l">第 6 集</div>
+            <div class="chip off-l">第 7 集</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone dark">
+        <div class="phone-label">深色模式 · 主题色 22% 底 + 提亮文字</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip tintp-d" data-calc>线路一</div>
+            <div class="chip off-d">线路二</div>
+            <div class="chip off-d">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip tintp-d" data-calc>第 3 集</div>
+            <div class="chip off-d">第 4 集</div>
+            <div class="chip off-d">第 5 集</div>
+            <div class="chip off-d">第 6 集</div>
+            <div class="chip off-d">第 7 集</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- H -->
+  <div class="group">
+    <div class="group-head">
+      <h2>方案 H · iOS 描边胶囊</h2><span class="tag">systemBlue 1.5pt 描边 + 蓝字 · Apple HIG</span>
+      <p>选中只加一圈系统蓝描边和蓝字，不加底色；未选中 systemGray6 底。视觉最轻，深色下也不会出现亮色块压画面。</p>
+    </div>
+    <div class="pair">
+      <div class="phone light">
+        <div class="phone-label">浅色模式 · 描边 #007AFF</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip oline-l" data-calc>线路一</div>
+            <div class="chip h-off-l">线路二</div>
+            <div class="chip h-off-l">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip oline-l" data-calc>第 3 集</div>
+            <div class="chip h-off-l">第 4 集</div>
+            <div class="chip h-off-l">第 5 集</div>
+            <div class="chip h-off-l">第 6 集</div>
+            <div class="chip h-off-l">第 7 集</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone dark">
+        <div class="phone-label">深色模式 · 描边 #0A84FF</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip oline-d" data-calc>线路一</div>
+            <div class="chip h-off-d">线路二</div>
+            <div class="chip h-off-d">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip oline-d" data-calc>第 3 集</div>
+            <div class="chip h-off-d">第 4 集</div>
+            <div class="chip h-off-d">第 5 集</div>
+            <div class="chip h-off-d">第 6 集</div>
+            <div class="chip h-off-d">第 7 集</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- I -->
+  <div class="group">
+    <div class="group-head">
+      <h2>方案 I · iOS 系统灰浮块</h2><span class="tag">systemGray5 / systemGray3 + 字重 · Apple HIG</span>
+      <p>完全不用彩色：浅色选中 systemGray5 底 + 近黑字，深色选中 systemGray3 底 + 白字。靠底色一档差 + 字色字重区分，最中性。</p>
+    </div>
+    <div class="pair">
+      <div class="phone light">
+        <div class="phone-label">浅色模式 · 选中 #E5E5EA</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip gray-sel-l" data-calc>线路一</div>
+            <div class="chip gray-off-l">线路二</div>
+            <div class="chip gray-off-l">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip gray-sel-l" data-calc>第 3 集</div>
+            <div class="chip gray-off-l">第 4 集</div>
+            <div class="chip gray-off-l">第 5 集</div>
+            <div class="chip gray-off-l">第 6 集</div>
+            <div class="chip gray-off-l">第 7 集</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone dark">
+        <div class="phone-label">深色模式 · 选中 #48484A</div>
+        <div class="section">
+          <p class="sec-title">线路</p>
+          <div class="row">
+            <div class="chip gray-sel-d" data-calc>线路一</div>
+            <div class="chip gray-off-d">线路二</div>
+            <div class="chip gray-off-d">线路三·高清</div>
+          </div>
+        </div>
+        <div class="section">
+          <p class="sec-title">选集</p>
+          <div class="row">
+            <div class="chip gray-sel-d" data-calc>第 3 集</div>
+            <div class="chip gray-off-d">第 4 集</div>
+            <div class="chip gray-off-d">第 5 集</div>
+            <div class="chip gray-off-d">第 6 集</div>
+            <div class="chip gray-off-d">第 7 集</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>三套固定方案的落地差别</b><br>
+  C：新增 <code>ChipSelectedInverseL = 0xFF1C1D24</code> / <code>ChipSelectedInverseD = 0xFFEDEDF5</code> 与对应文字色，不碰主题色。<br>
+  D：新增固定 <code>ChipSelectedBlueL = 0xFF0062CC</code> / <code>ChipSelectedBlueD = 0xFF0A84FF</code>，文字色各自写死（白 / #08121F）。<br>
+  E：新增 <code>ChipSelectedCoolL</code> / <code>ChipSelectedCoolD</code> 三个值（底 / 字 / 描边），与主题色完全解耦，换色不影响。<br>
+  三者都只改 <code>LineSection</code>、<code>QualityRow</code>、<code>EpisodeChip</code> 三处，线路与选集用同一套；全屏选集侧栏是固定深色面板，单独沿用 E 的深色值即可。字号、圆角、内边距不动。
+</div>
+
+<script>
+  const root = document.documentElement;
+  const sws = document.querySelectorAll('.sw');
+  sws.forEach(sw => sw.addEventListener('click', () => {
+    sws.forEach(s => s.classList.remove('on'));
+    sw.classList.add('on');
+    const c = sw.dataset.c;
+    root.style.setProperty('--primary', c);
+    root.style.setProperty('--on-primary', onColor(c));
+    recalc();
+  }));
+
+  function hexToRgb(hex) {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+  }
+  function luminance(rgb) {
+    const f = rgb.map(v => { v /= 255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); });
+    return 0.2126*f[0] + 0.7152*f[1] + 0.0722*f[2];
+  }
+  function onColor(hex) { return luminance(hexToRgb(hex)) > 0.30 ? '#000000' : '#FFFFFF'; }
+  function parseRGB(str) {
+    if (str.startsWith('color(srgb')) {
+      const nums = str.match(/-?0\.\d+|\b0\b|\b1\b/g).map(Number).slice(0,3);
+      return nums.map(v => v*255);
+    }
+    return str.match(/\d+/g).map(Number).slice(0,3);
+  }
+  function ratio(a, b) {
+    const l1 = luminance(a), l2 = luminance(b);
+    return (Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05);
+  }
+  function recalc() {
+    document.querySelectorAll('[data-calc]').forEach(el => {
+      const cs = getComputedStyle(el);
+      let meta = el.querySelector('.meta');
+      if (!meta) { meta = document.createElement('span'); meta.className = 'meta'; el.appendChild(meta); }
+      const r = ratio(parseRGB(cs.color), parseRGB(cs.backgroundColor));
+      meta.textContent = ' ' + r.toFixed(2) + ':1' + (r >= 4.5 ? ' ✓' : '');
+    });
+  }
+  root.style.setProperty('--on-primary', onColor('#007AFF'));
+  window.addEventListener('load', recalc);
+  document.addEventListener('DOMContentLoaded', recalc);
+</script>
+</body>
+</html>

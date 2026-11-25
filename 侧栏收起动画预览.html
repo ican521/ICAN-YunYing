@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>侧栏 B 渐变 + 收起动画预览</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px 28px 36px;background:#0b0b0d;color:#e8e8ea;
+       font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif}
+  h1{font-size:18px;margin:0 0 6px;font-weight:700}
+  .tip{font-size:12.5px;color:#94949c;line-height:1.75;margin:0 0 18px}
+  .stageWrap{position:relative}
+  .stage{position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;cursor:pointer;
+    background:
+      radial-gradient(55% 75% at 18% 28%, #2f74ad 0%, rgba(47,116,173,0) 62%),
+      radial-gradient(45% 65% at 58% 72%, #d9a44c 0%, rgba(217,164,76,0) 62%),
+      radial-gradient(40% 60% at 82% 22%, #a8473c 0%, rgba(168,71,60,0) 65%),
+      linear-gradient(118deg,#0e2d40 0%,#1c4f63 38%,#77552c 68%,#15222b 100%);
+  }
+  .stage::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,rgba(0,0,0,0) 1px 3px);opacity:.5}
+  .subtitle{position:absolute;left:0;right:0;bottom:11%;text-align:center;
+    font-size:2.05vmin;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.75);z-index:2;
+    transition:opacity .2s ease}
+  /* B 方案：整屏右浓左淡暗场，面板无硬边 */
+  .shade{position:absolute;inset:0;z-index:3;
+    /* 等浓度区 = 面板宽度（右侧 44%），再往左 11% 屏宽（约 96dp）淡出到全透明 */
+    background:linear-gradient(to left,
+      rgba(0,0,0,.94) 0%, rgba(0,0,0,.94) 44%, rgba(0,0,0,.42) 49.5%,
+      rgba(0,0,0,0) 55%, rgba(0,0,0,0) 100%);
+    transition:opacity .2s cubic-bezier(.4,0,.2,1);opacity:1}
+  .panel{position:absolute;top:0;right:0;bottom:0;width:44%;z-index:4;color:#fff;
+    transition:transform .26s cubic-bezier(.4,0,.2,1);transform:translateX(0)}
+  .content{padding:14px 16px 16px 26px;height:100%;display:flex;flex-direction:column;gap:10px}
+  .head{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+  .head b{font-size:15px;font-weight:600}
+  .reset{font-size:12px;color:#c9c9cf;border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:5px 11px}
+  .tabs{display:flex;gap:8px}
+  .tab{flex:1;text-align:center;font-size:12px;padding:7px 0;border-radius:12px;
+    background:rgba(255,255,255,.10);color:#c3c3ca}
+  .tab.on{color:#5aa9ff;font-weight:700}
+  .sec{font-size:11.5px;color:#9d9da5;margin-top:2px}
+  .chips{display:flex;gap:8px}
+  .chip{flex:1;text-align:center;font-size:12px;padding:8px 0;border-radius:12px;
+    background:rgba(255,255,255,.10);color:#c8c8cf}
+  .chip.on{color:#5aa9ff;font-weight:700}
+  .swatches{display:flex;gap:8px;justify-content:space-between}
+  .sw{width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,.18)}
+  .strack{height:2px;background:rgba(255,255,255,.18);border-radius:2px;position:relative}
+  .strack::after{content:"";position:absolute;left:0;top:0;height:2px;width:58%;background:#5aa9ff;border-radius:2px}
+  .sknob{position:absolute;left:58%;top:50%;width:14px;height:14px;border-radius:50%;background:#5aa9ff;
+    transform:translate(-50%,-50%);box-shadow:0 0 0 4px rgba(90,169,255,.15)}
+  .srow{display:flex;justify-content:space-between;font-size:11px;color:#a6a6ae;margin-top:6px}
+  .foot{margin-top:auto;font-size:11px;color:#7f7f88}
+
+  .closed .shade{opacity:0}
+  .closed .panel{transform:translateX(calc(100% + 18px))}
+  .closed .subtitle{opacity:1}
+
+  .hint{position:absolute;left:12px;top:12px;z-index:6;font-size:11.5px;color:#fff;
+    background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);
+    border-radius:8px;padding:6px 10px;pointer-events:none}
+  .bar{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  .btn{cursor:pointer;font-size:12.5px;padding:8px 14px;border-radius:10px;
+    background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.14);color:#e8e8ea}
+  .btn:hover{background:rgba(255,255,255,.16)}
+  .mono{font-family:Consolas,monospace;font-size:11.5px;color:#8b8b93}
+  .log{font-size:12px;color:#8fb8ff;min-height:18px}
+</style>
+</head>
+<body>
+
+<h1>B 方案 + 收起动画（可点击试）</h1>
+<p class="tip">
+  点面板左侧的画面空白处：暗场 200ms 淡出、面板 260ms 向右滑出，两者<b>同时开始</b>，面板完全离开后整层移除。<br>
+  点面板内部（Tab、色点、滑杆）不会关闭；选集列表里点某一集 = 切集并关闭。收起时点击<b>不穿透</b>，不会同时唤出播放控制栏。
+</p>
+
+<div class="stageWrap">
+  <div class="stage" id="stage">
+    <div class="hint">点击左侧画面空白处 → 收起面板</div>
+    <div class="subtitle">这是全屏视频画面，用来观察透光度</div>
+    <div class="shade"></div>
+    <div class="panel" id="panel"><div class="content">
+      <div class="head"><b>字幕设置</b><span class="reset">重置</span></div>
+      <div class="tabs"><div class="tab on">外观</div><div class="tab">调节</div><div class="tab">偏移</div></div>
+      <div class="sec">字幕样式</div>
+      <div class="chips"><div class="chip on">系统</div><div class="chip">自定义</div></div>
+      <div class="sec">文字颜色</div>
+      <div class="swatches">
+        <div class="sw" style="background:#fff"></div><div class="sw" style="background:#ffe14d"></div>
+        <div class="sw" style="background:#4df0ff"></div><div class="sw" style="background:#5cff8a"></div>
+        <div class="sw" style="background:#ff9a3d"></div><div class="sw" style="background:#ff7fc4"></div>
+        <div class="sw" style="background:#ff5a5a"></div><div class="sw" style="background:#5a9bff"></div>
+      </div>
+      <div class="sec">文字大小</div>
+      <div class="strack"><div class="sknob"></div></div>
+      <div class="srow"><span>小</span><span>58%</span><span>大</span></div>
+      <div class="foot">面板内容区一直落在 0.9 左右的黑底上</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="bar">
+  <div class="btn" id="reopen">呼出面板</div>
+  <div class="btn" id="replay">重播收起动画</div>
+  <div class="mono">暗场 200ms · 面板 260ms · 同起同收</div>
+  <div class="log" id="log"></div>
+</div>
+
+<script>
+  var stage = document.getElementById('stage');
+  var log = document.getElementById('log');
+  var panel = document.getElementById('panel');
+
+  function closePanel(src){
+    stage.classList.add('closed');
+    log.textContent = '收起中：暗场淡出 200ms / 面板右滑 260ms';
+    setTimeout(function(){ log.textContent = '面板已完全移出，整层移除'; }, 280);
+  }
+  function openPanel(){
+    stage.classList.remove('closed');
+    log.textContent = '呼出中：暗场淡入 200ms / 面板左滑 260ms';
+    setTimeout(function(){ log.textContent = '面板到位'; }, 280);
+  }
+
+  stage.addEventListener('click', function(e){
+    if (stage.classList.contains('closed')) return;
+    // 面板内部点击不关闭
+    if (e.target.closest('.panel')) { log.textContent = '面板内部点击：被面板消费，不关闭'; return; }
+    closePanel('stage');
+  });
+
+  document.getElementById('reopen').addEventListener('click', function(e){
+    e.stopPropagation(); openPanel();
+  });
+  document.getElementById('replay').addEventListener('click', function(){
+    stage.classList.remove('closed');
+    setTimeout(function(){ closePanel('replay'); }, 320);
+  });
+
+  openPanel();
+</script>
+</body>
+</html>

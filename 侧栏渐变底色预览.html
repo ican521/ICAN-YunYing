@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>右侧面板渐变底色预览</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;padding:26px 30px 40px;background:#0b0b0d;color:#e8e8ea;
+       font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;}
+  h1{font-size:18px;margin:0 0 6px;font-weight:700}
+  .tip{font-size:12.5px;color:#94949c;margin:0 0 22px;line-height:1.7}
+  .row{margin:0 0 26px}
+  .label{font-size:13.5px;font-weight:700;margin:0 0 8px;display:flex;align-items:baseline;gap:8px}
+  .label i{font-style:normal;font-weight:400;font-size:12px;color:#8b8b93}
+  .stage{position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;
+    background:
+      radial-gradient(55% 75% at 18% 28%, #2f74ad 0%, rgba(47,116,173,0) 62%),
+      radial-gradient(45% 65% at 58% 72%, #d9a44c 0%, rgba(217,164,76,0) 62%),
+      radial-gradient(40% 60% at 82% 22%, #a8473c 0%, rgba(168,71,60,0) 65%),
+      linear-gradient(118deg,#0e2d40 0%,#1c4f63 38%,#77552c 68%,#15222b 100%);
+  }
+  .stage::after{content:"";position:absolute;inset:0;background:
+      repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,rgba(0,0,0,0) 1px 3px);opacity:.5}
+  .subtitle{position:absolute;left:0;right:0;bottom:11%;text-align:center;
+    font-size:2.1vmin;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.75);z-index:2}
+  .panel{position:absolute;top:0;right:0;bottom:0;width:42%;z-index:3;color:#fff}
+  .content{padding:14px 16px 16px;height:100%;display:flex;flex-direction:column;gap:10px}
+  .head{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+  .head b{font-size:15px;font-weight:600}
+  .reset{font-size:12px;color:#c9c9cf;border:1px solid rgba(255,255,255,.15);
+    border-radius:12px;padding:5px 11px}
+  .tabs{display:flex;gap:8px}
+  .tab{flex:1;text-align:center;font-size:12px;padding:7px 0;border-radius:12px;
+    background:rgba(255,255,255,.10);color:#c3c3ca}
+  .tab.on{color:#5aa9ff;font-weight:700}
+  .sec{font-size:11.5px;color:#9d9da5;margin-top:2px}
+  .chips{display:flex;gap:8px}
+  .chip{flex:1;text-align:center;font-size:12px;padding:8px 0;border-radius:12px;
+    background:rgba(255,255,255,.10);color:#c8c8cf}
+  .chip.on{color:#5aa9ff;font-weight:700}
+  .swatches{display:flex;gap:8px;justify-content:space-between}
+  .sw{width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,.18)}
+  .slider{margin-top:4px}
+  .strack{height:2px;background:rgba(255,255,255,.18);border-radius:2px;position:relative}
+  .strack::after{content:"";position:absolute;left:0;top:0;height:2px;width:58%;
+    background:#5aa9ff;border-radius:2px}
+  .sknob{position:absolute;left:58%;top:50%;width:14px;height:14px;border-radius:50%;
+    background:#5aa9ff;transform:translate(-50%,-50%);box-shadow:0 0 0 4px rgba(90,169,255,.15)}
+  .srow{display:flex;justify-content:space-between;font-size:11px;color:#a6a6ae;margin-top:6px}
+  .foot{margin-top:auto;font-size:11px;color:#7f7f88}
+
+  /* A：面板自身整条渐变，右实左透 */
+  .stageA .panel{background:linear-gradient(to left,
+      rgba(0,0,0,1) 0%, rgba(0,0,0,.96) 32%, rgba(0,0,0,.62) 62%,
+      rgba(0,0,0,.24) 84%, rgba(0,0,0,0) 100%);}
+
+  /* B：整屏右浓左淡的暗场，面板无硬边，内容靠右 */
+  .stageB .shade{position:absolute;inset:0;z-index:3;
+      background:linear-gradient(to left,
+      rgba(0,0,0,.94) 0%, rgba(0,0,0,.9) 34%, rgba(0,0,0,.55) 62%,
+      rgba(0,0,0,.2) 84%, rgba(0,0,0,0) 100%);}
+  .stageB .panel{background:none;width:44%;}
+  .stageB .content{padding-left:26px}
+
+  /* C：面板 92% 实底 + 左缘渐隐 + 向左外延柔和暗场 */
+  .stageC .glow{position:absolute;top:0;bottom:0;right:42%;width:14%;z-index:2;
+      background:linear-gradient(to left, rgba(0,0,0,.42), rgba(0,0,0,0));}
+  .stageC .panel{background:rgba(0,0,0,.92);
+      -webkit-mask-image:linear-gradient(to left, #000 0%, #000 86%, transparent 100%);
+      mask-image:linear-gradient(to left, #000 0%, #000 86%, transparent 100%);}
+  .stageC .content{padding-left:22px}
+
+  .legend{font-size:11.5px;color:#7c7c85;margin:6px 0 0;line-height:1.7}
+  .legend code{color:#8fb8ff;font-family:Consolas,monospace}
+</style>
+</head>
+<body>
+
+<h1>右侧滑出面板 · 渐变底色三选</h1>
+<p class="tip">底图用高饱和“视频画面”模拟最坏情况（亮部多）。三张都是同一套面板内容，只差背景的渐变方式。</p>
+
+<!-- A -->
+<div class="row">
+  <div class="label">A · 面板整条渐变，右实左透<i>面板内部从左 0% 黑渐变到右 100% 黑，视频直接透出来</i></div>
+  <div class="stage stageA">
+    <div class="subtitle">这是全屏视频画面，用来观察透光度</div>
+    <div class="panel"><div class="content">
+      <div class="head"><b>字幕设置</b><span class="reset">重置</span></div>
+      <div class="tabs"><div class="tab on">外观</div><div class="tab">调节</div><div class="tab">偏移</div></div>
+      <div class="sec">字幕样式</div>
+      <div class="chips"><div class="chip on">系统</div><div class="chip">自定义</div></div>
+      <div class="sec">文字颜色</div>
+      <div class="swatches">
+        <div class="sw" style="background:#fff"></div><div class="sw" style="background:#ffe14d"></div>
+        <div class="sw" style="background:#4df0ff"></div><div class="sw" style="background:#5cff8a"></div>
+        <div class="sw" style="background:#ff9a3d"></div><div class="sw" style="background:#ff7fc4"></div>
+        <div class="sw" style="background:#ff5a5a"></div><div class="sw" style="background:#5a9bff"></div>
+      </div>
+      <div class="slider"><div class="strack"><div class="sknob"></div></div>
+        <div class="srow"><span>文字大小</span><span>58%</span></div></div>
+      <div class="foot">左半部分文字压在半透明区，亮画面时对比度会掉。</div>
+    </div></div>
+  </div>
+  <p class="legend">参数：<code>0% → transparent，62% → 0.62 黑，100% → 纯黑</code></p>
+</div>
+
+<!-- B -->
+<div class="row">
+  <div class="label">B · 整屏右浓左淡，面板没有硬边<i>暗场从屏幕右缘一路淡到左边，内容整体靠右收进深色区</i></div>
+  <div class="stage stageB">
+    <div class="subtitle">这是全屏视频画面，用来观察透光度</div>
+    <div class="shade"></div>
+    <div class="panel"><div class="content">
+      <div class="head"><b>字幕设置</b><span class="reset">重置</span></div>
+      <div class="tabs"><div class="tab on">外观</div><div class="tab">调节</div><div class="tab">偏移</div></div>
+      <div class="sec">字幕样式</div>
+      <div class="chips"><div class="chip on">系统</div><div class="chip">自定义</div></div>
+      <div class="sec">文字颜色</div>
+      <div class="swatches">
+        <div class="sw" style="background:#fff"></div><div class="sw" style="background:#ffe14d"></div>
+        <div class="sw" style="background:#4df0ff"></div><div class="sw" style="background:#5cff8a"></div>
+        <div class="sw" style="background:#ff9a3d"></div><div class="sw" style="background:#ff7fc4"></div>
+        <div class="sw" style="background:#ff5a5a"></div><div class="sw" style="background:#5a9bff"></div>
+      </div>
+      <div class="slider"><div class="strack"><div class="sknob"></div></div>
+        <div class="srow"><span>文字大小</span><span>58%</span></div></div>
+      <div class="foot">面板与视频之间没有明确分界，过渡最柔和。</div>
+    </div></div>
+  </div>
+  <p class="legend">参数：<code>0% → 0.94 黑，34% → 0.90 黑，62% → 0.55 黑，100% → 透明</code></p>
+</div>
+
+<!-- C -->
+<div class="row">
+  <div class="label">C · 面板 92% 实底，只有左缘渐隐 + 向左外延一层暗场<i>内容区始终是实底，只有边缘“化”进画面里</i></div>
+  <div class="stage stageC">
+    <div class="subtitle">这是全屏视频画面，用来观察透光度</div>
+    <div class="glow"></div>
+    <div class="panel"><div class="content">
+      <div class="head"><b>字幕设置</b><span class="reset">重置</span></div>
+      <div class="tabs"><div class="tab on">外观</div><div class="tab">调节</div><div class="tab">偏移</div></div>
+      <div class="sec">字幕样式</div>
+      <div class="chips"><div class="chip on">系统</div><div class="chip">自定义</div></div>
+      <div class="sec">文字颜色</div>
+      <div class="swatches">
+        <div class="sw" style="background:#fff"></div><div class="sw" style="background:#ffe14d"></div>
+        <div class="sw" style="background:#4df0ff"></div><div class="sw" style="background:#5cff8a"></div>
+        <div class="sw" style="background:#ff9a3d"></div><div class="sw" style="background:#ff7fc4"></div>
+        <div class="sw" style="background:#ff5a5a"></div><div class="sw" style="background:#5a9bff"></div>
+      </div>
+      <div class="slider"><div class="strack"><div class="sknob"></div></div>
+        <div class="srow"><span>文字大小</span><span>58%</span></div></div>
+      <div class="foot">文字最稳，边缘最自然；“左淡”只体现在最后一段。</div>
+    </div></div>
+  </div>
+  <p class="legend">参数：面板 <code>rgba(0,0,0,.92)</code>，左侧 14% 高宽由实到透明；外延暗场 <code>0.42 黑 → 透明</code>，宽约面板 1/3</p>
+</div>
+
+</body>
+</html>

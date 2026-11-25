@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>分段按钮切换动画预览</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 30px;
+    background: #ECECEF;
+    font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #1C1D24;
+  }
+  .head { max-width: 1040px; margin: 0 auto 18px; }
+  .head h1 { font-size: 21px; margin: 0 0 6px; }
+  .head p { margin: 0; font-size: 12.5px; color: #5C5E6E; line-height: 1.8; }
+
+  .wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+  .card { background: #fff; border-radius: 18px; padding: 18px 20px 20px; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.05); }
+  .card h2 { font-size: 15px; margin: 0 0 4px; }
+  .card .desc { font-size: 12px; color: #6B6D7C; margin: 0 0 14px; line-height: 1.7; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: #EAF2FF; color: #0B63CE; margin-left: 8px; vertical-align: 1px; }
+  .tag.rec { background: #EDF7EE; color: #1D7A33; }
+
+  .panel { border-radius: 16px; padding: 18px 16px 8px; background: #2C2C2C; }
+  .panel-label { font-size: 11px; margin-bottom: 12px; letter-spacing: .3px; color: #8E8E9A; }
+  .hint { font-size: 11px; color: #7E7E8A; margin: 10px 0 4px; }
+
+  /* 分段控件：整条连通、首尾圆角、段间 1dp */
+  .seg {
+    position: relative;
+    display: flex; height: 38px; border-radius: 19px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.10);
+    font-size: 12px;
+  }
+  .seg .divider { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.10); z-index: 0; }
+  .seg .item {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    position: relative; z-index: 3; cursor: pointer; user-select: none;
+    color: #A6A6BA;
+    transition: color 150ms linear;
+  }
+  .seg .item.on { color: #EDEDF5; }
+
+  /* 滑块指示器 */
+  .seg .thumb {
+    position: absolute; top: 0; bottom: 0; z-index: 1;
+    background: rgba(255,255,255,.16);
+    pointer-events: none;
+  }
+  /* A：滑动 */
+  .segA .thumb { transition: left 250ms cubic-bezier(.4,0,.2,1), width 250ms cubic-bezier(.4,0,.2,1); }
+  /* B：该栏不显示滑块，靠段内底色淡入 */
+  .segB .thumb { display: none; }
+  .segB .item.on { background: rgba(255,255,255,.16); transition: background-color 150ms ease, color 150ms linear; }
+  .segB .item { transition: background-color 150ms ease, color 150ms linear; }
+  /* C：滑动 + 文字轻微放大 */
+  .segC .thumb { transition: left 300ms cubic-bezier(.34,1.06,.42,1), width 300ms cubic-bezier(.34,1.06,.42,1); }
+
+  .note { max-width: 1040px; margin: 22px auto 0; font-size: 12px; color: #5C5E6E; line-height: 1.9; background: #fff; border-radius: 14px; padding: 16px 20px; }
+  .note b { color: #1C1D24; }
+  .note code { background: #F2F2F5; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>字幕设置 · 三段按钮切换过渡动画</h1>
+  <p>底色沿用方案 1（外框 10% 白 / 选中块 16% 白）。动画与配色互不影响，可以直接点每一栏的按钮试手感。</p>
+</div>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>方案 A · 滑块滑动 250ms<span class="tag rec">推荐</span></h2>
+    <p class="desc">选中块抽成一个整块的“滑块”，切换时从旧段平移到新段（250ms · FastOutSlowInEasing）；文字颜色同步交叉淡化 150ms。滑块压在段间细线上，滑过去时那条线被盖掉，过渡更连贯。</p>
+    <div class="panel">
+      <div class="panel-label">深色 · 点任一段试</div>
+      <div class="seg segA" id="segA" data-index="0">
+        <div class="thumb" style="left:0;width:33.333%"></div>
+        <div class="divider" style="left:33.333%"></div>
+        <div class="divider" style="left:66.666%"></div>
+        <div class="item on">外观</div>
+        <div class="item">调节</div>
+        <div class="item">偏移</div>
+      </div>
+      <div class="hint">250ms 位移 · 150ms 文字色</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>方案 B · 只淡化不滑动（150ms）</h2>
+    <p class="desc">保持现在的结构，选中段自己的底色和文字色做 150ms 交叉淡化。旧段淡出、新段淡入，控件本身不动。改动量最小，最接近现在的观感，只是不再“啪”一下。</p>
+    <div class="panel">
+      <div class="panel-label">深色 · 点任一段试</div>
+      <div class="seg segB" id="segB">
+        <div class="divider" style="left:33.333%"></div>
+        <div class="divider" style="left:66.666%"></div>
+        <div class="item on">外观</div>
+        <div class="item">调节</div>
+        <div class="item">偏移</div>
+      </div>
+      <div class="hint">150ms 背景淡入淡出 · 150ms 文字色</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>方案 C · 滑动 + 轻微回弹（300ms）</h2>
+    <p class="desc">同一套滑块，但用带一点过冲的曲线（overshoot），到位时轻微弹一下。手感更活泼，风险是 TV 遥控场景反复切换会显得吵；如果只在设置类控件里用，问题不大。</p>
+    <div class="panel">
+      <div class="panel-label">深色 · 点任一段试</div>
+      <div class="seg segC" id="segC" data-index="0">
+        <div class="thumb" style="left:0;width:33.333%"></div>
+        <div class="divider" style="left:33.333%"></div>
+        <div class="divider" style="left:66.666%"></div>
+        <div class="item on">外观</div>
+        <div class="item">调节</div>
+        <div class="item">偏移</div>
+      </div>
+      <div class="hint">300ms · 带 overshoot 曲线</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>落地口径（方案 A）</b><br>
+  1. <code>SegmentedTabs.kt</code> 里把选中底色从“每段自己画”改成“Row 内一个绝对定位的指示器”：用 <code>Layout</code> 或 <code>BoxWithConstraints</code> 拿到段宽，<code>animateFloatAsState(250.dp, tween(250, easing = FastOutSlowInEasing))</code> 驱动 x 偏移。<br>
+  2. 段间 1dp 线改成 <code>drawBehind</code> 画，Row 里只留等宽段，指示器与段宽对齐不会差 1dp。<br>
+  3. 文字色用 <code>animateColorAsState(tween(150, easing = LinearEasing))</code>，只动颜色不动字号，避免文字抖动。<br>
+  4. 建议新增 <code>SegmentedTabsAnimMs = 250</code>、<code>SegmentedTabsFadeMs = 150</code> 两个常量，别散落硬编码。<br>
+  5. <b>回落策略</b>：系统开“移除动画”（无障碍）时直接跳变，用 <code>LocalAccessibilityManager</code> 或读 <code>Settings.Global.ANIMATOR_DURATION_SCALE</code> 判断更省事；TV 遥控长按连点时以最后一次点击为终点，不要排队。<br>
+  6. 注意：这个组件与详情页 G+ 那批改的是同一个文件（<code>PlayerScreen.kt</code> 之外的 <code>SegmentedTabs.kt</code>，不冲突），但要和配色一起改，一次提交。
+</div>
+
+<script>
+  function bindSlider(id) {
+    const seg = document.getElementById(id);
+    const thumb = seg.querySelector('.thumb');
+    const items = [...seg.querySelectorAll('.item')];
+    items.forEach((el, i) => {
+      el.addEventListener('click', () => {
+        seg.dataset.index = i;
+        thumb.style.left = (i * 33.3333) + '%';
+        items.forEach((x, j) => x.classList.toggle('on', j === i));
+      });
+    });
+  }
+  function bindFade(id) {
+    const seg = document.getElementById(id);
+    const items = [...seg.querySelectorAll('.item')];
+    items.forEach((el, i) => {
+      el.addEventListener('click', () => {
+        items.forEach((x, j) => x.classList.toggle('on', j === i));
+      });
+    });
+  }
+  bindSlider('segA');
+  bindFade('segB');
+  bindSlider('segC');
+</script>
+
+</body>
+</html>

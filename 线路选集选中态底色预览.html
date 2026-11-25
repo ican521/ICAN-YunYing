@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>线路 / 选集 选中态配色对照</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 24px 40px;
+    background: #ECECEF;
+    font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #1C1D24;
+  }
+  .head { max-width: 1060px; margin: 0 auto 18px; }
+  .head h1 { font-size: 21px; margin: 0 0 8px; }
+  .head p { margin: 0 0 10px; font-size: 13px; color: #5C5E6E; line-height: 1.75; }
+  .head p b { color: #1C1D24; }
+  .swatches { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+  .swatches span { font-size: 12px; color: #6B6D7C; margin-right: 3px; }
+  .sw { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.14); }
+  .sw.on { box-shadow: 0 0 0 2px #1C1D24; }
+
+  .wrap { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+  .group { background: #fff; border-radius: 18px; padding: 18px 20px 20px; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.05); }
+  .group.answer { box-shadow: 0 0 0 2px #007AFF33, 0 8px 24px rgba(0,0,0,.06); }
+  .group-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .group-head h2 { font-size: 15px; margin: 0; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: #F0F0F3; color: #5C5E6E; }
+  .tag.now { background: #EEF1F5; color: #455066; }
+  .tag.hot { background: #EAF2FF; color: #0B63CE; }
+  .group-head p { margin: 0; width: 100%; font-size: 12px; color: #6B6D7C; line-height: 1.65; }
+
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .pair { grid-template-columns: 1fr; } }
+
+  .phone { border-radius: 20px; padding: 16px 15px 14px; }
+  .phone.light { background: #FFFFFF; border: 1px solid #E4E4E9; }
+  .phone.dark  { background: #242424; border: 1px solid #333338; }
+  .phone-label { font-size: 11px; letter-spacing: .3px; margin-bottom: 12px; }
+  .phone.light .phone-label { color: #8A8C9A; }
+  .phone.dark  .phone-label { color: #7C7C90; }
+
+  .stage { margin-bottom: 16px; }
+  .stage:last-child { margin-bottom: 0; }
+  .stage-title { font-size: 12px; font-weight: 600; margin: 0 0 9px; }
+  .phone.light .stage-title { color: #15161D; }
+  .phone.dark  .stage-title { color: #EDEDF5; }
+  .row { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chipbox { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .chip {
+    min-width: 44px; padding: 10px 12px; border-radius: 16px;
+    font-size: 12px; font-weight: 600; line-height: 1.2; text-align: center; white-space: nowrap;
+  }
+  .cap { font-size: 10px; text-align: center; line-height: 1.35; }
+  .phone.light .cap { color: #8A8C9A; }
+  .phone.dark  .cap { color: #7C7C90; }
+  .cap em { font-style: normal; font-weight: 600; }
+  .cap em.ok { color: #1D7A33; }
+  .cap em.no { color: #B2400E; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>线路 / 选集 选中态配色对照</h1>
+  <p>胶囊下方数字是「文字 vs 选中底」的 WCAG 对比度，正文达标线 4.5:1。未选中项统一 secondaryVariant 底 + 灰字，不动。</p>
+  <div class="swatches">
+    <span>主题色</span>
+    <div class="sw on" data-c="#007AFF" style="background:#007AFF"></div>
+    <div class="sw" data-c="#34C759" style="background:#34C759"></div>
+    <div class="sw" data-c="#FF9500" style="background:#FF9500"></div>
+    <div class="sw" data-c="#FF3B30" style="background:#FF3B30"></div>
+    <div class="sw" data-c="#B48CFF" style="background:#B48CFF"></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- 你问的效果：现状底 + 纯主题色文字 -->
+  <div class="group answer">
+    <div class="group-head">
+      <h2>现状底 + 纯主题色文字</h2>
+      <span class="tag hot">你问的效果</span>
+      <p>底色完全不动（浅 14% / 深 22%），文字直接换成 primary 本身。左 = 不守护（原样），右 = 自动向白/黑推到达标（会牺牲一部分主色）。</p>
+    </div>
+    <div class="pair">
+      <div class="phone light">
+        <div class="phone-label">浅色模式 · 页面 #FFFFFF</div>
+        <div class="stage"><p class="stage-title">线路</p><div class="row" id="ansLightLine"></div></div>
+        <div class="stage"><p class="stage-title">选集</p><div class="row" id="ansLightEp"></div></div>
+      </div>
+      <div class="phone dark">
+        <div class="phone-label">深色模式 · 页面 #242424</div>
+        <div class="stage"><p class="stage-title">线路</p><div class="row" id="ansDarkLine"></div></div>
+        <div class="stage"><p class="stage-title">选集</p><div class="row" id="ansDarkEp"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 只改底色：文字保持现状 tintedText -->
+  <div class="group">
+    <div class="group-head">
+      <h2>只改按钮底色（文字保持现状 chipTintedText）</h2>
+      <span class="tag now">上一轮方案</span>
+      <p>底越浓，文字被守护一路压深，主色感反而越弱；整块实底必须配白字才成立。</p>
+    </div>
+    <div class="pair">
+      <div class="phone light">
+        <div class="phone-label">浅色模式 · 页面 #FFFFFF</div>
+        <div class="stage"><p class="stage-title">线路</p><div class="row" id="rowLightLine"></div></div>
+        <div class="stage"><p class="stage-title">选集</p><div class="row" id="rowLightEp"></div></div>
+      </div>
+      <div class="phone dark">
+        <div class="phone-label">深色模式 · 页面 #242424</div>
+        <div class="stage"><p class="stage-title">线路</p><div class="row" id="rowDarkLine"></div></div>
+        <div class="stage"><p class="stage-title">选集</p><div class="row" id="rowDarkEp"></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ---------- 与 App 内 Color.kt 同算法 ----------
+function hexToRgb(h) {
+  const s = h.replace('#','');
+  return [parseInt(s.slice(0,2),16), parseInt(s.slice(2,4),16), parseInt(s.slice(4,6),16)];
+}
+function rgbToHex(r,g,b) {
+  const f = v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2,'0');
+  return '#' + f(r) + f(g) + f(b);
+}
+function rgbToHsv(r,g,b) {
+  r/=255; g/=255; b/=255;
+  const mx = Math.max(r,g,b), mn = Math.min(r,g,b), d = mx-mn;
+  let h = 0;
+  if (d !== 0) {
+    if (mx === r) h = ((g-b)/d) % 6;
+    else if (mx === g) h = (b-r)/d + 2;
+    else h = (r-g)/d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  const s = mx === 0 ? 0 : d/mx;
+  return [h, s, mx];
+}
+function hsvToRgb(h,s,v) {
+  const c = v*s, x = c*(1-Math.abs(((h/60)%2)-1)), m = v-c;
+  let r=0,g=0,b=0;
+  if (h<60) [r,g,b]=[c,x,0]; else if (h<120) [r,g,b]=[x,c,0];
+  else if (h<180) [r,g,b]=[0,c,x]; else if (h<240) [r,g,b]=[0,x,c];
+  else if (h<300) [r,g,b]=[x,0,c]; else [r,g,b]=[c,0,x];
+  return [(r+m)*255, (g+m)*255, (b+m)*255];
+}
+function shift(hex, satFactor, valFactor) {
+  const [h,s,v] = rgbToHsv(...hexToRgb(hex));
+  return rgbToHex(...hsvToRgb(h, Math.min(1, s*satFactor), Math.min(1, v*valFactor)));
+}
+function mix(a, b, f) {
+  const A = hexToRgb(a), B = hexToRgb(b);
+  return rgbToHex(A[0]+(B[0]-A[0])*f, A[1]+(B[1]-A[1])*f, A[2]+(B[2]-A[2])*f);
+}
+function lum(hex) {
+  const [r,g,b] = hexToRgb(hex).map(v => {
+    const c = v/255;
+    return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
+  });
+  return 0.2126*r + 0.7152*g + 0.0722*b;
+}
+function contrast(a, b) {
+  const l1 = lum(a), l2 = lum(b);
+  const hi = Math.max(l1,l2), lo = Math.min(l1,l2);
+  return (hi+0.05)/(lo+0.05);
+}
+
+const DARK_SURFACE = '#242424', LIGHT_SURFACE = '#FFFFFF';
+const ANCHOR_LIGHT = '#001018';
+
+function tintedFill(primary, dark, alpha) {
+  return mix(dark ? DARK_SURFACE : LIGHT_SURFACE, primary, alpha);
+}
+function tintedText(primary, dark, alpha) {
+  let ratio = dark ? 0.55 : 0.74;
+  const anchor = dark ? '#FFFFFF' : ANCHOR_LIGHT;
+  const fill = tintedFill(primary, dark, alpha);
+  let text = mix(anchor, primary, ratio);
+  while (contrast(text, fill) < 4.5 && ratio > 0) {
+    ratio -= 0.01;
+    text = mix(anchor, primary, ratio);
+  }
+  return { text, fill, ratio };
+}
+/** 纯主色起步（100%）再向锚色推，直到达标 */
+function guardedPrimaryText(primary, dark, fill) {
+  const anchor = dark ? '#FFFFFF' : ANCHOR_LIGHT;
+  let ratio = 1.0;
+  let text = primary;
+  while (contrast(text, fill) < 4.5 && ratio > 0) {
+    ratio -= 0.01;
+    text = mix(anchor, primary, ratio);
+  }
+  return { text, ratio };
+}
+
+const stages = [
+  { key: 'now',  name: '现状',      lightA: 0.14, darkA: 0.22 },
+  { key: 'mid',  name: '中档',      lightA: 0.24, darkA: 0.32 },
+  { key: 'deep', name: '深档',      lightA: 0.32, darkA: 0.45 },
+  { key: 'solid', name: '整块实底', lightA: 1.00, darkA: 1.00, forceWhiteText: true },
+];
+
+const LIGHT_OFF = { bg: '#F0F0F0', fg: '#5C5E6E' };
+const DARK_OFF  = { bg: '#3A3A43', fg: '#D8D8E0' };
+
+let themeHex = '#007AFF';
+
+function primaryOf(dark) {
+  return dark ? shift(themeHex, 0.9, 1.05) : shift(themeHex, 0.95, 0.85);
+}
+
+function makeBox(text, bg, fg, capHtml, weight) {
+  const box = document.createElement('div');
+  box.className = 'chipbox';
+  const chip = document.createElement('div');
+  chip.className = 'chip';
+  chip.textContent = text;
+  chip.style.background = bg;
+  chip.style.color = fg;
+  if (weight) chip.style.fontWeight = weight;
+  const cap = document.createElement('div');
+  cap.className = 'cap';
+  cap.innerHTML = capHtml;
+  box.appendChild(chip); box.appendChild(cap);
+  return box;
+}
+
+function offBox(isEp, dark) {
+  const off = dark ? DARK_OFF : LIGHT_OFF;
+  return makeBox(isEp ? '第 4 集' : '线路二', off.bg, off.fg, '未选中', '500');
+}
+
+/* ---- 你问的效果：现状底 + 纯主题色文字 ---- */
+function buildAnswerRow(el, dark, isEp) {
+  const primary = primaryOf(dark);
+  const alpha = dark ? 0.22 : 0.14;
+  const fill = tintedFill(primary, dark, alpha);
+  el.innerHTML = '';
+  el.appendChild(offBox(isEp, dark));
+
+  const raw = contrast(primary, fill);
+  el.appendChild(makeBox(
+    isEp ? '第 3 集' : '线路一', fill, primary,
+    '纯主色<br><em class="' + (raw >= 4.5 ? 'ok' : 'no') + '">' + raw.toFixed(2) + ':1</em>'
+  ));
+
+  const g = guardedPrimaryText(primary, dark, fill);
+  const gr = contrast(g.text, fill);
+  el.appendChild(makeBox(
+    isEp ? '第 3 集' : '线路一', fill, g.text,
+    '守护后<br><em class="' + (gr >= 4.5 ? 'ok' : 'no') + '">' + gr.toFixed(2) + ':1</em><br>主色 ' + Math.round(g.ratio*100) + '%'
+  ));
+}
+
+/* ---- 只改底色 ---- */
+function buildRow(el, dark, isEp) {
+  el.innerHTML = '';
+  el.appendChild(offBox(isEp, dark));
+  const primary = primaryOf(dark);
+
+  stages.forEach(st => {
+    const alpha = dark ? st.darkA : st.lightA;
+    const bg = tintedFill(primary, dark, alpha);
+    const { text } = tintedText(primary, dark, alpha);
+    const fg = st.forceWhiteText ? '#FFFFFF' : text;
+    const ratio = contrast(fg, bg);
+    let capHtml = st.name + '<br><em class="' + (ratio >= 4.5 ? 'ok' : 'no') + '">' + ratio.toFixed(2) + ':1</em>';
+    if (st.forceWhiteText) capHtml += '<br><em class="no">需白字</em>';
+    el.appendChild(makeBox(isEp ? '第 3 集' : '线路一', bg, fg, capHtml));
+  });
+}
+
+function render() {
+  buildAnswerRow(document.getElementById('ansLightLine'), false, false);
+  buildAnswerRow(document.getElementById('ansLightEp'), false, true);
+  buildAnswerRow(document.getElementById('ansDarkLine'), true, false);
+  buildAnswerRow(document.getElementById('ansDarkEp'), true, true);
+
+  buildRow(document.getElementById('rowLightLine'), false, false);
+  buildRow(document.getElementById('rowLightEp'), false, true);
+  buildRow(document.getElementById('rowDarkLine'), true, false);
+  buildRow(document.getElementById('rowDarkEp'), true, true);
+}
+
+document.querySelectorAll('.sw').forEach(sw => {
+  sw.addEventListener('click', () => {
+    document.querySelectorAll('.sw').forEach(s => s.classList.remove('on'));
+    sw.classList.add('on');
+    themeHex = sw.dataset.c;
+    render();
+  });
+});
+
+render();
+</script>
+</body>
+</html>

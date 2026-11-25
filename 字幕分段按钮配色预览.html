@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>字幕设置 · 外观/调节/偏移 分段按钮配色预览</title>
+<style>
+  :root{
+    --primary:#007AFF;
+    --tintedFill:#1C3754;      /* primary 22% 叠 #242424 */
+    --tintedText:#73BCFF;      /* 白 → primary 55% */
+    --muted:#A6A6BA;
+    --dp:1.4px;                 /* 2400px 屏按 0.5 倍展示 → 1dp≈1.375px */
+  }
+  body{margin:0;background:#08080a;font-family:-apple-system,"PingFang SC","Noto Sans SC",sans-serif;color:#EDEDF5;}
+  .wrap{padding:24px 28px 40px;}
+  h1{font-size:20px;font-weight:600;margin:0 0 6px;}
+  .sub{font-size:13px;color:#8b8b9a;margin-bottom:22px;line-height:1.6;}
+  .stage{position:relative;width:1200px;height:520px;border-radius:14px;overflow:hidden;margin-bottom:8px;
+         background:
+           radial-gradient(120% 90% at 18% 30%, #6b3a17 0%, #33200f 45%, #0a0a0a 100%);
+         box-shadow:0 10px 30px rgba(0,0,0,.5);}
+  /* 右实左淡的暗场 */
+  .shade{position:absolute;inset:0;
+    background:linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.94) 62%, rgba(0,0,0,0.94) 100%);}
+  /* 右侧面板（宽 42%） */
+  .panel{position:absolute;top:0;bottom:0;right:0;width:42%;padding:0 calc(16px * var(--dp));box-sizing:border-box;}
+  .titleRow{display:flex;align-items:center;justify-content:space-between;padding:calc(20px*var(--dp)) 0 calc(14px*var(--dp));}
+  .title{font-size:16px;font-weight:600;}
+  .reset{font-size:14px;color:#A6A6BA;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:6px 12px;}
+  .segRow{margin-bottom:18px;}
+  .seg{display:flex;align-items:center;height:38px;border-radius:19px;box-sizing:border-box;}
+  .seg > div{flex:1;display:flex;align-items:center;justify-content:center;height:100%;font-size:14px;}
+  .divider{width:1px;height:100%;flex:0 0 1px !important;}
+  .section{font-size:13px;color:#8f8f9e;margin:10px 0 8px;}
+  .slider{height:8px;border-radius:4px;background:rgba(255,255,255,.12);position:relative;margin-bottom:26px;}
+  .slider i{position:absolute;left:0;top:0;bottom:0;width:60%;border-radius:4px;background:var(--primary);}
+  .slider b{position:absolute;left:60%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#fff;}
+  .val{font-size:20px;margin:0 0 10px;}
+  .caption{display:flex;align-items:baseline;gap:10px;margin:14px 0 10px;}
+  .caption b{font-size:15px;}
+  .caption span{font-size:12.5px;color:#8b8b9a;}
+
+  /* ---- 方案 A：当前实现（外框 1dp white10 + 选中 tinted 22% + 浅蓝字） ---- */
+  .segA{border:1px solid rgba(255,255,255,.10);}
+  .segA > div{color:var(--muted);}
+  .segA .on{background:var(--tintedFill);color:var(--tintedText);font-weight:600;}
+  .segA .divider{background:rgba(255,255,255,.10);}
+
+  /* ---- 方案 B：外框提到 white16，选中段实心主题色 + 纯白字 ---- */
+  .segB{border:1px solid rgba(255,255,255,.16);}
+  .segB > div{color:var(--muted);}
+  .segB .on{background:var(--primary);color:#fff;font-weight:600;}
+  .segB .divider{background:rgba(255,255,255,.10);}
+
+  /* ---- 方案 C：玻璃白，选中段白 12% 底 + 白字，强调色只用于文字 ---- */
+  .segC{border:1px solid rgba(255,255,255,.14);}
+  .segC > div{color:rgba(255,255,255,.62);}
+  .segC .on{background:rgba(255,255,255,.12);color:#fff;font-weight:600;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+  .segC .divider{background:rgba(255,255,255,.10);}
+
+  /* ---- 方案 D：三个独立胶囊，无外框 ---- */
+  .segD{gap:8px;height:38px;background:none;}
+  .segD > div{border-radius:19px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.62);}
+  .segD .on{background:rgba(0,122,255,.90);color:#fff;font-weight:600;}
+
+  .note{font-size:12.5px;color:#7d7d8c;line-height:1.7;margin:0 0 30px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>字幕设置 · 「外观 / 调节 / 偏移」分段按钮</h1>
+  <p class="sub">四套配色都放在同一块「右浓左淡暗场 + 42% 宽面板」上，面板里同时放了滑杆作参照，判断选中段与整体是否协调。</p>
+
+  <div class="caption"><b>A · 当前实现</b><span>外框 white 10%、选中底 = 主题色 22% 叠 #242424、选中字 #73BCFF</span></div>
+  <div class="stage"><div class="shade"></div>
+    <div class="panel">
+      <div class="titleRow"><div class="title">字幕设置</div><div class="reset">重置</div></div>
+      <div class="segRow"><div class="seg segA"><div class="on">外观</div><div class="divider"></div><div>调节</div><div class="divider"></div><div>偏移</div></div></div>
+      <div class="section">字幕大小</div><div class="val">100%</div>
+      <div class="slider"><i></i><b></b></div>
+      <div class="section">字幕样式</div>
+      <div class="seg segA" style="width:60%"><div class="on">系统</div><div class="divider"></div><div>自定义</div></div>
+    </div>
+  </div>
+
+  <div class="caption"><b>B · 实心主题色（推荐）</b><span>外框 white 16%、选中段实心 #007AFF + 纯白粗体、未选中 white 65%</span></div>
+  <div class="stage"><div class="shade"></div>
+    <div class="panel">
+      <div class="titleRow"><div class="title">字幕设置</div><div class="reset">重置</div></div>
+      <div class="segRow"><div class="seg segB"><div class="on">外观</div><div class="divider"></div><div>调节</div><div class="divider"></div><div>偏移</div></div></div>
+      <div class="section">字幕大小</div><div class="val">100%</div>
+      <div class="slider"><i></i><b></b></div>
+      <div class="section">字幕样式</div>
+      <div class="seg segB" style="width:60%"><div class="on">系统</div><div class="divider"></div><div>自定义</div></div>
+    </div>
+  </div>
+
+  <div class="caption"><b>C · 玻璃白</b><span>外框 white 14%、选中段白 12% 底 + 内描边 white 18% + 白字、未选中 white 62%</span></div>
+  <div class="stage"><div class="shade"></div>
+    <div class="panel">
+      <div class="titleRow"><div class="title">字幕设置</div><div class="reset">重置</div></div>
+      <div class="segRow"><div class="seg segC"><div class="on">外观</div><div class="divider"></div><div>调节</div><div class="divider"></div><div>偏移</div></div></div>
+      <div class="section">字幕大小</div><div class="val">100%</div>
+      <div class="slider"><i></i><b></b></div>
+      <div class="section">字幕样式</div>
+      <div class="seg segC" style="width:60%"><div class="on">系统</div><div class="divider"></div><div>自定义</div></div>
+    </div>
+  </div>
+
+  <div class="caption"><b>D · 独立胶囊</b><span>去掉外框与分隔线，三个 19dp 圆角胶囊、间距 8dp；选中 white 6% → 主题色 90%</span></div>
+  <div class="stage"><div class="shade"></div>
+    <div class="panel">
+      <div class="titleRow"><div class="title">字幕设置</div><div class="reset">重置</div></div>
+      <div class="segRow"><div class="seg segD"><div class="on">外观</div><div>调节</div><div>偏移</div></div></div>
+      <div class="section">字幕大小</div><div class="val">100%</div>
+      <div class="slider"><i></i><b></b></div>
+      <div class="section">字幕样式</div>
+      <div class="seg segD" style="width:60%"><div class="on">系统</div><div>自定义</div></div>
+    </div>
+  </div>
+
+  <p class="note">判断要点：近黑底上「22% 主题色」混出来只有 #1C3754，亮度和周围几乎一样，选中段靠浅蓝字硬撑，看着像“半禁用”；<br>
+  B 用实心色把“选中”拉成唯一亮色块，和下方滑杆同一支主题色，层级最清楚；C 最含蓄但三段区分偏弱；D 与面板里另一排「系统/自定义」胶囊会撞样式。</p>
+</div>
+</body>
+</html>

@@ -427,6 +427,15 @@ fun PlayerScreen(
     // 之前用 isLandscape 判档，手机横着会被当成平板 → 退全屏时会先露出平板样式
     val isPhone = configuration.smallestScreenWidthDp < 600
     val landLayout = !isPhone
+    // 渲染用的「全屏」：手机从横屏全屏竖回竖屏的那一瞬间，fullscreen 状态要等下面的
+    // LaunchedEffect 下一帧才清掉；若照旧按 fullscreen 画，会多出 100~200ms 的
+    // 「竖屏窗口 + 全屏分支」中间态——视频铺满整个 1080x2400、画面被 FIT 居中到屏幕中间，
+    // 随后才一帧内缩回小窗，就是肉眼看到的「跳一下」。
+    // 对齐 fongmi：VideoActivity.exitFullscreen 里 setFullscreen(false)/setVideoView(false)
+    // 是在 onConfigurationChanged 里同步做完的，配置变化那一帧画出来就已经是小窗形态。
+    // 所以这里在渲染期派生一次，同一帧就收敛，状态清理仍交给 LaunchedEffect。
+    val renderFullscreen = fullscreen && !(isPhone && !isLandscape && !portraitFullscreen &&
+        !landscapeFullscreen && !landZooming && !portraitZooming)
     LaunchedEffect(isLandscape) {
         when {
             // 旋转进入全屏后保持纯净画面，工具栏由用户单击唤出
@@ -441,9 +450,24 @@ fun PlayerScreen(
                 if (isPhone && fullscreen && !locked && !portraitFullscreen && !landscapeFullscreen &&
                     !landZooming && !portraitZooming
                 ) {
+                    // 照搬 fongmi VideoActivity.exitFullscreen 的顺序（自动退全屏也走同一套）：
+                    // setFullscreen(false) → setRequestedOrientation(USER_PORTRAIT) → 2 秒后 setOrient() 回 FULL_USER。
+                    // fullscreen 立刻落 false，配合上面的 renderFullscreen，这一帧就画成竖屏详情页；
+                    // 方向先钉成 USER_PORTRAIT，避免手机还歪着时 FULL_USER 允许系统再转回横屏造成二次旋转
                     fullscreen = false
                     controlsVisible = false
-                    (context as? Activity)?.restoreDefaultOrientation()
+                    val activity = context as? Activity ?: return@LaunchedEffect
+                    activity.window.decorView.post {
+                        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
+                        activity.window.decorView.postDelayed({
+                            // 这两秒里又进了全屏就别抢方向（进全屏自己会请求 SENSOR_LANDSCAPE）
+                            if (!fullscreen && pendingFullscreen == null &&
+                                !landscapeFullscreen && !portraitFullscreen
+                            ) {
+                                activity.restoreDefaultOrientation()
+                            }
+                        }, 2000)
+                    }
                 }
             }
         }
@@ -616,8 +640,8 @@ fun PlayerScreen(
     // 视频铺满全屏/画中画（含过渡期）时上报给 AppRoot：根底色保持黑色。
     // 仅靠 pipTransition（进出过渡）覆盖不到稳态全屏——全屏下窗口底部最后约 1px
     // 仍由根底色绘制，浅色主题会露出一条白色细线。
-    val videoPresent = inPip || pipExitHold || fullscreen || exitRotating || pendingFullscreen != null
-    LaunchedEffect(inPip, pipExitHold, fullscreen, exitRotating, pendingFullscreen) {
+    val videoPresent = inPip || pipExitHold || renderFullscreen || exitRotating || pendingFullscreen != null
+    LaunchedEffect(inPip, pipExitHold, renderFullscreen, exitRotating, pendingFullscreen) {
         Players.setVideoPresent(videoPresent)
     }
     // 画中画窗口在 HyperOS 上是透明表面（fongmi 同样透明，但它内容铺满 100%）：
@@ -1230,7 +1254,7 @@ fun PlayerScreen(
     // 全屏/放大动画期间自动收起状态栏，缩回小窗收敛后恢复（旋转请求在挂起触发处先行发出）；
     // 进入全屏后的旋转等待期（pendingFullscreen）也要收起系统栏，否则旋转动画中顶部/底部
     // 会露出浅色状态栏/导航栏，看着像视频头尾由白色渐变成黑色
-    val immersive = fullscreen || landscapeFullscreen || landZooming || portraitZooming ||
+    val immersive = renderFullscreen || landscapeFullscreen || landZooming || portraitZooming ||
         pendingFullscreen != null
     LaunchedEffect(immersive) {
         Players.isFullscreen = immersive
@@ -1533,7 +1557,7 @@ fun PlayerScreen(
         // 横版布局未显式刷底色的空档（播放器上方/左侧、信息列底部与下方区块之间）
         // 会透出黑色，与刷白的区块拼成黑白块
         MiuixTheme.colorScheme.surface
-    } else if (inPip || pipExitHold || fullscreen || exitRotating || pendingFullscreen != null || landscapeFullscreen) {
+    } else if (inPip || pipExitHold || renderFullscreen || exitRotating || pendingFullscreen != null || landscapeFullscreen) {
         Color.Black
     } else {
         MiuixTheme.colorScheme.surface
@@ -1756,7 +1780,7 @@ fun PlayerScreen(
         // 其余分支（全屏 / 横屏 / 画中画）保持原样：盒子本身就是稳态尺寸，交给 media3 自身 FIT
         // 竖屏（非全屏、非横屏）画面几何一律由我们自己算，PlayerView 恒 FIT，
         // 所以这个分支对三种档位都走同一套「内容矩形 + 居中 + 外层裁剪」
-        val letterboxed = !inPip && !pipExitHold && !fullscreen &&
+        val letterboxed = !inPip && !pipExitHold && !renderFullscreen &&
             pendingFullscreen == null && !landLayout
 
         // 播完态「静帧替身」：STATE_ENDED 之后解码器已经停了，这时再 resize TextureView，
@@ -1808,7 +1832,7 @@ fun PlayerScreen(
                 // 全屏（手机旋转 / 平板横屏）：无条件铺满，fongmi MATCH_PARENT 同款。
                 // 平板横屏全屏稳态若走下面 isLandscape 定尺寸分支（宽高取自 Configuration），
                 // PiP 退出放大期间可能拿到中间态尺寸，Surface 与系统动画窗口错位跳变
-                fullscreen -> Modifier.fillMaxSize().clip(SquircleShape(deviceCorner))
+                renderFullscreen -> Modifier.fillMaxSize().clip(SquircleShape(deviceCorner))
                 // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
                 // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感。
                 // 这里不叠加 clip：旋转过渡只有 200~300ms，四角都是黑底看不出圆角差异，
@@ -1904,7 +1928,7 @@ fun PlayerScreen(
         val branchName = when {
             inPip -> "pip"
             pipExitHold -> "pipHold"
-            fullscreen -> "full"
+            renderFullscreen -> "full"
             pendingFullscreen != null -> "pending"
             isLandscape -> "land"
             else -> "portrait"
@@ -1914,7 +1938,7 @@ fun PlayerScreen(
                 val dv = (context as? Activity)?.window?.decorView
                 android.util.Log.i(
                     "PipTrace",
-                    "branch=$branchName inPip=$inPip hold=$pipExitHold full=$fullscreen " +
+                    "branch=$branchName inPip=$inPip hold=$pipExitHold full=$renderFullscreen fs=$fullscreen " +
                         "landFull=$landscapeFullscreen land=$isLandscape " +
                         "screen=${screenW.value}x${screenH.value} win=${dv?.width}x${dv?.height}",
                 )
@@ -1923,7 +1947,7 @@ fun PlayerScreen(
         when {
         // 画中画（含退出过渡）：只保留最底层视频，不挂任何覆盖层/信息流
         inPip || pipExitHold -> Unit
-        fullscreen -> {
+        renderFullscreen -> {
         FullscreenPlayLayout(
             current = current,
             episodeIndex = episodeIndex,
@@ -2121,7 +2145,7 @@ fun PlayerScreen(
         // 字幕设置侧边栏：与选集侧边栏同款，从右侧滑入；竖屏时避让状态栏
         if (showSubtitleSettings) {
             SubtitleSettingSideSheet(
-                statusBarInset = !(fullscreen || landscapeFullscreen || isLandscape),
+                statusBarInset = !(renderFullscreen || landscapeFullscreen || isLandscape),
                 onDismiss = { showSubtitleSettings = false },
             )
         }
@@ -2392,14 +2416,16 @@ private const val PREVIEW_HEIGHT_ANIM_MS = 300
 
 /**
  * 状态栏高度（Dp）。直接读窗口度量里的 statusBar inset：组合期同步可用，
- * 与系统栏可见性无关（全屏隐藏状态栏也不影响），值恒定。
- * 详情页小窗起点与加载期骨架共用同一来源，保证首帧位置一致。
+ * 与系统栏可见性无关（全屏隐藏状态栏也不影响），值本该恒定。
+ * 所以这里**不挂 density 作 key**：转屏那一瞬间窗口度量可能先报到 131px、再落到 121px，
+ * 一旦按 density 变化重算，小窗顶部就会多滑 10px（约 4dp）再回弹，肉眼是「又蹭了一下」。
+ * remember 不带 key = 整个播放页生命周期只取一次值，与 fongmi 的静态占位 View 做法一致。
  */
 @Composable
 private fun rememberStatusBarTopDp(): Dp {
     val density = LocalDensity.current
     val context = LocalContext.current
-    return remember(density) {
+    return remember {
         val px = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             runCatching {
                 context.getSystemService(android.view.WindowManager::class.java)

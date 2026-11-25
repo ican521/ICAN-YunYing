@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>字幕设置分段按钮配色预览</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 30px;
+    background: #ECECEF;
+    font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #1C1D24;
+  }
+  .head { max-width: 1040px; margin: 0 auto 18px; }
+  .head h1 { font-size: 21px; margin: 0 0 6px; }
+  .head p { margin: 0; font-size: 12.5px; color: #5C5E6E; line-height: 1.8; }
+
+  .wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  .card { background: #fff; border-radius: 18px; padding: 18px 20px 20px; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.05); }
+  .card h2 { font-size: 15px; margin: 0 0 4px; }
+  .card .desc { font-size: 12px; color: #6B6D7C; margin: 0 0 14px; line-height: 1.7; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .pair { grid-template-columns: 1fr; } }
+
+  .panel { border-radius: 16px; padding: 18px 16px; }
+  .panel.light { background: #FFFFFF; border: 1px solid #E4E4E9; }
+  .panel.dark  { background: #2C2C2C; border: 1px solid #3A3A3A; }
+  .panel-label { font-size: 11px; margin-bottom: 12px; letter-spacing: .3px; }
+  .panel.light .panel-label { color: #8A8C9A; }
+  .panel.dark  .panel-label { color: #8E8E9A; }
+
+  /* 分段控件本体：整条连通、首尾圆角、段间 1dp */
+  .seg {
+    display: flex; height: 38px; border-radius: 19px; overflow: hidden;
+    border: 1px solid transparent;
+    font-size: 12px;
+  }
+  .seg > .item {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    position: relative; cursor: pointer; user-select: none;
+  }
+  .seg > .item + .item::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 1px;
+  }
+  .seg .txt { position: relative; z-index: 2; }
+
+  /* ---- 现状 ---- */
+  .now-d { border-color: #434343; }
+  .now-d .item + .item::before { background: #434343; }
+  .now-d .sel { background: #434343; }
+  .now-d .on { color: #EDEDF5; }
+  .now-d .off { color: #A6A6BA; }
+
+  .now-l { border-color: #DEDEE3; }
+  .now-l .item + .item::before { background: #DEDEE3; }
+  .now-l .sel { background: #F0F0F0; }
+  .now-l .on { color: #15161D; }
+  .now-l .off { color: #5C5E6E; }
+
+  /* ---- 方案 1：外框降为半透明白，选中块提亮一档 ---- */
+  .s1-d { border-color: rgba(255,255,255,.10); }
+  .s1-d .item + .item::before { background: rgba(255,255,255,.10); }
+  .s1-d .sel { background: rgba(255,255,255,.16); }
+  .s1-d .on { color: #EDEDF5; }
+  .s1-d .off { color: #A6A6BA; }
+
+  .s1-l { border-color: rgba(0,0,0,.10); }
+  .s1-l .item + .item::before { background: rgba(0,0,0,.10); }
+  .s1-l .sel { background: #EFEFF2; }
+  .s1-l .on { color: #15161D; }
+  .s1-l .off { color: #5C5E6E; }
+
+  /* ---- 方案 2：选中块用主题色 tinted（与详情页 G+ 同源） ---- */
+  .s2-d { border-color: rgba(255,255,255,.10); }
+  .s2-d .item + .item::before { background: rgba(255,255,255,.10); }
+  .s2-d .sel { background: rgba(0,122,255,.22); }
+  .s2-d .on { color: #6FB0FF; }
+  .s2-d .off { color: #A6A6BA; }
+
+  .s2-l { border-color: rgba(0,0,0,.10); }
+  .s2-l .item + .item::before { background: rgba(0,0,0,.10); }
+  .s2-l .sel { background: rgba(0,122,255,.12); }
+  .s2-l .on { color: #0053B4; }
+  .s2-l .off { color: #5C5E6E; }
+
+  /* ---- 方案 3：去掉外框，只留段间细分隔线 ---- */
+  .s3-d { border-color: transparent; }
+  .s3-d .item + .item::before { background: rgba(255,255,255,.07); }
+  .s3-d .sel { background: rgba(255,255,255,.12); }
+  .s3-d .on { color: #EDEDF5; }
+  .s3-d .off { color: #A6A6BA; }
+
+  .s3-l { border-color: transparent; }
+  .s3-l .item + .item::before { background: rgba(0,0,0,.06); }
+  .s3-l .sel { background: #F1F1F4; }
+  .s3-l .on { color: #15161D; }
+  .s3-l .off { color: #5C5E6E; }
+
+  .note { max-width: 1040px; margin: 22px auto 0; font-size: 12px; color: #5C5E6E; line-height: 1.9; background: #fff; border-radius: 14px; padding: 16px 20px; }
+  .note b { color: #1C1D24; }
+  .note code { background: #F2F2F5; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: #EAF2FF; color: #0B63CE; margin-left: 8px; vertical-align: 1px; }
+  .tag.rec { background: #EDF7EE; color: #1D7A33; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>字幕设置 · 顶部三段按钮（SegmentedTabs）配色</h1>
+  <p>确认：是分段式单选——整条连通、只有首尾圆角、段间 1dp 分隔线，外框与分隔线用同一个 outline 色，选中段是 secondaryVariant 实底。问题就出在深色下 <code>#434343</code> 与 outline 同属一档灰，选中块和框线糊在一起。</p>
+</div>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>现状</h2>
+    <p class="desc">深色：框线 #434343、选中块 #434343，完全同色，只能靠文字明暗判断选中；浅色：#DEDEE3 框线 + #F0F0F0 选中块，也是同一档灰。</p>
+    <div class="pair">
+      <div class="panel light">
+        <div class="panel-label">浅色 · 面板 #FFFFFF</div>
+        <div class="seg now-l">
+          <div class="item sel"><span class="txt on">外观</span></div>
+          <div class="item"><span class="txt off">调节</span></div>
+          <div class="item"><span class="txt off">偏移</span></div>
+        </div>
+      </div>
+      <div class="panel dark">
+        <div class="panel-label">深色 · 面板 #2C2C2C（字幕侧栏实际底色）</div>
+        <div class="seg now-d">
+          <div class="item sel"><span class="txt on">外观</span></div>
+          <div class="item"><span class="txt off">调节</span></div>
+          <div class="item"><span class="txt off">偏移</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>方案 1 · 外框降为 10% 白，选中块提到 16% 白<span class="tag rec">推荐 · 最小改动</span></h2>
+    <p class="desc">保持无彩色，只把“框线”和“选中块”拉开两档明度：框线退到几乎看不见，选中块比面板亮一档。深色下选中块约落在 #4B4B4D，和框线不再撞色。</p>
+    <div class="pair">
+      <div class="panel light">
+        <div class="panel-label">浅色 · 框 10% 黑 / 选中 #EFEFF2</div>
+        <div class="seg s1-l">
+          <div class="item sel"><span class="txt on">外观</span></div>
+          <div class="item"><span class="txt off">调节</span></div>
+          <div class="item"><span class="txt off">偏移</span></div>
+        </div>
+      </div>
+      <div class="panel dark">
+        <div class="panel-label">深色 · 框 10% 白 / 选中 16% 白</div>
+        <div class="seg s1-d">
+          <div class="item sel"><span class="txt on">外观</span></div>
+          <div class="item"><span class="txt off">调节</span></div>
+          <div class="item"><span class="txt off">偏移</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>方案 2 · 选中块用主题色 tinted（和详情页 G+ 同源）</h2>
+    <p class="desc">框线同样退到 10% 白，选中块换成主题色 22%（深）/ 12%（浅）+ 同色文字。分段控件会带一点主题色，和详情页线路/选集那套观感统一；代价是侧栏里多一块彩色。</p>
+    <div class="pair">
+      <div class="panel light">
+        <div class="panel-label">浅色 · 主题色 12% 底 + 压深字</div>
+        <div class="seg s2-l">
+          <div class="item sel"><span class="txt on">外观</span></div>
+          <div class="item"><span class="txt off">调节</span></div>
+          <div class="item"><span class="txt off">偏移</span></div>
+        </div>
+      </div>
+      <div class="panel dark">
+        <div class="panel-label">深色 · 主题色 22% 底 + 提亮字</div>
+        <div class="seg s2-d">
+          <div class="item sel"><span class="txt on">外观</span></div>
+          <div class="item"><span class="txt off">调节</span></div>
+          <div class="item"><span class="txt off">偏移</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>方案 3 · 去掉外框，只留段间细分隔线</h2>
+    <p class="desc">不再画整条外框，只保留 7% 白的细分隔线，选中块用 12% 白。视觉最松，像 iOS 里没有容器的 tab；但三段边界感会弱一些，窄屏上看不出“这是一组”。</p>
+    <div class="pair">
+      <div class="panel light">
+        <div class="panel-label">浅色 · 无框 / 选中 #F1F1F4</div>
+        <div class="seg s3-l">
+          <div class="item sel"><span class="txt on">外观</span></div>
+          <div class="item"><span class="txt off">调节</span></div>
+          <div class="item"><span class="txt off">偏移</span></div>
+        </div>
+      </div>
+      <div class="panel dark">
+        <div class="panel-label">深色 · 无框 / 选中 12% 白</div>
+        <div class="seg s3-d">
+          <div class="item sel"><span class="txt on">外观</span></div>
+          <div class="item"><span class="txt off">调节</span></div>
+          <div class="item"><span class="txt off">偏移</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>落地影响面</b><br>
+  1. 这个组件是全局的 <code>SegmentedTabs</code>：播放页字幕设置（外观/调节/偏移）、外观页三档样式、描边三档，以及设置页「收藏同步」都用它，改一次全 App 一致。<br>
+  2. 方案 1 只动两个颜色：<code>outline</code> 换成 <code>Color.White.copy(alpha = 0.10f)</code> / <code>Color.Black.copy(alpha = 0.10f)</code>，<code>selectedFill</code> 换成 16% 白 / <code>#EFEFF2</code>；建议收口成 <code>SegmentedTabsOutlineAlpha</code>、<code>SegmentedTabsFillAlpha</code> 两个常量。<br>
+  3. 方案 2 的选中块要复用详情页 G+ 的主题色派生（14%/22% 与文字压深/提亮），注意两处 alpha 不同，别混用。<br>
+  4. 尺寸、圆角、字号、段间 1dp 宽度都不变，只换颜色。
+</div>
+
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>播放页「字幕」弹窗配色对比预览</title>
+<style>
+  :root{
+    --primary:#007AFF;
+    --ink:#15161D;
+    --ink-muted:#5C5E6E;
+    --line:rgba(0,0,0,.08);
+    /* 截图同款画面（本地下载的原图） */
+    --bg:url("design/subtitle-bg.jpg");
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:#101014;color:#EDEDF5;
+    font-family:-apple-system,"PingFang SC","Noto Sans SC",sans-serif;
+    padding:26px 28px 46px;
+  }
+  h1{font-size:20px;font-weight:600;margin:0 0 6px;}
+  .sub{font-size:13px;color:#9a9aab;margin:0 0 22px;line-height:1.7;max-width:900px;}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;}
+  .card{display:flex;flex-direction:column;gap:10px;}
+  .card h2{font-size:15px;font-weight:600;margin:0;}
+  .card .desc{font-size:12.5px;color:#9a9aab;line-height:1.6;margin:0;}
+  .tag{display:inline-block;font-size:11px;color:#c9c9d6;border:1px solid rgba(255,255,255,.16);
+    border-radius:6px;padding:2px 8px;margin-left:8px;vertical-align:1px;}
+
+  /* 播放器舞台：截图作底，等比裁剪铺满 */
+  .stage{position:relative;width:100%;aspect-ratio:2400/1080;border-radius:16px;overflow:hidden;
+    background:#000;box-shadow:0 12px 34px rgba(0,0,0,.55);}
+  .stage .bg{position:absolute;inset:0;background:var(--bg) center/cover no-repeat;}
+  /* 弹窗遮罩（PopupScrim 黑 40%，与 App 一致） */
+  .stage .scrim{position:absolute;inset:0;background:rgba(0,0,0,.40);}
+
+  /* 弹窗本体：居中浮层，尺寸按截图比例 */
+  .dialog{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:34%;min-width:300px;border-radius:26px;padding:22px 18px 18px;}
+  .dialog .title{text-align:center;font-size:20px;font-weight:600;margin:0 0 20px;}
+  .rows{display:flex;flex-direction:column;gap:14px;}
+  .row{display:flex;align-items:center;justify-content:space-between;
+    border-radius:18px;padding:16px 20px;font-size:16px;}
+  .row .check{width:18px;height:18px;}
+
+  /* ===== A · 当前实现（浅色实白容器 + 浅灰实底胶囊） ===== */
+  .A .dialog{background:#FFFFFF;box-shadow:0 18px 48px rgba(0,0,0,.45);}
+  .A .title{color:var(--ink);}
+  .A .row{background:#F1F1F3;color:var(--ink-muted);}
+
+  /* ===== B · 深色浮层（播放器场景固定深色玻璃，仿 Fongmi/YouTube） ===== */
+  .B .dialog{background:rgba(28,28,32,.92);backdrop-filter:blur(18px);
+    box-shadow:0 18px 48px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.08);}
+  .B .title{color:#F2F2F5;}
+  .B .row{background:rgba(255,255,255,.08);color:#D8D8E2;}
+  .B .row.on{background:rgba(255,255,255,.14);color:#FFFFFF;}
+
+  /* ===== C · 浅色毛玻璃（半透明白 + 模糊，淡灰行） ===== */
+  .C .dialog{background:rgba(255,255,255,.86);backdrop-filter:blur(20px);
+    box-shadow:0 18px 48px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.6);}
+  .C .title{color:var(--ink);}
+  .C .row{background:rgba(242,242,245,.9);color:var(--ink-muted);}
+
+  /* ===== D · 保留白容器，选项行改淡描边（去掉实灰块） ===== */
+  .D .dialog{background:#FFFFFF;box-shadow:0 18px 48px rgba(0,0,0,.45);}
+  .D .title{color:var(--ink);}
+  .D .row{background:transparent;color:var(--ink-muted);border:1px solid var(--line);}
+
+  /* 选中态参照（字幕轨选中时）：主题蓝实底 + 白字，四套统一 */
+  .row.on{background:var(--primary);color:#fff;}
+  .D .row.on{background:var(--primary);color:#fff;border-color:transparent;}
+
+  .foot{margin-top:26px;font-size:12.5px;color:#8b8b9c;line-height:1.8;}
+  .foot b{color:#c9c9d6;}
+</style>
+</head>
+<body>
+  <h1>播放页「字幕」弹窗 · 浅色模式配色对比</h1>
+  <p class="sub">
+    背景为你截图的林间播放画面，遮罩沿用 App 统一的 PopupScrim（黑 40%）。四套弹窗内都放了三行：
+    <b>当前字幕轨（选中态）/ 添加字幕 / 字幕设置</b>，便于同时看选中蓝底与未选中行的层级关系。
+    弹窗当前实现在 <code>SubtitleDialog</code> + <code>SubRow</code>（PlayerScreen.kt）。
+  </p>
+
+  <div class="grid">
+
+    <div class="card A">
+      <h2>A · 当前实现 <span class="tag">纯白容器 + 浅灰实底胶囊</span></h2>
+      <p class="desc">容器 #FFFFFF，未选中行 secondaryVariant 浅灰实底。暗画面上浮一块纯白，与周围深色控制层割裂，灰胶囊又和白容器层级偏近。</p>
+      <div class="stage">
+        <div class="bg"></div><div class="scrim"></div>
+        <div class="dialog">
+          <p class="title">字幕</p>
+          <div class="rows">
+            <div class="row on">中文字幕<div class="check">✓</div></div>
+            <div class="row">添加字幕</div>
+            <div class="row">字幕设置</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card B">
+      <h2>B · 深色浮层 <span class="tag">推荐 · 固定深灰玻璃</span></h2>
+      <p class="desc">不论 App 浅/深主题，播放页弹窗统一走深灰半透明 + 背景模糊；未选中行半透明白 8%，选中行白 14%。与播放器深色控制层同源，层级最稳，Fongmi / YouTube 播放器均采用此思路。</p>
+      <div class="stage">
+        <div class="bg"></div><div class="scrim"></div>
+        <div class="dialog">
+          <p class="title">字幕</p>
+          <div class="rows">
+            <div class="row on">中文字幕<div class="check">✓</div></div>
+            <div class="row">添加字幕</div>
+            <div class="row">字幕设置</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card C">
+      <h2>C · 浅色毛玻璃 <span class="tag">半透明白 + 模糊</span></h2>
+      <p class="desc">保留浅色调性，容器改 86% 白 + 背景模糊与细白边；行用极浅灰。比纯白柔和，但暗画面上浅色玻璃仍容易发灰，浅色主题下与页面弹层一致性一般。</p>
+      <div class="stage">
+        <div class="bg"></div><div class="scrim"></div>
+        <div class="dialog">
+          <p class="title">字幕</p>
+          <div class="rows">
+            <div class="row on">中文字幕<div class="check">✓</div></div>
+            <div class="row">添加字幕</div>
+            <div class="row">字幕设置</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card D">
+      <h2>D · 淡描边行 <span class="tag">改动最小 · 容器不动</span></h2>
+      <p class="desc">容器保持纯白，只把未选中行从浅灰实底改成透明底 + 1dp 极浅描边，拉开容器与行的层级。白浮层的割裂感只能缓解、不能根治，适合先小步调整。</p>
+      <div class="stage">
+        <div class="bg"></div><div class="scrim"></div>
+        <div class="dialog">
+          <p class="title">字幕</p>
+          <div class="rows">
+            <div class="row on">中文字幕<div class="check">✓</div></div>
+            <div class="row">添加字幕</div>
+            <div class="row">字幕设置</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="foot">
+    <b>说明：</b>预览里选中蓝底（primary 实底 + 白字 + 勾）四套保持一致，重点对比未选中行与弹窗容器的配色关系。
+    选定方向后，实际改动会把色值落到 <code>ui/theme/Color.kt</code> 全局常量，<code>SubtitleDialog</code> / <code>SubRow</code> 引用常量，不在页面内写硬编码 DP / 色值。
+  </p>
+</body>
+</html>

@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>历史卡进度条位置预览</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 30px;
+    background: #ECECEF;
+    font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #1C1D24;
+  }
+  .head { max-width: 1040px; margin: 0 auto 18px; }
+  .head h1 { font-size: 21px; margin: 0 0 6px; }
+  .head p { margin: 0; font-size: 12.5px; color: #5C5E6E; line-height: 1.8; }
+
+  .wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+  .card { background: #fff; border-radius: 18px; padding: 18px 20px 20px; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.05); }
+  .card h2 { font-size: 15px; margin: 0 0 4px; }
+  .card .desc { font-size: 12px; color: #6B6D7C; margin: 0 0 14px; line-height: 1.7; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: #EAF2FF; color: #0B63CE; margin-left: 8px; vertical-align: 1px; }
+  .tag.rec { background: #EDF7EE; color: #1D7A33; }
+
+  .rowbox { display: flex; gap: 34px; align-items: flex-start; flex-wrap: wrap; }
+  .stage { border-radius: 16px; padding: 22px 20px; }
+  .stage.light { background: #F7F7F7; border: 1px solid #E4E4E9; }
+  .stage.dark { background: #0B0B0B; border: 1px solid #232323; }
+  .stage-label { font-size: 11px; margin-bottom: 14px; }
+  .stage.light .stage-label { color: #8A8C9A; }
+  .stage.dark .stage-label { color: #8E8E9A; }
+
+  /* 5:7 历史卡 */
+  .vcard {
+    position: relative;
+    width: 148px; height: 207px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #2A2A2E;
+    box-shadow: 0 2px 10px rgba(0,0,0,.18);
+  }
+  .poster {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(120% 80% at 20% 10%, #4C6B8A 0%, #2E4159 42%, #1C2733 78%, #14181E 100%);
+  }
+  .scrim {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 40%;
+    background: linear-gradient(to top,
+      rgba(0,0,0,.85) 0%, rgba(0,0,0,.85) 12%,
+      rgba(0,0,0,.62) 34%, rgba(0,0,0,.34) 58%,
+      rgba(0,0,0,.12) 80%, rgba(0,0,0,0) 100%);
+  }
+  .caption {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 12px 12px 10px;
+  }
+  .cap-title {
+    color: #fff; font-size: 15px; font-weight: 500; line-height: 1.25;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cap-sub {
+    color: #C8C8D2; font-size: 12px; line-height: 1.3;
+    margin-top: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .badge {
+    position: absolute; left: 8px; top: 8px;
+    background: rgba(0,0,0,.55); color: #fff;
+    font-size: 10px; padding: 2px 7px; border-radius: 50px;
+  }
+
+  /* 进度条：现状（通栏贴底） */
+  .bar-bottom {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 4px; background: rgba(255,255,255,.27);
+  }
+  .bar-bottom > i { display: block; height: 4px; background: #007AFF; }
+
+  /* 新方案：标题与集数之间，与标题同宽 */
+  .bar-inline {
+    height: 4px; border-radius: 2px;
+    background: rgba(255,255,255,.27);
+    margin: 4px 0 0;
+  }
+  .bar-inline > i { display: block; height: 4px; border-radius: 2px; background: #007AFF; }
+
+  /* 细节放大 */
+  .zoom { position: relative; width: 296px; height: 414px; }
+  .zoom .vcard { transform: scale(2); transform-origin: top left; }
+  .ruler { position: absolute; border-left: 1px dashed rgba(255,120,120,.9); }
+  .ruler.h { border-left: none; border-top: 1px dashed rgba(255,120,120,.9); }
+
+  .annot { font-size: 11px; color: #6B6D7C; margin-top: 12px; line-height: 1.7; }
+  .note { max-width: 1040px; margin: 22px auto 0; font-size: 12px; color: #5C5E6E; line-height: 1.9; background: #fff; border-radius: 14px; padding: 16px 20px; }
+  .note b { color: #1C1D24; }
+  .note code { background: #F2F2F5; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>历史播放卡片 · 进度条挪到标题与集数之间</h1>
+  <p>进度条左右与标题同宽（都吃 12dp 内边距），位置夹在标题和集数（副标题）之间，高 4dp、圆角 2dp。</p>
+</div>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>对照：现状 vs 新位置（5:7 竖卡，实际尺寸 148×207）</h2>
+    <p class="desc">左边是现在的样子 —— 通栏、贴卡片最底、无圆角；右边是挪进标题区之后，少了那条贴边的横线，进度信息归到文字块里。</p>
+    <div class="rowbox">
+      <div class="stage light">
+        <div class="stage-label">浅色页面 · 现状</div>
+        <div class="vcard">
+          <div class="poster"></div>
+          <div class="scrim"></div>
+          <div class="badge">糯米</div>
+          <div class="caption">
+            <div class="cap-title">三体 第二季</div>
+            <div class="cap-sub">第 08 集</div>
+          </div>
+          <div class="bar-bottom"><i style="width:38%"></i></div>
+        </div>
+        <div class="annot">进度条距底 0，压在卡片圆角上</div>
+      </div>
+
+      <div class="stage light">
+        <div class="stage-label">浅色页面 · 新位置<span class="tag rec">推荐</span></div>
+        <div class="vcard">
+          <div class="poster"></div>
+          <div class="scrim"></div>
+          <div class="badge">糯米</div>
+          <div class="caption">
+            <div class="cap-title">三体 第二季</div>
+            <div class="bar-inline"><i style="width:38%"></i></div>
+            <div class="cap-sub">第 08 集</div>
+          </div>
+        </div>
+        <div class="annot">标题 → 4dp → 进度条 → 4dp → 集数</div>
+      </div>
+
+      <div class="stage dark">
+        <div class="stage-label">深色页面 · 现状</div>
+        <div class="vcard">
+          <div class="poster"></div>
+          <div class="scrim"></div>
+          <div class="badge">糯米</div>
+          <div class="caption">
+            <div class="cap-title">三体 第二季</div>
+            <div class="cap-sub">第 08 集</div>
+          </div>
+          <div class="bar-bottom"><i style="width:38%"></i></div>
+        </div>
+        <div class="annot">同上</div>
+      </div>
+
+      <div class="stage dark">
+        <div class="stage-label">深色页面 · 新位置</div>
+        <div class="vcard">
+          <div class="poster"></div>
+          <div class="scrim"></div>
+          <div class="badge">糯米</div>
+          <div class="caption">
+            <div class="cap-title">三体 第二季</div>
+            <div class="bar-inline"><i style="width:38%"></i></div>
+            <div class="cap-sub">第 08 集</div>
+          </div>
+        </div>
+        <div class="annot">同上</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2× 放大：看间距和圆角</h2>
+    <p class="desc">放大后能看清 4dp 的条高、2dp 圆角，以及标题/条/集数三段之间的呼吸感。进度 38% 与 85% 各一张，确认长进度时条尾不会顶到右边距。</p>
+    <div class="rowbox">
+      <div class="stage light">
+        <div class="zoom">
+          <div class="vcard">
+            <div class="poster"></div>
+            <div class="scrim"></div>
+            <div class="caption">
+              <div class="cap-title">三体 第二季</div>
+              <div class="bar-inline"><i style="width:38%"></i></div>
+              <div class="cap-sub">第 08 集</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="stage light">
+        <div class="zoom">
+          <div class="vcard">
+            <div class="poster"></div>
+            <div class="scrim"></div>
+            <div class="caption">
+              <div class="cap-title">漫长的季节</div>
+              <div class="bar-inline"><i style="width:85%"></i></div>
+              <div class="cap-sub">第 12 集 · 大结局</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>落地口径</b><br>
+  1. <code>PosterCaption</code> 是首页 / 收藏 / 历史 / 跨站源搜索共用的组件，不能直接改死结构 —— 给它加一个可选参数 <code>progress: Float? = null</code>（0..1），只有历史卡传值；默认 null 时一个像素都不多画，其余页面零影响。<br>
+  2. 顺序固定为：标题 → 4dp → 进度条（<code>fillMaxWidth</code> 吃满 12dp 内边距后的宽度，即与标题同宽）→ 4dp → 集数。<br>
+  3. 条高 4dp 不变，新增 2dp 圆角；底 <code>0x44FFFFFF</code>、进度色 <code>primary</code> 保持不变。<br>
+  4. 删掉历史卡原来那条 <code>align(BottomCenter)</code> 的通栏进度条（<code>CollectionScreens.kt</code> 约 671-685 行），以及那句“贴海报最底、通栏”的 KDoc。<br>
+  5. 间距收口成常量 <code>Spacing.posterProgressInlineGap = 4.dp</code>、<code>posterProgressInlineHeight = 4.dp</code>、<code>posterProgressInlineCorner = 2.dp</code>，不要散落硬编码。<br>
+  6. 无副标题（<code>episodeTitle</code> 为空）时，进度条下面直接接 10dp 底边距，不会塌。<br>
+  7. 顺带：<code>Spacing.historyProgressBarGap</code>（10dp）自 11-22 改版后已无引用，这轮一并清掉。
+</div>
+
+</body>
+</html>
