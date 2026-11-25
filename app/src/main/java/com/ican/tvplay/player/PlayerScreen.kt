@@ -201,7 +201,6 @@ import com.ican.tvplay.player.core.MediaItemFactory
 import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.ArcStretchSpinner
-import com.ican.tvplay.ui.components.FadingScrim
 import com.ican.tvplay.ui.components.SegmentedTabs
 import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.pageHorizontalPadding
@@ -4253,6 +4252,24 @@ private fun EpisodeChip(
     }
 }
 
+/**
+ * 全屏侧边面板的空白区收起层：只拦截触摸（点面板外收起、挡住底下视频控件误触），
+ * 不绘制任何颜色，取代原先的黑色遮罩 PopupScrim，避免滑出面板时压暗整个画面。
+ */
+@Composable
+private fun DismissTouchLayer(enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = enabled,
+                onClick = onClick,
+            ),
+    )
+}
+
 /** 全屏选集侧边弹窗（fongmi EpisodeListDialog 同款：右侧滑出面板，宽度=max(200dp,最长集名14sp文本宽)且≤屏宽1/2，
  * 垂直列表、居中 14sp 文本、圆角 8dp 背景、选中集高亮，打开自动滚动到当前集，点击切集并关闭）。
  * 收回动画与呼出对称：先从右往左滑入，收回时原路从左往右滑出，动画结束再通知父级移除。 */
@@ -4284,7 +4301,7 @@ private fun EpisodeSideSheet(
     // 用组件内全屏覆盖层而非 Popup/Dialog：
     // - Dialog 会新建窗口并自动唤出状态栏/导航栏，破坏全屏沉浸；
     // - Popup 子窗口的 layoutInDisplayCutoutMode 固定为 DEFAULT，横屏全屏时会避开左侧
-    //   挖孔/刘海区，遮罩左边留出一条盖不住的竖带；覆盖层跟随 Activity 窗口绘制，与视频区像素级对齐
+    //   挖孔/刘海区，与 Activity 窗口错位；覆盖层跟随 Activity 窗口绘制，与视频区像素级对齐
     // 呼出：首帧面板停在屏外，挂载后从右往左滑入到位（fongmi 弹窗转场同款方向）
     // 收回：sheetShown=false 触发原路从左往右滑出，动画结束再调用 onDismiss 移除覆盖层
     var sheetShown by remember { mutableStateOf(false) }
@@ -4294,7 +4311,7 @@ private fun EpisodeSideSheet(
         animationSpec = tween(260, easing = FastOutSlowInEasing),
         label = "episodeSheetSlide",
     )
-    // 黑色遮罩统一走 FadingScrim（PopupScrim + ScrimFadeMillis 淡入淡出，点击收起）
+    // 面板外不再压暗：空白区只放透明触摸拦截层（DismissTouchLayer），点击即收起
     // 收回：播放滑出动画后再通知父级
     val dismissWithAnim: () -> Unit = {
         scope.launch {
@@ -4313,11 +4330,8 @@ private fun EpisodeSideSheet(
         bottomStart = com.ican.tvplay.ui.theme.Spacing.sideSheetCorner,
     )
     Box(modifier = Modifier.fillMaxSize()) {
-            // 统一遮罩层：PopupScrim（黑色 40%）+ 200ms 渐显渐隐，点击收起面板
-            FadingScrim(
-                visible = sheetShown,
-                onClick = dismissWithAnim,
-            )
+            // 不再压暗画面：仅铺一层透明触摸拦截层，点面板外空白处收起面板
+            DismissTouchLayer(enabled = sheetShown, onClick = dismissWithAnim)
             Column(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -4325,7 +4339,7 @@ private fun EpisodeSideSheet(
                     .fillMaxHeight()
                     .width(panelWidth)
                     .clip(panelShape)
-                    .background(Color.Black.copy(alpha = 0.72f), panelShape)
+                    .background(Color.Black.copy(alpha = 0.85f), panelShape)
                     // 面板本体消费点击，避免点面板空白处误触发外层收起
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -4335,7 +4349,7 @@ private fun EpisodeSideSheet(
                     // 顶部留白改由列表 contentPadding 承担，内容可一路滑到面板最顶缘
                     .padding(horizontal = Spacing.dialogContentMargin),
             ) {
-                // 侧栏面板改为半透明黑（Black 72%），内部仍强制 miuix 深色色板以保证滑杆/文字对比，
+                // 侧栏面板底色为半透明黑（Black 85%，比原来 72% 更实），内部仍强制 miuix 深色色板以保证滑杆/文字对比，
                 // 选中/未选中配色与字幕设置的分段单选按钮完全同源
                 MiuixTheme(colors = darkColorScheme()) {
                 // 弹出前就定位到当前集（首帧就位，无滚动动画）：
@@ -4616,7 +4630,8 @@ private fun SubtitleSettingSideSheet(
         bottomStart = Spacing.sideSheetCorner,
     )
     Box(modifier = Modifier.fillMaxSize()) {
-        FadingScrim(visible = sheetShown, onClick = dismissWithAnim)
+        // 不再压暗画面：仅铺一层透明触摸拦截层，点面板外空白处收起面板
+        DismissTouchLayer(enabled = sheetShown, onClick = dismissWithAnim)
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -4624,7 +4639,7 @@ private fun SubtitleSettingSideSheet(
                 .fillMaxHeight()
                 .width(panelWidth)
                 .clip(panelShape)
-                .background(Color.Black.copy(alpha = 0.72f), panelShape)
+                .background(Color.Black.copy(alpha = 0.85f), panelShape)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -4637,7 +4652,7 @@ private fun SubtitleSettingSideSheet(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = Spacing.dialogContentMargin),
         ) {
-            // 侧栏面板改为半透明黑（Black 72%），内部仍强制 miuix 深色色板以保证滑杆/文字对比
+            // 侧栏面板底色为半透明黑（Black 85%，比原来 72% 更实），内部仍强制 miuix 深色色板以保证滑杆/文字对比
             MiuixTheme(colors = darkColorScheme()) {
             // 竖屏非全屏时给状态栏让位：作为可滚动内容的顶部留白（而不是容器内边距）
             val statusBarTopPadding = if (statusBarInset) {
