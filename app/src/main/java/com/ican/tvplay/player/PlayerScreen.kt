@@ -4721,17 +4721,21 @@ private fun SubtitleSettingSideSheet(
             ) {
                 Text(
                     text = "字幕设置",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = DarkOnSurface,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
                     modifier = Modifier.weight(1f),
                 )
+                // 「重置」与标题视觉等大：同档字重、胶囊高度贴齐标题行高；
+                // 底用 white 10%（与面板内 chip 同源）、不描边，避免黑底上的 1dp 细边发灰
                 Text(
                     text = "重置",
-                    fontSize = 14.sp,
-                    color = DarkOnSurfaceMuted,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White.copy(alpha = 0.80f),
                     modifier = Modifier
                         .clip(SquircleShape(Spacing.corner))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), SquircleShape(Spacing.corner))
+                        .background(Color.White.copy(alpha = 0.10f))
                         .combinedClickable(
                             // 对齐 fongmi：短按重置当前 Tab
                             onClick = {
@@ -4752,7 +4756,7 @@ private fun SubtitleSettingSideSheet(
                                 Players.setSubtitleOffset(0)
                             },
                         )
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
                 )
             }
             SubtitleStyleChips(
