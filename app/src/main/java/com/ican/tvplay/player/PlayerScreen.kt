@@ -4342,27 +4342,45 @@ private fun EpisodeSideSheet(
     // - Dialog 会新建窗口并自动唤出状态栏/导航栏，破坏全屏沉浸；
     // - Popup 子窗口的 layoutInDisplayCutoutMode 固定为 DEFAULT，横屏全屏时会避开左侧
     //   挖孔/刘海区，与 Activity 窗口错位；覆盖层跟随 Activity 窗口绘制，与视频区像素级对齐
-    // 呼出：首帧面板停在屏外，挂载后从右往左滑入到位（fongmi 弹窗转场同款方向）
-    // 收回：sheetShown=false 触发原路从左往右滑出，动画结束再调用 onDismiss 移除覆盖层
+    // 呼出：首帧就停在距终点 SIDE_SHEET_ENTER_OFFSET 的位置并同步淡入（200ms，与控制栏淡出同起同落），
+    // 不再从屏外整段滑入——那样前 100ms 面板还没进画面，看起来是“控制栏先消失、弹窗后出现”
+    // 收回：仍从左往右滑出到屏外，动画结束再调用 onDismiss 移除覆盖层
     var sheetShown by remember { mutableStateOf(false) }
+    var sheetClosing by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { sheetShown = true }
     val sheetSlideX by animateDpAsState(
-        targetValue = if (sheetShown) 0.dp else panelWidth + 20.dp,
-        animationSpec = tween(260, easing = FastOutSlowInEasing),
+        targetValue = when {
+            sheetClosing -> panelWidth + 20.dp
+            sheetShown -> 0.dp
+            else -> SIDE_SHEET_ENTER_OFFSET
+        },
+        animationSpec = tween(
+            if (sheetClosing) SIDE_SHEET_EXIT_MS else SIDE_SHEET_ENTER_MS,
+            easing = FastOutSlowInEasing,
+        ),
         label = "episodeSheetSlide",
+    )
+    val sheetAlpha by animateFloatAsState(
+        targetValue = if (sheetShown) 1f else 0f,
+        animationSpec = tween(
+            if (sheetClosing) SIDE_SHEET_EXIT_MS else SIDE_SHEET_ENTER_MS,
+            easing = FastOutSlowInEasing,
+        ),
+        label = "episodeSheetAlpha",
     )
     // 面板外不再压暗：空白区只放透明触摸拦截层（DismissTouchLayer），点击即收起
     // 收回：播放滑出动画后再通知父级
     val dismissWithAnim: () -> Unit = {
         scope.launch {
             sheetShown = false
-            kotlinx.coroutines.delay(260)
+            sheetClosing = true
+            kotlinx.coroutines.delay(SIDE_SHEET_EXIT_MS.toLong())
             onDismiss()
         }
     }
     // 返回键先收起弹窗（原为 Popup 的 dismissOnBackPress）
     BackHandler(onBack = dismissWithAnim)
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().alpha(sheetAlpha)) {
             // 触摸屏蔽层（无颜色）：点面板外收起面板，挡住底层视频控件
             SideSheetTouchShield(enabled = sheetShown, onClick = dismissWithAnim)
             // 渐变背景与面板同进同退：同一个 offset，一起滑入/滑出
@@ -4646,7 +4664,9 @@ private fun SubtitleSettingSideSheet(
         val screenPx = with(density) { configuration.screenWidthDp.dp.toPx() }
         with(density) { (screenPx * 0.42f).coerceIn(280.dp.toPx(), 400.dp.toPx()).toDp() }
     }
+    // 呼出：首帧停在距终点 SIDE_SHEET_ENTER_OFFSET 的位置并同步淡入（200ms，与控制栏淡出同起同落）
     var sheetShown by remember { mutableStateOf(false) }
+    var sheetClosing by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { sheetShown = true }
     // 背景渐变里「等浓度区」宽度 = 面板宽度占屏宽的比例
     val contentFraction = remember(panelWidth, configuration) {
@@ -4655,19 +4675,35 @@ private fun SubtitleSettingSideSheet(
     // 淡出带一直拉到屏幕最左缘：变淡起点仍在面板左缘（= 列表按钮左缘再往左 16dp）
     val featherFraction = remember(contentFraction) { (1f - contentFraction).coerceIn(0f, 1f) }
     val sheetSlideX by animateDpAsState(
-        targetValue = if (sheetShown) 0.dp else panelWidth + 20.dp,
-        animationSpec = tween(260, easing = FastOutSlowInEasing),
+        targetValue = when {
+            sheetClosing -> panelWidth + 20.dp
+            sheetShown -> 0.dp
+            else -> SIDE_SHEET_ENTER_OFFSET
+        },
+        animationSpec = tween(
+            if (sheetClosing) SIDE_SHEET_EXIT_MS else SIDE_SHEET_ENTER_MS,
+            easing = FastOutSlowInEasing,
+        ),
         label = "subtitleSheetSlide",
+    )
+    val sheetAlpha by animateFloatAsState(
+        targetValue = if (sheetShown) 1f else 0f,
+        animationSpec = tween(
+            if (sheetClosing) SIDE_SHEET_EXIT_MS else SIDE_SHEET_ENTER_MS,
+            easing = FastOutSlowInEasing,
+        ),
+        label = "subtitleSheetAlpha",
     )
     val dismissWithAnim: () -> Unit = {
         scope.launch {
             sheetShown = false
-            delay(260)
+            sheetClosing = true
+            delay(SIDE_SHEET_EXIT_MS.toLong())
             onDismiss()
         }
     }
     BackHandler(onBack = dismissWithAnim)
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().alpha(sheetAlpha)) {
         // 触摸屏蔽层（无颜色）：点面板外收起面板，挡住底层视频控件
         SideSheetTouchShield(enabled = sheetShown, onClick = dismissWithAnim)
         // 渐变背景与面板同进同退：同一个 offset，一起滑入/滑出
@@ -5501,6 +5537,16 @@ private const val DETAIL_SLOW_TIMEOUT_MS = 45_000L
 
 /** 控制层显隐淡入淡出时长（200ms，对齐 miuix 动画时长） */
 private const val CONTROL_FADE_DURATION_MS = 200
+
+/**
+ * 侧边面板展开：挂载首帧就停在终点右侧 [SIDE_SHEET_ENTER_OFFSET] 处并同步淡入，
+ * 时长与控制栏淡出同为 200ms —— 点按钮时面板和控制栏同时开始变化，不再“控制栏先没、弹窗后到”。
+ */
+private val SIDE_SHEET_ENTER_OFFSET = 56.dp
+private const val SIDE_SHEET_ENTER_MS = 200
+
+/** 侧边面板收起：滑出到屏外 + 淡出的时长 */
+private const val SIDE_SHEET_EXIT_MS = 260
 
 /**
  * 双击判定窗口：系统默认 300ms（ViewConfiguration.doubleTapTimeoutMillis），
