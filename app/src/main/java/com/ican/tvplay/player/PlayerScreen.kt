@@ -93,6 +93,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -1220,6 +1221,18 @@ fun PlayerScreen(
         } else {
             controller.show(WindowInsetsCompat.Type.systemBars())
         }
+    }
+    // 状态栏图标颜色按「状态栏底下实际是什么底色」定，不能无脑跟主题：
+    // 竖屏预览页顶部是「状态栏高度」的黑条（PortraitPlayLayout 与视频区统一黑底），
+    // 浅色主题下若把图标设成深色就直接糊进黑条里看不见（用户实测返修）。
+    // 横屏小窗顶部是主题底色 → 跟主题走；全屏/挂起/缩放动画中系统栏本就是隐藏的，保持浅色图标。
+    // 用 SideEffect 每次重组都重设，进出全屏、深浅色切换后都会被纠正，
+    // 不会被 enableEdgeToEdge 的配置回调覆盖。
+    val darkTheme = LocalDarkTheme.current
+    SideEffect {
+        val window = (context as? Activity)?.window ?: return@SideEffect
+        WindowCompat.getInsetsController(window, window.decorView)
+            .isAppearanceLightStatusBars = isLandscape && !immersive && !darkTheme
     }
 
     // 页面销毁时恢复状态栏（防止全屏中直接退出后状态栏缺失）
