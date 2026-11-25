@@ -2079,8 +2079,9 @@ private fun PortraitPlayLayout(
             modifier = Modifier.fillMaxSize(),
             playerState = playerState,
             // 进详情页即转圈（首次画面就绪前，无网速）；ready 后只随缓冲转。
+            // 刷新期间也在视频区正中转圈（刷新动画落在黑区，不在内容顶缘分界处）；
             // 缩放动画期间不画覆盖层（转圈跟着放大缩小会很怪）
-            showLoading = !zooming && !playerState.ready && playerState.error == null,
+            showLoading = !zooming && (!playerState.ready || refreshing) && playerState.error == null,
             blockedMessage = blockedMessage,
             controlsVisible = controlsVisible && !zooming,
             locked = locked,
@@ -2104,7 +2105,7 @@ private fun PortraitPlayLayout(
     // 否则圆点会连同容器一起消失（刷新过程中途"闪没"）
     if (playerState.error != null || refreshing) {
         PullToRefresh(
-            isRefreshing = refreshing,
+            isRefreshing = false,
             onRefresh = onRefreshError,
             modifier = Modifier
                 .weight(1f)
@@ -2981,33 +2982,35 @@ private fun LineSection(
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = selectedIdx,
     )
-    // positionedInitial：首次定位（进入页面 / 数据初次到位）用无动画瞬移，
-    // 之后点击切线路一律动画；点击被截断的 chip 时新选中项尚未布局（item==null）也要走动画
-    var positionedInitial by remember { mutableStateOf(false) }
-    // 切线路时自动滚动到可见范围：按实际遮挡量精确滚动，只露出被裁的部分
+    // 用户点击平滑滚动时，让落定的 chip 与边缘留出半个列表间距（仅 animate 分支加，自动定位不加）
+    val paddingHalfPx = with(LocalDensity.current) { (Spacing.dialogItemGap / 2).toPx() }
+    // userScrolled：仅当本次选中项是用户在列表里点出来的（且点的不是当前项）才置 true；
+    // 进页 / 异步到位 / 倒序切换等自动定位一律零动画；动画与否由这一次是否用户点击决定
+    var userScrolled by remember { mutableStateOf(false) }
+    // 切线路时：进页 / 自动定位无动画贴左；仅用户点击才按遮挡量平滑滚动并留半间距
     LaunchedEffect(lineFlag) {
+        val animate = userScrolled
+        userScrolled = false
         if (v.playSources.isEmpty() || selectedIdx !in v.playSources.indices) return@LaunchedEffect
         snapshotFlow { listState.layoutInfo.totalItemsCount }
             .filter { it > selectedIdx }
             .first()
-        val info = listState.layoutInfo
-        val viewportStart = info.viewportStartOffset
-        val viewportEnd = info.viewportEndOffset
-        val item = info.visibleItemsInfo.firstOrNull { it.index == selectedIdx }
-        when {
-            item == null ->
-                if (!positionedInitial) {
-                    listState.scrollToItem(selectedIdx)
-                } else {
-                    listState.animateScrollToItem(selectedIdx)
-                }
-            item.offset < viewportStart ->
-                listState.animateScrollBy((item.offset - viewportStart).toFloat())
-            item.offset + item.size > viewportEnd ->
-                listState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat())
+        if (!animate) {
+            // 进页 / 自动定位：无动画贴左，选中项落在列表第一位
+            listState.scrollToItem(selectedIdx)
+        } else {
+            val info = listState.layoutInfo
+            val viewportStart = info.viewportStartOffset
+            val viewportEnd = info.viewportEndOffset
+            val item = info.visibleItemsInfo.firstOrNull { it.index == selectedIdx }
+            when {
+                item == null -> listState.animateScrollToItem(selectedIdx)
+                item.offset < viewportStart ->
+                    listState.animateScrollBy((item.offset - viewportStart).toFloat() - paddingHalfPx)
+                item.offset + item.size > viewportEnd ->
+                    listState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat() + paddingHalfPx)
+            }
         }
-        // 任何分支执行完（含已完全可见、无需滚动的情况）都标记首次定位完成
-        positionedInitial = true
     }
     Column {
         Text(
@@ -3037,7 +3040,7 @@ private fun LineSection(
                     // 几何与选集 EpisodeChip 一致：40dp 最小宽、四边 dialogItemPadding，高度随内容撑开
                     .defaultMinSize(minWidth = 40.dp)
                     .tvCardEffect(
-                        onClick = { onLineChange(source.flag) },
+                        onClick = { if (source.flag != lineFlag) userScrolled = true; onLineChange(source.flag) },
                         shape = shape, focusedScale = 1.05f, glow = false,
                         // 线路列表自带选中态：整列表统一去掉按压/点击蒙层，选中色即反馈
                         pressEffect = false,
@@ -3078,28 +3081,31 @@ private fun QualityRow(
 ) {
     val darkMode = LocalDarkTheme.current
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = qualityPosition.coerceAtLeast(0))
-    // positionedInitial：首次定位瞬移，之后切画质用动画（口径同 LineSection）
-    var positionedInitial by remember { mutableStateOf(false) }
+    // 用户点击平滑滚动时，让落定的 chip 与边缘留出半个列表间距（仅 animate 分支加，自动定位不加）
+    val paddingHalfPx = with(LocalDensity.current) { (Spacing.dialogItemGap / 2).toPx() }
+    // userScrolled：仅用户点击切换画质才置 true；进页 / 异步到位自动定位零动画（口径同 LineSection）
+    var userScrolled by remember { mutableStateOf(false) }
     LaunchedEffect(qualityPosition) {
+        val animate = userScrolled
+        userScrolled = false
         if (qualityPosition !in qualities.indices) return@LaunchedEffect
         snapshotFlow { listState.layoutInfo.totalItemsCount }
             .filter { it > qualityPosition }
             .first()
-        val info = listState.layoutInfo
-        val item = info.visibleItemsInfo.firstOrNull { it.index == qualityPosition }
-        when {
-            item == null ->
-                if (!positionedInitial) {
-                    listState.scrollToItem(qualityPosition)
-                } else {
-                    listState.animateScrollToItem(qualityPosition)
-                }
-            item.offset < info.viewportStartOffset ->
-                listState.animateScrollBy((item.offset - info.viewportStartOffset).toFloat())
-            item.offset + item.size > info.viewportEndOffset ->
-                listState.animateScrollBy((item.offset + item.size - info.viewportEndOffset).toFloat())
+        if (!animate) {
+            // 进页 / 自动定位：无动画贴左，选中项落在列表第一位
+            listState.scrollToItem(qualityPosition)
+        } else {
+            val info = listState.layoutInfo
+            val item = info.visibleItemsInfo.firstOrNull { it.index == qualityPosition }
+            when {
+                item == null -> listState.animateScrollToItem(qualityPosition)
+                item.offset < info.viewportStartOffset ->
+                    listState.animateScrollBy((item.offset - info.viewportStartOffset).toFloat() - paddingHalfPx)
+                item.offset + item.size > info.viewportEndOffset ->
+                    listState.animateScrollBy((item.offset + item.size - info.viewportEndOffset).toFloat() + paddingHalfPx)
+            }
         }
-        positionedInitial = true
     }
     Column {
         Text(
@@ -3126,7 +3132,7 @@ private fun QualityRow(
                 modifier = Modifier
                     .defaultMinSize(minWidth = 40.dp)
                     .tvCardEffect(
-                        onClick = { onQualityChange(idx) },
+                        onClick = { if (idx != qualityPosition) userScrolled = true; onQualityChange(idx) },
                         shape = shape, focusedScale = 1.05f, glow = false,
                         pressEffect = false,
                     )
@@ -3162,6 +3168,9 @@ private fun EpisodeSection(
 ) {
     var showEpisodeGrid by remember { mutableStateOf(false) }
     var reversedEp by remember { mutableStateOf(false) }
+    // userScrolled：仅用户在列表 / 网格弹窗里点出别的集才置 true；
+    // 进页、异步到位、倒序切换等自动定位一律零动画；声明在函数体顶部，供 Column 内 effect/chip 与块外弹窗 onSelect 共用
+    var userScrolled by remember { mutableStateOf(false) }
 
     Column {
         Row(
@@ -3210,41 +3219,30 @@ private fun EpisodeSection(
                 initialDispIdx
             } else 0,
         )
-        // positionedInitial：标记首次定位是否已完成。
-        // 首次定位（含异步加载完成后的兜底）一律用无动画 scrollToItem；
-        // 之后手动切集/倒序切换才用 animateScrollToItem 做过渡动画。
-        var positionedInitial by remember { mutableStateOf(false) }
+        // 用户点击平滑滚动时，让落定的 chip 与边缘留出半个列表间距（仅 animate 分支加，自动定位不加）
+        val paddingHalfPx = with(LocalDensity.current) { (Spacing.dialogItemGap / 2).toPx() }
         LaunchedEffect(selectedDispIdx, lineEpisodes.size) {
+            val animate = userScrolled
+            userScrolled = false
             if (lineEpisodes.isEmpty() || selectedDispIdx !in 0 until lineEpisodes.size) return@LaunchedEffect
             snapshotFlow { listState.layoutInfo.totalItemsCount }
                 .filter { it > selectedDispIdx }
                 .first()
-            val info = listState.layoutInfo
-            val viewportStart = info.viewportStartOffset
-            val viewportEnd = info.viewportEndOffset
-            val viewportWidth = viewportEnd - viewportStart
-            val item = info.visibleItemsInfo.firstOrNull { it.index == selectedDispIdx }
-            val needsScroll = item == null || item.offset < viewportStart || item.offset + item.size > viewportEnd
-            when {
-                // 首次定位（进入页面 / 异步加载完成）：无动画瞬移到贴左可见
-                !positionedInitial -> {
-                    if (needsScroll) listState.scrollToItem(selectedDispIdx)
-                    positionedInitial = true
-                }
-                // 后续切集：仅当新选中集不在可视范围内时才滚动到刚好露出
-                needsScroll -> when {
-                    // item 为 null（尚未布局，如点击被截断的 chip）：改为动画滚动，避免瞬移
-                    item == null ->
-                        listState.animateScrollToItem(selectedDispIdx)
-                    // 左侧被遮挡：向左滚到刚好贴左
+            if (!animate) {
+                // 进页 / 自动定位：无动画贴左，选中项落在列表第一位
+                listState.scrollToItem(selectedDispIdx)
+            } else {
+                val info = listState.layoutInfo
+                val viewportStart = info.viewportStartOffset
+                val viewportEnd = info.viewportEndOffset
+                val item = info.visibleItemsInfo.firstOrNull { it.index == selectedDispIdx }
+                when {
+                    item == null -> listState.animateScrollToItem(selectedDispIdx)
                     item.offset < viewportStart ->
-                        listState.animateScrollBy((item.offset - viewportStart).toFloat())
-                    // 右侧被遮挡：向右滚到刚好完整显示
+                        listState.animateScrollBy((item.offset - viewportStart).toFloat() - paddingHalfPx)
                     item.offset + item.size > viewportEnd ->
-                        listState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat())
+                        listState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat() + paddingHalfPx)
                 }
-                // 已完全可见：不滚动
-                else -> Unit
             }
         }
         // 默认横向滚动（fongmi: adapter_episode_hori）；通栏横滑同 LineSection：列表天然占满
@@ -3259,7 +3257,7 @@ private fun EpisodeSection(
                 EpisodeChip(
                     title = ep.title,
                     selected = idx == episodeIndex,
-                    onClick = { onEpisodeSelect(idx) },
+                    onClick = { if (idx != episodeIndex) userScrolled = true; onEpisodeSelect(idx) },
                     enforceMinHeight = false,
                 )
             }
@@ -3273,6 +3271,7 @@ private fun EpisodeSection(
         // 倒序仅作用于播放页选集行；"更多"弹窗始终正序显示
         reversed = false,
         onSelect = { idx ->
+            if (idx != episodeIndex) userScrolled = true
             onEpisodeSelect(idx)
             showEpisodeGrid = false
         },
