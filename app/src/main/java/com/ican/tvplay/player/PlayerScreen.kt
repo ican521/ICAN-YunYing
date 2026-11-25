@@ -4151,9 +4151,8 @@ private fun FullscreenPlayLayout(
 
         // 动作栏对话框（与竖屏同款）
         // 播放内核（fongmi PlayerEngineDialog：EXO / MPV / 其他=系统选择器外部播放器）
-        // 全屏浮层强制深色：色板不跟随 App 浅/深主题，容器/未选中行固定深色档，选中蓝底不变。
-        val dialogThemeColor by settings.themeColor.collectAsStateWithLifecycle()
-        MiuixTheme(colors = playerDarkMiuixColors(dialogThemeColor)) {
+        // 全屏浮层固定深色：容器/未选中行取深色档现成色值（不跟随 App 浅/深主题），
+        // 选中强调色仍接入当前主题色。根宿主弹窗不继承调用处局部色板，故色值在弹窗组件内按 forceDark 显式指定。
         val engineOptions = Players.Kernel.entries.map { it.label } + "其他"
         OptionDialog(showEngine, "播放内核", engineOptions, playerState.kernel.label, { it }, { label ->
             when (label) {
@@ -4182,10 +4181,11 @@ private fun FullscreenPlayLayout(
             },
             // ISO 光盘镜像只有 MPV 能解：EXO 置灰且不可点，避免切过去必然进错误页
             enabled = { label -> !(playerState.isoSource && label == Players.Kernel.EXO.label) },
+            forceDark = true,
         ) { showEngine = false }
-        OptionDialog(showSpeed, "倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
-        OptionDialog(showBuffer, "缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
-        OptionDialog(showDecode, "解码方式", Players.Decode.entries, playerState.decode, { it.label }, { onDecodeChange(it); showDecode = false }) { showDecode = false }
+        OptionDialog(showSpeed, "倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }, forceDark = true) { showSpeed = false }
+        OptionDialog(showBuffer, "缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }, forceDark = true) { showBuffer = false }
+        OptionDialog(showDecode, "解码方式", Players.Decode.entries, playerState.decode, { it.label }, { onDecodeChange(it); showDecode = false }, forceDark = true) { showDecode = false }
         if (showEpisodes) {
             EpisodeSideSheet(
                 episodes = lineEpisodes,
@@ -4197,7 +4197,7 @@ private fun FullscreenPlayLayout(
                 onDismiss = { showEpisodes = false },
             )
         }
-        OptionDialog(showAudio, "音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }) { showAudio = false }
+        OptionDialog(showAudio, "音轨", playerState.audioTracks, playerState.audioTracks.firstOrNull { it.selected }, { it.name }, { Players.selectTrack(it, androidx.media3.common.C.TRACK_TYPE_AUDIO); showAudio = false }, forceDark = true) { showAudio = false }
         SubtitleDialog(
             show = showText,
             tracks = playerState.textTracks,
@@ -4206,8 +4206,8 @@ private fun FullscreenPlayLayout(
             onAddSubtitle = { showText = false; onAddSubtitle() },
             onSettings = { showText = false; onOpenSubtitleSettings() },
             onDismiss = { showText = false },
+            forceDark = true,
         )
-        }
     }
 }
 
@@ -4608,7 +4608,15 @@ private fun <T> OptionDialog(
     onSelect: (T) -> Unit,
     enabled: (T) -> Boolean = { true },
     onDismiss: () -> Unit,
+    // true = 全屏呼出的功能弹窗：容器/未选中行固定深色档（不跟随主题），选中强调色仍取主题色；
+    // false = 竖屏详情页弹窗，跟随全局浅/深主题
+    forceDark: Boolean = false,
 ) {
+    val scheme = MiuixTheme.colorScheme
+    val dialogContainer = if (forceDark) DarkSurfaceVariant else scheme.surfaceContainer
+    val dialogTitleColor = if (forceDark) DarkOnSurface else scheme.onBackground
+    val rowFill = if (forceDark) DarkDialogRow else scheme.secondaryVariant
+    val rowText = if (forceDark) DarkDialogRowText else scheme.onSecondaryVariant
     // 选项过多（倍速档位/音轨）时限高可滚动，避免超出屏幕被裁、末项露出半截边缘
     val maxDialogHeight = with(LocalConfiguration.current) { (screenHeightDp * 0.65f).dp }
     // 与设置页「站源设置」同款：miuix OverlayDialog 底部呼出（滑入滑出 + 遮罩由库处理）
@@ -4617,7 +4625,7 @@ private fun <T> OptionDialog(
         // 标题自绘（与选集「更多」弹窗同款）：库默认 insideMargin=24dp 会在列表底部压出一条背景色
         // 遮挡带且标题间距不可控；传 null + insideMargin 归零后全部边距由内容区自控
         title = null,
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        backgroundColor = dialogContainer,
         renderInRootScaffold = true,
         largeScreen = false,
         onDismissRequest = onDismiss,
@@ -4633,7 +4641,7 @@ private fun <T> OptionDialog(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
-                color = MiuixTheme.colorScheme.onBackground,
+                color = dialogTitleColor,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -4668,13 +4676,12 @@ private fun <T> OptionDialog(
                             ) { onSelect(opt) }
                             // 与线路/选集 chip 一致：选中 primary 主题色底 + onPrimary 自适应文字；未选中 secondaryVariant 灰底，无描边
                             .background(
-                                if (selected) MiuixTheme.colorScheme.primary
-                                else MiuixTheme.colorScheme.secondaryVariant, shape,
+                                if (selected) scheme.primary else rowFill, shape,
                             )
                             .padding(Spacing.dialogItemPadding),
                     ) {
-                        Text(label(opt), style = MaterialTheme.typography.bodyMedium, color = if (selected) MiuixTheme.colorScheme.onPrimary else MiuixTheme.colorScheme.onSecondaryVariant, modifier = Modifier.weight(1f))
-                        if (selected) Icon(AppIcons.Check, null, tint = MiuixTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
+                        Text(label(opt), style = MaterialTheme.typography.bodyMedium, color = if (selected) scheme.onPrimary else rowText, modifier = Modifier.weight(1f))
+                        if (selected) Icon(AppIcons.Check, null, tint = scheme.onPrimary, modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -4687,13 +4694,18 @@ private fun SubtitleDialog(
     show: Boolean, tracks: List<Players.TrackOption>, textDisabled: Boolean,
     onSelect: (Players.TrackOption) -> Unit,
     onAddSubtitle: () -> Unit, onSettings: () -> Unit, onDismiss: () -> Unit,
+    // true = 全屏呼出的字幕弹窗：容器/未选中行固定深色档；false = 竖屏详情页弹窗，跟随主题
+    forceDark: Boolean = false,
 ) {
+    val scheme = MiuixTheme.colorScheme
+    val dialogContainer = if (forceDark) DarkSurfaceVariant else scheme.surfaceContainer
+    val dialogTitleColor = if (forceDark) DarkOnSurface else scheme.onBackground
     // 与设置页「站源设置」同款：miuix OverlayDialog 底部呼出
     // 标题自绘 + insideMargin 归零（同 OptionDialog）：消除库默认 24dp 内边距造成的底部背景遮挡条
     OverlayDialog(
         show = show,
         title = null,
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        backgroundColor = dialogContainer,
         renderInRootScaffold = true,
         largeScreen = false,
         onDismissRequest = onDismiss,
@@ -4710,7 +4722,7 @@ private fun SubtitleDialog(
             Text(
                 text = "字幕",
                 style = MaterialTheme.typography.titleLarge,
-                color = MiuixTheme.colorScheme.onBackground,
+                color = dialogTitleColor,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -4727,9 +4739,9 @@ private fun SubtitleDialog(
                     .padding(bottom = Spacing.dialogContentMargin),
                 verticalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
             ) {
-                tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected) { onSelect(t) } }
-                SubRow("添加字幕", false) { onAddSubtitle() }
-                SubRow("字幕设置", false) { onSettings() }
+                tracks.forEach { t -> SubRow(t.name, !textDisabled && t.selected, forceDark) { onSelect(t) } }
+                SubRow("添加字幕", false, forceDark) { onAddSubtitle() }
+                SubRow("字幕设置", false, forceDark) { onSettings() }
             }
         }
     }
@@ -5396,7 +5408,10 @@ private fun SubInfoRow(label: String, value: String) {
 }
 
 @Composable
-private fun SubRow(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun SubRow(label: String, selected: Boolean, forceDark: Boolean = false, onClick: () -> Unit) {
+    val scheme = MiuixTheme.colorScheme
+    val rowFill = if (forceDark) DarkDialogRow else scheme.secondaryVariant
+    val rowText = if (forceDark) DarkDialogRowText else scheme.onSecondaryVariant
     val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -5408,13 +5423,12 @@ private fun SubRow(label: String, selected: Boolean, onClick: () -> Unit) {
             ) { onClick() }
             // 与线路/选集 chip 一致：选中 primary 主题色底 + onPrimary 自适应文字；未选中 secondaryVariant 灰底，无描边
             .background(
-                if (selected) MiuixTheme.colorScheme.primary
-                else MiuixTheme.colorScheme.secondaryVariant, shape,
+                if (selected) scheme.primary else rowFill, shape,
             )
             .padding(Spacing.dialogItemPadding),
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = if (selected) MiuixTheme.colorScheme.onPrimary else MiuixTheme.colorScheme.onSecondaryVariant, modifier = Modifier.weight(1f))
-        if (selected) Icon(AppIcons.Check, null, tint = MiuixTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = if (selected) scheme.onPrimary else rowText, modifier = Modifier.weight(1f))
+        if (selected) Icon(AppIcons.Check, null, tint = scheme.onPrimary, modifier = Modifier.size(18.dp))
     }
 }
 
