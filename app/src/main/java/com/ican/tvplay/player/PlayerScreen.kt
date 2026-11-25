@@ -421,12 +421,11 @@ fun PlayerScreen(
     var exitRotating by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    // 布局档位按「设备类别」定，跟当前屏幕横竖无关——对齐 fongmi 的资源限定符分档
-    // （layout/activity_video.xml tag=port 手机；layout-sw600dp/activity_video.xml tag=land 平板）：
-    // 手机（sw<600dp）固定竖屏小窗布局；平板（≥600dp）固定横版布局（平板竖着也是横版样式）。
-    // 之前用 isLandscape 判档，手机横着会被当成平板 → 退全屏时会先露出平板样式
+    // 布局档位按「当前屏幕横竖」定：平板竖着走竖屏小窗、横着走横版；
+    // 手机竖屏小窗、横屏自动进全屏（见下方 checkLand 同款 effect），不会落进横版分支。
+    // 手机类别仅用于「横屏自动进全屏」这一条的判定。
     val isPhone = configuration.smallestScreenWidthDp < 600
-    val landLayout = !isPhone
+    val landLayout = isLandscape
     // 渲染用的「全屏」：手机从横屏全屏竖回竖屏的那一瞬间，fullscreen 状态要等下面的
     // LaunchedEffect 下一帧才清掉；若照旧按 fullscreen 画，会多出 100~200ms 的
     // 「竖屏窗口 + 全屏分支」中间态——视频铺满整个 1080x2400、画面被 FIT 居中到屏幕中间，
