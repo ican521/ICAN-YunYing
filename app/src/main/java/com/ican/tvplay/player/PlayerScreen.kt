@@ -203,7 +203,6 @@ import com.ican.tvplay.player.core.MediaItemFactory
 import com.ican.tvplay.ui.appContainer
 import com.ican.tvplay.ui.components.AppIcons
 import com.ican.tvplay.ui.components.ArcStretchSpinner
-import com.ican.tvplay.ui.components.SegmentedTabs
 import com.ican.tvplay.ui.components.dialogBottomMargin
 import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
@@ -4224,6 +4223,8 @@ private fun EpisodeChip(
     enforceMinHeight: Boolean = true,
     fill: Color? = null,
     selectedTextColor: Color? = null,
+    // 未选中文字色：侧栏深色场景下需要比 onSecondaryVariant 更收敛，允许调用方覆盖
+    unselectedTextColor: Color? = null,
 ) {
     val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
     val darkMode = LocalDarkTheme.current
@@ -4252,7 +4253,7 @@ private fun EpisodeChip(
             text = title,
             style = MaterialTheme.typography.labelMedium,
             color = if (selected) (selectedTextColor ?: tintedText)
-            else MiuixTheme.colorScheme.onSecondaryVariant,
+            else (unselectedTextColor ?: MiuixTheme.colorScheme.onSecondaryVariant),
             fontWeight = if (selected) FontWeight.SemiBold else null,
             maxLines = 1,
         )
@@ -4705,6 +4706,10 @@ private fun SubtitleSettingSideSheet(
             }
             // 排版对齐 fongmi dialog_subtitle_setting：顶部标题 + 右侧「重置」，下面一排 Tab 按钮
             var subtitleTab by remember { mutableIntStateOf(0) }
+            // 面板内所有单选 chip 统一配色：底一律 white 10%，选中=主题色文字+加粗，未选中=muted 白
+            val chipFill = Color.White.copy(alpha = 0.10f)
+            val chipSelectedText = MiuixTheme.colorScheme.primary
+            val chipUnselectedText = Color.White.copy(alpha = 0.62f)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -4755,6 +4760,9 @@ private fun SubtitleSettingSideSheet(
                 selectedIndex = subtitleTab,
                 onSelect = { subtitleTab = it },
                 modifier = Modifier.padding(bottom = Spacing.sectionSpacing),
+                fill = chipFill,
+                selectedTextColor = chipSelectedText,
+                unselectedTextColor = chipUnselectedText,
             )
             if (subtitleTab == 0) {
             SideSheetSectionTitle("字幕样式")
@@ -4766,8 +4774,9 @@ private fun SubtitleSettingSideSheet(
                     settings.setSubtitleStyle(subtitleStyle.copy(mode = if (index == 1) SubtitleStyle.MODE_CUSTOM else SubtitleStyle.MODE_SYSTEM))
                 },
                 modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
-                fill = Color.White.copy(alpha = 0.10f),
-                selectedTextColor = MiuixTheme.colorScheme.primary,
+                fill = chipFill,
+                selectedTextColor = chipSelectedText,
+                unselectedTextColor = chipUnselectedText,
             )
             if (subtitleStyle.mode == SubtitleStyle.MODE_CUSTOM) {
                 SideSheetSectionTitle(
@@ -4812,8 +4821,9 @@ private fun SubtitleSettingSideSheet(
                         settings.setSubtitleStyle(subtitleStyle.copy(edgeType = type))
                     },
                     modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
-                    fill = Color.White.copy(alpha = 0.10f),
-                    selectedTextColor = MiuixTheme.colorScheme.primary,
+                    fill = chipFill,
+                    selectedTextColor = chipSelectedText,
+                    unselectedTextColor = chipUnselectedText,
                 )
                 if (subtitleStyle.edgeType != SubtitleStyle.EDGE_NONE) {
                     SideSheetSectionTitle(
@@ -4864,6 +4874,9 @@ private fun SubtitleSettingSideSheet(
                         settings.setSubtitleStyle(subtitleStyle.copy(backgroundColor = color))
                     },
                     modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
+                    fill = chipFill,
+                    selectedTextColor = chipSelectedText,
+                    unselectedTextColor = chipUnselectedText,
                 )
                 if (android.graphics.Color.alpha(subtitleStyle.backgroundColor) > 0) {
                     SubtitleStyleSliderRow(
@@ -4979,8 +4992,7 @@ private fun SideSheetSectionTitle(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * 字幕样式选项行：fongmi PlaybackDialogTabs 同款「连通外框 + 选中段主题色填充」分段按钮，
- * 与设置页「收藏同步」共用 [SegmentedTabs]。
+ * 字幕样式 Tab 行（外观/调节/偏移）与「背景颜色」行：统一走独立胶囊 chip 行。
  */
 @Composable
 private fun SubtitleStyleChips(
@@ -4988,18 +5000,25 @@ private fun SubtitleStyleChips(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    fill: Color? = null,
+    selectedTextColor: Color? = null,
+    unselectedTextColor: Color? = null,
 ) {
-    SegmentedTabs(
+    // 面板内所有单选行统一走独立胶囊 chip 行，不再用连通外框的 SegmentedTabs
+    SubtitleStyleChipRow(
         labels = labels,
         selectedIndex = selectedIndex,
         onSelect = onSelect,
         modifier = modifier,
+        fill = fill,
+        selectedTextColor = selectedTextColor,
+        unselectedTextColor = unselectedTextColor,
     )
 }
 
 /**
- * 字幕样式独立胶囊 chip 行：与线路/选集 [EpisodeChip] 同款外观（独立胶囊 + 圆角），
- * 不走 SegmentedTabs 的连通外框与段间分割线。
+ * 字幕样式独立胶囊 chip 行：与线路/选集 [EpisodeChip] 同款外观（独立胶囊 + 圆角）；
+ * 面板内 Tab（外观/调节/偏移）、系统/自定义、描边样式、背景颜色全部复用本行。
  */
 @Composable
 private fun SubtitleStyleChipRow(
@@ -5009,6 +5028,7 @@ private fun SubtitleStyleChipRow(
     modifier: Modifier = Modifier,
     fill: Color? = null,
     selectedTextColor: Color? = null,
+    unselectedTextColor: Color? = null,
 ) {
     Row(
         modifier = modifier,
@@ -5022,6 +5042,7 @@ private fun SubtitleStyleChipRow(
                 enforceMinHeight = false,
                 fill = fill,
                 selectedTextColor = selectedTextColor,
+                unselectedTextColor = unselectedTextColor,
             )
         }
     }
