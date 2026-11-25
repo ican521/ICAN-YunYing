@@ -36,6 +36,7 @@ import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -1190,19 +1191,39 @@ object Players {
         // mpv.conf 只在 native 初始化时读取，必须在 builder.build() 之前写好，晚写等于不生效；
         // 每次覆盖写，仅 [hdr] 条件 profile；写失败只告警，不阻断后续 builder 构建
         // auto_profiles 条件里属性名含 "/" 不能直接写进 Lua 表达式，必须用脚本注入的全局 get("…") 取值；判 pq/hlg/smpte2084 三种 HDR 取值
-        // target-peak=1500：Vulkan HDR 直出时显式上报峰值，避免 Android 上 auto 峰值读不到回退到低档导致发闷；只影响 HDR 命中的 profile
+        // 运行时读 Display.getHdrCapabilities()：HDR10 支持且 maxLuminance(API 34+) 可用 → HDR 分支
+        // 写 target-peak=<nits> + target-colorspace-hint=yes；不支持 HDR → 降级 SDR：
+        // target-prim=bt.709 / target-trc=srgb / target-peak=200，且不写 colorspace-hint。
+        val (supportsHdr10, hdrPeakNits, hdrReady) = runCatching {
+            val dm = ctx.getSystemService(android.hardware.display.DisplayManager::class.java)
+            val display = dm?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+            val caps = display?.hdrCapabilities
+            val hdrTypes = caps?.supportedHdrTypes
+            val h10 = hdrTypes?.contains(android.view.Display.HdrCapabilities.HDR_TYPE_HDR10) == true
+            val maxLum = if (android.os.Build.VERSION.SDK_INT >= 34) caps?.desiredMaxLuminance ?: -1f else -1f
+            val peak = if (maxLum > 0f) maxLum.roundToInt().coerceIn(300, 2000) else 1000
+            Triple(h10, peak, h10)
+        }.getOrDefault(Triple(false, 1000, false))
+        val mpvConf = if (hdrReady) {
+            "[hdr]\n" +
+                "profile-cond=get(\"video-params/gamma\") == \"pq\" or get(\"video-params/gamma\") == \"hlg\" or get(\"video-params/gamma\") == \"smpte2084\"\n" +
+                "profile-restore=copy\n" +
+                "target-colorspace-hint=yes\n" +
+                "target-peak=$hdrPeakNits\n"
+        } else {
+            "[hdr]\n" +
+                "profile-cond=get(\"video-params/gamma\") == \"pq\" or get(\"video-params/gamma\") == \"hlg\" or get(\"video-params/gamma\") == \"smpte2084\"\n" +
+                "profile-restore=copy\n" +
+                "target-prim=bt.709\n" +
+                "target-trc=srgb\n" +
+                "target-peak=200\n"
+        }
         try {
-            java.io.File(mpvDir, "mpv.conf").writeText(
-                "[hdr]\n" +
-                    "profile-cond=get(\"video-params/gamma\") == \"pq\" or get(\"video-params/gamma\") == \"hlg\" or get(\"video-params/gamma\") == \"smpte2084\"\n" +
-                    "profile-restore=copy\n" +
-                    "target-colorspace-hint=yes\n" +
-                    "target-peak=1500\n",
-                java.nio.charset.StandardCharsets.UTF_8,
-            )
+            java.io.File(mpvDir, "mpv.conf").writeText(mpvConf, java.nio.charset.StandardCharsets.UTF_8)
         } catch (t: Throwable) {
             Log.w(TAG, "write mpv.conf failed", t)
         }
+        Log.i(TAG, "hdr display: hdr10=$supportsHdr10 peak=$hdrPeakNits mode=${if (hdrReady) "hdr" else "sdr"}")
         val builder = androidx.media3.mpvplayer.MpvPlayerConfig.Builder()
             .addConfigDirectory(mpvDir)
             .addTlsCaFileFromAsset(ctx, "cacert.pem", caFile)
