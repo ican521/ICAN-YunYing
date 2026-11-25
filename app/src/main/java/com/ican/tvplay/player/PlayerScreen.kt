@@ -35,6 +35,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -4257,18 +4258,28 @@ private fun EpisodeChip(
 /**
  * 全屏侧边面板的渐变背景层：整屏「右实左淡」横向暗场。
  * 右侧与面板等宽的一段保持 94% 等浓度（内容始终压在稳定底色上），
- * 面板左缘外只用 [featherFraction] 这一段平滑淡开，再往左视频完全不受影响。
- * 本层不自带动画与触摸：由调用方把它和面板放进同一个 offset，随面板一起滑入滑出。
+ * 面板左缘外一直到屏幕最左缘都在平滑褪淡。
+ * 与面板同起同收：跟面板共用同一个 offset 位移，同时 260ms 淡入淡出
+ * （淡出带横跨到屏幕最左，单靠位移不可能整块移出屏幕，所以必须配合透明度收尾）。
  */
 @Composable
 private fun SideSheetGradientLayer(
+    visible: Boolean,
     contentFraction: Float,
     featherFraction: Float,
     modifier: Modifier = Modifier,
 ) {
+    val layerAlpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(260, easing = FastOutSlowInEasing),
+        label = "sideSheetGradient",
+    )
+    // 完全隐藏且不处于显示态时直接不组合，避免透明层常驻占位
+    if (layerAlpha == 0f && !visible) return
     Box(
         modifier = modifier
             .fillMaxSize()
+            .alpha(layerAlpha)
             .background(sideSheetScrimBrush(contentFraction, featherFraction = featherFraction)),
     )
 }
@@ -4320,11 +4331,8 @@ private fun EpisodeSideSheet(
     val contentFraction = remember(panelWidth, configuration) {
         (panelWidth.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
     }
-    // 淡出带固定 200dp：从面板左缘（= 列表按钮左缘再往左 16dp）开始变淡，往外拉得更长更缓
-    val featherDp = 200.dp
-    val featherFraction = remember(configuration) {
-        (featherDp.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
-    }
+    // 淡出带一直拉到屏幕最左缘：变淡起点仍在面板左缘（= 列表按钮左缘再往左 16dp）
+    val featherFraction = remember(contentFraction) { (1f - contentFraction).coerceIn(0f, 1f) }
     // 用组件内全屏覆盖层而非 Popup/Dialog：
     // - Dialog 会新建窗口并自动唤出状态栏/导航栏，破坏全屏沉浸；
     // - Popup 子窗口的 layoutInDisplayCutoutMode 固定为 DEFAULT，横屏全屏时会避开左侧
@@ -4334,7 +4342,7 @@ private fun EpisodeSideSheet(
     var sheetShown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { sheetShown = true }
     val sheetSlideX by animateDpAsState(
-        targetValue = if (sheetShown) 0.dp else panelWidth + featherDp + 20.dp,
+        targetValue = if (sheetShown) 0.dp else panelWidth + 20.dp,
         animationSpec = tween(260, easing = FastOutSlowInEasing),
         label = "episodeSheetSlide",
     )
@@ -4354,6 +4362,7 @@ private fun EpisodeSideSheet(
             SideSheetTouchShield(enabled = sheetShown, onClick = dismissWithAnim)
             // 渐变背景与面板同进同退：同一个 offset，一起滑入/滑出
             SideSheetGradientLayer(
+                visible = sheetShown,
                 contentFraction = contentFraction,
                 featherFraction = featherFraction,
                 modifier = Modifier.offset { IntOffset(sheetSlideX.roundToPx(), 0) },
@@ -4638,13 +4647,10 @@ private fun SubtitleSettingSideSheet(
     val contentFraction = remember(panelWidth, configuration) {
         (panelWidth.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
     }
-    // 淡出带固定 200dp：从面板左缘（= 列表按钮左缘再往左 16dp）开始变淡，往外拉得更长更缓
-    val featherDp = 200.dp
-    val featherFraction = remember(configuration) {
-        (featherDp.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
-    }
+    // 淡出带一直拉到屏幕最左缘：变淡起点仍在面板左缘（= 列表按钮左缘再往左 16dp）
+    val featherFraction = remember(contentFraction) { (1f - contentFraction).coerceIn(0f, 1f) }
     val sheetSlideX by animateDpAsState(
-        targetValue = if (sheetShown) 0.dp else panelWidth + featherDp + 20.dp,
+        targetValue = if (sheetShown) 0.dp else panelWidth + 20.dp,
         animationSpec = tween(260, easing = FastOutSlowInEasing),
         label = "subtitleSheetSlide",
     )
@@ -4661,6 +4667,7 @@ private fun SubtitleSettingSideSheet(
         SideSheetTouchShield(enabled = sheetShown, onClick = dismissWithAnim)
         // 渐变背景与面板同进同退：同一个 offset，一起滑入/滑出
         SideSheetGradientLayer(
+            visible = sheetShown,
             contentFraction = contentFraction,
             featherFraction = featherFraction,
             modifier = Modifier.offset { IntOffset(sheetSlideX.roundToPx(), 0) },
