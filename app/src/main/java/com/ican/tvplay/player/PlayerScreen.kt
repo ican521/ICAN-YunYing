@@ -2801,7 +2801,6 @@ private fun PreviewPlayerArea(
                         desc = "返回",
                         pressEffect = true,
                         pressColor = Color.White,
-                        touchRing = true,
                         onClick = { onBack() },
                     )
                     Spacer(modifier = Modifier.weight(1f))
@@ -4671,8 +4670,6 @@ private fun PlainTopBtn(
     pressEffect: Boolean = false,
     // 蒙层色覆盖：小窗按钮压在暗视频上，用白色 10% 叠出「浅灰」按压感
     pressColor: Color? = null,
-    // 调试用：画出 48dp 实际点击热区描边，改回 false 即撤销
-    touchRing: Boolean = false,
     onClick: () -> Unit,
 ) {
     Box(
@@ -4685,13 +4682,6 @@ private fun PlainTopBtn(
                 glow = false,
                 pressEffect = pressEffect,
                 pressColor = pressColor,
-            )
-            .then(
-                if (touchRing) {
-                    Modifier.border(1.dp, Color(0xFFFF00FF), CircleShape)
-                } else {
-                    Modifier
-                },
             ),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, desc, tint = Color.White, modifier = Modifier.size(24.dp)) }

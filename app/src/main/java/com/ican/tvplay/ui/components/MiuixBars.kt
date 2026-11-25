@@ -2,6 +2,7 @@ package com.ican.tvplay.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -25,12 +26,21 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * @param showBackground 为 false 时不绘制圆形底色，仅保留箭头图标（追番更新页等要求纯箭头）
  * @param iconSize 箭头图标尺寸，默认 24dp；搜索页等与搜索栏并排的场景可传更小值收敛视觉
  */
+/**
+ * 箭头图标的光学修正比例（相对 iconSize 的横向位移）。
+ * miuix ChevronBackward 的几何包围盒在 24dp 视口里是严格居中的（bbox 中心 603.6 = 视口中心 603.6，
+ * 视口 1207.2），但箭头尖端在左、两条笔画向右张开，墨量重心实测偏右约 0.25dp/24dp，
+ * 放进圆底里看着略偏右。按 iconSize 的 2% 往左挪，把视觉重心压回圆心。
+ */
+private const val BACK_ICON_OPTICAL_FRACTION = 0.02f
+
 @Composable
 fun MiuixBackButton(
     onClick: () -> Unit,
     showBackground: Boolean = true,
     iconSize: Dp = 24.dp,
 ) {
+    val opticalDx = iconSize * BACK_ICON_OPTICAL_FRACTION
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -49,7 +59,9 @@ fun MiuixBackButton(
             imageVector = MiuixIcons.Regular.ChevronBackward,
             contentDescription = "返回",
             tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            modifier = Modifier.size(iconSize),
+            modifier = Modifier
+                .size(iconSize)
+                .offset(x = -opticalDx),
         )
     }
 }
