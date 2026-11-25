@@ -214,6 +214,7 @@ import com.ican.tvplay.ui.theme.DarkOnSurfaceMuted
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.chipTintedFill
 import com.ican.tvplay.ui.theme.chipTintedText
+import com.ican.tvplay.ui.theme.sideSheetScrimBrush
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.compose.runtime.snapshotFlow
@@ -4255,14 +4256,18 @@ private fun EpisodeChip(
 }
 
 /**
- * 全屏侧边面板的背景层：整屏「右浓左淡」的横向渐变暗场。
- * 屏幕最右侧 94% 黑、到面板区域仍有 90%，往左逐段变淡（55% → 20%）直至完全透明，
- * 面板不再有自己的实底与硬边，靠这层渐变托底并与视频自然衔接。
+ * 全屏侧边面板的背景层：整屏「右实左淡」的横向渐变暗场。
+ * 右侧与面板等宽的一段保持 [contentFraction] 等浓度 94% 黑（内容始终压在稳定底色上），
+ * 面板左缘往左按 33 段 smoothstep 平滑归零到屏幕最左（与首页海报标题的渐变同一套曲线）。
  * 200ms 淡入淡出（与面板 260ms 滑动同起）；显示期间接住所有点击（点空白处收起），
  * 同时挡住底下的视频控件，避免一次点击触发两件事。
  */
 @Composable
-private fun SideSheetGradientBackdrop(visible: Boolean, onClick: () -> Unit) {
+private fun SideSheetGradientBackdrop(
+    visible: Boolean,
+    contentFraction: Float,
+    onClick: () -> Unit,
+) {
     val scrimAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
         animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
@@ -4274,17 +4279,7 @@ private fun SideSheetGradientBackdrop(visible: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .alpha(scrimAlpha)
-            .background(
-                Brush.horizontalGradient(
-                    colorStops = arrayOf(
-                        0.00f to Color.Transparent,
-                        0.16f to Color.Black.copy(alpha = 0.20f),
-                        0.38f to Color.Black.copy(alpha = 0.55f),
-                        0.66f to Color.Black.copy(alpha = 0.90f),
-                        1.00f to Color.Black.copy(alpha = 0.94f),
-                    ),
-                ),
-            )
+            .background(sideSheetScrimBrush(contentFraction))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -4322,6 +4317,10 @@ private fun EpisodeSideSheet(
         }
         with(density) { minOf(w, maxPx).toDp() }
     }
+    // 背景渐变里「等浓度区」宽度 = 面板宽度占屏宽的比例：面板按最长集名动态算宽，等浓度区跟着变
+    val contentFraction = remember(panelWidth, configuration) {
+        (panelWidth.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
+    }
     // 用组件内全屏覆盖层而非 Popup/Dialog：
     // - Dialog 会新建窗口并自动唤出状态栏/导航栏，破坏全屏沉浸；
     // - Popup 子窗口的 layoutInDisplayCutoutMode 固定为 DEFAULT，横屏全屏时会避开左侧
@@ -4354,8 +4353,13 @@ private fun EpisodeSideSheet(
         bottomStart = com.ican.tvplay.ui.theme.Spacing.sideSheetCorner,
     )
     Box(modifier = Modifier.fillMaxSize()) {
-            // 背景：整屏右浓左淡渐变暗场（面板本身不再单独铺色），点面板外空白处收起面板
-            SideSheetGradientBackdrop(visible = sheetShown, onClick = dismissWithAnim)
+            // 背景：整屏右实左淡渐变暗场，右侧与面板等宽的一段为等浓度（面板本身不铺色），
+            // 点面板外空白处收起面板
+            SideSheetGradientBackdrop(
+                visible = sheetShown,
+                contentFraction = contentFraction,
+                onClick = dismissWithAnim,
+            )
             Column(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -4633,6 +4637,10 @@ private fun SubtitleSettingSideSheet(
     }
     var sheetShown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { sheetShown = true }
+    // 背景渐变里「等浓度区」宽度 = 面板宽度占屏宽的比例
+    val contentFraction = remember(panelWidth, configuration) {
+        (panelWidth.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
+    }
     val sheetSlideX by animateDpAsState(
         targetValue = if (sheetShown) 0.dp else panelWidth + 20.dp,
         animationSpec = tween(260, easing = FastOutSlowInEasing),
@@ -4654,8 +4662,13 @@ private fun SubtitleSettingSideSheet(
         bottomStart = Spacing.sideSheetCorner,
     )
     Box(modifier = Modifier.fillMaxSize()) {
-        // 背景：整屏右浓左淡渐变暗场（面板本身不再单独铺色），点面板外空白处收起面板
-        SideSheetGradientBackdrop(visible = sheetShown, onClick = dismissWithAnim)
+        // 背景：整屏右实左淡渐变暗场，右侧与面板等宽的一段为等浓度（面板本身不铺色），
+        // 点面板外空白处收起面板
+        SideSheetGradientBackdrop(
+            visible = sheetShown,
+            contentFraction = contentFraction,
+            onClick = dismissWithAnim,
+        )
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)

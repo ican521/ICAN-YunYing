@@ -150,6 +150,25 @@ fun posterTitleScrimBrush(): Brush = Brush.verticalGradient(
 )
 val PosterActionScrim = Color(0x88000000)  // 编辑模式右上角删除圆钮底
 
+/**
+ * 全屏侧边面板背景：横向「右实左淡」暗场（与 [posterCaptionScrim] 同一套 smoothstep 曲线）。
+ * 右侧 [contentFraction]（面板宽度占屏宽的比例）起保持 [plateauAlpha] 等浓度，
+ * 再往左平滑归零到屏幕最左缘；33 段采样，两端斜率趋零，大屏上看不出色带与分界线。
+ * 面板宽度是动态的（选集面板按最长集名算宽、字幕面板按屏宽 42%），调用方传实时比例即可跟随。
+ */
+fun sideSheetScrimBrush(contentFraction: Float, plateauAlpha: Float = 0.94f): Brush {
+    val start = contentFraction.coerceIn(0f, 0.995f)
+    val stops = Array(33) { i ->
+        val t = i / 32f
+        // q：0 = 等浓度区起点（面板左缘），1 = 屏幕最左缘
+        val q = if (t >= start) 0f else ((start - t) / start).coerceIn(0f, 1f)
+        val f = 1f - (3f * q * q - 2f * q * q * q)
+        t to Color.Black.copy(alpha = plateauAlpha * f)
+    }
+    return Brush.horizontalGradient(colorStops = stops)
+}
+
+
 // 主题色板选中勾的背衬（半透明黑，保证勾在任意色点上都可见）
 val CheckScrim = Color(0x55000000)
 
