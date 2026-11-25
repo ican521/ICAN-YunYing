@@ -2118,8 +2118,8 @@ private fun PortraitPlayLayout(
             refreshTexts = listOf("下拉刷新", "松开刷新", "正在刷新", "刷新完成"),
             refreshTextStyle = MaterialTheme.typography.bodySmall,
             // contentPadding 只 offset RefreshHeader（不影响 DetailInfoColumn）：
-            // 实测 9dp 仍略偏上，12dp 后上下留白更接近（黑块底→标题顶这段空白内居中）
-            contentPadding = PaddingValues(top = 12.dp),
+            // 12dp 实测仍偏上，16dp 再下移一档（黑块底→标题顶这段空白内居中）
+            contentPadding = PaddingValues(top = 16.dp),
         ) {
             DetailInfoColumn(
                 modifier = Modifier.fillMaxSize(),
