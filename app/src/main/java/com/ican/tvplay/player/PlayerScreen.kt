@@ -4320,8 +4320,8 @@ private fun EpisodeSideSheet(
     val contentFraction = remember(panelWidth, configuration) {
         (panelWidth.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
     }
-    // 淡出带固定 144dp：面板左缘再往外平滑淡开，观感更自然；屏幕其余部分完全不压暗
-    val featherDp = 144.dp
+    // 淡出带固定 200dp：从面板左缘（= 列表按钮左缘再往左 16dp）开始变淡，往外拉得更长更缓
+    val featherDp = 200.dp
     val featherFraction = remember(configuration) {
         (featherDp.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
     }
@@ -4638,8 +4638,8 @@ private fun SubtitleSettingSideSheet(
     val contentFraction = remember(panelWidth, configuration) {
         (panelWidth.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
     }
-    // 淡出带固定 144dp：面板左缘再往外平滑淡开，观感更自然；屏幕其余部分完全不压暗
-    val featherDp = 144.dp
+    // 淡出带固定 200dp：从面板左缘（= 列表按钮左缘再往左 16dp）开始变淡，往外拉得更长更缓
+    val featherDp = 200.dp
     val featherFraction = remember(configuration) {
         (featherDp.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
     }

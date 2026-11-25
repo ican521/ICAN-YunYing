@@ -151,10 +151,14 @@ fun posterTitleScrimBrush(): Brush = Brush.verticalGradient(
 val PosterActionScrim = Color(0x88000000)  // 编辑模式右上角删除圆钮底
 
 /**
- * 全屏侧边面板背景：横向「右实左淡」暗场（与 [posterCaptionScrim] 同一套 smoothstep 曲线）。
+ * 全屏侧边面板背景：横向「右实左淡」暗场。
  * [contentFraction] 是面板占屏宽的比例，故等浓度区位于横向坐标 [1 - contentFraction] → 1（屏幕右侧），
- * 只在面板左缘外 [featherFraction] 这一小段内平滑归零，再往左完全透明（视频恢复原亮度）。
- * 97 段采样：淡出带在手机上仅约 0.11 屏宽，段数太少会出现阶梯。
+ * 面板左缘（= 列表按钮左缘再往左 16dp）就是「开始变淡」的位置，往外 [featherFraction] 内褪到 0，
+ * 再往左完全透明（视频恢复原亮度）。
+ * 曲线用 (1-q)^2：在面板左缘处直接开始变淡（斜率最大），越往外越平缓收尾，
+ * 这样"开始变淡"的位置肉眼可辨、能对齐到 16dp；不用 smoothstep（起点斜率为 0，
+ * 实黑会往左多糊出一截，看起来变淡的位置比面板左缘偏左）。
+ * 97 段采样：淡出带只占屏宽一小段，段数太少会出现阶梯。
  * 注意 Brush.horizontalGradient 的色标是「0 = 最左，1 = 最右」，不要写成 contentFraction 直接当起点。
  */
 fun sideSheetScrimBrush(
@@ -172,9 +176,10 @@ fun sideSheetScrimBrush(
             t >= start -> 1f        // 等浓度区（面板宽度内，贴屏幕右缘）
             t <= end -> 0f          // 淡出带以外，完全通透
             else -> {
-                // q：0 = 面板左缘，1 = 淡出带外缘
+                // q：0 = 面板左缘（变淡起点），1 = 淡出带外缘
                 val q = (start - t) / feather
-                1f - (3f * q * q - 2f * q * q * q)
+                val r = 1f - q
+                r * r
             }
         }
         t to Color.Black.copy(alpha = plateauAlpha * f)
