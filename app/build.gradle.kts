@@ -21,8 +21,8 @@ val localProps = Properties().apply {
 }
 
 // 自动版本号：一次确认的改动 = 一个 commit = 版本末位 +1，不再手改本文件
-// 基线：第 629 个提交（2026-11-15 版本号机制的收尾提交）视为 1.0.0 / versionCode 2，
-// 之后每多一个提交，末位与 versionCode 各 +1；同一 commit 打出来的包版本号恒定
+// 基线：第 629 个提交（2026-11-15 版本号机制的收尾提交）视为 versionCode 2 的起点，
+// 主线大版本为 2.0，末位随提交数自增；同一 commit 打出来的包版本号恒定
 fun gitCommitCount(): Int = try {
     val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
         .directory(rootDir)
@@ -45,7 +45,7 @@ android {
         minSdk = 24
         targetSdk = 37
         versionCode = 2 + versionDelta
-        versionName = "1.0.$versionDelta"
+        versionName = "2.0.$versionDelta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
