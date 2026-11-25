@@ -209,8 +209,11 @@ import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.BrandPink
+import com.ican.tvplay.ui.theme.DarkDialogRow
+import com.ican.tvplay.ui.theme.DarkDialogRowText
 import com.ican.tvplay.ui.theme.DarkOnSurface
 import com.ican.tvplay.ui.theme.DarkOnSurfaceMuted
+import com.ican.tvplay.ui.theme.DarkSurfaceVariant
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.chipTintedFill
 import com.ican.tvplay.ui.theme.chipTintedText
@@ -409,6 +412,9 @@ fun PlayerScreen(
     // 缩放会话令牌：每次进入/退出全屏自增，作为收敛监听 LaunchedEffect 的 key，
     // 避免协程体内把 landZooming 置 false 导致自身被取消、渐显逻辑丢失
     var landZoomToken by remember { mutableIntStateOf(0) }
+    // 缩放动画开始时刻：动画本身只有几百毫秒，若因配置变化（深浅色切换等）打断收敛协程卡住，
+    // 用它可以判断「动画是不是真的卡了」，避免 landZooming 残留 true 把返回永久吞掉
+    var zoomStartedAt by remember { mutableLongStateOf(0L) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
@@ -419,6 +425,34 @@ fun PlayerScreen(
             pendingFullscreen == false && !isLandscape -> {
                 fullscreen = false; pendingFullscreen = null; controlsVisible = false
             }
+        }
+    }
+    // 旋转超时兜底：挂起态原本只能靠「系统真的转了屏」收敛。
+    // 实测（小米 13 / Android 16）：横屏全屏时下拉通知栏切深浅色后，MIUI 把该 Activity 当成「视频全屏」，
+    // 退出时即使 requestedOrientation 已设成 FULL_USER 屏幕也不转回竖屏 → isLandscape 永不变化，
+    // pendingFullscreen 永久挂着、fullscreen 一直是 true，BackHandler 把返回全吞掉（返回彻底失效）。
+    // 这里给挂起态加超时：旋转没来就按当前方向直接落定布局（横屏落横版小窗），保证返回永远可用。
+    LaunchedEffect(pendingFullscreen) {
+        when (pendingFullscreen) {
+            // 等旋转进全屏：超时未转则撤销挂起、退回当前方向的小窗布局，
+            // 避免停在什么都不画的 pending 空白态（此刻方向还没变，直接铺满会挂到错误方向的布局上）
+            true -> {
+                delay(1200)
+                if (pendingFullscreen == true) {
+                    pendingFullscreen = null
+                    fullscreen = false
+                    controlsVisible = false
+                    (context as? Activity).restoreDefaultOrientation()
+                }
+            }
+            // 等旋转退全屏：超时未转则按当前方向落小窗布局（不再等旋转），返回随即恢复可用
+            false -> {
+                delay(600)
+                if (pendingFullscreen == false) {
+                    fullscreen = false; pendingFullscreen = null; controlsVisible = false
+                }
+            }
+            null -> Unit
         }
     }
 
@@ -1275,6 +1309,7 @@ fun PlayerScreen(
             controlsVisible = false
             landscapeFullscreen = false
             landZooming = true
+            zoomStartedAt = android.os.SystemClock.elapsedRealtime()
             landZoomToken++
         } else if (portraitFullscreen) {
             // 竖屏全屏：不旋转，播放器缩回预览小窗（缩放动画），收敛后再挂详情信息流
@@ -1282,9 +1317,15 @@ fun PlayerScreen(
             controlsVisible = false
             portraitFullscreen = false
             portraitZooming = true
+            zoomStartedAt = android.os.SystemClock.elapsedRealtime()
             portraitZoomToken++
+        } else if (pendingFullscreen == true) {
+            // 还在等旋转进全屏（画面尚未铺满）：直接撤销挂起并恢复方向，别让它继续转成全屏
+            (context as? Activity).restoreDefaultOrientation()
+            pendingFullscreen = null
         } else {
-            // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）
+            // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）；
+            // 系统不转屏时由 pendingFullscreen 的超时兜底收敛，不会再卡住返回
             (context as? Activity).restoreDefaultOrientation()
             pendingFullscreen = false
         }
@@ -1294,12 +1335,26 @@ fun PlayerScreen(
         // 锁定状态下屏蔽返回（对齐 fongmi isLock() 拦截语义），
         // 系统侧滑/返回键不退出全屏、不退出页面，解锁后恢复
         if (locked) return
-        if (fullscreen) {
+        // 放大/缩回动画进行中忽略返回，避免动画中途退出页面；
+        // 但动画卡住（配置变化打断收敛协程）超过 400ms 就强制回到小窗稳态，
+        // 否则 landZooming/portraitZooming 残留 true 会把返回永久吞掉（这一下仍算被消费，下次返回即生效）
+        if (landZooming || portraitZooming) {
+            if (android.os.SystemClock.elapsedRealtime() - zoomStartedAt < 400L) return
+            landZooming = false
+            portraitZooming = false
+            landscapeFullscreen = false
+            portraitFullscreen = false
+            fullscreen = false
+            controlsVisible = false
+            (context as? Activity).restoreDefaultOrientation()
+            return
+        }
+        // 全屏相关状态一律先退全屏：之前只判 fullscreen，
+        // 旋转挂起（pendingFullscreen 非空）时返回被 BackHandler 吞掉、又走不到退页面 → 返回失效
+        if (fullscreen || pendingFullscreen != null || landscapeFullscreen || portraitFullscreen) {
             exitFullscreen()
             return
         }
-        // 放大/缩回动画进行中忽略返回，避免动画中途退出页面
-        if (landZooming || portraitZooming) return
         // 退出播放页前先暂停：返回转场期间若视频继续出帧，转场观感会被片源帧率（约 25fps）拉低，
         // 看起来像动画不是满帧；先让画面静止，转场按屏幕刷新率播放。
         // 后台续播模式不暂停，否则退出后会打断「后台播放」。
@@ -1308,7 +1363,10 @@ fun PlayerScreen(
         onBack()
     }
     // 返回键 / 三键导航：退回最稳的 BackHandler（手势导航那一侧由下面的预测返回接管）
-    BackHandler(enabled = fullscreen || landZooming || portraitZooming) { handleBack() }
+    // 挂起态也要接管：否则旋转等待中按返回会直接退出播放页
+    BackHandler(
+        enabled = fullscreen || pendingFullscreen != null || landZooming || portraitZooming,
+    ) { handleBack() }
 
     // 手势导航的预测返回：targetSdk 37 在 Android 16 上预测返回已无法关闭
     // （manifest 的 enableOnBackInvokedCallback=false 从 36 起失效），只挂 BackHandler 时
@@ -1318,7 +1376,9 @@ fun PlayerScreen(
     // 抬手越过阈值（flow 正常结束）才走原 handleBack 逻辑；
     // 手势取消则什么都不做——不能像上一版那样「进度一出现就缩放、取消再反向弹回」，
     // 否则用户看到的是滑一下闪一下、实际没退出去。
-    PredictiveBackHandler(enabled = fullscreen || landZooming || portraitZooming) { progress ->
+    PredictiveBackHandler(
+        enabled = fullscreen || pendingFullscreen != null || landZooming || portraitZooming,
+    ) { progress ->
         try {
             progress.collect { p ->
                 if (com.ican.tvplay.BuildConfig.DEBUG) {
@@ -1901,6 +1961,7 @@ fun PlayerScreen(
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     landscapeFullscreen = true
                     landZooming = true
+                    zoomStartedAt = android.os.SystemClock.elapsedRealtime()
                     landZoomToken++
                 },
                 onBack = { handleBack() },
@@ -1957,6 +2018,7 @@ fun PlayerScreen(
                     landscapeFullscreen = false
                     portraitFullscreen = true
                     portraitZooming = true
+                    zoomStartedAt = android.os.SystemClock.elapsedRealtime()
                     portraitZoomToken++
                     controlsVisible = false
                 } else {
