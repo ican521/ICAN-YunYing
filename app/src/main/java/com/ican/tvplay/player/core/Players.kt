@@ -1201,7 +1201,8 @@ object Players {
             val hdrTypes = caps?.supportedHdrTypes
             val h10 = hdrTypes?.contains(android.view.Display.HdrCapabilities.HDR_TYPE_HDR10) == true
             val maxLum = if (android.os.Build.VERSION.SDK_INT >= 34) caps?.desiredMaxLuminance ?: -1f else -1f
-            val peak = if (maxLum > 0f) maxLum.roundToInt().coerceIn(300, 2000) else 1000
+            // 峰值下限抬到 1000、上限不设：本机上报 420 偏低导致偏暗，保留动态读取但抬下限；读不到/异常仍兜底 1000
+            val peak = if (maxLum > 0f) maxLum.roundToInt().coerceAtLeast(1000) else 1000
             Triple(h10, peak, h10)
         }.getOrDefault(Triple(false, 1000, false))
         val mpvConf = if (hdrReady) {
