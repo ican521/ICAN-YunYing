@@ -153,16 +153,29 @@ val PosterActionScrim = Color(0x88000000)  // 编辑模式右上角删除圆钮�
 /**
  * 全屏侧边面板背景：横向「右实左淡」暗场（与 [posterCaptionScrim] 同一套 smoothstep 曲线）。
  * 右侧 [contentFraction]（面板宽度占屏宽的比例）起保持 [plateauAlpha] 等浓度，
- * 再往左平滑归零到屏幕最左缘；33 段采样，两端斜率趋零，大屏上看不出色带与分界线。
+ * 只在面板左缘外 [featherFraction] 这一小段内平滑归零，再往左完全透明（视频恢复原亮度）。
+ * 97 段采样：淡出带在手机上仅约 0.11 屏宽，段数太少会出现阶梯。
  * 面板宽度是动态的（选集面板按最长集名算宽、字幕面板按屏宽 42%），调用方传实时比例即可跟随。
  */
-fun sideSheetScrimBrush(contentFraction: Float, plateauAlpha: Float = 0.94f): Brush {
+fun sideSheetScrimBrush(
+    contentFraction: Float,
+    plateauAlpha: Float = 0.94f,
+    featherFraction: Float = 0.11f,
+): Brush {
     val start = contentFraction.coerceIn(0f, 0.995f)
-    val stops = Array(33) { i ->
-        val t = i / 32f
-        // q：0 = 等浓度区起点（面板左缘），1 = 屏幕最左缘
-        val q = if (t >= start) 0f else ((start - t) / start).coerceIn(0f, 1f)
-        val f = 1f - (3f * q * q - 2f * q * q * q)
+    val feather = featherFraction.coerceIn(0.001f, start.coerceAtLeast(0.001f))
+    val end = (start - feather).coerceAtLeast(0f)
+    val stops = Array(97) { i ->
+        val t = i / 96f
+        val f = when {
+            t >= start -> 1f        // 等浓度区（面板宽度内）
+            t <= end -> 0f          // 淡出带以外，完全通透
+            else -> {
+                // q：0 = 面板左缘，1 = 淡出带外缘
+                val q = (start - t) / feather
+                1f - (3f * q * q - 2f * q * q * q)
+            }
+        }
         t to Color.Black.copy(alpha = plateauAlpha * f)
     }
     return Brush.horizontalGradient(colorStops = stops)

@@ -4258,7 +4258,7 @@ private fun EpisodeChip(
 /**
  * 全屏侧边面板的背景层：整屏「右实左淡」的横向渐变暗场。
  * 右侧与面板等宽的一段保持 [contentFraction] 等浓度 94% 黑（内容始终压在稳定底色上），
- * 面板左缘往左按 33 段 smoothstep 平滑归零到屏幕最左（与首页海报标题的渐变同一套曲线）。
+ * 面板左缘外只用 [featherFraction] 这一小段淡出到透明，再往左视频完全不受影响。
  * 200ms 淡入淡出（与面板 260ms 滑动同起）；显示期间接住所有点击（点空白处收起），
  * 同时挡住底下的视频控件，避免一次点击触发两件事。
  */
@@ -4266,6 +4266,7 @@ private fun EpisodeChip(
 private fun SideSheetGradientBackdrop(
     visible: Boolean,
     contentFraction: Float,
+    featherFraction: Float,
     onClick: () -> Unit,
 ) {
     val scrimAlpha by animateFloatAsState(
@@ -4279,7 +4280,7 @@ private fun SideSheetGradientBackdrop(
         modifier = Modifier
             .fillMaxSize()
             .alpha(scrimAlpha)
-            .background(sideSheetScrimBrush(contentFraction))
+            .background(sideSheetScrimBrush(contentFraction, featherFraction = featherFraction))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -4321,6 +4322,10 @@ private fun EpisodeSideSheet(
     val contentFraction = remember(panelWidth, configuration) {
         (panelWidth.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
     }
+    // 淡出带固定 96dp：只把面板左缘软掉，屏幕其余部分完全不压暗
+    val featherFraction = remember(configuration) {
+        (96f / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
+    }
     // 用组件内全屏覆盖层而非 Popup/Dialog：
     // - Dialog 会新建窗口并自动唤出状态栏/导航栏，破坏全屏沉浸；
     // - Popup 子窗口的 layoutInDisplayCutoutMode 固定为 DEFAULT，横屏全屏时会避开左侧
@@ -4358,6 +4363,7 @@ private fun EpisodeSideSheet(
             SideSheetGradientBackdrop(
                 visible = sheetShown,
                 contentFraction = contentFraction,
+                featherFraction = featherFraction,
                 onClick = dismissWithAnim,
             )
             Column(
@@ -4641,6 +4647,10 @@ private fun SubtitleSettingSideSheet(
     val contentFraction = remember(panelWidth, configuration) {
         (panelWidth.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
     }
+    // 淡出带固定 96dp：只把面板左缘软掉，屏幕其余部分完全不压暗
+    val featherFraction = remember(configuration) {
+        (96f / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
+    }
     val sheetSlideX by animateDpAsState(
         targetValue = if (sheetShown) 0.dp else panelWidth + 20.dp,
         animationSpec = tween(260, easing = FastOutSlowInEasing),
@@ -4667,6 +4677,7 @@ private fun SubtitleSettingSideSheet(
         SideSheetGradientBackdrop(
             visible = sheetShown,
             contentFraction = contentFraction,
+            featherFraction = featherFraction,
             onClick = dismissWithAnim,
         )
         Column(
