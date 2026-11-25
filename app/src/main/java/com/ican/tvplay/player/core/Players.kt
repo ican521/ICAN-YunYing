@@ -1187,17 +1187,27 @@ object Players {
         // 字节值与 EXO 的 TARGET_BUFFER_BYTES 同量级，高码率时 demuxer 缓存不会爆内存。
         val forwardBytes = (64L * 1024 * 1024 * tier.multiplier).toString()
         val backBytes = (32L * 1024 * 1024 * tier.multiplier).toString()
+        // mpv.conf 只在 native 初始化时读取，必须在 builder.build() 之前写好，晚写等于不生效；
+        // 每次覆盖写，仅 [hdr] 条件 profile；写失败只告警，不阻断后续 builder 构建
+        try {
+            java.io.File(mpvDir, "mpv.conf").writeText(
+                "[hdr]\n" +
+                    "profile-cond=video-params/gamma == \"pq\" or video-params/gamma == \"hlg\"\n" +
+                    "profile-restore=copy\n" +
+                    "target-colorspace-hint=yes\n",
+                java.nio.charset.StandardCharsets.UTF_8,
+            )
+        } catch (t: Throwable) {
+            Log.w(TAG, "write mpv.conf failed", t)
+        }
         val builder = androidx.media3.mpvplayer.MpvPlayerConfig.Builder()
             .addConfigDirectory(mpvDir)
             .addTlsCaFileFromAsset(ctx, "cacert.pem", caFile)
             .addPreInitStringOption("demuxer-max-bytes", forwardBytes)
             .addPreInitStringOption("demuxer-max-back-bytes", backBytes)
-            // HDR10（smpte2084 / bt2020）走 libplacebo tone mapping 转 SDR 输出：
-            // 不启用 surface 色彩空间提示（CTA861 元数据）—— 它对 HDR 有效，但 SDR 源（bt709/bt1886）
-            // 会被系统按 PQ 解释导致整体过曝（实测 4K SDR mp4）；target-peak 200 保证 tone map 后不过暗
-            .addPreInitStringOption("tone-mapping", "bt.2446a")
-            .addPreInitStringOption("hdr-compute-peak", "yes")
-            .addPreInitStringOption("target-peak", "200")
+            // HDR：不用 pre-init 强行 tone map（那会把 HDR 一律压成 SDR，也会让 PQ 数据被当 SDR 渲染而偏暗），
+            // 改为按内容条件启用 surface 色彩空间下发：只有 video-params/gamma 为 pq/hlg 时才套 [hdr] profile，
+            // SDR（bt1886/bt709）不命中 profile 因此不会被系统当 PQ 解释（修 1.0.170 的过曝）；tone mapping 交给 libmpv 默认
             // mpv 日志落 filesDir/mpv/mpv.log（绝对路径，便于 adb pull 验证 HDR 路径）；
             // 本版 libmpv 无 log-level 选项，日志级别走原生 msg-level
             .addPreInitStringOption("log-file", java.io.File(mpvDir, "mpv.log").absolutePath)

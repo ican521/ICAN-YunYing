@@ -208,14 +208,17 @@ import com.ican.tvplay.ui.components.pageHorizontalPadding
 import com.ican.tvplay.ui.components.siteShortName
 import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.BrandPink
-import com.ican.tvplay.ui.theme.DarkOnSurface
-import com.ican.tvplay.ui.theme.DarkOnSurfaceMuted
-import com.ican.tvplay.ui.theme.DarkSurfaceElevated
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.chipTintedFill
 import com.ican.tvplay.ui.theme.chipTintedText
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
+import com.ican.tvplay.ui.theme.SideSheetBackground
+import com.ican.tvplay.ui.theme.SideSheetBorder
+import com.ican.tvplay.ui.theme.SideSheetChipActive
+import com.ican.tvplay.ui.theme.SideSheetChipIdle
+import com.ican.tvplay.ui.theme.SideSheetTextPrimary
+import com.ican.tvplay.ui.theme.SideSheetTextSecondary
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameMillis
 import kotlinx.coroutines.delay
@@ -4315,7 +4318,7 @@ private fun EpisodeSideSheet(
                     .fillMaxHeight()
                     .width(panelWidth)
                     .clip(panelShape)
-                    .background(DarkSurfaceElevated, panelShape)
+                    .background(SideSheetBackground, panelShape)
                     // 面板本体消费点击，避免点面板空白处误触发外层收起
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -4347,24 +4350,20 @@ private fun EpisodeSideSheet(
                     itemsIndexed(episodes, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { idx, ep ->
                         val selected = idx == currentIndex
                         val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
-                        val primary = MiuixTheme.colorScheme.primary
-                        // 面板固定深色，选中态按深色档派生
-                        val tintedFill = remember(primary) { chipTintedFill(primary, dark = true) }
-                        val tintedText = remember(primary) { chipTintedText(primary, dark = true) }
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(shape)
                                 .background(
-                                    // 选中 = primary 派生 tinted 底；未选中 = 透明
-                                    if (selected) tintedFill
-                                    else Color.Transparent,
+                                    // 选中 = 实心 chip 底；未选中 = 实心 idle 底
+                                    if (selected) SideSheetChipActive
+                                    else SideSheetChipIdle,
                                 )
                                 .border(
-                                    // 外框统一 outline，不随选中态换色（与字幕设置分段单选同款）
+                                    // 外框统一侧栏边框色，不随选中态换色（与字幕设置分段单选同款）
                                     width = 1.dp,
-                                    color = MiuixTheme.colorScheme.outline,
+                                    color = SideSheetBorder,
                                     shape = shape,
                                 )
                                 // 选集列表自带选中态：去掉按压/点击涟漪，选中色即反馈
@@ -4377,9 +4376,9 @@ private fun EpisodeSideSheet(
                             Text(
                                 text = ep.title,
                                 fontSize = 14.sp,
-                                // 选中 tinted 文字；未选中 onSurfaceVariantSummary
-                                color = if (selected) tintedText
-                                else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                // 选中主文字；未选中次要文字
+                                color = if (selected) SideSheetTextPrimary
+                                else SideSheetTextSecondary,
                                 fontWeight = if (selected) FontWeight.SemiBold else null,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -4627,7 +4626,7 @@ private fun SubtitleSettingSideSheet(
                 .fillMaxHeight()
                 .width(panelWidth)
                 .clip(panelShape)
-                .background(DarkSurfaceElevated, panelShape)
+                .background(SideSheetBackground, panelShape)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -4662,16 +4661,16 @@ private fun SubtitleSettingSideSheet(
                 Text(
                     text = "字幕设置",
                     style = MaterialTheme.typography.titleMedium,
-                    color = DarkOnSurface,
+                    color = SideSheetTextPrimary,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
                     text = "重置",
                     fontSize = 14.sp,
-                    color = DarkOnSurfaceMuted,
+                    color = SideSheetTextPrimary,
                     modifier = Modifier
                         .clip(SquircleShape(Spacing.corner))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), SquircleShape(Spacing.corner))
+                        .background(SideSheetChipActive, SquircleShape(Spacing.corner))
                         .combinedClickable(
                             // 对齐 fongmi：短按重置当前 Tab
                             onClick = {
@@ -4897,7 +4896,7 @@ private fun SubtitleSettingSideSheet(
             Text(
                 text = "正数延后显示，负数提前显示，单位秒；仅对外挂字幕生效",
                 fontSize = 12.sp,
-                color = DarkOnSurfaceMuted,
+                color = SideSheetTextSecondary,
                 modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
             )
             }
@@ -4907,14 +4906,14 @@ private fun SubtitleSettingSideSheet(
 }
 
 /**
- * 字幕设置侧栏标题：14.sp / DarkOnSurfaceMuted / 通栏；段内标题通过 modifier 传 sectionSpacing 顶部间距。
+ * 字幕设置侧栏标题：14.sp / SideSheetTextSecondary / 通栏；段内标题通过 modifier 传 sectionSpacing 顶部间距。
  */
 @Composable
 private fun SideSheetSectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         fontSize = 14.sp,
-        color = DarkOnSurfaceMuted,
+        color = SideSheetTextSecondary,
         modifier = modifier.fillMaxWidth(),
     )
 }
@@ -4935,6 +4934,10 @@ private fun SubtitleStyleChips(
         selectedIndex = selectedIndex,
         onSelect = onSelect,
         modifier = modifier,
+        selectedFill = SideSheetChipActive,
+        selectedText = SideSheetTextPrimary,
+        idleText = SideSheetTextSecondary,
+        containerBorder = SideSheetBorder,
     )
 }
 
@@ -5076,7 +5079,7 @@ private fun OffsetAdjustRow(offsetMs: Long, modifier: Modifier = Modifier) {
                     }
                     .padding(vertical = 10.dp),
             )
-            Text("s", fontSize = 12.sp, color = DarkOnSurfaceMuted)
+            Text("s", fontSize = 12.sp, color = SideSheetTextSecondary)
         }
         OffsetStepButton("+") {
             Players.setSubtitleOffset(Players.state.value.subtitleOffsetMs + SUBTITLE_OFFSET_STEP_MS)
