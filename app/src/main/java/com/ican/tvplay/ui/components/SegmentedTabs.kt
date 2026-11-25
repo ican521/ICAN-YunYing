@@ -81,7 +81,7 @@ fun SegmentedTabs(
             }
             val selected = index == selectedIndex
             val animatedFill by animateColorAsState(
-                targetValue = if (selected) tintedFill else Color.Transparent,
+                targetValue = if (selected) tintedFill else tintedFill.copy(alpha = 0f),
                 animationSpec = tween(SegmentedTabsFadeMs, easing = FastOutSlowInEasing),
                 label = "SegmentedTabsFill",
             )

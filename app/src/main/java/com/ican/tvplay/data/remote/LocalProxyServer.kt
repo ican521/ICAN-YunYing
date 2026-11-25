@@ -3,10 +3,17 @@ package com.ican.tvplay.data.remote
 import android.content.Context
 import android.util.Log
 import fi.iki.elonen.NanoHTTPD
+import java.io.IOException
 import java.io.InputStream
 import java.lang.reflect.Method
 import java.net.Inet4Address
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
+import java.net.Socket
+import java.util.concurrent.TimeUnit
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.ResponseBody
 
 /**
  * fongmi 同款本地代理服务器：NanoHTTPD 在 9978~9998 端口起 HTTP 服务，
@@ -28,6 +35,26 @@ object LocalProxyServer {
     /** 代理请求最大并发线程数：正常播放（m3u8 播放列表+分片+字幕）同时只占几个，留足余量 */
     private const val MAX_PROXY_THREADS = 12
 
+    /** jar 自带本地代理的端口探测区间（catvod spider 默认从 6677 起） */
+    private const val JAR_PORT_START = 6677
+    private const val JAR_PORT_END = 6699
+
+    /** 端口探测连接超时：小超时快速扫一遍区间 */
+    private const val JAR_PROBE_TIMEOUT_MS = 300
+
+    /** 转发到 jar 的连接超时（5-10s 区间取 8s）；读超时为 0：长视频流不能被读超时掐断 */
+    private const val FORWARD_CONNECT_TIMEOUT_MS = 8000L
+    private const val FORWARD_READ_TIMEOUT_MS = 0L
+
+    /** 上游未给 Content-Type 时的兜底 MIME */
+    private const val FALLBACK_MIME = "application/octet-stream"
+
+    /** 本机回环地址 */
+    private const val LOCAL_HOST = "127.0.0.1"
+
+    /** 上游不可达时返回的网关错误码 */
+    private const val BAD_GATEWAY_CODE = 502
+
     private var server: ProxyServer? = null
     @Volatile
     private var spiderManager: SpiderManager? = null
@@ -35,6 +62,14 @@ object LocalProxyServer {
     private var appContext: Context? = null
     @Volatile
     private var boundPort: Int = -1
+
+    /** 探测到的 jar 本地代理端口，未探测到为 -1 */
+    @Volatile
+    private var cachedJarPort: Int = -1
+
+    /** 转发专用 OkHttpClient（不复用 catvod 网关卡的 client），懒加载复用连接池 */
+    @Volatile
+    private var forwardClient: OkHttpClient? = null
 
     val isRunning: Boolean get() = server != null
 
@@ -124,6 +159,47 @@ object LocalProxyServer {
         boundPort = -1
         spiderManager = null
         appContext = null
+        cachedJarPort = -1
+    }
+
+    /**
+     * 探测 jar 自带本地代理端口（[JAR_PORT_START]..[JAR_PORT_END]）：首个可连通端口即缓存；
+     * 跳过本服务自己的监听端口，避免把自己当 jar 造成回环。探测失败返回 -1。
+     */
+    private fun detectJarPort(): Int {
+        synchronized(this) {
+            cachedJarPort.takeIf { it > 0 }?.let { return it }
+            val ownPort = boundPort
+            for (port in JAR_PORT_START..JAR_PORT_END) {
+                if (port == ownPort) continue
+                var socket: Socket? = null
+                try {
+                    socket = Socket()
+                    socket.connect(InetSocketAddress(LOCAL_HOST, port), JAR_PROBE_TIMEOUT_MS)
+                    cachedJarPort = port
+                    Log.i(TAG, "jar proxy detected at port=$port")
+                    return port
+                } catch (_: IOException) {
+                    runCatching { socket?.close() }
+                }
+            }
+            Log.w(TAG, "jar proxy port not found in $JAR_PORT_START..$JAR_PORT_END")
+            return -1
+        }
+    }
+
+    /** 转发专用客户端：连接超时 8s、读超时 0（长流不断），不设 callTimeout */
+    private fun getForwardClient(): OkHttpClient {
+        forwardClient?.let { return it }
+        synchronized(this) {
+            forwardClient?.let { return it }
+            val client = OkHttpClient.Builder()
+                .connectTimeout(FORWARD_CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .readTimeout(FORWARD_READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .build()
+            forwardClient = client
+            return client
+        }
     }
 
     /**
@@ -161,6 +237,40 @@ object LocalProxyServer {
     }
 
     /**
+     * 包装上游响应流：EOF 或 close 时关闭 ResponseBody，避免连接泄漏占满连接池/线程池。
+     * OkHttp 的 body.close() 可重复调用，重复关闭安全。
+     */
+    private class ClosingBodyInputStream(
+        private val delegate: InputStream,
+        private val body: ResponseBody,
+    ) : InputStream() {
+
+        override fun read(): Int {
+            val read = delegate.read()
+            if (read == -1) closeBody()
+            return read
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            val read = delegate.read(b, off, len)
+            if (read == -1) closeBody()
+            return read
+        }
+
+        override fun close() {
+            try {
+                delegate.close()
+            } finally {
+                closeBody()
+            }
+        }
+
+        private fun closeBody() {
+            runCatching { body.close() }
+        }
+    }
+
+    /**
      * 必须显式绑 IPv4 通配地址：NanoHTTPD(port) 只传端口时，绑定的是 IPv6 通配 [::]，
      * 在部分设备上是 v6only 监听（/proc/net/tcp 无 9978，只有 tcp6 有），
      * 导致局域网 IPv4 扫描（192.168.x.x:9978/device）永远连不上、收藏同步发现不到本机。
@@ -174,6 +284,9 @@ object LocalProxyServer {
                 session.uri.trim().startsWith("/device") -> deviceResponse()
                 // fongmi /action：目前仅实现 do=sync&type=keep（收藏同步接收端）
                 session.uri.trim().startsWith("/action") -> actionResponse(session)
+                // jar playerContent 直连本地代理的流地址（/proxy/play/...）：转发到 jar 端口，
+                // 不能落到下面的 /proxy?do= 透传（那是 jar 自己的代理协议，不认识 play 路径）
+                session.uri.trim().startsWith("/proxy/play") -> forwardPlayProxy(session)
                 session.uri.trim().startsWith("/proxy") -> proxyResponse(session)
                 else -> newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not Found")
             }
@@ -254,6 +367,71 @@ object LocalProxyServer {
                 )
             }
         }
+
+        /**
+         * /proxy/play/... 流转发入口：先按缓存端口走一次；IOException 时清缓存重探一次再重试，
+         * 只重试一次。端口未知/连不上返回 502，不回落到 proxyResponse 的 /proxy?do= 透传。
+         */
+        private fun forwardPlayProxy(session: IHTTPSession): Response {
+            var port = cachedJarPort.takeIf { it > 0 } ?: detectJarPort()
+            if (port <= 0) {
+                return badGatewayResponse("Jar proxy unreachable")
+            }
+            return try {
+                forwardToJar(session, port)
+            } catch (e: IOException) {
+                Log.w(TAG, "forward play proxy failed, re-probe once: ${e.message}")
+                cachedJarPort = -1
+                port = detectJarPort()
+                if (port <= 0) return badGatewayResponse("Jar proxy unreachable")
+                forwardToJar(session, port)
+            }
+        }
+
+        /** 单次转发：拼回原 path + query，透传 Range/UA/Referer/Accept，响应体流式回传 */
+        private fun forwardToJar(session: IHTTPSession, port: Int): Response {
+            val path = session.uri.trim()
+            val query = session.queryParameterString
+            val targetUrl = buildString {
+                append("http://").append(LOCAL_HOST).append(':').append(port).append(path)
+                if (!query.isNullOrEmpty()) append('?').append(query)
+            }
+            val requestBuilder = Request.Builder().url(targetUrl).get()
+                .header("Accept-Encoding", "identity")
+            listOf("range", "user-agent", "referer", "accept").forEach { name ->
+                forwardedHeader(session, name)?.let { requestBuilder.header(name, it) }
+            }
+            val response = getForwardClient().newCall(requestBuilder.build()).execute()
+            val body = response.body
+            if (body == null) {
+                runCatching { response.close() }
+                return newFixedLengthResponse(toStatus(response.code), FALLBACK_MIME, "Empty body")
+            }
+            val mime = body.contentType()?.toString()?.ifBlank { FALLBACK_MIME } ?: FALLBACK_MIME
+            val wrapped = ClosingBodyInputStream(body.byteStream(), body)
+            val length = body.contentLength()
+            val upstream = if (length >= 0) {
+                newFixedLengthResponse(toStatus(response.code), mime, wrapped, length)
+            } else {
+                newChunkedResponse(toStatus(response.code), mime, wrapped)
+            }
+            // 206 分段响应必须原样带出 Content-Range；Accept-Ranges/Content-Length 有则透传
+            response.header("Content-Range")?.let { upstream.addHeader("Content-Range", it) }
+            response.header("Accept-Ranges")?.let { upstream.addHeader("Accept-Ranges", it) }
+            if (length < 0) {
+                response.header("Content-Length")?.let { upstream.addHeader("Content-Length", it) }
+            }
+            return upstream
+        }
+
+        /** 忽略大小写取请求头（NanoHTTPD 2.3.1 入库前已转小写，这里双保险） */
+        private fun forwardedHeader(session: IHTTPSession, name: String): String? {
+            val lower = name.lowercase()
+            return session.headers.entries.firstOrNull { it.key.lowercase() == lower }?.value
+        }
+
+        private fun badGatewayResponse(message: String): Response =
+            newFixedLengthResponse(toStatus(BAD_GATEWAY_CODE), MIME_PLAINTEXT, message)
 
         private fun createResponse(result: Array<*>): Response {
             if (result.isEmpty()) {
