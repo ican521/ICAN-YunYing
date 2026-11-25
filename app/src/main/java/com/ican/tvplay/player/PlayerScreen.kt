@@ -2796,7 +2796,14 @@ private fun PreviewPlayerArea(
                         .fillMaxWidth()
                         .padding(start = 4.dp, end = 4.dp, top = 4.dp),
                 ) {
-                    PlainTopBtn(AppIcons.Back, "返回") { onBack() }
+                    PlainTopBtn(
+                        icon = AppIcons.Back,
+                        desc = "返回",
+                        pressEffect = true,
+                        pressColor = Color.White,
+                        touchRing = true,
+                        onClick = { onBack() },
+                    )
                     Spacer(modifier = Modifier.weight(1f))
                     PlainTopBtn(AppIcons.Cast, "投屏") { }
                 }
@@ -4657,11 +4664,35 @@ private fun ControlChip(text: String, onClick: () -> Unit) {
 
 /** 顶栏纯图标按钮（fongmi 同款）：48dp 无圆形底色，仅白色图标，保留点击热区与焦点缩放 */
 @Composable
-private fun PlainTopBtn(icon: ImageVector, desc: String, onClick: () -> Unit) {
+private fun PlainTopBtn(
+    icon: ImageVector,
+    desc: String,
+    // 按压反馈（miuix MiuixIndication 圆形蒙层）：默认关闭，投屏等按钮保持现状无反馈
+    pressEffect: Boolean = false,
+    // 蒙层色覆盖：小窗按钮压在暗视频上，用白色 10% 叠出「浅灰」按压感
+    pressColor: Color? = null,
+    // 调试用：画出 48dp 实际点击热区描边，改回 false 即撤销
+    touchRing: Boolean = false,
+    onClick: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .size(48.dp)
-            .tvCardEffect(onClick = onClick, shape = CircleShape, focusedScale = 1.10f, glow = false, pressEffect = false),
+            .tvCardEffect(
+                onClick = onClick,
+                shape = CircleShape,
+                focusedScale = 1.10f,
+                glow = false,
+                pressEffect = pressEffect,
+                pressColor = pressColor,
+            )
+            .then(
+                if (touchRing) {
+                    Modifier.border(1.dp, Color(0xFFFF00FF), CircleShape)
+                } else {
+                    Modifier
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, desc, tint = Color.White, modifier = Modifier.size(24.dp)) }
 }
