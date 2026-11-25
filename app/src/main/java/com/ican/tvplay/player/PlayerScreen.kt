@@ -213,6 +213,7 @@ import com.ican.tvplay.ui.theme.DarkOnSurfaceMuted
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.chipTintedFill
 import com.ican.tvplay.ui.theme.chipTintedText
+import com.ican.tvplay.ui.theme.playerDarkMiuixColors
 import com.ican.tvplay.ui.theme.sideSheetScrimBrush
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
@@ -4078,6 +4079,9 @@ private fun FullscreenPlayLayout(
 
         // 动作栏对话框（与竖屏同款）
         // 播放内核（fongmi PlayerEngineDialog：EXO / MPV / 其他=系统选择器外部播放器）
+        // 全屏浮层强制深色：色板不跟随 App 浅/深主题，容器/未选中行固定深色档，选中蓝底不变。
+        val dialogThemeColor by settings.themeColor.collectAsStateWithLifecycle()
+        MiuixTheme(colors = playerDarkMiuixColors(dialogThemeColor)) {
         val engineOptions = Players.Kernel.entries.map { it.label } + "其他"
         OptionDialog(showEngine, "播放内核", engineOptions, playerState.kernel.label, { it }, { label ->
             when (label) {
@@ -4128,6 +4132,7 @@ private fun FullscreenPlayLayout(
             onSettings = { showText = false; onOpenSubtitleSettings() },
             onDismiss = { showText = false },
         )
+        }
     }
 }
 

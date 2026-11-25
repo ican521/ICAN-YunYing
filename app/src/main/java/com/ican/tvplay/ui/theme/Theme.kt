@@ -130,6 +130,31 @@ private fun Typography.inkTight(): Typography = copy(
 private fun inkTightTypography(): Typography = Typography().inkTight()
 
 /**
+ * 全屏播放页弹窗专用：固定深色色板，不跟随 App 浅/深主题切换。
+ * 表面色取项目既定深色档（surfaceContainer #242424、secondaryVariant 深灰胶囊、onSecondaryVariant 浅字、
+ * onBackground 近白）；强调色家族仍跟随用户主题色板（themeColor），windowDimming 沿用统一 PopupScrim。
+ * 仅用于全屏布局内的 OptionDialog / SubtitleDialog 等浮层，竖屏详情信息流不受影响。
+ */
+@Composable
+fun playerDarkMiuixColors(themeColor: Int): Colors {
+    val seed = if (themeColor == 0) BrandPrimaryDefault else Color(themeColor)
+    val onSeed = if (seed.luminance() > 0.30f) Color.Black else Color.White
+    return miuixDarkColorScheme(
+        primary = seed,
+        onPrimary = onSeed,
+        primaryVariant = seed,
+        onPrimaryVariant = onSeed,
+        primaryContainer = seed,
+        onPrimaryContainer = onSeed,
+        surfaceContainer = DarkSurfaceVariant,
+        secondaryVariant = DarkSurfaceElevated,
+        onSecondaryVariant = DarkOnSurfaceMuted,
+        onBackground = DarkOnSurface,
+        windowDimming = PopupScrim,
+    )
+}
+
+/**
  * miuix 主题色板：表面色固定为项目既定值（surfaceContainer 深色 #242424 / 浅色 #FFFFFF，
  * windowDimming 固定 PopupScrim）；主题色板非 0 时强调色系直接取色板原色（不做 tonal 派生，
  * 避免黄色被映射成橄榄黄等偏色），文字色按亮度自动取黑/白保证可读，换色即时生效。
