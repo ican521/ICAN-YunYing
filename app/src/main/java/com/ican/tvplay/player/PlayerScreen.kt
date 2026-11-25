@@ -416,6 +416,9 @@ fun PlayerScreen(
     // 缩放动画开始时刻：动画本身只有几百毫秒，若因配置变化（深浅色切换等）打断收敛协程卡住，
     // 用它可以判断「动画是不是真的卡了」，避免 landZooming 残留 true 把返回永久吞掉
     var zoomStartedAt by remember { mutableLongStateOf(0L) }
+    // 补转屏会话令牌：退全屏时 FULL_USER 被系统吞掉（屏幕仍横着）落定布局后，
+    // 用它触发一次「按重力感应」的方向请求，转屏到位再把方向控制权还给系统
+    var rotateBackToken by remember { mutableIntStateOf(0) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
@@ -446,15 +449,26 @@ fun PlayerScreen(
                     (context as? Activity).restoreDefaultOrientation()
                 }
             }
-            // 等旋转退全屏：超时未转则按当前方向落小窗布局（不再等旋转），返回随即恢复可用
+            // 等旋转退全屏：超时未转则按当前方向落小窗布局（不再等旋转），返回随即恢复可用；
+            // 但此时屏幕可能还横着（MIUI 吞了 FULL_USER 的转屏请求）→ 落定后补一次按重力感应的方向请求，
+            // 转屏到位再自动切成竖屏页（沉浸已退出，系统这时才听方向请求）
             false -> {
                 delay(600)
                 if (pendingFullscreen == false) {
                     fullscreen = false; pendingFullscreen = null; controlsVisible = false
+                    rotateBackToken++
                 }
             }
             null -> Unit
         }
+    }
+    LaunchedEffect(rotateBackToken) {
+        if (rotateBackToken == 0) return@LaunchedEffect
+        val activity = context as? Activity ?: return@LaunchedEffect
+        // 按重力感应走（不依赖用户旋转锁，也不会在真横着拿时硬掰竖屏）；等转屏到位后落回跟随用户旋转
+        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
+        delay(700)
+        activity.restoreDefaultOrientation()
     }
 
     // 共享 PlayerView（fongmi 同思路：全屏/竖屏只是改容器尺寸，PlayerView 从不销毁重建）。
