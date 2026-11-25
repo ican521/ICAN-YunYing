@@ -419,7 +419,14 @@ fun PlayerScreen(
     // 退全屏等旋转期间：视频保持铺满，但不切到「当前方向的横版小窗」（否则会先闪一下平板样式），
     // 系统栏在这段时间已恢复，系统才会接受方向请求
     var exitRotating by remember { mutableStateOf(false) }
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // 布局档位按「设备类别」定，跟当前屏幕横竖无关——对齐 fongmi 的资源限定符分档
+    // （layout/activity_video.xml tag=port 手机；layout-sw600dp/activity_video.xml tag=land 平板）：
+    // 手机（sw<600dp）固定竖屏小窗布局；平板（≥600dp）固定横版布局（平板竖着也是横版样式）。
+    // 之前用 isLandscape 判档，手机横着会被当成平板 → 退全屏时会先露出平板样式
+    val isPhone = configuration.smallestScreenWidthDp < 600
+    val landLayout = !isPhone
     LaunchedEffect(isLandscape) {
         when {
             // 旋转进入全屏后保持纯净画面，工具栏由用户单击唤出
@@ -428,6 +435,16 @@ fun PlayerScreen(
             }
             // 转回竖屏：退全屏的过渡结束，交给竖屏布局
             !isLandscape -> exitRotating = false
+        }
+    }
+    // 手机横屏自动进全屏（照搬 fongmi checkLand：isPort() && ResUtil.isLand(this) → enterFullscreen）。
+    // 手机布局固定是竖屏小窗，横着拿若不进全屏，竖屏布局会横躺，所以此时直接铺满进全屏
+    LaunchedEffect(isLandscape, isPhone) {
+        if (isPhone && isLandscape && !fullscreen && pendingFullscreen == null && !exitRotating &&
+            !landZooming && !portraitZooming && !landscapeFullscreen && !portraitFullscreen
+        ) {
+            fullscreen = true
+            controlsVisible = false
         }
     }
     // 退全屏转屏兜底：1 秒还横着就当系统真的不肯转，撤掉「铺满视频」态让当前方向的布局接手，
@@ -1226,7 +1243,7 @@ fun PlayerScreen(
     SideEffect {
         val window = (context as? Activity)?.window ?: return@SideEffect
         WindowCompat.getInsetsController(window, window.decorView)
-            .isAppearanceLightStatusBars = isLandscape && !immersive && !darkTheme
+            .isAppearanceLightStatusBars = landLayout && !immersive && !darkTheme
     }
 
     // 页面销毁时恢复状态栏（防止全屏中直接退出后状态栏缺失）
@@ -1440,8 +1457,8 @@ fun PlayerScreen(
         // PiP 理论上只在播放中（current 非空）进入；极端时序下给纯黑兜底，
         // 避免空数据把错误页/信息流投进画中画
         if (inPip || !initialized) {
-            if (isLandscape) {
-                // 横屏 / 转屏挂起期：沿用原来的整屏黑兜底
+            if (landLayout) {
+                // 横版档位（平板，含平板竖屏）/ 转屏挂起期：沿用原来的整屏黑兜底
                 Box(
                     modifier = Modifier.fillMaxSize().background(Color.Black),
                     contentAlignment = Alignment.Center,
@@ -1729,7 +1746,7 @@ fun PlayerScreen(
         // 竖屏（非全屏、非横屏）画面几何一律由我们自己算，PlayerView 恒 FIT，
         // 所以这个分支对三种档位都走同一套「内容矩形 + 居中 + 外层裁剪」
         val letterboxed = !inPip && !pipExitHold && !fullscreen &&
-            pendingFullscreen == null && !isLandscape
+            pendingFullscreen == null && !landLayout
 
         // 播完态「静帧替身」：STATE_ENDED 之后解码器已经停了，这时再 resize TextureView，
         // Android 要么重新分配一块没写过的空缓冲（未写入的 YUV → 深蓝块），
@@ -1788,12 +1805,12 @@ fun PlayerScreen(
                 pendingFullscreen != null -> Modifier.fillMaxSize()
                 // 退全屏等旋转：继续铺满（此刻还没转回竖屏，切横版小窗会先闪一下平板样式）
                 exitRotating -> Modifier.fillMaxSize()
-                // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
+                // 横版档位（平板，含平板竖屏）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
                 // 圆角：换 TextureView 后视频参与 View 合成，可由 graphicsLayer 直接裁剪；
                 // 小窗 16dp，放大过程中与窗口同步插值到设备屏幕圆角
-                isLandscape ->
+                landLayout ->
                     Modifier
                         // 动画值全部在布局/绘制阶段的 lambda 内读取：放大/缩回动画期间本分支不触发逐帧重组
                         .offset { IntOffset(animLeft.value.roundToPx(), animTop.value.roundToPx()) }
@@ -1953,7 +1970,7 @@ fun PlayerScreen(
         pendingFullscreen == true -> Unit
         // 退全屏等旋转：只有视频，不挂横版/竖屏布局（避免先闪一下平板端样式）
         exitRotating -> Unit
-        else -> if (pendingFullscreen == null && isLandscape) {
+        else -> if (landLayout) {
             // 自然横屏（平板）：fongmi activity_detail_land 横版布局，
             // 信息列/下方区块锚定动画中的播放器边界，随缩放一起滑出滑入（ChangeBounds 效果）
             LandscapePlayLayout(
