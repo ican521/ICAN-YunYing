@@ -3833,8 +3833,9 @@ private fun FullscreenPlayLayout(
         }
 
         // 全屏控制层显隐加淡入淡出（200ms，对齐 miuix）
+        // 侧栏（选集/字幕设置）打开期间整层控制栏一起隐去，画面上只留侧栏和背景渐变
         AnimatedVisibility(
-            visible = controlsVisible && !locked,
+            visible = controlsVisible && !locked && !sideSheetOpen,
             enter = fadeIn(tween(CONTROL_FADE_DURATION_MS)),
             exit = fadeOut(tween(CONTROL_FADE_DURATION_MS)),
         ) {
@@ -4017,7 +4018,7 @@ private fun FullscreenPlayLayout(
         // 两态合并在同一个容器里：解锁时 visible 由 unlockHint 切到 controlsVisible，前后都为 true，
         // 因此不触发进出场动画，只是把锁形图标直接换成开启锁形，不会跟控制栏一起 200ms 渐显。
         AnimatedVisibility(
-            visible = if (locked) unlockHint else controlsVisible,
+            visible = if (locked) unlockHint else (controlsVisible && !sideSheetOpen),
             enter = fadeIn(tween(CONTROL_FADE_DURATION_MS)),
             exit = fadeOut(tween(CONTROL_FADE_DURATION_MS)),
             modifier = Modifier.align(Alignment.CenterEnd),
