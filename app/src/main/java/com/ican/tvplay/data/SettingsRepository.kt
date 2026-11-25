@@ -249,6 +249,15 @@ class SettingsRepository(context: Context) {
         _playerEngine.value = engine
     }
 
+    /** 播放解码方式（存 Decode.name 字符串，默认 AUTO；data 层不依赖 player 包） */
+    private val _playerDecode = MutableStateFlow(prefs.getString(KEY_PLAYER_DECODE, null).orEmpty())
+    val playerDecode: StateFlow<String> = _playerDecode.asStateFlow()
+
+    fun setPlayerDecode(decode: String) {
+        prefs.edit().putString(KEY_PLAYER_DECODE, decode).apply()
+        _playerDecode.value = decode
+    }
+
     /** 缓冲档位：1/2/3（默认缓冲时长的倍率，仿 fongmi PlayerSetting.getBuffer） */
     private val _playerBuffer = MutableStateFlow(prefs.getInt(KEY_PLAYER_BUFFER, 1))
     val playerBuffer: StateFlow<Int> = _playerBuffer.asStateFlow()
@@ -526,6 +535,7 @@ class SettingsRepository(context: Context) {
         _playerScale.value = prefs.getString(KEY_PLAYER_SCALE, null).orEmpty()
         _playerAutoNext.value = prefs.getBoolean(KEY_PLAYER_AUTO_NEXT, true)
         _playerEngine.value = prefs.getString(KEY_PLAYER_ENGINE, null).orEmpty()
+        _playerDecode.value = prefs.getString(KEY_PLAYER_DECODE, null).orEmpty()
         _playerBuffer.value = prefs.getInt(KEY_PLAYER_BUFFER, 1)
         _playerBrightness.value = prefs.getFloat(KEY_PLAYER_BRIGHTNESS, -1f)
         _playerBackgroundPlay.value = prefs.getInt(KEY_PLAYER_BACKGROUND, BACKGROUND_OFF)
@@ -560,6 +570,7 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_SCALE = "player_scale"
         const val KEY_PLAYER_AUTO_NEXT = "player_auto_next"
         const val KEY_PLAYER_ENGINE = "player_engine"
+        const val KEY_PLAYER_DECODE = "player_decode"
         const val KEY_PLAYER_BUFFER = "player_buffer"
         const val KEY_PLAYER_BRIGHTNESS = "player_brightness"
         const val KEY_PLAYER_BACKGROUND = "player_background"

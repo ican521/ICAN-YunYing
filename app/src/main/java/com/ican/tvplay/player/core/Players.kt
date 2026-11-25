@@ -76,7 +76,7 @@ object Players {
     const val DEFAULT_VIDEO_ASPECT_RATIO = 16f / 9f
 
     /** 解码内核 */
-    enum class Decode(val label: String) { HARD("硬解"), SOFT("软解") }
+    enum class Decode(val label: String) { AUTO("自动"), HARD("硬解"), SOFT("软解") }
 
     /** 播放内核（仿 fongmi PlayerEngine.Type：EXO=ExoPlayer，MPV=libmpv） */
     enum class Kernel(val label: String) { EXO("EXO"), MPV("MPV") }
@@ -108,7 +108,7 @@ object Players {
         /** 播放到结尾（STATE_ENDED）：竖屏用「最后一帧静帧」顶替真实 surface */
         val ended: Boolean = false,
         val speed: Float = 1.0f,
-        val decode: Decode = Decode.HARD,
+        val decode: Decode = Decode.AUTO,
         val kernel: Kernel = Kernel.EXO,
         val scaleMode: ScaleMode = ScaleMode.FIT,
         val bufferTier: BufferTier = BufferTier.LOW,
@@ -1192,12 +1192,12 @@ object Players {
             .addTlsCaFileFromAsset(ctx, "cacert.pem", caFile)
             .addPreInitStringOption("demuxer-max-bytes", forwardBytes)
             .addPreInitStringOption("demuxer-max-back-bytes", backBytes)
-            // HDR10（smpte2084 / bt2020）直出：主路径把 HDR 元数据交给 Android 显示链路（target-colorspace-hint），
-            // 后三项为 hint 不生效时的 HDR→SDR 保底；仅对 HDR 内容生效，SDR 源不受影响
-            .addPreInitStringOption("target-colorspace-hint", "yes")
+            // HDR10（smpte2084 / bt2020）走 libplacebo tone mapping 转 SDR 输出：
+            // 不启用 surface 色彩空间提示（CTA861 元数据）—— 它对 HDR 有效，但 SDR 源（bt709/bt1886）
+            // 会被系统按 PQ 解释导致整体过曝（实测 4K SDR mp4）；target-peak 200 保证 tone map 后不过暗
             .addPreInitStringOption("tone-mapping", "bt.2446a")
             .addPreInitStringOption("hdr-compute-peak", "yes")
-            .addPreInitStringOption("target-peak", "100")
+            .addPreInitStringOption("target-peak", "200")
             // mpv 日志落 filesDir/mpv/mpv.log（绝对路径，便于 adb pull 验证 HDR 路径）；
             // 本版 libmpv 无 log-level 选项，日志级别走原生 msg-level
             .addPreInitStringOption("log-file", java.io.File(mpvDir, "mpv.log").absolutePath)
@@ -1219,8 +1219,11 @@ object Players {
         val renderersFactory = DefaultRenderersFactory(ctx)
             .setEnableDecoderFallback(true)
             .setExtensionRendererMode(
-                if (decode == Decode.SOFT) DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-                else DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF,
+                when (decode) {
+                    Decode.AUTO -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+                    Decode.HARD -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
+                    Decode.SOFT -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                },
             )
         // MediaSourceFactory：统一处理 headers 和字幕偏移解析器
         val mediaSourceFactory = DefaultMediaSourceFactory(ctx)

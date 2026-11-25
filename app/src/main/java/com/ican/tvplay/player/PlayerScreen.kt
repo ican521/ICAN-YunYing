@@ -335,6 +335,7 @@ fun PlayerScreen(
     val savedAutoNext by settings.playerAutoNext.collectAsStateWithLifecycle()
     val savedEngine by settings.playerEngine.collectAsStateWithLifecycle()
     val savedBuffer by settings.playerBuffer.collectAsStateWithLifecycle()
+    val savedDecode by settings.playerDecode.collectAsStateWithLifecycle()
     val savedSubtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
     val savedSubtitlePosition by settings.subtitlePosition.collectAsStateWithLifecycle()
     val savedSubtitleStyle by settings.subtitleStyle.collectAsStateWithLifecycle()
@@ -499,6 +500,10 @@ fun PlayerScreen(
             Players.BufferTier.entries.firstOrNull { it.multiplier == savedBuffer }
                 ?: Players.BufferTier.LOW,
         )
+    }
+    LaunchedEffect(savedDecode) {
+        val decode = Players.Decode.entries.firstOrNull { it.name == savedDecode } ?: Players.Decode.AUTO
+        if (Players.state.value.decode != decode) Players.setDecode(decode)
     }
     // 字幕字号/位置（持久化，仿 fongmi SubtitleSetting）：修改后实时作用到当前 Player
     LaunchedEffect(savedSubtitleScale) { Players.setSubtitleScale(savedSubtitleScale) }
@@ -1825,6 +1830,7 @@ fun PlayerScreen(
             onEpisodeSelect = requestEpisodeChange,
             onEngineChange = { settings.setPlayerEngine(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
+            onDecodeChange = { Players.setDecode(it); settings.setPlayerDecode(it.name) },
             openingMs = openingMs,
             endingMs = endingMs,
             onMarkOpening = { markOpening() },
@@ -2975,6 +2981,9 @@ private fun LineSection(
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = selectedIdx,
     )
+    // positionedInitial：首次定位（进入页面 / 数据初次到位）用无动画瞬移，
+    // 之后点击切线路一律动画；点击被截断的 chip 时新选中项尚未布局（item==null）也要走动画
+    var positionedInitial by remember { mutableStateOf(false) }
     // 切线路时自动滚动到可见范围：按实际遮挡量精确滚动，只露出被裁的部分
     LaunchedEffect(lineFlag) {
         if (v.playSources.isEmpty() || selectedIdx !in v.playSources.indices) return@LaunchedEffect
@@ -2986,12 +2995,19 @@ private fun LineSection(
         val viewportEnd = info.viewportEndOffset
         val item = info.visibleItemsInfo.firstOrNull { it.index == selectedIdx }
         when {
-            item == null -> listState.scrollToItem(selectedIdx)
+            item == null ->
+                if (!positionedInitial) {
+                    listState.scrollToItem(selectedIdx)
+                } else {
+                    listState.animateScrollToItem(selectedIdx)
+                }
             item.offset < viewportStart ->
                 listState.animateScrollBy((item.offset - viewportStart).toFloat())
             item.offset + item.size > viewportEnd ->
                 listState.animateScrollBy((item.offset + item.size - viewportEnd).toFloat())
         }
+        // 任何分支执行完（含已完全可见、无需滚动的情况）都标记首次定位完成
+        positionedInitial = true
     }
     Column {
         Text(
@@ -3062,6 +3078,8 @@ private fun QualityRow(
 ) {
     val darkMode = LocalDarkTheme.current
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = qualityPosition.coerceAtLeast(0))
+    // positionedInitial：首次定位瞬移，之后切画质用动画（口径同 LineSection）
+    var positionedInitial by remember { mutableStateOf(false) }
     LaunchedEffect(qualityPosition) {
         if (qualityPosition !in qualities.indices) return@LaunchedEffect
         snapshotFlow { listState.layoutInfo.totalItemsCount }
@@ -3070,12 +3088,18 @@ private fun QualityRow(
         val info = listState.layoutInfo
         val item = info.visibleItemsInfo.firstOrNull { it.index == qualityPosition }
         when {
-            item == null -> listState.scrollToItem(qualityPosition)
+            item == null ->
+                if (!positionedInitial) {
+                    listState.scrollToItem(qualityPosition)
+                } else {
+                    listState.animateScrollToItem(qualityPosition)
+                }
             item.offset < info.viewportStartOffset ->
                 listState.animateScrollBy((item.offset - info.viewportStartOffset).toFloat())
             item.offset + item.size > info.viewportEndOffset ->
                 listState.animateScrollBy((item.offset + item.size - info.viewportEndOffset).toFloat())
         }
+        positionedInitial = true
     }
     Column {
         Text(
@@ -3209,9 +3233,9 @@ private fun EpisodeSection(
                 }
                 // 后续切集：仅当新选中集不在可视范围内时才滚动到刚好露出
                 needsScroll -> when {
-                    // item 为 null（尚未布局）时瞬移，避免访问空指针
+                    // item 为 null（尚未布局，如点击被截断的 chip）：改为动画滚动，避免瞬移
                     item == null ->
-                        listState.scrollToItem(selectedDispIdx)
+                        listState.animateScrollToItem(selectedDispIdx)
                     // 左侧被遮挡：向左滚到刚好贴左
                     item.offset < viewportStart ->
                         listState.animateScrollBy((item.offset - viewportStart).toFloat())
@@ -3525,6 +3549,7 @@ private fun FullscreenPlayLayout(
     onEpisodeSelect: (Int) -> Unit,
     onEngineChange: (Players.Kernel) -> Unit,
     onBufferChange: (Players.BufferTier) -> Unit,
+    onDecodeChange: (Players.Decode) -> Unit,
     openingMs: Long,
     endingMs: Long,
     onMarkOpening: () -> Unit,
@@ -3575,6 +3600,7 @@ private fun FullscreenPlayLayout(
     var showEngine by remember { mutableStateOf(false) }
     var showSpeed by remember { mutableStateOf(false) }
     var showBuffer by remember { mutableStateOf(false) }
+    var showDecode by remember { mutableStateOf(false) }
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
     var showEpisodes by remember { mutableStateOf(false) }
@@ -3917,6 +3943,8 @@ private fun FullscreenPlayLayout(
                         // 左组：内核（EXO/MPV/其他弹窗，fongmi PlayerEngineDialog）/ 缓冲 / 重播 / 倍速 / 缩放（点击循环切换）
                         // 点击动作栏按钮重置 5 秒自动隐藏计时（fongmi setR1Callback 同款），不立即消失
                         ActionBtn(playerState.kernel.label) { showEngine = true; onControlInteract() }
+                        // 解码方式：EXO 自动/硬解/软解；MPV 软解=纯软解，自动与硬解都走 hwdec
+                        ActionBtn(playerState.decode.label) { showDecode = true; onControlInteract() }
                         ActionBtn("缓冲") { showBuffer = true; onControlInteract() }
                         ActionBtn("重播") { Players.seekTo(0); onControlInteract() }
                         // 倍速：按钮直接显示当前倍速值（与内核/缩放按钮同款「显示当前态」）；
@@ -4065,6 +4093,7 @@ private fun FullscreenPlayLayout(
         }) { showEngine = false }
         OptionDialog(showSpeed, "倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
         OptionDialog(showBuffer, "缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
+        OptionDialog(showDecode, "解码方式", Players.Decode.entries, playerState.decode, { it.label }, { onDecodeChange(it); showDecode = false }) { showDecode = false }
         if (showEpisodes) {
             EpisodeSideSheet(
                 episodes = lineEpisodes,
