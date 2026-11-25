@@ -4291,7 +4291,7 @@ private fun SideSheetGradientBackdrop(
 }
 
 /** 全屏选集侧边弹窗（fongmi EpisodeListDialog 同款：右侧滑出面板，宽度=max(200dp,最长集名14sp文本宽)且≤屏宽1/2，
- * 垂直列表、居中 14sp 文本、圆角 8dp 背景、选中集高亮，打开自动滚动到当前集，点击切集并关闭）。
+ * 垂直列表、居中 14sp 文本、无面板底色与圆角（左缘为直边，靠整屏渐变暗场托底）、选中集高亮，打开自动滚动到当前集，点击切集并关闭）。
  * 收回动画与呼出对称：先从右往左滑入，收回时原路从左往右滑出，动画结束再通知父级移除。 */
 @Composable
 private fun EpisodeSideSheet(
@@ -4350,13 +4350,6 @@ private fun EpisodeSideSheet(
     }
     // 返回键先收起弹窗（原为 Popup 的 dismissOnBackPress）
     BackHandler(onBack = dismissWithAnim)
-    // 面板形状：只在左上/左下圆角，必须同时 clip，否则列表内容会画到圆角外（溢出面板）
-    val panelShape = SquircleShape(
-        topStart = com.ican.tvplay.ui.theme.Spacing.sideSheetCorner,
-        topEnd = 0.dp,
-        bottomEnd = 0.dp,
-        bottomStart = com.ican.tvplay.ui.theme.Spacing.sideSheetCorner,
-    )
     Box(modifier = Modifier.fillMaxSize()) {
             // 背景：整屏右实左淡渐变暗场，右侧与面板等宽的一段为等浓度（面板本身不铺色），
             // 点面板外空白处收起面板
@@ -4372,7 +4365,6 @@ private fun EpisodeSideSheet(
                     .offset { IntOffset(sheetSlideX.roundToPx(), 0) }
                     .fillMaxHeight()
                     .width(panelWidth)
-                    .clip(panelShape)
                     // 面板本体消费点击，避免点面板空白处误触发外层收起
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -4664,13 +4656,6 @@ private fun SubtitleSettingSideSheet(
         }
     }
     BackHandler(onBack = dismissWithAnim)
-    // 面板形状：只在左上/左下圆角，clip 与 background 同形状，内容才不会画到圆角外
-    val panelShape = SquircleShape(
-        topStart = Spacing.sideSheetCorner,
-        topEnd = 0.dp,
-        bottomEnd = 0.dp,
-        bottomStart = Spacing.sideSheetCorner,
-    )
     Box(modifier = Modifier.fillMaxSize()) {
         // 背景：整屏右实左淡渐变暗场，右侧与面板等宽的一段为等浓度（面板本身不铺色），
         // 点面板外空白处收起面板
@@ -4686,7 +4671,6 @@ private fun SubtitleSettingSideSheet(
                 .offset { IntOffset(sheetSlideX.roundToPx(), 0) }
                 .fillMaxHeight()
                 .width(panelWidth)
-                .clip(panelShape)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
