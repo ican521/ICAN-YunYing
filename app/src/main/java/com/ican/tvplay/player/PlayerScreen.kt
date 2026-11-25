@@ -416,59 +416,27 @@ fun PlayerScreen(
     // 缩放动画开始时刻：动画本身只有几百毫秒，若因配置变化（深浅色切换等）打断收敛协程卡住，
     // 用它可以判断「动画是不是真的卡了」，避免 landZooming 残留 true 把返回永久吞掉
     var zoomStartedAt by remember { mutableLongStateOf(0L) }
-    // 补转屏会话令牌：退全屏时 FULL_USER 被系统吞掉（屏幕仍横着）落定布局后，
-    // 用它触发一次「按重力感应」的方向请求，转屏到位再把方向控制权还给系统
-    var rotateBackToken by remember { mutableIntStateOf(0) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
-            // 旋转进入/退出全屏后都保持纯净画面，工具栏由用户单击唤出
+            // 旋转进入全屏后保持纯净画面，工具栏由用户单击唤出
             pendingFullscreen == true && isLandscape -> {
                 fullscreen = true; pendingFullscreen = null; controlsVisible = false
             }
-            pendingFullscreen == false && !isLandscape -> {
-                fullscreen = false; pendingFullscreen = null; controlsVisible = false
-            }
         }
     }
-    // 旋转超时兜底：挂起态原本只能靠「系统真的转了屏」收敛。
-    // 实测（小米 13 / Android 16）：横屏全屏时下拉通知栏切深浅色后，MIUI 把该 Activity 当成「视频全屏」，
-    // 退出时即使 requestedOrientation 已设成 FULL_USER 屏幕也不转回竖屏 → isLandscape 永不变化，
-    // pendingFullscreen 永久挂着、fullscreen 一直是 true，BackHandler 把返回全吞掉（返回彻底失效）。
-    // 这里给挂起态加超时：旋转没来就按当前方向直接落定布局（横屏落横版小窗），保证返回永远可用。
+    // 进全屏挂起超时兜底：等不到旋转就别停在什么都不画的 pending 空白态，
+    // 撤销挂起退回当前方向的小窗布局（退全屏不再走 pending，见 exitFullscreen）
     LaunchedEffect(pendingFullscreen) {
-        when (pendingFullscreen) {
-            // 等旋转进全屏：超时未转则撤销挂起、退回当前方向的小窗布局，
-            // 避免停在什么都不画的 pending 空白态（此刻方向还没变，直接铺满会挂到错误方向的布局上）
-            true -> {
-                delay(1200)
-                if (pendingFullscreen == true) {
-                    pendingFullscreen = null
-                    fullscreen = false
-                    controlsVisible = false
-                    (context as? Activity).restoreDefaultOrientation()
-                }
+        if (pendingFullscreen == true) {
+            delay(1200)
+            if (pendingFullscreen == true) {
+                pendingFullscreen = null
+                fullscreen = false
+                controlsVisible = false
+                (context as? Activity).restoreDefaultOrientation()
             }
-            // 等旋转退全屏：超时未转则按当前方向落小窗布局（不再等旋转），返回随即恢复可用；
-            // 但此时屏幕可能还横着（MIUI 吞了 FULL_USER 的转屏请求）→ 落定后补一次按重力感应的方向请求，
-            // 转屏到位再自动切成竖屏页（沉浸已退出，系统这时才听方向请求）
-            false -> {
-                delay(600)
-                if (pendingFullscreen == false) {
-                    fullscreen = false; pendingFullscreen = null; controlsVisible = false
-                    rotateBackToken++
-                }
-            }
-            null -> Unit
         }
-    }
-    LaunchedEffect(rotateBackToken) {
-        if (rotateBackToken == 0) return@LaunchedEffect
-        val activity = context as? Activity ?: return@LaunchedEffect
-        // 按重力感应走（不依赖用户旋转锁，也不会在真横着拿时硬掰竖屏）；等转屏到位后落回跟随用户旋转
-        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
-        delay(700)
-        activity.restoreDefaultOrientation()
     }
 
     // 共享 PlayerView（fongmi 同思路：全屏/竖屏只是改容器尺寸，PlayerView 从不销毁重建）。
@@ -1351,10 +1319,22 @@ fun PlayerScreen(
             (context as? Activity).restoreDefaultOrientation()
             pendingFullscreen = null
         } else {
-            // 先请求竖屏旋转，转完再退全屏布局（与进全屏对称）；
-            // 系统不转屏时由 pendingFullscreen 的超时兜底收敛，不会再卡住返回
-            (context as? Activity).restoreDefaultOrientation()
-            pendingFullscreen = false
+            // 照搬 fongmi VideoActivity.exitFullscreen 的顺序：
+            // 1) 先立即退全屏（系统栏回来、解掉 MIUI「视频全屏」的方向锁）；
+            // 2) 再请求 USER_PORTRAIT 把屏幕转回竖屏（不等旋转落地才收敛，返回随时可用）；
+            // 3) 2 秒后把方向控制权还给系统（fongmi 的 App.post(setOrient, 2000) → FULL_USER）。
+            // 之前「等旋转 + 超时兜底」的问题是系统不转屏时会落在横版小窗，而 pending 还会吞掉返回。
+            fullscreen = false
+            controlsVisible = false
+            pendingFullscreen = null
+            val activity = context as? Activity ?: return
+            activity.window.decorView.post {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
+                activity.window.decorView.postDelayed({
+                    // 这 2 秒里又进了全屏就别抢方向（进全屏自己会请求 SENSOR_LANDSCAPE）
+                    if (!fullscreen && pendingFullscreen == null) activity.restoreDefaultOrientation()
+                }, 2000)
+            }
         }
     }
 
