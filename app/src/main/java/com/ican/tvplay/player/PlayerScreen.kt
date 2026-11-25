@@ -2048,6 +2048,11 @@ private fun PortraitPlayLayout(
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
 
+    // 下拉刷新受控态：仅用户真正下拉触发（onRefresh）才置 true；refreshing 结束后清掉，交组件播完成收回动画。
+    // 放在函数体顶部而非 if 块内，避免条件翻转时状态被丢弃；自动刷新路径不经 onRefresh，此值保持 false。
+    var pullRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(refreshing) { if (!refreshing) pullRefreshing = false }
+
     // 单一 Column 根：NavHost 目的地容器会给多个顶层子元素传播 fill 约束，
     // 多顶层发射会让底部标签栏被拉伸成全屏、白色背景盖住视频区（"纯白底+只有按钮"的根因）
     Column(
@@ -2105,12 +2110,13 @@ private fun PortraitPlayLayout(
     // 否则圆点会连同容器一起消失（刷新过程中途"闪没"）
     if (playerState.error != null || refreshing) {
         PullToRefresh(
-            isRefreshing = false,
-            onRefresh = onRefreshError,
+            isRefreshing = pullRefreshing && refreshing,
+            onRefresh = { pullRefreshing = true; onRefreshError() },
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            refreshTexts = listOf("下拉刷新", "松开刷新", "正在刷新", "刷新完成"),
+            refreshTexts = listOf("", "", "", ""),
+            refreshTextStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 0.sp),
         ) {
             DetailInfoColumn(
                 modifier = Modifier.fillMaxSize(),

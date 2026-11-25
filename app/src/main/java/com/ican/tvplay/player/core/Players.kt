@@ -1190,12 +1190,14 @@ object Players {
         // mpv.conf 只在 native 初始化时读取，必须在 builder.build() 之前写好，晚写等于不生效；
         // 每次覆盖写，仅 [hdr] 条件 profile；写失败只告警，不阻断后续 builder 构建
         // auto_profiles 条件里属性名含 "/" 不能直接写进 Lua 表达式，必须用脚本注入的全局 get("…") 取值；判 pq/hlg/smpte2084 三种 HDR 取值
+        // target-peak=1000：Vulkan HDR 直出时显式上报峰值，避免 Android 上 auto 峰值读不到回退到低档导致发闷；只影响 HDR 命中的 profile
         try {
             java.io.File(mpvDir, "mpv.conf").writeText(
                 "[hdr]\n" +
                     "profile-cond=get(\"video-params/gamma\") == \"pq\" or get(\"video-params/gamma\") == \"hlg\" or get(\"video-params/gamma\") == \"smpte2084\"\n" +
                     "profile-restore=copy\n" +
-                    "target-colorspace-hint=yes\n",
+                    "target-colorspace-hint=yes\n" +
+                    "target-peak=1000\n",
                 java.nio.charset.StandardCharsets.UTF_8,
             )
         } catch (t: Throwable) {
