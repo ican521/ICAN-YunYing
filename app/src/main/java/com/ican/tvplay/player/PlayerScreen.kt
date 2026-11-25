@@ -2114,11 +2114,9 @@ private fun PortraitPlayLayout(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            refreshTexts = listOf("", "", "", ""),
-            refreshTextStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 0.sp),
-            // miuix 指示器圆心位于 (circleSize+36dp)/2 时居中，故用 contentPadding 顶边内边距把刷新圆圈下移 16dp；
-            // contentPadding 只 offset RefreshHeader，不影响 DetailInfoColumn 布局
-            contentPadding = PaddingValues(top = 16.dp),
+            // 文案与样式回到 miuix 原生：四态中文提示 + 默认小号字，不再用 0.sp 隐藏文字
+            refreshTexts = listOf("下拉刷新", "松开刷新", "正在刷新", "刷新完成"),
+            refreshTextStyle = MaterialTheme.typography.bodySmall,
         ) {
             DetailInfoColumn(
                 modifier = Modifier.fillMaxSize(),
