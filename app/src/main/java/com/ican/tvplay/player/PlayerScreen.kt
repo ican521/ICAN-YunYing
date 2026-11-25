@@ -2417,8 +2417,8 @@ private const val LAND_PLAYER_WIDTH_FRACTION = 0.38f
 /** 横屏小窗↔全屏放大/缩回动画时长（对齐 fongmi ChangeBounds 150ms） */
 private const val LAND_ZOOM_DURATION_MS = 150
 
-/** 竖屏预览小窗高度随片源比例变化时的过渡时长（对齐 fongmi VideoActivity changeHeight 的 300ms） */
-private const val PREVIEW_HEIGHT_ANIM_MS = 300
+/** 竖屏预览小窗高度随片源比例变化时的过渡时长（对齐项目内控制层/侧栏的 200ms，不再用 fongmi 的 300ms） */
+private const val PREVIEW_HEIGHT_ANIM_MS = 200
 
 /**
  * 状态栏高度（Dp）。直接读窗口度量里的 statusBar inset：组合期同步可用，
