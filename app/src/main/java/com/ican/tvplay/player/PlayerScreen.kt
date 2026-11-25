@@ -1836,7 +1836,12 @@ fun PlayerScreen(
             autoNext = savedAutoNext,
             onAutoNextChange = { settings.setPlayerAutoNext(it) },
             onEpisodeSelect = requestEpisodeChange,
-            onEngineChange = { settings.setPlayerEngine(it.name) },
+            onEngineChange = { kernel ->
+                // 点了就切，不能只写设置：ISO 自动切 MPV 只改内存态、设置仍是 EXO，
+                // 此时 setPlayerEngine("EXO") 写的是同值，StateFlow 不发射 → LaunchedEffect 不重启 → 点了没反应。
+                Players.setKernel(kernel)
+                settings.setPlayerEngine(kernel.name)
+            },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
             onDecodeChange = { Players.setDecode(it); settings.setPlayerDecode(it.name) },
             openingMs = openingMs,
@@ -4112,7 +4117,10 @@ private fun FullscreenPlayLayout(
                 else -> Players.Kernel.entries.firstOrNull { it.label == label }?.let(onEngineChange)
             }
             showEngine = false
-        }) { showEngine = false }
+            },
+            // ISO 光盘镜像只有 MPV 能解：EXO 置灰且不可点，避免切过去必然进错误页
+            enabled = { label -> !(playerState.isoSource && label == Players.Kernel.EXO.label) },
+        ) { showEngine = false }
         OptionDialog(showSpeed, "倍速", listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 2.5f, 3.0f), playerState.speed, { formatSpeed(it) }, { onSpeedChange(it); showSpeed = false }) { showSpeed = false }
         OptionDialog(showBuffer, "缓冲档位", Players.BufferTier.entries, playerState.bufferTier, { it.label }, { onBufferChange(it); showBuffer = false }) { showBuffer = false }
         OptionDialog(showDecode, "解码方式", Players.Decode.entries, playerState.decode, { it.label }, { onDecodeChange(it); showDecode = false }) { showDecode = false }
@@ -4536,6 +4544,7 @@ private fun MiniLargeBtn(icon: ImageVector, desc: String, onClick: () -> Unit, i
 private fun <T> OptionDialog(
     show: Boolean, title: String, options: List<T>, current: T?, label: (T) -> String,
     onSelect: (T) -> Unit,
+    enabled: (T) -> Boolean = { true },
     onDismiss: () -> Unit,
 ) {
     // 选项过多（倍速档位/音轨）时限高可滚动，避免超出屏幕被裁、末项露出半截边缘
@@ -4582,12 +4591,16 @@ private fun <T> OptionDialog(
             ) {
                 options.forEach { opt ->
                     val selected = opt == current
+                    val itemEnabled = enabled(opt)
                     val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
+                            // 不可用项整行淡化（播放内核里 ISO 源时的 EXO），且不响应点击
+                            .alpha(if (itemEnabled) 1f else 0.35f)
                             .clickable(
+                                enabled = itemEnabled,
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                 indication = null,
                             ) { onSelect(opt) }

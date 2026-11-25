@@ -125,6 +125,8 @@ object Players {
         val networkSpeedBps: Long = 0L,
         /** 视频宽高比（宽/高，fongmi onVideoSizeChanged 同款）：竖屏顶部预览小窗高度随视频比例调整，默认 16:9 */
         val videoAspectRatio: Float = DEFAULT_VIDEO_ASPECT_RATIO,
+        /** 当前源是 ISO 光盘镜像：EXO 无容器能力（start 会自动切 MPV），播放内核弹窗据此把 EXO 置灰 */
+        val isoSource: Boolean = false,
     )
 
     /** 高频进度（播放中每 500ms 一跳）：与 PlayerState 拆开，
@@ -603,7 +605,13 @@ object Players {
         currentSpec = spec
         retryCount = 0  // 新源重置错误计数
         // 新源开播清除旧错误，并重置播放内的字幕偏移（偏移只对当前这一集有效，仿 fongmi）
-        _state.value = _state.value.copy(error = null, subtitleOffsetMs = 0L, switching = false)
+        // isoSource 同步刷新：切到/切离 ISO 源时，播放内核弹窗里 EXO 的可用性要跟着变
+        _state.value = _state.value.copy(
+            error = null,
+            subtitleOffsetMs = 0L,
+            switching = false,
+            isoSource = isIsoUrl(spec.url),
+        )
         // ISO 光盘镜像：EXO 无容器能力，自动切到自带 libmpv（libbluray/udf/iso9660 已编进 so）。
         // 仅改内存内核态，不写持久化设置；下次冷启动仍按用户设置的内核走。
         if (isIsoUrl(spec.url) && _state.value.kernel != Kernel.MPV &&
