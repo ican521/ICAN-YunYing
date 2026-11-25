@@ -27,9 +27,8 @@ import com.ican.tvplay.data.BACKGROUND_PIP
 import com.ican.tvplay.player.core.PlaybackService
 import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.ui.appContainer
-import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.TvPlayTheme
-import com.ican.tvplay.ui.theme.appMiuixColors
+import com.ican.tvplay.ui.theme.playerDarkMiuixColors
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -124,9 +123,10 @@ class PlayerActivity : ComponentActivity(), PlayerHost {
             val themeMode by container.settingsRepository.themeMode.collectAsStateWithLifecycle()
             val themeColor by container.settingsRepository.themeColor.collectAsStateWithLifecycle()
             TvPlayTheme(themeMode = themeMode, themeColor = themeColor) {
-                val isDark = LocalDarkTheme.current
+                // 播放页整页固定深色 miuix 色板：根 Scaffold 宿主渲染的弹窗/面板统一取深色档，
+                // 不跟随 App 浅/深主题；强调色家族仍接入当前主题色。
                 MiuixTheme(
-                    colors = appMiuixColors(themeColor, isDark),
+                    colors = playerDarkMiuixColors(themeColor),
                 ) {
                     CompositionLocalProvider(
                         LocalContentColor provides MiuixTheme.colorScheme.onBackground,
