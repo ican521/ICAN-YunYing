@@ -35,7 +35,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -4256,35 +4255,34 @@ private fun EpisodeChip(
 }
 
 /**
- * 全屏侧边面板的背景层：整屏「右实左淡」的横向渐变暗场。
- * 右侧与面板等宽的一段保持 [contentFraction] 等浓度 94% 黑（内容始终压在稳定底色上），
- * 面板左缘外只用 [featherFraction] 这一小段淡出到透明，再往左视频完全不受影响。
- * 200ms 淡入淡出（与面板 260ms 滑动同起）；显示期间接住所有点击（点空白处收起），
- * 同时挡住底下的视频控件，避免一次点击触发两件事。
+ * 全屏侧边面板的渐变背景层：整屏「右实左淡」横向暗场。
+ * 右侧与面板等宽的一段保持 94% 等浓度（内容始终压在稳定底色上），
+ * 面板左缘外只用 [featherFraction] 这一段平滑淡开，再往左视频完全不受影响。
+ * 本层不自带动画与触摸：由调用方把它和面板放进同一个 offset，随面板一起滑入滑出。
  */
 @Composable
-private fun SideSheetGradientBackdrop(
-    visible: Boolean,
+private fun SideSheetGradientLayer(
     contentFraction: Float,
     featherFraction: Float,
-    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val scrimAlpha by animateFloatAsState(
-        targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-        label = "sideSheetBackdrop",
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(sideSheetScrimBrush(contentFraction, featherFraction = featherFraction)),
     )
-    // 完全隐藏且不处于显示态时直接不组合，避免透明层常驻占位
-    if (scrimAlpha == 0f && !visible) return
+}
+
+/** 全屏侧边面板的触摸屏蔽层：不绘制任何颜色，只负责点空白收起与挡住底层视频控件 */
+@Composable
+private fun SideSheetTouchShield(enabled: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .alpha(scrimAlpha)
-            .background(sideSheetScrimBrush(contentFraction, featherFraction = featherFraction))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                enabled = visible,
+                enabled = enabled,
                 onClick = onClick,
             ),
     )
@@ -4322,9 +4320,10 @@ private fun EpisodeSideSheet(
     val contentFraction = remember(panelWidth, configuration) {
         (panelWidth.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
     }
-    // 淡出带固定 96dp：只把面板左缘软掉，屏幕其余部分完全不压暗
+    // 淡出带固定 144dp：面板左缘再往外平滑淡开，观感更自然；屏幕其余部分完全不压暗
+    val featherDp = 144.dp
     val featherFraction = remember(configuration) {
-        (96f / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
+        (featherDp.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
     }
     // 用组件内全屏覆盖层而非 Popup/Dialog：
     // - Dialog 会新建窗口并自动唤出状态栏/导航栏，破坏全屏沉浸；
@@ -4335,7 +4334,7 @@ private fun EpisodeSideSheet(
     var sheetShown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { sheetShown = true }
     val sheetSlideX by animateDpAsState(
-        targetValue = if (sheetShown) 0.dp else panelWidth + 20.dp,
+        targetValue = if (sheetShown) 0.dp else panelWidth + featherDp + 20.dp,
         animationSpec = tween(260, easing = FastOutSlowInEasing),
         label = "episodeSheetSlide",
     )
@@ -4351,13 +4350,13 @@ private fun EpisodeSideSheet(
     // 返回键先收起弹窗（原为 Popup 的 dismissOnBackPress）
     BackHandler(onBack = dismissWithAnim)
     Box(modifier = Modifier.fillMaxSize()) {
-            // 背景：整屏右实左淡渐变暗场，右侧与面板等宽的一段为等浓度（面板本身不铺色），
-            // 点面板外空白处收起面板
-            SideSheetGradientBackdrop(
-                visible = sheetShown,
+            // 触摸屏蔽层（无颜色）：点面板外收起面板，挡住底层视频控件
+            SideSheetTouchShield(enabled = sheetShown, onClick = dismissWithAnim)
+            // 渐变背景与面板同进同退：同一个 offset，一起滑入/滑出
+            SideSheetGradientLayer(
                 contentFraction = contentFraction,
                 featherFraction = featherFraction,
-                onClick = dismissWithAnim,
+                modifier = Modifier.offset { IntOffset(sheetSlideX.roundToPx(), 0) },
             )
             Column(
                 modifier = Modifier
@@ -4639,12 +4638,13 @@ private fun SubtitleSettingSideSheet(
     val contentFraction = remember(panelWidth, configuration) {
         (panelWidth.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
     }
-    // 淡出带固定 96dp：只把面板左缘软掉，屏幕其余部分完全不压暗
+    // 淡出带固定 144dp：面板左缘再往外平滑淡开，观感更自然；屏幕其余部分完全不压暗
+    val featherDp = 144.dp
     val featherFraction = remember(configuration) {
-        (96f / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
+        (featherDp.value / configuration.screenWidthDp.toFloat()).coerceIn(0f, 1f)
     }
     val sheetSlideX by animateDpAsState(
-        targetValue = if (sheetShown) 0.dp else panelWidth + 20.dp,
+        targetValue = if (sheetShown) 0.dp else panelWidth + featherDp + 20.dp,
         animationSpec = tween(260, easing = FastOutSlowInEasing),
         label = "subtitleSheetSlide",
     )
@@ -4657,13 +4657,13 @@ private fun SubtitleSettingSideSheet(
     }
     BackHandler(onBack = dismissWithAnim)
     Box(modifier = Modifier.fillMaxSize()) {
-        // 背景：整屏右实左淡渐变暗场，右侧与面板等宽的一段为等浓度（面板本身不铺色），
-        // 点面板外空白处收起面板
-        SideSheetGradientBackdrop(
-            visible = sheetShown,
+        // 触摸屏蔽层（无颜色）：点面板外收起面板，挡住底层视频控件
+        SideSheetTouchShield(enabled = sheetShown, onClick = dismissWithAnim)
+        // 渐变背景与面板同进同退：同一个 offset，一起滑入/滑出
+        SideSheetGradientLayer(
             contentFraction = contentFraction,
             featherFraction = featherFraction,
-            onClick = dismissWithAnim,
+            modifier = Modifier.offset { IntOffset(sheetSlideX.roundToPx(), 0) },
         )
         Column(
             modifier = Modifier
