@@ -1600,9 +1600,15 @@ fun PlayerScreen(
         // 效果：16:9 = 屏宽×0.5625；2.35:1 银幕变矮不再留上下黑边；
         // 竖屏片源（9:16）算出来超上限就压到半屏高，画面在满宽黑框里居中、左右留黑边。
         // 触发时机等价 fongmi 的 onSizeChanged → changeHeight()：比例一变就重算。
+        // 用「竖屏归一化」的屏幕尺寸算：横屏时 screenW 是长边（872.7dp），直接套进去
+        // 目标高度会被夹到 (392.7-44)/2 ≈ 174.4dp = 479px，等转回竖屏目标变 460px，
+        // animateDpAsState 又用 300ms 走这段差值 → 小窗落地后还要往上蹭 10px（日志 131→121）。
+        // 取 min/max 后两种方向算出的目标恒等，转屏不再触发这段高度动画。
+        val portraitW = minOf(screenW, screenH)
+        val portraitH = maxOf(screenW, screenH)
         val portraitPreviewTargetH = with(density) {
-            (screenW.toPx() * (1f / videoRatio)).toDp()
-        }.coerceIn(150.dp, (screenH - statusBarTop) / 2f)
+            (portraitW.toPx() * (1f / videoRatio)).toDp()
+        }.coerceIn(150.dp, (portraitH - statusBarTop) / 2f)
 
         // 横屏小窗↔全屏放大/缩回过渡：宽/高/顶部偏移连续插值，
         // PlayerView 全程不重建，只有画面在放大，不挂任何控制层
