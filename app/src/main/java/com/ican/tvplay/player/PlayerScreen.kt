@@ -1815,6 +1815,8 @@ fun PlayerScreen(
             locked = locked,
             settings = settings,
             onToggleControls = { controlsVisible = !controlsVisible },
+            // 侧栏打开即把控制栏显隐状态落为「隐藏」：侧栏收起后控制栏不会自己弹回来，需用户再点一下才唤出
+            onHideControls = { controlsVisible = false },
             onControlInteract = { controlsTick++ },
             onTogglePlay = { Players.playPause() },
             onPrev = { if (episodeIndex > 0) episodeIndex-- },
@@ -1847,7 +1849,7 @@ fun PlayerScreen(
                 saveProgress()
             },
             onSeekDragChange = { seekDragging = it },
-            onOpenSubtitleSettings = { showSubtitleSettings = true },
+            onOpenSubtitleSettings = { controlsVisible = false; showSubtitleSettings = true },
             onAddSubtitle = { launchSubtitlePicker() },
             subtitleSettingsOpen = showSubtitleSettings,
         )
@@ -1982,7 +1984,7 @@ fun PlayerScreen(
             onScaleChange = { settings.setPlayerScale(it.name) },
             onBufferChange = { settings.setPlayerBuffer(it.multiplier) },
             onSeekDragChange = { seekDragging = it },
-            onOpenSubtitleSettings = { showSubtitleSettings = true },
+            onOpenSubtitleSettings = { controlsVisible = false; showSubtitleSettings = true },
             onAddSubtitle = { launchSubtitlePicker() },
             blockedMessage = btBlockedMsg,
         )
@@ -3543,6 +3545,7 @@ private fun FullscreenPlayLayout(
     locked: Boolean,
     settings: SettingsRepository,
     onToggleControls: () -> Unit,
+    onHideControls: () -> Unit,
     onControlInteract: () -> Unit,
     onTogglePlay: () -> Unit,
     onPrev: () -> Unit,
@@ -4005,7 +4008,7 @@ private fun FullscreenPlayLayout(
                         // 最右侧：选集（fongmi control.action.episodes：剧集数 ≥2 才显示，
                         // 点击弹出右侧选集列表 EpisodeListDialog）
                         if (lineEpisodes.size >= 2) {
-                            ActionBtn("选集") { showEpisodes = true; onControlInteract() }
+                            ActionBtn("选集") { onHideControls(); showEpisodes = true; onControlInteract() }
                         }
                     }
                     } // BoxWithConstraints（动作栏横滑容器）结束
