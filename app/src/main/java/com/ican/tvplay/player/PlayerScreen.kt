@@ -416,14 +416,26 @@ fun PlayerScreen(
     // 缩放动画开始时刻：动画本身只有几百毫秒，若因配置变化（深浅色切换等）打断收敛协程卡住，
     // 用它可以判断「动画是不是真的卡了」，避免 landZooming 残留 true 把返回永久吞掉
     var zoomStartedAt by remember { mutableLongStateOf(0L) }
+    // 退全屏等旋转期间：视频保持铺满，但不切到「当前方向的横版小窗」（否则会先闪一下平板样式），
+    // 系统栏在这段时间已恢复，系统才会接受方向请求
+    var exitRotating by remember { mutableStateOf(false) }
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscape) {
         when {
             // 旋转进入全屏后保持纯净画面，工具栏由用户单击唤出
             pendingFullscreen == true && isLandscape -> {
-                fullscreen = true; pendingFullscreen = null; controlsVisible = false
+                fullscreen = true; pendingFullscreen = null; controlsVisible = false; exitRotating = false
             }
+            // 转回竖屏：退全屏的过渡结束，交给竖屏布局
+            !isLandscape -> exitRotating = false
         }
+    }
+    // 退全屏转屏兜底：1 秒还横着就当系统真的不肯转，撤掉「铺满视频」态让当前方向的布局接手，
+    // 免得停在「有系统栏的全屏画面」上没法操作
+    LaunchedEffect(exitRotating) {
+        if (!exitRotating) return@LaunchedEffect
+        delay(1000)
+        if (exitRotating && isLandscape) exitRotating = false
     }
     // 进全屏挂起超时兜底：等不到旋转就别停在什么都不画的 pending 空白态，
     // 撤销挂起退回当前方向的小窗布局（退全屏不再走 pending，见 exitFullscreen）
@@ -576,8 +588,8 @@ fun PlayerScreen(
     // 视频铺满全屏/画中画（含过渡期）时上报给 AppRoot：根底色保持黑色。
     // 仅靠 pipTransition（进出过渡）覆盖不到稳态全屏——全屏下窗口底部最后约 1px
     // 仍由根底色绘制，浅色主题会露出一条白色细线。
-    val videoPresent = inPip || pipExitHold || fullscreen || pendingFullscreen != null
-    LaunchedEffect(inPip, pipExitHold, fullscreen, pendingFullscreen) {
+    val videoPresent = inPip || pipExitHold || fullscreen || exitRotating || pendingFullscreen != null
+    LaunchedEffect(inPip, pipExitHold, fullscreen, exitRotating, pendingFullscreen) {
         Players.setVideoPresent(videoPresent)
     }
     // 画中画窗口在 HyperOS 上是透明表面（fongmi 同样透明，但它内容铺满 100%）：
@@ -1327,6 +1339,8 @@ fun PlayerScreen(
             fullscreen = false
             controlsVisible = false
             pendingFullscreen = null
+            // 转屏到位前继续铺满视频、不切当前方向的布局（否则竖屏入口返回时会先闪一下平板横版样式）
+            exitRotating = true
             val activity = context as? Activity ?: return
             activity.window.decorView.post {
                 activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
@@ -1342,6 +1356,8 @@ fun PlayerScreen(
         // 锁定状态下屏蔽返回（对齐 fongmi isLock() 拦截语义），
         // 系统侧滑/返回键不退出全屏、不退出页面，解锁后恢复
         if (locked) return
+        // 退全屏的转屏过渡期（约 200~300ms）：返回先消费掉，别在过渡中把播放页一起退出
+        if (exitRotating) return
         // 放大/缩回动画进行中忽略返回，避免动画中途退出页面；
         // 但动画卡住（配置变化打断收敛协程）超过 400ms 就强制回到小窗稳态，
         // 否则 landZooming/portraitZooming 残留 true 会把返回永久吞掉（这一下仍算被消费，下次返回即生效）
@@ -1372,7 +1388,7 @@ fun PlayerScreen(
     // 返回键 / 三键导航：退回最稳的 BackHandler（手势导航那一侧由下面的预测返回接管）
     // 挂起态也要接管：否则旋转等待中按返回会直接退出播放页
     BackHandler(
-        enabled = fullscreen || pendingFullscreen != null || landZooming || portraitZooming,
+        enabled = fullscreen || pendingFullscreen != null || exitRotating || landZooming || portraitZooming,
     ) { handleBack() }
 
     // 手势导航的预测返回：targetSdk 37 在 Android 16 上预测返回已无法关闭
@@ -1384,7 +1400,7 @@ fun PlayerScreen(
     // 手势取消则什么都不做——不能像上一版那样「进度一出现就缩放、取消再反向弹回」，
     // 否则用户看到的是滑一下闪一下、实际没退出去。
     PredictiveBackHandler(
-        enabled = fullscreen || pendingFullscreen != null || landZooming || portraitZooming,
+        enabled = fullscreen || pendingFullscreen != null || exitRotating || landZooming || portraitZooming,
     ) { progress ->
         try {
             progress.collect { p ->
@@ -1489,7 +1505,7 @@ fun PlayerScreen(
         // 横版布局未显式刷底色的空档（播放器上方/左侧、信息列底部与下方区块之间）
         // 会透出黑色，与刷白的区块拼成黑白块
         MiuixTheme.colorScheme.surface
-    } else if (inPip || pipExitHold || fullscreen || pendingFullscreen != null || landscapeFullscreen) {
+    } else if (inPip || pipExitHold || fullscreen || exitRotating || pendingFullscreen != null || landscapeFullscreen) {
         Color.Black
     } else {
         MiuixTheme.colorScheme.surface
@@ -1770,6 +1786,8 @@ fun PlayerScreen(
                 // 这里不叠加 clip：旋转过渡只有 200~300ms，四角都是黑底看不出圆角差异，
                 // 省掉一次离屏图层合成（interop TextureView 上这笔开销不小，双击后更跟手）
                 pendingFullscreen != null -> Modifier.fillMaxSize()
+                // 退全屏等旋转：继续铺满（此刻还没转回竖屏，切横版小窗会先闪一下平板样式）
+                exitRotating -> Modifier.fillMaxSize()
                 // 自然横屏（平板）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
@@ -1933,6 +1951,8 @@ fun PlayerScreen(
         }
         // 进全屏旋转过渡期：仅黑底，不渲染任何非全屏布局（白底信息流会露出来）
         pendingFullscreen == true -> Unit
+        // 退全屏等旋转：只有视频，不挂横版/竖屏布局（避免先闪一下平板端样式）
+        exitRotating -> Unit
         else -> if (pendingFullscreen == null && isLandscape) {
             // 自然横屏（平板）：fongmi activity_detail_land 横版布局，
             // 信息列/下方区块锚定动画中的播放器边界，随缩放一起滑出滑入（ChangeBounds 效果）
