@@ -58,6 +58,22 @@ const val SegmentedTabsFadeMs = 150
 /** 分段按钮外框与段间分隔线透明度（深色叠白 / 浅色叠黑） */
 const val SegmentedTabsOutlineAlpha = 0.10f
 
+// ===== 全屏侧边面板（选集 / 字幕设置）统一色板 =====
+// 面板没有自身底色，文字与胶囊都直接压在「右实左淡」的近黑暗场上，
+// 因此一律用白色透明度分层，禁止在 sheet 里内联写 0.1/0.62 之类的魔法数。
+
+/** 面板内胶囊/列表项的底色（白色透明度）：选中与未选中同底，靠文字色区分 */
+const val SideSheetFillAlpha = 0.10f
+
+/** 面板内未选中文字（压在白 10% 底上）的白色透明度 */
+const val SideSheetMutedTextAlpha = 0.62f
+
+/** 面板顶部操作钮（重置）文字：比未选中 chip 亮一档，但仍弱于标题 */
+const val SideSheetActionTextAlpha = 0.80f
+
+/** 面板段落小标题文字（如「字幕样式」「文字颜色」）的白色透明度 */
+const val SideSheetSectionTextAlpha = 0.78f
+
 /** 浅色档选中文字起步主色占比（其余压向 [ChipTintedTextAnchorLight]），对比度不足时再按守护步长推远 */
 private const val ChipTintedTextPrimaryRatioLight = 0.74f
 

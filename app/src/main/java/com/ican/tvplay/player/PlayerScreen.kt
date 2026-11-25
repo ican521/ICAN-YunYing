@@ -160,6 +160,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
@@ -215,6 +216,10 @@ import com.ican.tvplay.ui.theme.chipTintedFill
 import com.ican.tvplay.ui.theme.chipTintedText
 import com.ican.tvplay.ui.theme.playerDarkMiuixColors
 import com.ican.tvplay.ui.theme.sideSheetScrimBrush
+import com.ican.tvplay.ui.theme.SideSheetActionTextAlpha
+import com.ican.tvplay.ui.theme.SideSheetFillAlpha
+import com.ican.tvplay.ui.theme.SideSheetMutedTextAlpha
+import com.ican.tvplay.ui.theme.SideSheetSectionTextAlpha
 import com.ican.tvplay.ui.theme.Spacing
 import com.ican.tvplay.ui.theme.SquircleShape
 import androidx.compose.runtime.snapshotFlow
@@ -4230,6 +4235,8 @@ private fun EpisodeChip(
     selectedTextColor: Color? = null,
     // 未选中文字色：侧栏深色场景下需要比 onSecondaryVariant 更收敛，允许调用方覆盖
     unselectedTextColor: Color? = null,
+    // 字号覆盖：侧栏里 chip 与列表项统一 14sp（默认 labelMedium 只有 12sp，全屏里偏小）
+    fontSize: TextUnit? = null,
 ) {
     val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
     val darkMode = LocalDarkTheme.current
@@ -4256,7 +4263,11 @@ private fun EpisodeChip(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.labelMedium,
+            style = if (fontSize != null) {
+                MaterialTheme.typography.labelMedium.copy(fontSize = fontSize)
+            } else {
+                MaterialTheme.typography.labelMedium
+            },
             color = if (selected) (selectedTextColor ?: tintedText)
             else (unselectedTextColor ?: MiuixTheme.colorScheme.onSecondaryVariant),
             fontWeight = if (selected) FontWeight.SemiBold else null,
@@ -4319,6 +4330,7 @@ private fun EpisodeSideSheet(
     onSelect: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val settings = appContainer().settingsRepository
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
@@ -4411,9 +4423,10 @@ private fun EpisodeSideSheet(
                     .padding(horizontal = Spacing.dialogContentMargin),
             ) {
                 // 面板不再单独铺色：文字直接压在整屏「右浓左淡」渐变暗场上（面板区域仍 ≥90% 黑），
-                // 内部强制 miuix 深色色板以保证滑杆/文字对比，
-                // 选中/未选中配色与字幕设置的分段单选按钮完全同源
-                MiuixTheme(colors = darkColorScheme()) {
+                // 内部强制深色档色板以保证滑杆/文字对比；强调色跟随用户选的主题色，
+                // 与同页「倍速/音轨/字幕」等弹窗（playerDarkMiuixColors(themeColor)）保持同色
+                val sheetThemeColor by settings.themeColor.collectAsStateWithLifecycle()
+                MiuixTheme(colors = playerDarkMiuixColors(sheetThemeColor)) {
                 // 弹出前就定位到当前集（首帧就位，无滚动动画）：
                 // initialFirstVisibleItemIndex 让当前集作为第一个可见 item 出现在顶部。
                 val listState = rememberLazyListState(
@@ -4437,9 +4450,11 @@ private fun EpisodeSideSheet(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                // 行高对齐选集 chip（episodeChipHeight 48dp），与底部弹窗条目同一密度
+                                .heightIn(min = Spacing.episodeChipHeight)
                                 .clip(shape)
                                 // 选中/未选中统一浅灰胶囊底（白 10%），仅文字区分选中态
-                                .background(Color.White.copy(alpha = 0.10f))
+                                .background(Color.White.copy(alpha = SideSheetFillAlpha))
                                 // 选集列表自带选中态：去掉按压/点击涟漪，选中色即反馈
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
@@ -4737,8 +4752,9 @@ private fun SubtitleSettingSideSheet(
                 .padding(bottom = Spacing.dialogContentMargin),
         ) {
             // 面板不再单独铺色：文字直接压在整屏「右浓左淡」渐变暗场上（面板区域仍 ≥90% 黑），
-            // 内部强制 miuix 深色色板以保证滑杆/文字对比
-            MiuixTheme(colors = darkColorScheme()) {
+            // 内部强制深色档色板；强调色跟随用户选的主题色，与同页其他弹窗同色
+            val sheetThemeColor by settings.themeColor.collectAsStateWithLifecycle()
+            MiuixTheme(colors = playerDarkMiuixColors(sheetThemeColor)) {
             // 竖屏非全屏时给状态栏让位：作为可滚动内容的顶部留白（而不是容器内边距）
             val statusBarTopPadding = if (statusBarInset) {
                 WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -4748,9 +4764,9 @@ private fun SubtitleSettingSideSheet(
             // 排版对齐 fongmi dialog_subtitle_setting：顶部标题 + 右侧「重置」，下面一排 Tab 按钮
             var subtitleTab by remember { mutableIntStateOf(0) }
             // 面板内所有单选 chip 统一配色：底一律 white 10%，选中=主题色文字+加粗，未选中=muted 白
-            val chipFill = Color.White.copy(alpha = 0.10f)
+            val chipFill = Color.White.copy(alpha = SideSheetFillAlpha)
             val chipSelectedText = MiuixTheme.colorScheme.primary
-            val chipUnselectedText = Color.White.copy(alpha = 0.62f)
+            val chipUnselectedText = Color.White.copy(alpha = SideSheetMutedTextAlpha)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -4767,16 +4783,13 @@ private fun SubtitleSettingSideSheet(
                     color = Color.White,
                     modifier = Modifier.weight(1f),
                 )
-                // 「重置」与标题视觉等大：同档字重、胶囊高度贴齐标题行高；
+                // 「重置」与标题视觉等大：固定 40dp 高（≈ 20sp 标题行高 + 一点余量），文字垂直居中；
                 // 底用 white 10%（与面板内 chip 同源）、不描边，避免黑底上的 1dp 细边发灰
-                Text(
-                    text = "重置",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.White.copy(alpha = 0.80f),
+                Box(
                     modifier = Modifier
+                        .height(40.dp)
                         .clip(SquircleShape(Spacing.corner))
-                        .background(Color.White.copy(alpha = 0.10f))
+                        .background(Color.White.copy(alpha = SideSheetFillAlpha))
                         .combinedClickable(
                             // 对齐 fongmi：短按重置当前 Tab
                             onClick = {
@@ -4797,8 +4810,16 @@ private fun SubtitleSettingSideSheet(
                                 Players.setSubtitleOffset(0)
                             },
                         )
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                )
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "重置",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = SideSheetActionTextAlpha),
+                    )
+                }
             }
             SubtitleStyleChips(
                 labels = listOf("外观", "调节", "偏移"),
@@ -5024,14 +5045,16 @@ private fun SubtitleSettingSideSheet(
 }
 
 /**
- * 字幕设置侧栏标题：14.sp / DarkOnSurfaceMuted / 通栏；段内标题通过 modifier 传 sectionSpacing 顶部间距。
+ * 字幕设置侧栏段落标题：15sp / Medium / 通栏；段内标题通过 modifier 传 sectionSpacing 顶部间距。
+ * 字号比面板大标题（20sp）低两档但字重提一档，避免层级落差过大像辅助说明。
  */
 @Composable
 private fun SideSheetSectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        fontSize = 14.sp,
-        color = DarkOnSurfaceMuted,
+        fontSize = 15.sp,
+        fontWeight = FontWeight.Medium,
+        color = Color.White.copy(alpha = SideSheetSectionTextAlpha),
         modifier = modifier.fillMaxWidth(),
     )
 }
@@ -5075,8 +5098,9 @@ private fun SubtitleStyleChipRow(
     selectedTextColor: Color? = null,
     unselectedTextColor: Color? = null,
 ) {
+    // 等宽均分：同一面板里 3 个 Tab 行与 4 个「背景颜色」行左右端能对齐（按内容宽度排会参差不齐）
     Row(
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.dialogItemGap),
     ) {
         labels.forEachIndexed { index, label ->
@@ -5084,10 +5108,13 @@ private fun SubtitleStyleChipRow(
                 title = label,
                 selected = index == selectedIndex,
                 onClick = { onSelect(index) },
-                enforceMinHeight = false,
+                modifier = Modifier.weight(1f),
+                // 高度对齐选集 chip（episodeChipHeight 48dp），字号统一 14sp
+                enforceMinHeight = true,
                 fill = fill,
                 selectedTextColor = selectedTextColor,
                 unselectedTextColor = unselectedTextColor,
+                fontSize = 14.sp,
             )
         }
     }
