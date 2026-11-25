@@ -113,10 +113,10 @@ object Spacing {
     val updateCardCorner = 10.dp
 
     /**
-     * 海报叠加层（左上/右上角标胶囊、编辑删除钮）距海报边缘的外边距：10dp（档位表 10 档）。
+     * 海报叠加层（左上/右上角标胶囊、编辑删除钮）距海报边缘的外边距：8dp（档位表 8 档）。
      * 胶囊底是绘制出来的，没有字形下沉，布局值即视觉值。
      */
-    val posterOverlayMargin = 10.dp
+    val posterOverlayMargin = 8.dp
 
     /** 海报角标内边距（水平） */
     val posterBadgePaddingH = 6.dp
