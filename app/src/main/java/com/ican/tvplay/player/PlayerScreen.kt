@@ -1785,8 +1785,10 @@ fun PlayerScreen(
         // 其余分支（全屏 / 横屏 / 画中画）保持原样：盒子本身就是稳态尺寸，交给 media3 自身 FIT
         // 竖屏（非全屏、非横屏）画面几何一律由我们自己算，PlayerView 恒 FIT，
         // 所以这个分支对三种档位都走同一套「内容矩形 + 居中 + 外层裁剪」
+        // 旋转挂起、屏幕还没转过去时也要沿用自算矩形 + FIT：否则 letterboxed 一落 false，
+        // resizeMode 立刻切到 scaleMode，media3 重量一次 contentFrame，画面会先缩一下再转
         val letterboxed = !inPip && !pipExitHold && !renderFullscreen &&
-            pendingFullscreen == null && !landLayout
+            (pendingFullscreen == null || !isLandscape) && !landLayout
 
         // 播完态「静帧替身」：STATE_ENDED 之后解码器已经停了，这时再 resize TextureView，
         // Android 要么重新分配一块没写过的空缓冲（未写入的 YUV → 深蓝块），
@@ -1838,8 +1840,13 @@ fun PlayerScreen(
                 // 平板横屏全屏稳态若走下面 isLandscape 定尺寸分支（宽高取自 Configuration），
                 // PiP 退出放大期间可能拿到中间态尺寸，Surface 与系统动画窗口错位跳变
                 renderFullscreen -> Modifier.fillMaxSize().clip(SquircleShape(deviceCorner))
-                // 旋转挂起期间：直接铺满，详情列已隐藏（when 分支 pendingFullscreen==true -> Unit），
-                // 旋转到位后即为全屏，避免"小窗旋转后瞬间放大"的叠加感。
+                // 旋转挂起、屏幕还没转过去：几何/位置/比例全部冻结在竖屏小窗，
+                // 不提前铺满、也不切 resizeMode，点全屏到真正转起来之间画面一帧都不动
+                pendingFullscreen != null && !isLandscape ->
+                    Modifier
+                        .offset { IntOffset(0, pAnimTop.value.roundToPx()) }
+                        .animatedSize(pAnimWidth, pAnimHeight)
+                // 旋转挂起、已横过来只等 fullscreen 落位：直接铺满，跳过横版 38% 小窗那一帧。
                 // 这里不叠加 clip：旋转过渡只有 200~300ms，四角都是黑底看不出圆角差异，
                 // 省掉一次离屏图层合成（interop TextureView 上这笔开销不小，双击后更跟手）
                 pendingFullscreen != null -> Modifier.fillMaxSize()
