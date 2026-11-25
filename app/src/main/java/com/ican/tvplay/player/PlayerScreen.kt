@@ -35,6 +35,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -130,6 +131,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
@@ -4253,18 +4255,40 @@ private fun EpisodeChip(
 }
 
 /**
- * 全屏侧边面板的空白区收起层：只拦截触摸（点面板外收起、挡住底下视频控件误触），
- * 不绘制任何颜色，取代原先的黑色遮罩 PopupScrim，避免滑出面板时压暗整个画面。
+ * 全屏侧边面板的背景层：整屏「右浓左淡」的横向渐变暗场。
+ * 屏幕最右侧 94% 黑、到面板区域仍有 90%，往左逐段变淡（55% → 20%）直至完全透明，
+ * 面板不再有自己的实底与硬边，靠这层渐变托底并与视频自然衔接。
+ * 200ms 淡入淡出（与面板 260ms 滑动同起）；显示期间接住所有点击（点空白处收起），
+ * 同时挡住底下的视频控件，避免一次点击触发两件事。
  */
 @Composable
-private fun DismissTouchLayer(enabled: Boolean, onClick: () -> Unit) {
+private fun SideSheetGradientBackdrop(visible: Boolean, onClick: () -> Unit) {
+    val scrimAlpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+        label = "sideSheetBackdrop",
+    )
+    // 完全隐藏且不处于显示态时直接不组合，避免透明层常驻占位
+    if (scrimAlpha == 0f && !visible) return
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .alpha(scrimAlpha)
+            .background(
+                Brush.horizontalGradient(
+                    colorStops = arrayOf(
+                        0.00f to Color.Transparent,
+                        0.16f to Color.Black.copy(alpha = 0.20f),
+                        0.38f to Color.Black.copy(alpha = 0.55f),
+                        0.66f to Color.Black.copy(alpha = 0.90f),
+                        1.00f to Color.Black.copy(alpha = 0.94f),
+                    ),
+                ),
+            )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                enabled = enabled,
+                enabled = visible,
                 onClick = onClick,
             ),
     )
@@ -4330,8 +4354,8 @@ private fun EpisodeSideSheet(
         bottomStart = com.ican.tvplay.ui.theme.Spacing.sideSheetCorner,
     )
     Box(modifier = Modifier.fillMaxSize()) {
-            // 不再压暗画面：仅铺一层透明触摸拦截层，点面板外空白处收起面板
-            DismissTouchLayer(enabled = sheetShown, onClick = dismissWithAnim)
+            // 背景：整屏右浓左淡渐变暗场（面板本身不再单独铺色），点面板外空白处收起面板
+            SideSheetGradientBackdrop(visible = sheetShown, onClick = dismissWithAnim)
             Column(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -4339,7 +4363,6 @@ private fun EpisodeSideSheet(
                     .fillMaxHeight()
                     .width(panelWidth)
                     .clip(panelShape)
-                    .background(Color.Black.copy(alpha = 0.85f), panelShape)
                     // 面板本体消费点击，避免点面板空白处误触发外层收起
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -4349,7 +4372,8 @@ private fun EpisodeSideSheet(
                     // 顶部留白改由列表 contentPadding 承担，内容可一路滑到面板最顶缘
                     .padding(horizontal = Spacing.dialogContentMargin),
             ) {
-                // 侧栏面板底色为半透明黑（Black 85%，比原来 72% 更实），内部仍强制 miuix 深色色板以保证滑杆/文字对比，
+                // 面板不再单独铺色：文字直接压在整屏「右浓左淡」渐变暗场上（面板区域仍 ≥90% 黑），
+                // 内部强制 miuix 深色色板以保证滑杆/文字对比，
                 // 选中/未选中配色与字幕设置的分段单选按钮完全同源
                 MiuixTheme(colors = darkColorScheme()) {
                 // 弹出前就定位到当前集（首帧就位，无滚动动画）：
@@ -4630,8 +4654,8 @@ private fun SubtitleSettingSideSheet(
         bottomStart = Spacing.sideSheetCorner,
     )
     Box(modifier = Modifier.fillMaxSize()) {
-        // 不再压暗画面：仅铺一层透明触摸拦截层，点面板外空白处收起面板
-        DismissTouchLayer(enabled = sheetShown, onClick = dismissWithAnim)
+        // 背景：整屏右浓左淡渐变暗场（面板本身不再单独铺色），点面板外空白处收起面板
+        SideSheetGradientBackdrop(visible = sheetShown, onClick = dismissWithAnim)
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -4639,7 +4663,6 @@ private fun SubtitleSettingSideSheet(
                 .fillMaxHeight()
                 .width(panelWidth)
                 .clip(panelShape)
-                .background(Color.Black.copy(alpha = 0.85f), panelShape)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -4652,7 +4675,8 @@ private fun SubtitleSettingSideSheet(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = Spacing.dialogContentMargin),
         ) {
-            // 侧栏面板底色为半透明黑（Black 85%，比原来 72% 更实），内部仍强制 miuix 深色色板以保证滑杆/文字对比
+            // 面板不再单独铺色：文字直接压在整屏「右浓左淡」渐变暗场上（面板区域仍 ≥90% 黑），
+            // 内部强制 miuix 深色色板以保证滑杆/文字对比
             MiuixTheme(colors = darkColorScheme()) {
             // 竖屏非全屏时给状态栏让位：作为可滚动内容的顶部留白（而不是容器内边距）
             val statusBarTopPadding = if (statusBarInset) {
