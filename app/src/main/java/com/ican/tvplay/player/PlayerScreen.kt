@@ -4607,10 +4607,10 @@ private fun <T> OptionDialog(
     show: Boolean, title: String, options: List<T>, current: T?, label: (T) -> String,
     onSelect: (T) -> Unit,
     enabled: (T) -> Boolean = { true },
-    onDismiss: () -> Unit,
     // true = 全屏呼出的功能弹窗：容器/未选中行固定深色档（不跟随主题），选中强调色仍取主题色；
     // false = 竖屏详情页弹窗，跟随全局浅/深主题
     forceDark: Boolean = false,
+    onDismiss: () -> Unit = {},
 ) {
     val scheme = MiuixTheme.colorScheme
     val dialogContainer = if (forceDark) DarkSurfaceVariant else scheme.surfaceContainer
@@ -4693,9 +4693,10 @@ private fun <T> OptionDialog(
 private fun SubtitleDialog(
     show: Boolean, tracks: List<Players.TrackOption>, textDisabled: Boolean,
     onSelect: (Players.TrackOption) -> Unit,
-    onAddSubtitle: () -> Unit, onSettings: () -> Unit, onDismiss: () -> Unit,
+    onAddSubtitle: () -> Unit, onSettings: () -> Unit,
     // true = 全屏呼出的字幕弹窗：容器/未选中行固定深色档；false = 竖屏详情页弹窗，跟随主题
     forceDark: Boolean = false,
+    onDismiss: () -> Unit = {},
 ) {
     val scheme = MiuixTheme.colorScheme
     val dialogContainer = if (forceDark) DarkSurfaceVariant else scheme.surfaceContainer
