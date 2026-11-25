@@ -135,7 +135,11 @@ fun SearchHomeScreen(
                         // 先收键盘再返回，避免键盘跟着页面转场一直留到首页
                         focusManager.clearFocus()
                         onBack()
-                    }, showBackground = true, iconSize = 20.dp)
+                    }, showBackground = true, iconSize = 20.dp,
+                        // 箭头用搜索栏前导搜索图标的同款色（miuix InputField 内部取
+                        // onSurfaceContainerHigh），两个圆底/胶囊里的图标色统一
+                        tint = MiuixTheme.colorScheme.onSurfaceContainerHigh,
+                    )
 
                     // miuix 原生胶囊搜索框（左搜索图标 + 输入后右侧清除钮，IME 搜索键提交）
                     MiuixSearchInput(

@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ican.tvplay.ui.theme.Spacing
@@ -39,6 +40,9 @@ fun MiuixBackButton(
     onClick: () -> Unit,
     showBackground: Boolean = true,
     iconSize: Dp = 24.dp,
+    // 箭头颜色覆盖：默认 onSurfaceVariantSummary；与搜索栏并排的场景传搜索图标同款
+    // onSurfaceContainerHigh（miuix InputField 前导搜索图标就是用这个色）
+    tint: Color? = null,
 ) {
     val opticalDx = iconSize * BACK_ICON_OPTICAL_FRACTION
     Box(
@@ -58,7 +62,7 @@ fun MiuixBackButton(
         Icon(
             imageVector = MiuixIcons.Regular.ChevronBackward,
             contentDescription = "返回",
-            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            tint = tint ?: MiuixTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier
                 .size(iconSize)
                 .offset(x = -opticalDx),
