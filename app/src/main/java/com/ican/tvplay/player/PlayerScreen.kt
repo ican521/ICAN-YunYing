@@ -422,10 +422,10 @@ fun PlayerScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     // 布局档位按「当前屏幕横竖」定：平板竖着走竖屏小窗、横着走横版；
-    // 手机竖屏小窗、横屏自动进全屏（见下方 checkLand 同款 effect），不会落进横版分支。
-    // 手机类别仅用于「横屏自动进全屏」这一条的判定。
+    // 手机一律不落横版分支（竖屏小窗、横屏自动进全屏，见下方 checkLand 同款 effect）——
+    // 手机横过来那一帧 fullscreen 还没落位，若按 isLandscape 直接判档会闪一帧横版小窗
     val isPhone = configuration.smallestScreenWidthDp < 600
-    val landLayout = isLandscape
+    val landLayout = isLandscape && !isPhone
     // 渲染用的「全屏」：手机从横屏全屏竖回竖屏的那一瞬间，fullscreen 状态要等下面的
     // LaunchedEffect 下一帧才清掉；若照旧按 fullscreen 画，会多出 100~200ms 的
     // 「竖屏窗口 + 全屏分支」中间态——视频铺满整个 1080x2400、画面被 FIT 居中到屏幕中间，
@@ -433,8 +433,14 @@ fun PlayerScreen(
     // 对齐 fongmi：VideoActivity.exitFullscreen 里 setFullscreen(false)/setVideoView(false)
     // 是在 onConfigurationChanged 里同步做完的，配置变化那一帧画出来就已经是小窗形态。
     // 所以这里在渲染期派生一次，同一帧就收敛，状态清理仍交给 LaunchedEffect。
-    val renderFullscreen = fullscreen && !(isPhone && !isLandscape && !portraitFullscreen &&
-        !landscapeFullscreen && !landZooming && !portraitZooming)
+    // 手机已横过来、fullscreen 还没被下面 LaunchedEffect 置位的那一帧，也直接按全屏渲染：
+    // 否则会先落一帧「竖屏布局横躺」，Surface 多 resize 一次、视觉上先顿一下
+    val enteringLandFullscreen = isPhone && isLandscape && !fullscreen &&
+        pendingFullscreen == null && !exitRotating && !landZooming &&
+        !portraitZooming && !landscapeFullscreen && !portraitFullscreen
+    val renderFullscreen = (fullscreen || enteringLandFullscreen) &&
+        !(isPhone && !isLandscape && !portraitFullscreen && !landscapeFullscreen &&
+            !landZooming && !portraitZooming)
     LaunchedEffect(isLandscape) {
         when {
             // 旋转进入全屏后保持纯净画面，工具栏由用户单击唤出
