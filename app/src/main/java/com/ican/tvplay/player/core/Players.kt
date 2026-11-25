@@ -1218,8 +1218,8 @@ object Players {
                 androidx.media3.mpvplayer.MpvAndroidOptions.Builder()
                     .setShaderCacheDirectory(mpvCacheDir)
                     .setAudioPassthroughEnabled(false)
-                    .setVulkanEnabled(false)
-                    .setGpuNextEnabled(false)
+                    .setVulkanEnabled(true)
+                    .setGpuNextEnabled(true)
                     .build(),
             )
         return builder.build()
