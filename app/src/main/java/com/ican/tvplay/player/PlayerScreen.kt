@@ -210,7 +210,6 @@ import com.ican.tvplay.ui.components.tvCardEffect
 import com.ican.tvplay.ui.theme.BrandPink
 import com.ican.tvplay.ui.theme.DarkOnSurface
 import com.ican.tvplay.ui.theme.DarkOnSurfaceMuted
-import com.ican.tvplay.ui.theme.DarkSurfaceElevated
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.chipTintedFill
 import com.ican.tvplay.ui.theme.chipTintedText
@@ -4213,6 +4212,8 @@ private fun EpisodeChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enforceMinHeight: Boolean = true,
+    fill: Color? = null,
+    selectedTextColor: Color? = null,
 ) {
     val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
     val darkMode = LocalDarkTheme.current
@@ -4231,7 +4232,7 @@ private fun EpisodeChip(
             .tvCardEffect(onClick = onClick, shape = shape, focusedScale = 1.05f, glow = false, pressEffect = false)
             // 选中：primary 派生 tinted 底；未选中 secondaryVariant（浅 #F0F0F0 / 深 #434343）
             .background(
-                if (selected) tintedFill
+                fill ?: if (selected) tintedFill
                 else MiuixTheme.colorScheme.secondaryVariant,
                 shape,
             )
@@ -4240,7 +4241,7 @@ private fun EpisodeChip(
         Text(
             text = title,
             style = MaterialTheme.typography.labelMedium,
-            color = if (selected) tintedText
+            color = if (selected) (selectedTextColor ?: tintedText)
             else MiuixTheme.colorScheme.onSecondaryVariant,
             fontWeight = if (selected) FontWeight.SemiBold else null,
             maxLines = 1,
@@ -4320,7 +4321,7 @@ private fun EpisodeSideSheet(
                     .fillMaxHeight()
                     .width(panelWidth)
                     .clip(panelShape)
-                    .background(DarkSurfaceElevated, panelShape)
+                    .background(Color.Black.copy(alpha = 0.72f), panelShape)
                     // 面板本体消费点击，避免点面板空白处误触发外层收起
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -4330,7 +4331,7 @@ private fun EpisodeSideSheet(
                     // 顶部留白改由列表 contentPadding 承担，内容可一路滑到面板最顶缘
                     .padding(horizontal = Spacing.dialogContentMargin),
             ) {
-                // 侧栏固定深色底：色板强制深色（与字幕设置侧栏同款），
+                // 侧栏面板改为半透明黑（Black 72%），内部仍强制 miuix 深色色板以保证滑杆/文字对比，
                 // 选中/未选中配色与字幕设置的分段单选按钮完全同源
                 MiuixTheme(colors = darkColorScheme()) {
                 // 弹出前就定位到当前集（首帧就位，无滚动动画）：
@@ -4352,26 +4353,13 @@ private fun EpisodeSideSheet(
                     itemsIndexed(episodes, key = { _, ep -> ep.index }, contentType = { _, _ -> "episode" }) { idx, ep ->
                         val selected = idx == currentIndex
                         val shape = SquircleShape(com.ican.tvplay.ui.theme.Spacing.corner)
-                        val primary = MiuixTheme.colorScheme.primary
-                        // 面板固定深色，选中态按深色档派生
-                        val tintedFill = remember(primary) { chipTintedFill(primary, dark = true) }
-                        val tintedText = remember(primary) { chipTintedText(primary, dark = true) }
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(shape)
-                                .background(
-                                    // 选中 = primary 派生 tinted 底；未选中 = 透明
-                                    if (selected) tintedFill
-                                    else Color.Transparent,
-                                )
-                                .border(
-                                    // 外框统一 outline，不随选中态换色（与字幕设置分段单选同款）
-                                    width = 1.dp,
-                                    color = MiuixTheme.colorScheme.outline,
-                                    shape = shape,
-                                )
+                                // 选中/未选中统一浅灰胶囊底（白 10%），仅文字区分选中态
+                                .background(Color.White.copy(alpha = 0.10f))
                                 // 选集列表自带选中态：去掉按压/点击涟漪，选中色即反馈
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
@@ -4382,8 +4370,8 @@ private fun EpisodeSideSheet(
                             Text(
                                 text = ep.title,
                                 fontSize = 14.sp,
-                                // 选中 tinted 文字；未选中 onSurfaceVariantSummary
-                                color = if (selected) tintedText
+                                // 选中 primary 文字；未选中 onSurfaceVariantSummary
+                                color = if (selected) MiuixTheme.colorScheme.primary
                                 else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 fontWeight = if (selected) FontWeight.SemiBold else null,
                                 maxLines = 1,
@@ -4632,7 +4620,7 @@ private fun SubtitleSettingSideSheet(
                 .fillMaxHeight()
                 .width(panelWidth)
                 .clip(panelShape)
-                .background(DarkSurfaceElevated, panelShape)
+                .background(Color.Black.copy(alpha = 0.72f), panelShape)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -4645,7 +4633,7 @@ private fun SubtitleSettingSideSheet(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = Spacing.dialogContentMargin),
         ) {
-            // 侧栏固定深色底，miuix 滑杆强制使用深色色板，避免浅色主题下滑杆轨道看不清
+            // 侧栏面板改为半透明黑（Black 72%），内部仍强制 miuix 深色色板以保证滑杆/文字对比
             MiuixTheme(colors = darkColorScheme()) {
             // 竖屏非全屏时给状态栏让位：作为可滚动内容的顶部留白（而不是容器内边距）
             val statusBarTopPadding = if (statusBarInset) {
@@ -4716,6 +4704,8 @@ private fun SubtitleSettingSideSheet(
                     settings.setSubtitleStyle(subtitleStyle.copy(mode = if (index == 1) SubtitleStyle.MODE_CUSTOM else SubtitleStyle.MODE_SYSTEM))
                 },
                 modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
+                fill = Color.White.copy(alpha = 0.10f),
+                selectedTextColor = MiuixTheme.colorScheme.primary,
             )
             if (subtitleStyle.mode == SubtitleStyle.MODE_CUSTOM) {
                 SideSheetSectionTitle(
@@ -4760,6 +4750,8 @@ private fun SubtitleSettingSideSheet(
                         settings.setSubtitleStyle(subtitleStyle.copy(edgeType = type))
                     },
                     modifier = Modifier.padding(top = Spacing.videoTitleContentGap),
+                    fill = Color.White.copy(alpha = 0.10f),
+                    selectedTextColor = MiuixTheme.colorScheme.primary,
                 )
                 if (subtitleStyle.edgeType != SubtitleStyle.EDGE_NONE) {
                     SideSheetSectionTitle(
@@ -4953,6 +4945,8 @@ private fun SubtitleStyleChipRow(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    fill: Color? = null,
+    selectedTextColor: Color? = null,
 ) {
     Row(
         modifier = modifier,
@@ -4964,6 +4958,8 @@ private fun SubtitleStyleChipRow(
                 selected = index == selectedIndex,
                 onClick = { onSelect(index) },
                 enforceMinHeight = false,
+                fill = fill,
+                selectedTextColor = selectedTextColor,
             )
         }
     }
