@@ -434,7 +434,18 @@ fun PlayerScreen(
                 fullscreen = true; pendingFullscreen = null; controlsVisible = false; exitRotating = false
             }
             // 转回竖屏：退全屏的过渡结束，交给竖屏布局
-            !isLandscape -> exitRotating = false
+            !isLandscape -> {
+                exitRotating = false
+                // 手机从「横屏全屏」竖回竖屏：自动退全屏回详情页
+                // （fongmi onConfigurationChanged：isAutoRotate && isPort && PORTRAIT && !isRotate && !isLock → exitFullscreen）
+                if (isPhone && fullscreen && !locked && !portraitFullscreen && !landscapeFullscreen &&
+                    !landZooming && !portraitZooming
+                ) {
+                    fullscreen = false
+                    controlsVisible = false
+                    (context as? Activity)?.restoreDefaultOrientation()
+                }
+            }
         }
     }
     // 手机横屏自动进全屏（照搬 fongmi checkLand：isPort() && ResUtil.isLand(this) → enterFullscreen）。
