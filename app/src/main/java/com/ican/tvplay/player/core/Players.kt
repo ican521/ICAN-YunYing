@@ -603,6 +603,16 @@ object Players {
         retryCount = 0  // 新源重置错误计数
         // 新源开播清除旧错误，并重置播放内的字幕偏移（偏移只对当前这一集有效，仿 fongmi）
         _state.value = _state.value.copy(error = null, subtitleOffsetMs = 0L, switching = false)
+        // ISO 光盘镜像：EXO 无容器能力，自动切到自带 libmpv（libbluray/udf/iso9660 已编进 so）。
+        // 仅改内存内核态，不写持久化设置；下次冷启动仍按用户设置的内核走。
+        if (isIsoUrl(spec.url) && _state.value.kernel != Kernel.MPV &&
+            runCatching { MpvPlayer.isAvailable() }.getOrDefault(false)
+        ) {
+            Log.i(TAG, "iso direct play, switch kernel to MPV: ${spec.url.substringBefore('?').take(120)}")
+            setKernel(Kernel.MPV)
+            startResolved(spec, startPositionMs)
+            return
+        }
         val inferred = spec.format ?: ContentTypeProbe.fromUrl(spec.url)
         val needProbe = inferred == null && _state.value.kernel == Kernel.EXO &&
             (spec.url.startsWith("http://") || spec.url.startsWith("https://"))
@@ -633,6 +643,12 @@ object Players {
             Log.e(TAG, "start fail url=${spec.url.take(120)}", t)
             notifyError(describeError(t))
         }
+    }
+
+    /** URL 后缀是否为光盘镜像 .iso（去掉 query/fragment 后小写判定，与 ContentTypeProbe 同口径） */
+    private fun isIsoUrl(url: String): Boolean {
+        val path = url.substringBefore('?').substringBefore('#').lowercase(java.util.Locale.ROOT)
+        return path.endsWith(".iso")
     }
 
     /** 字幕字号（0.5x - 4.0x）：实时应用到已绑定的 SubtitleView / MPV 字幕选项 */
@@ -1176,6 +1192,16 @@ object Players {
             .addTlsCaFileFromAsset(ctx, "cacert.pem", caFile)
             .addPreInitStringOption("demuxer-max-bytes", forwardBytes)
             .addPreInitStringOption("demuxer-max-back-bytes", backBytes)
+            // HDR10（smpte2084 / bt2020）直出：主路径把 HDR 元数据交给 Android 显示链路（target-colorspace-hint），
+            // 后三项为 hint 不生效时的 HDR→SDR 保底；仅对 HDR 内容生效，SDR 源不受影响
+            .addPreInitStringOption("target-colorspace-hint", "yes")
+            .addPreInitStringOption("tone-mapping", "bt.2446a")
+            .addPreInitStringOption("hdr-compute-peak", "yes")
+            .addPreInitStringOption("target-peak", "100")
+            // mpv 日志落 filesDir/mpv/mpv.log（绝对路径，便于 adb pull 验证 HDR 路径）；
+            // 本版 libmpv 无 log-level 选项，日志级别走原生 msg-level
+            .addPreInitStringOption("log-file", java.io.File(mpvDir, "mpv.log").absolutePath)
+            .addPreInitStringOption("msg-level", "all=info")
             .addAndroidSubtitleOptions(ctx, buildMpvSubtitleOptions())
             .addAndroidDefaults(
                 androidx.media3.mpvplayer.MpvAndroidOptions.Builder()

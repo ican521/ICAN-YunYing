@@ -52,6 +52,8 @@ internal object ContentTypeProbe {
      */
     fun probe(url: String, headers: Map<String, String>): String? {
         if (!url.startsWith("http://") && !url.startsWith("https://")) return null
+        // 光盘镜像：读 16KB 头部对 .iso 无判定意义，且 jar 反代 206/大文件可能拖慢起播，直接短路
+        if (isIsoUrl(url)) return null
         val request = runCatching {
             Request.Builder()
                 .url(url)
@@ -69,6 +71,12 @@ internal object ContentTypeProbe {
                 )
             }
         }.getOrNull()
+    }
+
+    /** URL 后缀是否为光盘镜像 .iso（去掉 query/fragment 后小写判定，与 Players 同口径） */
+    private fun isIsoUrl(url: String): Boolean {
+        val path = url.substringBefore('?').substringBefore('#').lowercase(Locale.ROOT)
+        return path.endsWith(".iso")
     }
 
     private fun readHead(input: InputStream): ByteArray {
