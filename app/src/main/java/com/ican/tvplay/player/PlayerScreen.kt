@@ -1813,7 +1813,10 @@ fun PlayerScreen(
         // 所以这个分支对三种档位都走同一套「内容矩形 + 居中 + 外层裁剪」
         // 旋转挂起、屏幕还没转过去时也要沿用自算矩形 + FIT：否则 letterboxed 一落 false，
         // resizeMode 立刻切到 scaleMode，media3 重量一次 contentFrame，画面会先缩一下再转
-        val letterboxed = !inPip && !pipExitHold && !renderFullscreen &&
+        // 退全屏等转屏（exitRotating）必须排除：那一刻外框还是铺满整屏，若仍按预览小窗
+        // 内容尺寸居中，SurfaceView 会真的把画面缩成预览大小浮在屏幕正中（转屏完成后再跳回顶部）。
+        // 汉一帧都不该出现，所以这段时间内层一律铺满外框，交给 media3 按当前档位出画
+        val letterboxed = !inPip && !pipExitHold && !renderFullscreen && !exitRotating &&
             (pendingFullscreen == null || !isLandscape) && !landLayout
 
         // 播完态「静帧替身」：STATE_ENDED 之后解码器已经停了，这时再 resize TextureView，
@@ -1876,8 +1879,11 @@ fun PlayerScreen(
                 // 这里不叠加 clip：旋转过渡只有 200~300ms，四角都是黑底看不出圆角差异，
                 // 省掉一次离屏图层合成（interop TextureView 上这笔开销不小，双击后更跟手）
                 pendingFullscreen != null -> Modifier.fillMaxSize()
-                // 退全屏等旋转：继续铺满（此刻还没转回竖屏，切横版小窗会先闪一下平板样式）
-                exitRotating -> Modifier.fillMaxSize()
+                // 退全屏等旋转：继续铺满（此刻还没转回竖屏，切横版小窗会先闪一下平板样式）。
+                // 必须带上 isLandscape：屏幕一翻到竖屏、exitRotating 还没被 LaunchedEffect 清掉时，
+                // 若仍走这一支，外框还是铺满整屏、内层却已按预览高度出画，画面就缩在屏幕正中闪几帧。
+                // 加上 isLandscape 后，配置一变就落到竖屏分支，框和画面同时落在最终小窗位置
+                exitRotating && isLandscape -> Modifier.fillMaxSize()
                 // 横版档位（平板，含平板竖屏）：小窗静止态、放大/缩回动画中、已放大全屏
                 // 全程使用同一套 offset/宽高修饰符（静止值恰为 38% 小窗），
                 // 不在动画修饰符与 statusBarsPadding 静态修饰符之间切换，避免收敛瞬间上跳
