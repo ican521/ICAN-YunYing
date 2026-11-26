@@ -248,14 +248,14 @@ fun SearchHomeScreen(
                             }
                             Spacer(Modifier.height(Spacing.titleContentGap))
                             WordFlowRow(
-                                words = history.asReversed(),
+                                words = history,
                                 onWordClick = { submit(it) },
                                 onWordLongClick = { vm.removeHistory(it) },
                             )
                         }
                     }
 
-                    // 下半部分：推荐（空查询时显示热搜词；输入关键词时显示匹配的影片标题）
+                    // 下半部分：推荐（空查询显示热搜词；输入关键词时优先搜索建议，建议为空回退热搜）
                     Column {
                         Text(
                             text = "推荐",
@@ -263,7 +263,12 @@ fun SearchHomeScreen(
                             color = MiuixTheme.colorScheme.onSurface,
                         )
                         Spacer(Modifier.height(Spacing.titleContentGap))
-                        val recommendWords = if (queryText.isBlank()) hotWords else suggestions
+                        // 输入时优先用实时搜索建议；建议未返回/为空时回退热搜，避免推荐区整组清空
+                        val recommendWords = when {
+                            queryText.isBlank() -> hotWords
+                            suggestions.isNotEmpty() -> suggestions
+                            else -> hotWords
+                        }
                         WordFlowRow(words = recommendWords, onWordClick = { submit(it) })
                     }
                 }

@@ -5,6 +5,8 @@ import com.ican.tvplay.data.remote.TvBoxSite
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 /** 主题模式：跟随系统 / 浅色 / 深色 */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
@@ -512,18 +514,40 @@ class SettingsRepository(context: Context) {
 
     // ---- 搜索历史 ----
 
+    // 搜索历史：List<String> 序列化成 JSON 字符串落盘（对齐 fongmi RecordAdapter + Setting.putKeyword），
+    // 有序以保留「最新置顶」顺序；旧版 StringSet 数据不迁移，读回失败/缺失按空列表处理。
+    private val historyJson = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        coerceInputValues = true
+    }
+
+    private fun decodeSearchHistory(raw: String?): List<String> {
+        if (raw.isNullOrBlank()) return emptyList()
+        return runCatching {
+            historyJson.decodeFromString<List<String>>(raw)
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun encodeSearchHistory(list: List<String>): String =
+        historyJson.encodeToString(list)
+
     private val _searchHistory = MutableStateFlow(
-        runCatching {
-            prefs.getStringSet(KEY_SEARCH_HISTORY, emptySet()).orEmpty().toList()
-        }.getOrDefault(emptyList()),
+        runCatching { decodeSearchHistory(prefs.getString(KEY_SEARCH_HISTORY, null)) }
+            .getOrDefault(emptyList()),
     )
     val searchHistory: StateFlow<List<String>> = _searchHistory.asStateFlow()
 
     fun addSearchHistory(query: String) {
         val q = query.trim()
         if (q.isEmpty()) return
-        val updated = (_searchHistory.value.filter { it != q } + q).take(MAX_SEARCH_HISTORY)
-        prefs.edit().putStringSet(KEY_SEARCH_HISTORY, updated.toSet()).apply()
+        // fongmi checkToAdd：先移除旧位置，再插到头部；超出上限删尾部最旧一条
+        val updated = _searchHistory.value.filter { it != q }.toMutableList()
+        updated.add(0, q)
+        if (updated.size > MAX_SEARCH_HISTORY) updated.removeAt(MAX_SEARCH_HISTORY)
+        prefs.edit().putString(KEY_SEARCH_HISTORY, encodeSearchHistory(updated)).apply()
         _searchHistory.value = updated
     }
 
@@ -536,7 +560,7 @@ class SettingsRepository(context: Context) {
         val q = query.trim()
         if (q.isEmpty()) return
         val updated = _searchHistory.value.filter { it != q }
-        prefs.edit().putStringSet(KEY_SEARCH_HISTORY, updated.toSet()).apply()
+        prefs.edit().putString(KEY_SEARCH_HISTORY, encodeSearchHistory(updated)).apply()
         _searchHistory.value = updated
     }
 
@@ -600,7 +624,7 @@ class SettingsRepository(context: Context) {
         _favoriteUpdatePopupEveryLaunch.value =
             prefs.getBoolean(KEY_FAVORITE_UPDATE_POPUP_EVERY_LAUNCH, true)
         _searchHistory.value = runCatching {
-            prefs.getStringSet(KEY_SEARCH_HISTORY, emptySet()).orEmpty().toList()
+            decodeSearchHistory(prefs.getString(KEY_SEARCH_HISTORY, null))
         }.getOrDefault(emptyList())
         _hotWordsJson.value = prefs.getString(KEY_HOT, null).orEmpty()
         _siteToggleVersion.value += 1
