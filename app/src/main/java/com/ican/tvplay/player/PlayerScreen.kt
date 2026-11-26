@@ -4253,6 +4253,10 @@ private fun FullscreenPlayLayout(
         ) {
             Box(
                 modifier = Modifier
+                    // 横屏旋转到挖孔落在右侧时让开前置摄像头，再叠 fongmi 的 4dp 边距
+                    .windowInsetsPadding(
+                        WindowInsets.displayCutout.only(WindowInsetsSides.End),
+                    )
                     .padding(end = 4.dp)
                     .size(48.dp)
                     .tvCardEffect(
