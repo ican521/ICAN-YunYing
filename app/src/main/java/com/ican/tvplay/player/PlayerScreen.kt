@@ -56,6 +56,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -4007,7 +4011,12 @@ private fun FullscreenPlayLayout(
                 info = videoInfo,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = 16.dp, top = 64.dp),
+                    // 横屏时前置摄像头挖孔在屏幕左侧（部分旋转方向在上方），
+                    // 按 displayCutout 的 start/top inset 让位，再叠固定的 16dp/56dp 视觉间距
+                    .windowInsetsPadding(
+                        WindowInsets.displayCutout.only(WindowInsetsSides.Start + WindowInsetsSides.Top),
+                    )
+                    .padding(start = 16.dp, top = 56.dp),
             )
         }
 
