@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -82,16 +83,19 @@ fun VideoInfoPanel(
             fontFamily = FontFamily.Monospace,
         )
         rows.forEach { (label, value) ->
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 标签是中文、值是数字/英文，两者字体 fallback 的行高不同，
+                // 顶部对齐会差一两像素；统一按基线对齐
                 Text(
                     text = label,
-                    modifier = Modifier.width(48.dp),
+                    modifier = Modifier.width(48.dp).alignByBaseline(),
                     color = Color(0x99FFFFFF),
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                 )
                 Text(
                     text = value,
+                    modifier = Modifier.alignByBaseline(),
                     color = Color.White,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
