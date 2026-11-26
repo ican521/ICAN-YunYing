@@ -20,21 +20,36 @@ val localProps = Properties().apply {
     }
 }
 
-// 自动版本号：一次确认的改动 = 一个 commit = 版本末位 +1，不再手改本文件
-// 基线：第 629 个提交（2026-11-15 版本号机制的收尾提交）视为 versionCode 2 的起点，
-// 主线大版本为 2.0，末位随提交数自增；同一 commit 打出来的包版本号恒定
-fun gitCommitCount(): Int = try {
-    val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
-        .directory(rootDir)
-        .redirectErrorStream(true)
-        .start()
-    val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
-    if (process.waitFor() == 0) output.toIntOrNull() ?: 629 else 629
-} catch (e: Exception) {
-    629
+// 版本号：versionName = 手写 SemVer 前缀 + 当前 commit 短哈希（如 2.0.0-9123708）；
+// versionCode 仍按提交数单调递增，保证覆盖安装不回退。
+// git 不在系统 PATH 时回退常见安装路径，避免构建进程调不到 git 走兜底值。
+fun runGit(vararg args: String): String? {
+    val candidates = listOf(
+        "git",
+        "C:\\Program Files\\Git\\cmd\\git.exe",
+        "C:\\Program Files (x86)\\Git\\cmd\\git.exe",
+    )
+    for (exec in candidates) {
+        try {
+            val process = ProcessBuilder(exec, *args)
+                .directory(rootDir)
+                .redirectErrorStream(true)
+                .start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+            if (process.waitFor() == 0 && output.isNotEmpty()) return output
+        } catch (e: Exception) {
+            // 尝试下一个候选路径
+        }
+    }
+    return null
 }
 
+fun gitCommitCount(): Int = runGit("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 629
+
+fun gitShortHash(): String = runGit("rev-parse", "--short", "HEAD") ?: "unknown"
+
 val versionDelta = (gitCommitCount() - 629).coerceAtLeast(0)
+val versionHash = gitShortHash()
 
 android {
     namespace = "com.ican.tvplay"
@@ -45,7 +60,7 @@ android {
         minSdk = 24
         targetSdk = 37
         versionCode = 2 + versionDelta
-        versionName = "2.0.$versionDelta"
+        versionName = "2.0.0-$versionHash"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
