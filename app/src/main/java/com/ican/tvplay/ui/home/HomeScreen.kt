@@ -108,6 +108,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.ican.tvplay.R
+import com.ican.tvplay.data.HOME_REC_CATEGORY_ID
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.data.model.VideoCategory
 import com.ican.tvplay.data.remote.TvBoxSite
@@ -645,9 +646,21 @@ fun HomeScreen(
                 val startedAt = System.currentTimeMillis()
                 try {
                     val list = if (folder == null) {
-                        viewModel.getCategoryVideos(pageCategory.id)
+                        // 「推荐」是虚拟分类（卡片来自 homeContent），下拉刷新要重拉 homeContent；
+                        // 普通分类下拉则绕开已访问缓存真发一次 categoryContent（对齐 fongmi）
+                        if (forceNetwork && pageCategory.id == HOME_REC_CATEGORY_ID) {
+                            viewModel.refreshHomeContent()
+                        } else {
+                            viewModel.getCategoryVideos(pageCategory.id, refresh = forceNetwork)
+                        }
                     } else {
                         viewModel.getFolderVideos(folder.first)
+                    }
+                    // 刷新拿到空结果（网络异常 / 源本身返回空）：保留旧卡片不清屏，
+                    // 与「刷新时不清空」的既有观感一致
+                    if (forceNetwork && list.isEmpty() && pageVideos.value.isNotEmpty()) {
+                        android.util.Log.d("HomeRefresh", "refresh empty, keep ${pageVideos.value.size} cards")
+                        return@LaunchedEffect
                     }
                     // 内容判定与缓存分支共用同一套规则（目录卡优先，其次频道卡）
                     // 最短展示时长：数据来得太快时也让等待动画完整走一小段，避免闪烁

@@ -209,18 +209,25 @@ class HomeViewModel(container: AppContainer) : ViewModel() {
     suspend fun cachedCategoryVideos(categoryId: String): List<Video>? =
         categoryCacheLock.withLock { categoryCache[categoryCacheKey(categoryId)] }
 
-    /** 按分类 id 独立取该分类下视频（每页独立加载，不依赖 selectedCategory 选中态）；命中已访问缓存则直接返回 */
-
-    /** 按分类 id 独立取该分类下视频（每页独立加载，不依赖 selectedCategory 选中态）；命中预取缓存则直接返回 */
-    suspend fun getCategoryVideos(categoryId: String): List<Video> {
-        cachedCategoryVideos(categoryId)?.let { return it }
-        val list = repo.getVideos(categoryId)
+    /**
+     * 按分类 id 独立取该分类下视频（每页独立加载，不依赖 selectedCategory 选中态）。
+     * [refresh] 为 true（下拉刷新）时跳过已访问缓存，真发一次 spider categoryContent（对齐 fongmi）。
+     */
+    suspend fun getCategoryVideos(categoryId: String, refresh: Boolean = false): List<Video> {
+        if (!refresh) cachedCategoryVideos(categoryId)?.let { return it }
+        val list = repo.getVideos(categoryId, refresh)
         // 空结果不入缓存：冷启动 spider 未就绪时取到的空列表若被缓存，该分类会一直空白
         if (list.isNotEmpty()) {
             categoryCacheLock.withLock { categoryCache[categoryCacheKey(categoryId)] = list }
         }
         return list
     }
+
+    /**
+     * 下拉刷新「推荐」tab：重拉一次 homeContent（fongmi TypeFragment.getHome → SiteApi.homeContent）。
+     * 只更新推荐位缓存与卡片，不重建分类表。失败/空结果返回空列表，由页面决定是否保留旧卡片。
+     */
+    suspend fun refreshHomeContent(): List<Video> = repo.refreshHomeContent()
 
     /** 网盘目录钻取：按文件夹 id 取子目录内容（fongmi openFolder 同款） */
     suspend fun getFolderVideos(folderId: String): List<Video> = repo.getFolderVideos(folderId)

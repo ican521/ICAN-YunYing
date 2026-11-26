@@ -625,12 +625,34 @@ class VideoRepository(
         }
     }
 
-    suspend fun getVideos(categoryId: String): List<Video> {
+    suspend fun getVideos(categoryId: String, refresh: Boolean = false): List<Video> {
         ensureLoaded()
         val loaded = _currentSite.value ?: return emptyList()
         val cat = _categories.value.firstOrNull { it.id == categoryId } ?: return emptyList()
-        return loadCategoryVideos(loaded, cat, page = 1)
+        return loadCategoryVideos(loaded, cat, page = 1, refresh = refresh)
     }
+
+    /**
+     * 下拉刷新「推荐」tab：重拉一次 homeContent（对齐 fongmi TypeFragment.getHome → SiteApi.homeContent）。
+     * 只刷新推荐位缓存与卡片，不重建分类表（否则 tab 数量/顺序会在地下拉时跳动）。
+     * 失败或无结果返回空列表，不做缓存覆盖，页面据此保留旧卡片。
+     */
+    suspend fun refreshHomeContent(): List<Video> = runCatching {
+        ensureLoaded()
+        val loaded = _currentSite.value ?: return@runCatching emptyList()
+        if (!loaded.site.isSpider()) return@runCatching emptyList()
+        val spider = currentSpider ?: run {
+            loadMutex.withLock { }
+            currentSpider
+        } ?: return@runCatching emptyList()
+        val homeJson = spiderManager.homeContent(spider, filter = true)
+        val rec = homeRecVideos(spider, homeJson)
+        if (rec.isNotEmpty()) {
+            homeCache["${loaded.site.key}|$HOME_REC_CATEGORY_ID"] = rec
+            schedulePersistHomeCache(loaded.site.key)
+        }
+        rec
+    }.onFailure { Log.d(REPO_TAG, "refreshHomeContent failed: ${it.message}") }.getOrDefault(emptyList())
 
     /**
      * 网盘目录钻取（fongmi FolderFragment.openFolder 同款）：
@@ -853,13 +875,15 @@ class VideoRepository(
         loaded: LoadedSite,
         cat: VideoCategory,
         page: Int,
+        refresh: Boolean = false,
     ): List<Video> {
-        // 首页第一页走内存缓存（只有真正访问过的分类才在里面）；翻页不缓存
+        // 首页第一页走内存缓存（只有真正访问过的分类才在里面）；翻页不缓存。
+        // refresh=true（下拉刷新）绕开该缓存，真发一次 categoryContent（对齐 fongmi）。
         val list = if (page == 1) {
             val key = "${loaded.site.key}|${cat.id}"
             // 空结果不入缓存：spider 未就绪 / 网络异常时取到空列表若被缓存，
             // 之后首页会一直命中空缓存（历史 bug：首次启动首页没有视频卡片）
-            homeCache[key] ?: fetchCategoryVideos(loaded, cat)
+            (if (refresh) null else homeCache[key]) ?: fetchCategoryVideos(loaded, cat)
                 .also {
                     if (it.isNotEmpty()) {
                         homeCache[key] = it
