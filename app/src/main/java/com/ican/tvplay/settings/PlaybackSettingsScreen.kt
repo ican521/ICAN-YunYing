@@ -36,17 +36,21 @@ import com.ican.tvplay.ui.theme.Spacing
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 播放设置页（设置页「播放设置」入口进入）。
- * 目前只有「视频渲染」一项：TextureView（默认）/ SurfaceView（HDR 直通）。
+ * 视频渲染（TextureView / SurfaceView）+ 输出设置两项（照 fongmi 输出设置挑的）：
+ * AAC 优先（默认开）、隧道模式（默认关，仅 Surface）。
  * 后续内核/解码等播放参数也归到这里，不再散落在播放页弹窗。
  */
 @Composable
 fun PlaybackSettingsScreen(onBack: () -> Unit) {
     val viewModel = appViewModel { SettingsViewModel(this) }
     val render by viewModel.playerRender.collectAsStateWithLifecycle()
+    val aacFirst by viewModel.playerAacFirst.collectAsStateWithLifecycle()
+    val tunnel by viewModel.playerTunnel.collectAsStateWithLifecycle()
     val surface = render == SettingsRepository.RENDER_SURFACE
     val barColor = MiuixTheme.colorScheme.surface
 
@@ -124,6 +128,28 @@ fun PlaybackSettingsScreen(onBack: () -> Unit) {
                 }
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
+                        Column {
+                            SwitchPreference(
+                                title = "AAC 优先",
+                                summary = "多音轨片源优先选 AAC，避免优先选中设备解不了的 AC3/EAC3",
+                                checked = aacFirst,
+                                onCheckedChange = { viewModel.setPlayerAacFirst(it) },
+                            )
+                            SwitchPreference(
+                                title = "隧道模式",
+                                summary = if (surface) {
+                                    "视频/音频走同一条 tunneled 硬件通路（需 SurfaceView，仅 EXO）"
+                                } else {
+                                    "打开会自动切到 SurfaceView（隧道只支持 Surface 输出）"
+                                },
+                                checked = tunnel,
+                                onCheckedChange = { viewModel.setPlayerTunnel(it) },
+                            )
+                        }
+                    }
+                }
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = "TextureView：画面作为普通 View 参与合成，横屏小窗↔全屏缩放跟手、支持圆角，" +
@@ -135,6 +161,21 @@ fun PlaybackSettingsScreen(onBack: () -> Unit) {
                             Text(
                                 text = "SurfaceView：画面交给系统合成器独立出层，HDR10/HLG 片源的 10bit/PQ 可直通到屏幕；" +
                                     "代价是缩放动画可能滞后一帧、圆角裁剪不生效，播完的静帧替身也不再抓取。",
+                                modifier = Modifier.padding(top = 8.dp),
+                                fontSize = 13.sp,
+                                lineHeight = 20.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                            Text(
+                                text = "AAC 优先：只影响多音轨片源选哪条（EXO 内核），关掉后按片源默认顺序选，遇到的 AC3/EAC3 可能无声。",
+                                modifier = Modifier.padding(top = 8.dp),
+                                fontSize = 13.sp,
+                                lineHeight = 20.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                            Text(
+                                text = "隧道模式：画面与声音走同一条 tunneled 通路，亮度/HDR 更贴硬件能力；" +
+                                    "代价是画质/音质的后处理（锐化、均衡器等）全部失效，且只有 SurfaceView + EXO 才生效。",
                                 modifier = Modifier.padding(top = 8.dp),
                                 fontSize = 13.sp,
                                 lineHeight = 20.sp,

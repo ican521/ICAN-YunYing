@@ -356,6 +356,8 @@ fun PlayerScreen(
     val savedRender by settings.playerRender.collectAsStateWithLifecycle()
     val savedBuffer by settings.playerBuffer.collectAsStateWithLifecycle()
     val savedDecode by settings.playerDecode.collectAsStateWithLifecycle()
+    val savedAacFirst by settings.playerAacFirst.collectAsStateWithLifecycle()
+    val savedTunnel by settings.playerTunnel.collectAsStateWithLifecycle()
     val savedSubtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
     val savedSubtitlePosition by settings.subtitlePosition.collectAsStateWithLifecycle()
     val savedSubtitleStyle by settings.subtitleStyle.collectAsStateWithLifecycle()
@@ -618,6 +620,9 @@ fun PlayerScreen(
         val decode = Players.Decode.entries.firstOrNull { it.name == savedDecode } ?: Players.Decode.AUTO
         if (Players.state.value.decode != decode) Players.setDecode(decode)
     }
+    // 输出设置（仿 fongmi）：AAC 优先只重选音轨，隧道模式重建渲染管线
+    LaunchedEffect(savedAacFirst) { Players.setAacFirst(savedAacFirst) }
+    LaunchedEffect(savedTunnel) { Players.setTunnel(savedTunnel) }
     // 字幕字号/位置（持久化，仿 fongmi SubtitleSetting）：修改后实时作用到当前 Player
     LaunchedEffect(savedSubtitleScale) { Players.setSubtitleScale(savedSubtitleScale) }
     LaunchedEffect(savedSubtitlePosition) { Players.setSubtitlePosition(savedSubtitlePosition) }

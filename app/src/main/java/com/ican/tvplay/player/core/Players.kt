@@ -115,6 +115,10 @@ object Players {
         val kernel: Kernel = Kernel.EXO,
         val scaleMode: ScaleMode = ScaleMode.FIT,
         val bufferTier: BufferTier = BufferTier.LOW,
+        /** AAC 音轨优先（仿 fongmi preferAac，默认开） */
+        val aacFirst: Boolean = true,
+        /** 隧道模式（仿 fongmi tunnel，默认关；只在 Surface 输出下生效） */
+        val tunnel: Boolean = false,
         val audioTracks: List<TrackOption> = emptyList(),
         val textTracks: List<TrackOption> = emptyList(),
         val textDisabled: Boolean = false,
@@ -273,6 +277,26 @@ object Players {
 
     /** 当前 EXO 播放器的可热切换缓冲 LoadControl（重建播放器时随之重建） */
     private var tieredLoadControl: TieredLoadControl? = null
+
+    /** 当前 EXO 播放器的 TrackSelector（AAC 优先 / 隧道模式在播放中热改参数用） */
+    private var trackSelectorRef: DefaultTrackSelector? = null
+
+    /**
+     * 输出选项（仿 fongmi ExoUtil.buildTrackSelector）：
+     * AAC 优先 → preferredAudioMimeType(AAC)；隧道模式 → setTunnelingEnabled(true)。
+     * 基于现有 Parameters 的 buildUpon 改，保留播放器已经算好的 viewport/设备约束。
+     */
+    private fun DefaultTrackSelector.Parameters.Builder.withOutputOptions(): DefaultTrackSelector.Parameters.Builder {
+        val state = _state.value
+        return setPreferredAudioMimeType(if (state.aacFirst) MimeTypes.AUDIO_AAC else null)
+            .setTunnelingEnabled(state.tunnel)
+    }
+
+    /** 播放中改 AAC 优先 / 隧道模式：只重选轨道，不重建播放器（AAC 切换即时生效） */
+    private fun applyTrackParameters() {
+        val selector = trackSelectorRef ?: return
+        selector.setParameters(selector.parameters.buildUpon().withOutputOptions().build())
+    }
 
     private var appContext: Context? = null
     private var currentSpec: PlaySpec? = null
@@ -1153,6 +1177,29 @@ object Players {
         rebuild()
     }
 
+    /**
+     * AAC 音轨优先（仿 fongmi ExoUtil.buildTrackSelector 的 preferredAudioMimeType）：
+     * 只改 TrackSelector 参数重选轨道，播放不中断；MPV 内核忽略（MPV 侧没有等价开关）。
+     */
+    fun setAacFirst(enabled: Boolean) {
+        if (_state.value.aacFirst == enabled) return
+        _state.value = _state.value.copy(aacFirst = enabled)
+        applyTrackParameters()
+    }
+
+    /**
+     * 隧道模式（仿 fongmi tunnel + tunnelingEnabled）：tunneled 播放要重建渲染管线，
+     * 走 rebuild()（重建后从原位置继续）；MPV 内核忽略。
+     */
+    fun setTunnel(enabled: Boolean) {
+        if (_state.value.tunnel == enabled) return
+        _state.value = _state.value.copy(tunnel = enabled)
+        if (_state.value.kernel == Kernel.EXO) {
+            if (player == null) return   // 还没建播放器：下次 buildExoPlayer 自然带上
+            rebuild()
+        }
+    }
+
     fun setBufferTier(tier: BufferTier) {
         if (_state.value.bufferTier == tier) return
         _state.value = _state.value.copy(bufferTier = tier)
@@ -1411,6 +1458,13 @@ object Players {
                     Decode.SOFT -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
                 },
             )
+        // 轨道选择：仿 fongmi ExoUtil.buildTrackSelector ——
+        // AAC 优先（多音轨片源优先选 AAC，避免优先选中设备解不了的 AC3/EAC3）、
+        // 隧道模式（tunneled playback，只有 Surface 输出成立）。两项都能在播放中热改参数。
+        val trackSelector = DefaultTrackSelector(ctx).apply {
+            setParameters(parameters.buildUpon().withOutputOptions().build())
+        }
+        trackSelectorRef = trackSelector
         // MediaSourceFactory：统一处理 headers 和字幕偏移解析器
         val mediaSourceFactory = DefaultMediaSourceFactory(ctx)
             .setSubtitleParserFactory(SubtitleOffsetParserFactory { _state.value.subtitleOffsetMs })
@@ -1424,7 +1478,7 @@ object Players {
             .apply { addEventListener(handler, bandwidthListener) }
         bandwidthMeter = meter
         return ExoPlayer.Builder(ctx, renderersFactory)
-            .setTrackSelector(DefaultTrackSelector(ctx))
+            .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
             .setBandwidthMeter(meter)
             .setMediaSourceFactory(mediaSourceFactory)

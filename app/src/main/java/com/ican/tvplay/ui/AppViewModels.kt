@@ -635,6 +635,8 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val playerBackgroundPlay: StateFlow<Int> = settings.playerBackgroundPlay
     /** 视频渲染方式（SettingsRepository.RENDER_TEXTURE / RENDER_SURFACE） */
     val playerRender: StateFlow<String> = settings.playerRender
+    val playerAacFirst: StateFlow<Boolean> = settings.playerAacFirst
+    val playerTunnel: StateFlow<Boolean> = settings.playerTunnel
     val configUrl: StateFlow<String> = settings.configUrl
     val favoriteUpdateCheckEnabled: StateFlow<Boolean> = settings.favoriteUpdateCheckEnabled
     val favoriteUpdateIntervalHours: StateFlow<Int> = settings.favoriteUpdateIntervalHours
@@ -663,6 +665,8 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setPlayerBackgroundPlay(mode: Int) = settings.setPlayerBackgroundPlay(mode)
 
     fun setPlayerRender(render: String) = settings.setPlayerRender(render)
+    fun setPlayerAacFirst(enabled: Boolean) = settings.setPlayerAacFirst(enabled)
+    fun setPlayerTunnel(enabled: Boolean) = settings.setPlayerTunnel(enabled)
     fun setFavoriteUpdateCheckEnabled(enabled: Boolean) =
         settings.setFavoriteUpdateCheckEnabled(enabled)
     fun setFavoriteUpdateIntervalHours(hours: Int) = settings.setFavoriteUpdateIntervalHours(hours)

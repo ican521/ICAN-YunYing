@@ -263,6 +263,35 @@ class SettingsRepository(context: Context) {
         val value = if (render == RENDER_SURFACE) RENDER_SURFACE else RENDER_TEXTURE
         prefs.edit().putString(KEY_PLAYER_RENDER, value).apply()
         _playerRender.value = value
+        // 仿 fongmi PlayerSetting.putRender：切回 TextureView 时隧道模式自动关闭
+        // （tunnel 只在 Surface 输出下才有意义，留着开关会让人以为「开着但没生效」）
+        if (value == RENDER_TEXTURE && _playerTunnel.value) setPlayerTunnel(false)
+    }
+
+    /**
+     * AAC 音轨优先（仿 fongmi DecodeSetting.isPreferAAC，默认开）：
+     * 多音轨片源优先选 AAC，避免优先选中手机不支持的 AC3/EAC3 造成无声或回落失败。
+     */
+    private val _playerAacFirst = MutableStateFlow(prefs.getBoolean(KEY_PLAYER_AAC_FIRST, true))
+    val playerAacFirst: StateFlow<Boolean> = _playerAacFirst.asStateFlow()
+
+    fun setPlayerAacFirst(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_PLAYER_AAC_FIRST, enabled).apply()
+        _playerAacFirst.value = enabled
+    }
+
+    /**
+     * 隧道模式（仿 fongmi DecodeSetting.isTunnel + PlayerSetting 联动，默认关）：
+     * 视频/音频走一条 tunneled 硬件通路，只有 SurfaceView 支持，开启即强制切 Surface 渲染。
+     */
+    private val _playerTunnel = MutableStateFlow(prefs.getBoolean(KEY_PLAYER_TUNNEL, false))
+    val playerTunnel: StateFlow<Boolean> = _playerTunnel.asStateFlow()
+
+    fun setPlayerTunnel(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_PLAYER_TUNNEL, enabled).apply()
+        _playerTunnel.value = enabled
+        // fongmi DecodeSetting.putTunnel：开隧道强制 Surface 渲染（Texture 下 tunneled 播放不成立）
+        if (enabled && _playerRender.value != RENDER_SURFACE) setPlayerRender(RENDER_SURFACE)
     }
 
     /** 播放解码方式（存 Decode.name 字符串，默认 AUTO；data 层不依赖 player 包） */
@@ -554,6 +583,8 @@ class SettingsRepository(context: Context) {
         _playerRender.value = prefs.getString(KEY_PLAYER_RENDER, null).orEmpty()
             .ifEmpty { RENDER_TEXTURE }
         _playerDecode.value = prefs.getString(KEY_PLAYER_DECODE, null).orEmpty()
+        _playerAacFirst.value = prefs.getBoolean(KEY_PLAYER_AAC_FIRST, true)
+        _playerTunnel.value = prefs.getBoolean(KEY_PLAYER_TUNNEL, false)
         _playerBuffer.value = prefs.getInt(KEY_PLAYER_BUFFER, 1)
         _playerBrightness.value = prefs.getFloat(KEY_PLAYER_BRIGHTNESS, -1f)
         _playerBackgroundPlay.value = prefs.getInt(KEY_PLAYER_BACKGROUND, BACKGROUND_OFF)
@@ -594,6 +625,9 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_ENGINE = "player_engine"
         const val KEY_PLAYER_RENDER = "player_render"
         const val KEY_PLAYER_DECODE = "player_decode"
+        // 输出设置（仿 fongmi decode_prefer_aac / decode_tunnel）
+        const val KEY_PLAYER_AAC_FIRST = "player_aac_first"
+        const val KEY_PLAYER_TUNNEL = "player_tunnel"
         const val KEY_PLAYER_BUFFER = "player_buffer"
         const val KEY_PLAYER_BRIGHTNESS = "player_brightness"
         const val KEY_PLAYER_BACKGROUND = "player_background"
