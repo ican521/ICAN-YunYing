@@ -197,9 +197,11 @@ object AppIcons {
             "M1 10v2c4.97 0 9 4.03 9 9h2c0 -6.08 -4.93 -11 -11 -11z",
     )
 
+    // 照搬 fongmi mobile/res/drawable/ic_control_info.xml（描边圆环 + i，线条风格与返回键一致）
     val Info: ImageVector = vector(
         "info",
-        "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2zm0-8h-2V7h2z",
+        "M11,7h2v2h-2zM11,11h2v6h-2zM12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2z" +
+            "M12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8z",
     )
 
     val Fullscreen: ImageVector = vector(
