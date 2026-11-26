@@ -148,6 +148,12 @@ object Players {
         val audioSampleRate: Int = 0,
         val audioChannels: Int = 0,
         val audioBitrate: Int = 0,
+        /** EXO 实际启用的解码器（AnalyticsListener.onDecoderInitialized），MPV 下为 null */
+        val decoderName: String? = null,
+        /** 由 decoderName 推断：c2.qti/omx 厂商前缀 = 硬解，c2.android/OMX.google = 软解 */
+        val hardwareDecode: Boolean = false,
+        /** 视频丢帧累计数（AnalyticsListener.onDroppedVideoFrames） */
+        val droppedFrames: Int = 0,
         /** true = 当前内核没有 media3 Tracks（MPV）：除 videoSize 外都读不到 */
         val unavailable: Boolean = false,
     ) {
@@ -195,6 +201,9 @@ object Players {
             audioSampleRate = (audio?.sampleRate ?: 0).coerceAtLeast(0),
             audioChannels = (audio?.channelCount ?: 0).coerceAtLeast(0),
             audioBitrate = (audio?.bitrate ?: 0).coerceAtLeast(0),
+            decoderName = videoDecoderName,
+            hardwareDecode = isHardwareDecoder(videoDecoderName),
+            droppedFrames = droppedVideoFrames,
             unavailable = video == null && size.width <= 0,
         )
     }
@@ -573,6 +582,36 @@ object Players {
         }
     }
 
+    /** 视频信息面板：EXO 实际启用的解码器名与丢帧数（MPV 内核没有这条回调，字段留空） */
+    private var videoDecoderName: String? = null
+    private var droppedVideoFrames = 0
+
+    private val infoAnalytics = object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+        override fun onVideoDecoderInitialized(
+            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+            decoderName: String,
+            initializationDurationMs: Long,
+        ) {
+            videoDecoderName = decoderName
+        }
+
+        override fun onDroppedVideoFrames(
+            eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+            droppedFrames: Int,
+            elapsedMs: Long,
+        ) {
+            droppedVideoFrames = droppedFrames
+        }
+    }
+
+    /** c2.android./OMX.google. 是 AOSP 软解；c2.qti/c2.mtk/omx.qcom 等厂商前缀算硬解 */
+    private fun isHardwareDecoder(name: String?): Boolean {
+        val n = name?.lowercase() ?: return false
+        if (n.startsWith("c2.android.") || n.startsWith("omx.google.")) return false
+        if (n.contains(".sw.") || n.contains("software")) return false
+        return n.startsWith("c2.") || n.startsWith("omx.")
+    }
+
     private val listener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _state.value = _state.value.copy(playing = isPlaying)
@@ -704,6 +743,9 @@ object Players {
         val token = ++startToken
         currentSpec = spec
         retryCount = 0  // 新源重置错误计数
+        // 新源重置视频信息面板的解码器/丢帧（上一集的解码器名不能留到新一集）
+        videoDecoderName = null
+        droppedVideoFrames = 0
         // 新源开播清除旧错误，并重置播放内的字幕偏移（偏移只对当前这一集有效，仿 fongmi）
         // isoSource 同步刷新：切到/切离 ISO 源时，播放内核弹窗里 EXO 的可用性要跟着变
         _state.value = _state.value.copy(
@@ -1451,6 +1493,8 @@ object Players {
                 }
                 playWhenReady = true
                 addListener(listener)
+                // 视频信息面板的解码器/丢帧采集（release 也要，不受 DEBUG 开关影响）
+                addAnalyticsListener(infoAnalytics)
                 setPlaybackSpeed(_state.value.speed)
             }
     }

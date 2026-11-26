@@ -43,6 +43,11 @@ fun VideoInfoPanel(
         val color = listOfNotNull(info.colorSpace, info.colorTransfer, info.colorRange)
         if (color.isNotEmpty()) add("色彩" to color.joinToString(" · "))
         if (info.videoBitrate > 0) add("码率" to formatBitrate(info.videoBitrate))
+        // 解码器/丢帧只有 EXO 有数据；MPV 内核拿不到就不显示这两行
+        info.decoderName?.let { decoder ->
+            add("解码器" to "$decoder（${if (info.hardwareDecode) "硬解" else "软解"}）")
+            add("丢帧" to info.droppedFrames.toString())
+        }
         val audio = buildString {
             val mime = info.audioMime?.substringAfterLast('/')?.uppercase(Locale.US)
             val codecText = mime ?: info.audioCodecs
