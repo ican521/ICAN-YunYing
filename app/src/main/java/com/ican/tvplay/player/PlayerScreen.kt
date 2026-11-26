@@ -47,6 +47,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -94,6 +95,7 @@ import androidx.compose.material3.TabRowDefaults
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -4251,13 +4253,17 @@ private fun FullscreenPlayLayout(
             exit = fadeOut(tween(CONTROL_FADE_DURATION_MS)),
             modifier = Modifier.align(Alignment.CenterEnd),
         ) {
+            // 挖孔落在右侧时 inset 本身就承担了视觉间距，此时不再叠原来的 4dp；
+            // 没有挖孔时才用 fongmi 的 4dp 边距
+            val cutoutEnd = WindowInsets.displayCutout
+                .asPaddingValues(LocalDensity.current)
+                .calculateEndPadding(LocalLayoutDirection.current)
             Box(
                 modifier = Modifier
-                    // 横屏旋转到挖孔落在右侧时让开前置摄像头，再叠 fongmi 的 4dp 边距
                     .windowInsetsPadding(
                         WindowInsets.displayCutout.only(WindowInsetsSides.End),
                     )
-                    .padding(end = 4.dp)
+                    .padding(end = if (cutoutEnd > 0.dp) 0.dp else 4.dp)
                     .size(48.dp)
                     .tvCardEffect(
                         onClick = { if (locked) onUnlock() else onLockToggle() },
