@@ -346,7 +346,6 @@ fun SettingsScreen(
         Card(modifier = Modifier.fillMaxWidth()) {
             ArrowPreference(
                 title = "播放设置",
-                summary = "决定画面怎么输出、音轨怎么选、切后台后怎么继续播",
                 onClick = onPlaybackSettingsClick,
             )
         }
