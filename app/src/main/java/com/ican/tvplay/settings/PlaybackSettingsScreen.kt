@@ -128,24 +128,22 @@ fun PlaybackSettingsScreen(onBack: () -> Unit) {
                 }
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
-                        Column {
-                            SwitchPreference(
-                                title = "AAC 优先",
-                                summary = "多音轨片源优先选 AAC，避免优先选中设备解不了的 AC3/EAC3",
-                                checked = aacFirst,
-                                onCheckedChange = { viewModel.setPlayerAacFirst(it) },
-                            )
-                            SwitchPreference(
-                                title = "隧道模式",
-                                summary = if (surface) {
-                                    "视频/音频走同一条 tunneled 硬件通路（需 SurfaceView，仅 EXO）"
-                                } else {
-                                    "打开会自动切到 SurfaceView（隧道只支持 Surface 输出）"
-                                },
-                                checked = tunnel,
-                                onCheckedChange = { viewModel.setPlayerTunnel(it) },
-                            )
-                        }
+                        SwitchPreference(
+                            title = "AAC 优先",
+                            summary = "多音轨片源优先选 AAC，避免优先选中设备解不了的 AC3/EAC3",
+                            checked = aacFirst,
+                            onCheckedChange = { viewModel.setPlayerAacFirst(it) },
+                        )
+                        SwitchPreference(
+                            title = "隧道模式",
+                            summary = if (surface) {
+                                "视频/音频走同一条 tunneled 硬件通路（需 SurfaceView，仅 EXO）"
+                            } else {
+                                "打开会自动切到 SurfaceView（隧道只支持 Surface 输出）"
+                            },
+                            checked = tunnel,
+                            onCheckedChange = { viewModel.setPlayerTunnel(it) },
+                        )
                     }
                 }
                 item {
