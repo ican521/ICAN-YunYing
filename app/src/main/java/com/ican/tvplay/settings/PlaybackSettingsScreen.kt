@@ -1,5 +1,6 @@
 package com.ican.tvplay.ui.settings
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,11 +23,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.ican.tvplay.data.BACKGROUND_OFF
+import com.ican.tvplay.data.BACKGROUND_PIP
 import com.ican.tvplay.data.SettingsRepository
 import com.ican.tvplay.ui.SettingsViewModel
 import com.ican.tvplay.ui.appViewModel
@@ -42,7 +46,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 /**
  * 播放设置页（设置页「播放设置」入口进入）。
  * 视频渲染（TextureView / SurfaceView）+ 输出设置两项（照 fongmi 输出设置挑的）：
- * AAC 优先（默认开）、隧道模式（默认关，仅 Surface）。
+ * AAC 优先（默认开）、隧道模式（默认关，仅 Surface）+ 后台播放（关闭 / 画中画）。
  * 后续内核/解码等播放参数也归到这里，不再散落在播放页弹窗。
  */
 @Composable
@@ -51,8 +55,10 @@ fun PlaybackSettingsScreen(onBack: () -> Unit) {
     val render by viewModel.playerRender.collectAsStateWithLifecycle()
     val aacFirst by viewModel.playerAacFirst.collectAsStateWithLifecycle()
     val tunnel by viewModel.playerTunnel.collectAsStateWithLifecycle()
+    val backgroundPlay by viewModel.playerBackgroundPlay.collectAsStateWithLifecycle()
     val surface = render == SettingsRepository.RENDER_SURFACE
     val barColor = MiuixTheme.colorScheme.surface
+    val context = LocalContext.current
 
     Scaffold(
         modifier = Modifier
@@ -128,6 +134,38 @@ fun PlaybackSettingsScreen(onBack: () -> Unit) {
                 }
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
+                        OverlayDropdownPreference(
+                            title = "后台播放",
+                            summary = if (backgroundPlay == BACKGROUND_OFF) {
+                                "关闭：退出播放页即停止"
+                            } else {
+                                "画中画：全屏播放切后台自动进小窗继续播"
+                            },
+                            items = listOf("关闭", "画中画"),
+                            selectedIndex = if (backgroundPlay == BACKGROUND_OFF) 0 else 1,
+                            onSelectedIndexChange = { index ->
+                                when (index) {
+                                    0 -> viewModel.setPlayerBackgroundPlay(BACKGROUND_OFF)
+                                    else -> {
+                                        viewModel.setPlayerBackgroundPlay(BACKGROUND_PIP)
+                                        // Android 13+ 需要运行时通知权限，后台续播的通知栏控制才显示
+                                        if (Build.VERSION.SDK_INT >= 33) {
+                                            (context as? android.app.Activity)?.let { act ->
+                                                androidx.core.app.ActivityCompat.requestPermissions(
+                                                    act,
+                                                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                                                    1001,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
                         SwitchPreference(
                             title = "AAC 优先",
                             summary = "多音轨片源优先选 AAC，避免优先选中设备解不了的 AC3/EAC3",
@@ -174,6 +212,14 @@ fun PlaybackSettingsScreen(onBack: () -> Unit) {
                             Text(
                                 text = "隧道模式：画面与声音走同一条 tunneled 通路，亮度/HDR 更贴硬件能力；" +
                                     "代价是画质/音质的后处理（锐化、均衡器等）全部失效，且只有 SurfaceView + EXO 才生效。",
+                                modifier = Modifier.padding(top = 8.dp),
+                                fontSize = 13.sp,
+                                lineHeight = 20.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            )
+                            Text(
+                                text = "后台播放：关闭时退出播放页就停；选画中画后全屏播放切到后台会自动缩成小窗继续播，" +
+                                    "通知栏同时出现播放控制（Android 13+ 需要通知权限）。",
                                 modifier = Modifier.padding(top = 8.dp),
                                 fontSize = 13.sp,
                                 lineHeight = 20.sp,

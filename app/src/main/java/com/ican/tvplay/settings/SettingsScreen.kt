@@ -1,6 +1,5 @@
 package com.ican.tvplay.ui.settings
 
-import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,9 +60,7 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import com.ican.tvplay.data.BACKGROUND_OFF
 import com.ican.tvplay.BuildConfig
-import com.ican.tvplay.data.BACKGROUND_PIP
 import com.ican.tvplay.data.HomeLayoutSize
 import com.ican.tvplay.data.ThemeMode
 import com.ican.tvplay.data.remote.TvBoxSite
@@ -95,8 +92,6 @@ fun SettingsScreen(
     val viewModel = appViewModel { SettingsViewModel(this) }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
-    val backgroundPlay by viewModel.playerBackgroundPlay.collectAsStateWithLifecycle()
-    val playerRender by viewModel.playerRender.collectAsStateWithLifecycle()
     val favoriteUpdateCheckEnabled by viewModel.favoriteUpdateCheckEnabled.collectAsStateWithLifecycle()
     val favoriteUpdateIntervalHours by viewModel.favoriteUpdateIntervalHours.collectAsStateWithLifecycle()
     val favoriteUpdateStartupPopup by viewModel.favoriteUpdateStartupPopup.collectAsStateWithLifecycle()
@@ -145,19 +140,6 @@ fun SettingsScreen(
     ) { uri ->
         // 不立即恢复：先弹二次确认，避免误选文件直接清空收藏/历史
         uri?.let { pendingRestoreUri = it }
-    }
-
-    // Android 13+ 需要运行时通知权限，后台播放的通知栏控制才能显示
-    val requestNotificationPermission = {
-        if (Build.VERSION.SDK_INT >= 33) {
-            (context as? android.app.Activity)?.let { act ->
-                androidx.core.app.ActivityCompat.requestPermissions(
-                    act,
-                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-                    1001,
-                )
-            }
-        }
     }
 
     val horizontal = pageHorizontalPadding()
@@ -364,29 +346,8 @@ fun SettingsScreen(
         Card(modifier = Modifier.fillMaxWidth()) {
             ArrowPreference(
                 title = "播放设置",
-                summary = "视频渲染：${
-                    if (playerRender == com.ican.tvplay.data.SettingsRepository.RENDER_SURFACE) {
-                        "SurfaceView"
-                    } else {
-                        "TextureView"
-                    }
-                }",
+                summary = "决定画面怎么输出、音轨怎么选、切后台后怎么继续播",
                 onClick = onPlaybackSettingsClick,
-            )
-            OverlayDropdownPreference(
-                title = "后台播放",
-                summary = "全屏播放时切后台自动进入画中画",
-                items = listOf("关闭", "画中画"),
-                selectedIndex = if (backgroundPlay == BACKGROUND_OFF) 0 else 1,
-                onSelectedIndexChange = { index ->
-                    when (index) {
-                        0 -> viewModel.setPlayerBackgroundPlay(BACKGROUND_OFF)
-                        else -> {
-                            viewModel.setPlayerBackgroundPlay(BACKGROUND_PIP)
-                            requestNotificationPermission()
-                        }
-                    }
-                },
             )
         }
         }
