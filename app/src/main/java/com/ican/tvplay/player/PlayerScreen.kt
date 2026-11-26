@@ -48,6 +48,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -4009,16 +4010,21 @@ private fun FullscreenPlayLayout(
                     delay(500)
                 }
             }
+            // start 侧有挖孔时 inset 本身已足够让位，不再叠 16dp；top 的 56dp 是给顶栏留位，始终保留
+            val cutoutStart = WindowInsets.displayCutout
+                .asPaddingValues(LocalDensity.current)
+                .calculateStartPadding(LocalLayoutDirection.current)
             VideoInfoPanel(
                 info = videoInfo,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    // 横屏时前置摄像头挖孔在屏幕左侧（部分旋转方向在上方），
-                    // 按 displayCutout 的 start/top inset 让位，再叠固定的 16dp/56dp 视觉间距
                     .windowInsetsPadding(
                         WindowInsets.displayCutout.only(WindowInsetsSides.Start + WindowInsetsSides.Top),
                     )
-                    .padding(start = 16.dp, top = 56.dp),
+                    .padding(
+                        start = if (cutoutStart > 0.dp) 0.dp else 16.dp,
+                        top = 56.dp,
+                    ),
             )
         }
 
