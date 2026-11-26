@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -288,7 +290,11 @@ fun PosterCaption(
 /**
  * 海报统一渲染入口（首页 / 搜索 / 收藏 / 历史共用）。
  *
- * 封面缺失或加载失败（如糯米站源）时，海报位置统一显示「[空]」占位，不再显示视频标题。
+ * 封面缺失或加载失败时，按 fongmi `ImgUtil.getTextDrawable` 画「首字色块」占位：
+ * 取标题首字，底色取 Material 400 调色板（19 色），与 fongmi 无海报卡片观感一致。
+ *
+ * @param cover null 表示「还没轮到加载」（历史页错峰渐显）：保持容器底色，不提前闪色块；
+ *              空串表示「确实没有封面」：直接画首字色块。
  */
 @Composable
 fun PosterImage(
@@ -302,31 +308,75 @@ fun PosterImage(
     // 每次重组都重建等于在滑动中反复解析同一串 URL
     val model = remember(context, cover) { posterModel(context, cover) }
     // 轻量 AsyncImage（替代 SubcomposeAsyncImage：去掉子组合的二次测量开销）；
-    // 加载失败叠标题文字兜底，与原 error 槽行为一致（remember key 到 cover：换封面后重置失败态）
+    // 加载失败叠首字色块兜底（remember key 到 cover：换封面后重置失败态）
     var failed by remember(cover) { mutableStateOf(false) }
     Box(modifier = modifier) {
-        AsyncImage(
-            model = model,
-            contentDescription = title,
-            contentScale = contentScale,
-            modifier = Modifier.fillMaxSize(),
-            onSuccess = { failed = false },
-            onError = { failed = true },
-        )
-        if (failed) {
-            PosterTextFallback()
+        // 未轮到揭示：只留卡片底色（历史页首屏错峰渐显用 null 表达这个状态）
+        if (cover == null) return@Box
+        if (model != null && !failed) {
+            AsyncImage(
+                model = model,
+                contentDescription = title,
+                contentScale = contentScale,
+                modifier = Modifier.fillMaxSize(),
+                onSuccess = { failed = false },
+                onError = { failed = true },
+            )
+        }
+        // 空地址 / 脏地址解析不出请求 / 加载失败：都回落到首字色块（fongmi 同款行为）
+        if (model == null || failed) {
+            PosterTextFallback(title)
         }
     }
 }
 
-/** 无海报时的兜底：不显示视频标题，统一显示「[空]」占位 */
+/** fongmi `ColorGenerator.PALETTE_400`：19 色 Material 400 档，颜色值取 MDColor 常量 */
+private val POSTER_FALLBACK_PALETTE = intArrayOf(
+    0xFFEF5350.toInt(), // Red
+    0xFFEC407A.toInt(), // Pink
+    0xFFAB47BC.toInt(), // Purple
+    0xFF7E57C2.toInt(), // Deep Purple
+    0xFF5C6BC0.toInt(), // Indigo
+    0xFF42A5F5.toInt(), // Blue
+    0xFF29B6F6.toInt(), // Light Blue
+    0xFF26C6DA.toInt(), // Cyan
+    0xFF26A69A.toInt(), // Teal
+    0xFF66BB6A.toInt(), // Green
+    0xFF9CCC65.toInt(), // Light Green
+    0xFFD4E157.toInt(), // Lime
+    0xFFFFEE58.toInt(), // Yellow
+    0xFFFFCA28.toInt(), // Amber
+    0xFFFFA726.toInt(), // Orange
+    0xFFFF7043.toInt(), // Deep Orange
+    0xFF8D6E63.toInt(), // Brown
+    0xFFBDBDBD.toInt(), // Grey
+    0xFF78909C.toInt(), // Blue Grey
+)
+
+/**
+ * 无海报占位（对齐 fongmi `ImgUtil.getTextDrawable` + `ColorGenerator.get400`）：
+ * 直角色块 + 居中白字，字为标题首字（标题为空时取「！」）；
+ * 取色 `(首字.hashCode() and MAX_VALUE) % 19` —— 与 fongmi 完全同一套映射，同一部片颜色一致。
+ */
 @Composable
-private fun PosterTextFallback() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+private fun PosterTextFallback(title: String) {
+    val key = title.ifEmpty { "！" }.take(1)
+    val color = remember(key) {
+        Color(POSTER_FALLBACK_PALETTE[(key.hashCode() and Int.MAX_VALUE) % POSTER_FALLBACK_PALETTE.size])
+    }
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize().background(color),
+        contentAlignment = Alignment.Center,
+    ) {
+        // fongmi TextDrawable：字号取短边 / 2.5；这里按像素换算成 sp 并除掉系统字体缩放，
+        // 保证「大字号」设置下色块里的字不会撑爆卡片（它只是图形，不是可读文本）
+        val fontPx = with(LocalDensity.current) { minOf(maxWidth, maxHeight).toPx() / 2.5f }
+        val fontSize = with(LocalDensity.current) { (fontPx / fontScale).toSp() }
         Text(
-            text = "[空]",
-            style = MaterialTheme.typography.bodySmall,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            text = key,
+            color = Color.White,
+            fontSize = fontSize,
+            fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
             maxLines = 1,
         )
