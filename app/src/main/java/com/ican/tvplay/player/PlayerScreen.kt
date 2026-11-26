@@ -202,6 +202,7 @@ import com.ican.tvplay.data.SUBTITLE_OFFSET_MAX_MS
 import com.ican.tvplay.data.SUBTITLE_OFFSET_STEP_MS
 import com.ican.tvplay.data.local.FavoriteEntity
 import com.ican.tvplay.data.local.HistoryEntity
+import com.ican.tvplay.data.local.upsertKeepingCover
 import com.ican.tvplay.data.model.Episode
 import com.ican.tvplay.data.model.Video
 import com.ican.tvplay.player.core.PlaybackService
@@ -768,6 +769,15 @@ fun PlayerScreen(
         // 跨站源场景优先：MultiSourceSearchScreen 提前 cache 的视频直接命中，
         // 避免先在 VideoRepository 的当前站点上发起慢查询（错站查询既慢又可能查错视频）
         var v = Players.consumeCachedVideo(videoId)?.video
+        // 库里已有的这条记录：续播状态与封面回填都读这一份（fongmi 从历史续播时把
+        // history.getVodPic() 带进播放页，详情再拿 checkPic 单向补空）
+        val savedHistory = container.historyDao.observeOne(videoId).first()
+        // 入口带进来的封面（卡片封面 / 库里已存封面）：详情不吐 cover 时用它回填
+        val entryCover = Players.cachedVideo
+            ?.takeIf { it.video.id == videoId }
+            ?.video?.cover
+            ?.takeIf { it.isNotBlank() }
+            ?: savedHistory?.cover?.takeIf { it.isNotBlank() }.orEmpty()
         // 搜索元数据不含选集（点击卡片立即跳转）：先把元数据挂上屏（页面骨架立刻可见，
         // 小窗与详情区各转一个圈，对齐 fongmi VideoActivity 的 progress + progressLayout），
         // 再在播放页内补拉完整详情；拉取失败 → v=null 走错误页
@@ -791,6 +801,8 @@ fun PlayerScreen(
                 val merged = full.copy(
                     // 详情标题为空时沿用卡片标题（爱刷这类源详情不给 vod_name）
                     title = full.title.ifBlank { v.title },
+                    // 封面同理：详情不吐 cover 时用入口封面补上（fongmi Vod.checkPic）
+                    cover = full.cover.ifBlank { v.cover.ifBlank { entryCover } },
                     sourceName = v.sourceName.ifBlank {
                         com.ican.tvplay.ui.components.siteShortName(
                             metaEntry.site.name, metaEntry.siteKey,
@@ -807,7 +819,7 @@ fun PlayerScreen(
             // 历史/收藏直达：用历史记录的站源直接拉详情，不等 ensureLoaded 的整站首页初始化
             // （配置刷新 + homeContent + 分类的串行等待），与搜索卡片点击同链路；
             // 查不到站点（URL 播放等）才回退 getVideo
-            val historySite = container.historyDao.observeOne(videoId).first()
+            val historySite = savedHistory
                 ?.sourceKey?.takeIf { it.isNotBlank() }
                 ?.let { container.videoRepository.findSiteForDirectDetail(it) }
             v = if (historySite != null) {
@@ -831,10 +843,13 @@ fun PlayerScreen(
             item.copy(
                 title = item.title.ifBlank { titleHint },
                 sourceName = item.sourceName.ifBlank { fallbackSiteName },
+                // 封面单向回填（fongmi Vod.checkPic 语义）：只在详情封面为空时补入口封面，
+                // 非空一律以详情为准 —— 宽卡源详情 cover 为空，不补的话历史卡片就是空海报
+                cover = item.cover.ifBlank { entryCover },
             )
         }
         if (v != null) {
-            val history = container.historyDao.observeOne(videoId).first()
+            val history = savedHistory
             // 恢复上次所选线路：调用方未指定线路（搜索页等）或指定的线路在新详情中不存在时，
             // 用历史记录的 lineFlag 兜底；都没有才落回首条线路。
             // 否则 eps 会取错线路的选集列表，history.episodeIndex 越界被丢弃，表现为"集数重置"。
@@ -1104,7 +1119,7 @@ fun PlayerScreen(
                         siteKey,
                     )
                 }
-                container.historyDao.upsert(
+                container.historyDao.upsertKeepingCover(
                     HistoryEntity(
                         videoId = v.id,
                         title = v.title,

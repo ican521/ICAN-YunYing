@@ -56,6 +56,7 @@ import com.ican.tvplay.data.SUBTITLE_MIN_POSITION
 import com.ican.tvplay.data.SUBTITLE_MIN_SCALE
 import com.ican.tvplay.data.SUBTITLE_OFFSET_MAX_MS
 import com.ican.tvplay.data.local.HistoryEntity
+import com.ican.tvplay.data.local.upsertKeepingCover
 import com.ican.tvplay.data.model.Episode
 import com.ican.tvplay.data.model.PlayLine
 import com.ican.tvplay.data.model.Video
@@ -506,7 +507,7 @@ object Players {
         val index = targetIndex
         scope.launch {
             runCatching {
-                dao.upsert(
+                dao.upsertKeepingCover(
                     HistoryEntity(
                         videoId = ctx.video.id,
                         title = ctx.video.title,
@@ -537,7 +538,7 @@ object Players {
         val dur = if (p.duration != C.TIME_UNSET) p.duration.coerceAtLeast(0L) else 0L
         scope.launch {
             runCatching {
-                app.container.historyDao.upsert(
+                app.container.historyDao.upsertKeepingCover(
                     HistoryEntity(
                         videoId = ctx.video.id,
                         title = ctx.video.title,

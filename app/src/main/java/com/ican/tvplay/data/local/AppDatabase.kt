@@ -153,11 +153,30 @@ interface HistoryDao {
     @Upsert
     suspend fun upsert(history: HistoryEntity)
 
+    @Query("SELECT cover FROM history WHERE videoId = :videoId LIMIT 1")
+    suspend fun coverOf(videoId: String): String?
+
     @Query("DELETE FROM history WHERE videoId = :videoId")
     suspend fun delete(videoId: String)
 
     @Query("DELETE FROM history")
     suspend fun clear()
+}
+
+/**
+ * 落库历史：封面做单向回填（仿 fongmi `Vod.checkPic`）。
+ *
+ * 宽卡/随机视频源（「爱刷」这类）详情不吐 cover，从历史续播回来时新封面是空串；
+ * 直接 upsert 会把库里已有的封面刷掉，历史卡片就成了空海报。
+ * 这里只在「新封面为空」时沿用库里已有的封面，非空一律以新值为准，绝不主动清空。
+ */
+suspend fun HistoryDao.upsertKeepingCover(history: HistoryEntity) {
+    val kept = if (history.cover.isBlank()) {
+        coverOf(history.videoId)?.takeIf { it.isNotBlank() }.orEmpty()
+    } else {
+        ""
+    }
+    upsert(if (kept.isEmpty()) history else history.copy(cover = kept))
 }
 
 @Database(
