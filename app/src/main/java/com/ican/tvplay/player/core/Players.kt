@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
@@ -128,6 +129,105 @@ object Players {
         /** 当前源是 ISO 光盘镜像：EXO 无容器能力（start 会自动切 MPV），播放内核弹窗据此把 EXO 置灰 */
         val isoSource: Boolean = false,
     )
+
+    /** 视频信息面板的数据快照：只取当前媒体轨的编码参数（标题/内核/网速这类界面可见项不重复展示） */
+    data class VideoInfo(
+        val width: Int = 0,
+        val height: Int = 0,
+        val frameRate: Float = 0f,
+        val videoCodecs: String? = null,
+        val videoMime: String? = null,
+        val videoBitrate: Int = 0,
+        /** 位深：由 codecs 串的 profile 推断（hvc1 Main10 / avc1 High10 / vp09 profile2） */
+        val bitDepth: Int = 0,
+        val colorSpace: String? = null,
+        val colorTransfer: String? = null,
+        val colorRange: String? = null,
+        val audioCodecs: String? = null,
+        val audioMime: String? = null,
+        val audioSampleRate: Int = 0,
+        val audioChannels: Int = 0,
+        val audioBitrate: Int = 0,
+        /** true = 当前内核没有 media3 Tracks（MPV）：除 videoSize 外都读不到 */
+        val unavailable: Boolean = false,
+    ) {
+        val hasSize: Boolean get() = width > 0 && height > 0
+    }
+
+    /**
+     * 快照当前媒体信息：EXO 走 media3 Tracks/Format（含 colorInfo），MPV 的 SimpleBasePlayer
+     * 不提供 Tracks，只能拿到 videoSize，其余字段留空由面板标注。
+     */
+    fun videoInfo(): VideoInfo {
+        val p = player ?: return VideoInfo(unavailable = true)
+        val tracks = runCatching { p.currentTracks }.getOrNull()
+        val video = firstFormat(tracks, C.TRACK_TYPE_VIDEO)
+        val audio = firstFormat(tracks, C.TRACK_TYPE_AUDIO)
+        val size = runCatching { p.videoSize }.getOrDefault(VideoSize.UNKNOWN)
+        val color = video?.colorInfo
+        return VideoInfo(
+            width = video?.width?.takeIf { it > 0 } ?: size.width,
+            height = video?.height?.takeIf { it > 0 } ?: size.height,
+            frameRate = video?.frameRate ?: 0f,
+            videoCodecs = video?.codecs,
+            videoMime = video?.sampleMimeType,
+            videoBitrate = (video?.bitrate ?: 0).coerceAtLeast(0),
+            bitDepth = bitDepthOf(video?.codecs),
+            colorSpace = when (color?.colorSpace) {
+                C.COLOR_SPACE_BT2020 -> "BT.2020"
+                C.COLOR_SPACE_BT709 -> "BT.709"
+                else -> null
+            },
+            colorTransfer = when (color?.colorTransfer) {
+                C.COLOR_TRANSFER_ST2084 -> "PQ (HDR10)"
+                C.COLOR_TRANSFER_HLG -> "HLG"
+                C.COLOR_TRANSFER_SDR -> "SDR"
+                C.COLOR_TRANSFER_LINEAR -> "Linear"
+                else -> null
+            },
+            colorRange = when (color?.colorRange) {
+                C.COLOR_RANGE_LIMITED -> "Limited"
+                C.COLOR_RANGE_FULL -> "Full"
+                else -> null
+            },
+            audioCodecs = audio?.codecs,
+            audioMime = audio?.sampleMimeType,
+            audioSampleRate = (audio?.sampleRate ?: 0).coerceAtLeast(0),
+            audioChannels = (audio?.channelCount ?: 0).coerceAtLeast(0),
+            audioBitrate = (audio?.bitrate ?: 0).coerceAtLeast(0),
+            unavailable = video == null && size.width <= 0,
+        )
+    }
+
+    private fun firstFormat(tracks: Tracks?, type: Int): Format? {
+        val group = tracks?.groups?.firstOrNull { it.type == type } ?: return null
+        for (i in 0 until group.length) {
+            val format = runCatching { group.getTrackFormat(i) }.getOrNull()
+            if (format != null) return format
+        }
+        return null
+    }
+
+    private fun bitDepthOf(codecs: String?): Int {
+        val parts = codecs?.split('.') ?: return 0
+        return when {
+            codecs.startsWith("hvc1") || codecs.startsWith("hev1") ->
+                // hvc1.<profile space>.<profile idc>.<level>: 2=Main10, 3=Main12 仍是 10/12bit 输出
+                when (parts.getOrNull(1)?.toIntOrNull()) {
+                    2 -> 10
+                    3 -> 12
+                    else -> 8
+                }
+            codecs.startsWith("avc1") -> {
+                // avc1.PPCCLL：PP 为十六进制 profile_idc，110=High10、122/244=High422/444（10bit）
+                val profile = parts.getOrNull(1)?.take(2)?.toIntOrNull(16) ?: 0
+                if (profile == 110 || profile == 122 || profile == 244) 10 else 8
+            }
+            codecs.startsWith("vp09") -> if (parts.getOrNull(2)?.toIntOrNull() == 2) 10 else 8
+            else -> 0
+        }
+    }
+
 
     /** 高频进度（播放中每 500ms 一跳）：与 PlayerState 拆开，
      *  进度刷新只重组订阅本流的进度条/时间文本，不再牵动整个播放页 */

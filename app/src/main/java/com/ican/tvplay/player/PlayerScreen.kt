@@ -2832,8 +2832,6 @@ private fun PreviewPlayerArea(
                         pressColor = Color.White,
                         onClick = { onBack() },
                     )
-                    Spacer(modifier = Modifier.weight(1f))
-                    PlainTopBtn(AppIcons.Cast, "投屏") { }
                 }
 
                 // 中部：上一集 / 播放暂停 / 下一集（fongmi: play 与两侧各 40dp 间距）
@@ -3811,6 +3809,8 @@ private fun FullscreenPlayLayout(
     var showAudio by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
     var showEpisodes by remember { mutableStateOf(false) }
+    // 视频信息面板（全屏顶栏右上角 info 按钮）：只列编码参数，不显示标题/集名/网速/内核
+    var showVideoInfo by remember { mutableStateOf(false) }
     // 选集或字幕设置侧栏打开期间抑制全部播放手势
     val sideSheetOpen = showEpisodes || subtitleSettingsOpen
     // fongmi 同款手势反馈浮层：拖动 seek 预览目标 / 长按倍速提示
@@ -3993,6 +3993,24 @@ private fun FullscreenPlayLayout(
                 }
             },
     ) {
+        // 视频信息面板（顶栏 info 按钮展开）：放在控制层之外，控制层 3 秒自动隐藏后仍保留；
+        // 打开期间每 500ms 重取一次快照（缓冲/码率等字段会变）
+        if (showVideoInfo) {
+            var videoInfo by remember { mutableStateOf(Players.videoInfo()) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    videoInfo = Players.videoInfo()
+                    delay(500)
+                }
+            }
+            VideoInfoPanel(
+                info = videoInfo,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 16.dp, top = 64.dp),
+            )
+        }
+
         // fongmi 手势反馈浮层：顶部居中显示快进/快退目标时间（无胶囊底，纯文字+图标）
         // 拖动底部进度条：顶部居中实时显示「跳转至 MM:SS」，跟随手指位置更新（无胶囊底）
         // 内部订阅独立进度流：拖动期间的进度刷新只重组本浮层
@@ -4060,7 +4078,11 @@ private fun FullscreenPlayLayout(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                     )
-                    PlainTopBtn(AppIcons.Cast, "投屏") { }
+                    // 视频信息按钮（圆圈 i，仿当贝播放页右上角）：点击展开/收起下方编码参数面板
+                    PlainTopBtn(AppIcons.Info, "视频信息") {
+                        showVideoInfo = !showVideoInfo
+                        onControlInteract()
+                    }
                 }
 
                 // 中部（fongmi: 40/48dp shape_control 按钮，play 与两侧各 40dp 间距）
