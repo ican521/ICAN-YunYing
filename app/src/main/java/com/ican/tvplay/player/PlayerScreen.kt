@@ -95,6 +95,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -344,6 +345,7 @@ fun PlayerScreen(
     val savedScale by settings.playerScale.collectAsStateWithLifecycle()
     val savedAutoNext by settings.playerAutoNext.collectAsStateWithLifecycle()
     val savedEngine by settings.playerEngine.collectAsStateWithLifecycle()
+    val savedRender by settings.playerRender.collectAsStateWithLifecycle()
     val savedBuffer by settings.playerBuffer.collectAsStateWithLifecycle()
     val savedDecode by settings.playerDecode.collectAsStateWithLifecycle()
     val savedSubtitleScale by settings.subtitleScale.collectAsStateWithLifecycle()
@@ -510,11 +512,22 @@ fun PlayerScreen(
 
     // 共享 PlayerView（fongmi 同思路：全屏/竖屏只是改容器尺寸，PlayerView 从不销毁重建）。
     // 常驻唯一 AndroidView，竖屏↔全屏↔画中画切换时 Surface 不销毁，消除切换黑屏。
-    // fongmi 用 surface_type="none" + setRender(SURFACE)（默认 SurfaceView）；
-    // 我们对齐用 surface_view：视频由系统合成器独立缩放，画中画退出放大无残帧。
-    val sharedPlayerView = remember {
+    // 渲染方式来自设置（设置→播放设置→视频渲染）：
+    //   TEXTURE（默认）对齐现有体验：画面参与 View 合成，缩放跟手、圆角可裁、播完能抓静帧；
+    //   SURFACE 由系统合成器独立出层，HDR 片源的 10bit/PQ 才能直通（缩放动画可能滞后一帧）。
+    // media3 的 surface_type 只在 inflate 时读 attrs、运行期改不了，所以切换时按设置重建这一个
+    // PlayerView（Player 实例不动，音频继续，画面重新 attach）；AndroidView 节点用 key 强制重建。
+    val renderSurface = savedRender == com.ican.tvplay.data.SettingsRepository.RENDER_SURFACE
+    val sharedPlayerView = remember(renderSurface) {
         android.view.LayoutInflater.from(context)
-            .inflate(com.ican.tvplay.R.layout.player_view, null) as PlayerView
+            .inflate(
+                if (renderSurface) {
+                    com.ican.tvplay.R.layout.player_view_surface
+                } else {
+                    com.ican.tvplay.R.layout.player_view
+                },
+                null,
+            ) as PlayerView
     }.apply {
         Players.bindPlayerView(this)
         // fongmi VideoActivity 同款：视频区矩形变化即同步 sourceRectHint，
@@ -542,7 +555,7 @@ fun PlayerScreen(
             }
         }
     }
-    DisposableEffect(Unit) {
+    DisposableEffect(sharedPlayerView) {
         onDispose {
             Players.unbindPlayerView(sharedPlayerView)
             sharedPlayerView.setDefaultArtwork(null)
@@ -1891,40 +1904,44 @@ fun PlayerScreen(
                 .background(Color.Black),
             contentAlignment = Alignment.Center,
         ) {
-            AndroidView(
-                factory = { sharedPlayerView },
-                update = { view ->
-                    // 竖屏几何由我们自己算（原始/裁剪/填充都在 contentSizeFor 里定了尺寸），
-                    // 这里恒 FIT，不让 media3 再按自己的方式撑大内层（撑大会溢出小窗压到信息流）
-                    view.resizeMode = if (letterboxed) {
-                        androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+            // key 绑定到当前渲染方式对应的 PlayerView：设置里切换 TEXTURE/SURFACE 后
+            // AndroidView 节点重建、factory 重新返回新视图（否则 factory 只在首帧执行，换不了视图）
+            key(sharedPlayerView) {
+                AndroidView(
+                    factory = { sharedPlayerView },
+                    update = { view ->
+                        // 竖屏几何由我们自己算（原始/裁剪/填充都在 contentSizeFor 里定了尺寸），
+                        // 这里恒 FIT，不让 media3 再按自己的方式撑大内层（撑大会溢出小窗压到信息流）
+                        view.resizeMode = if (letterboxed) {
+                            androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        } else {
+                            playerState.scaleMode.resizeMode
+                        }
+                        if (com.ican.tvplay.BuildConfig.DEBUG) {
+                            android.util.Log.i(
+                                "PipTrace",
+                                "videoMode mode=${playerState.scaleMode} letterboxed=$letterboxed " +
+                                    "ratio=${"%.3f".format(videoRatio)}",
+                            )
+                        }
+                        // PlayerView 背景直接用黑色：视频 FIT 模式黑边区显示黑色。
+                        view.setBackgroundColor(android.graphics.Color.BLACK)
+                        if (view.player !== Players.player) Players.bindPlayerView(view)
+                        // 静帧替身顶上时把真实 surface 藏掉，避免空缓冲/旧矩阵缓冲从图外露出来
+                        val hide = endedFrameSnapshot != null
+                        view.visibility = if (hide) android.view.View.INVISIBLE else android.view.View.VISIBLE
+                    },
+                    modifier = if (letterboxed) {
+                        // 居中 + 精确内容矩形：宽/高在布局阶段读取，逐帧不重组；
+                        // 裁剪档位下内容会比框大，由外层 Box 的 clipToBounds 裁掉
+                        Modifier
+                            .align(Alignment.Center)
+                            .animatedSize(pContentWidth, pContentHeight)
                     } else {
-                        playerState.scaleMode.resizeMode
-                    }
-                    if (com.ican.tvplay.BuildConfig.DEBUG) {
-                        android.util.Log.i(
-                            "PipTrace",
-                            "videoMode mode=${playerState.scaleMode} letterboxed=$letterboxed " +
-                                "ratio=${"%.3f".format(videoRatio)}",
-                        )
-                    }
-                    // PlayerView 背景直接用黑色：视频 FIT 模式黑边区显示黑色。
-                    view.setBackgroundColor(android.graphics.Color.BLACK)
-                    if (view.player !== Players.player) Players.bindPlayerView(view)
-                    // 静帧替身顶上时把真实 surface 藏掉，避免空缓冲/旧矩阵缓冲从图外露出来
-                    val hide = endedFrameSnapshot != null
-                    view.visibility = if (hide) android.view.View.INVISIBLE else android.view.View.VISIBLE
-                },
-                modifier = if (letterboxed) {
-                    // 居中 + 精确内容矩形：宽/高在布局阶段读取，逐帧不重组；
-                    // 裁剪档位下内容会比框大，由外层 Box 的 clipToBounds 裁掉
-                    Modifier
-                        .align(Alignment.Center)
-                        .animatedSize(pContentWidth, pContentHeight)
-                } else {
-                    Modifier.fillMaxSize()
-                },
-            )
+                        Modifier.fillMaxSize()
+                    },
+                )
+            }
             // 播完后的静态画面：几何与真实视频层完全一致（同一套插值），
             // 缩放动画期间它跟着黑框走，完全不碰 surface
             endedFrameSnapshot?.let { frame ->

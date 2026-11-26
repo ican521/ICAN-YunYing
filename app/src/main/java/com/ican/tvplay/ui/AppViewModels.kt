@@ -633,6 +633,8 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     val wideColumnsLandscape: StateFlow<Int?> = settings.wideColumnsLandscape
     val wideColumnsPortrait: StateFlow<Int?> = settings.wideColumnsPortrait
     val playerBackgroundPlay: StateFlow<Int> = settings.playerBackgroundPlay
+    /** 视频渲染方式（SettingsRepository.RENDER_TEXTURE / RENDER_SURFACE） */
+    val playerRender: StateFlow<String> = settings.playerRender
     val configUrl: StateFlow<String> = settings.configUrl
     val favoriteUpdateCheckEnabled: StateFlow<Boolean> = settings.favoriteUpdateCheckEnabled
     val favoriteUpdateIntervalHours: StateFlow<Int> = settings.favoriteUpdateIntervalHours
@@ -659,6 +661,8 @@ class SettingsViewModel(container: AppContainer) : ViewModel() {
     fun setWideColumnsPortrait(columns: Int?) = settings.setWideColumnsPortrait(columns)
 
     fun setPlayerBackgroundPlay(mode: Int) = settings.setPlayerBackgroundPlay(mode)
+
+    fun setPlayerRender(render: String) = settings.setPlayerRender(render)
     fun setFavoriteUpdateCheckEnabled(enabled: Boolean) =
         settings.setFavoriteUpdateCheckEnabled(enabled)
     fun setFavoriteUpdateIntervalHours(hours: Int) = settings.setFavoriteUpdateIntervalHours(hours)

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SurfaceView 渲染（设置→播放设置→视频渲染 切到「SurfaceView」时使用）：
+     画面由系统合成器以独立图层输出，解码器的 10bit/PQ 元数据可以直通到屏幕，
+     HDR 片源才可能真 HDR；代价是缩放动画可能滞后一帧、圆角裁剪不生效。 -->
+<androidx.media3.ui.PlayerView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/player_view"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF000000"
+    app:surface_type="surface_view"
+    app:use_controller="false"
+    app:keep_content_on_player_reset="false" />

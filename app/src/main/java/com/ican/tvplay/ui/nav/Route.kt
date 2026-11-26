@@ -20,6 +20,11 @@ sealed interface Route : NavKey, Parcelable {
     @Serializable
     data object ColorPalette : Route
 
+    /** 播放设置页（设置页入口进入）：视频渲染等在设置页二级页里切换 */
+    @Parcelize
+    @Serializable
+    data object PlaybackSettings : Route
+
     /**
      * 搜索页（搜索入口与首页热词/卡片直达结果共用同一页）：
      * initialQuery 为空 → 历史 + 推荐态；非空 → 直接进入跨站源结果态

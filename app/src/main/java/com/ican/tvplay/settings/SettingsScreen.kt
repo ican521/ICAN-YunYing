@@ -89,12 +89,14 @@ import androidx.tv.material3.Icon
 @Composable
 fun SettingsScreen(
     onColorPaletteClick: () -> Unit = {},
+    onPlaybackSettingsClick: () -> Unit = {},
     onBack: () -> Unit = {},
 ) {
     val viewModel = appViewModel { SettingsViewModel(this) }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val backgroundPlay by viewModel.playerBackgroundPlay.collectAsStateWithLifecycle()
+    val playerRender by viewModel.playerRender.collectAsStateWithLifecycle()
     val favoriteUpdateCheckEnabled by viewModel.favoriteUpdateCheckEnabled.collectAsStateWithLifecycle()
     val favoriteUpdateIntervalHours by viewModel.favoriteUpdateIntervalHours.collectAsStateWithLifecycle()
     val favoriteUpdateStartupPopup by viewModel.favoriteUpdateStartupPopup.collectAsStateWithLifecycle()
@@ -360,6 +362,17 @@ fun SettingsScreen(
 
         item {
         Card(modifier = Modifier.fillMaxWidth()) {
+            ArrowPreference(
+                title = "播放设置",
+                summary = "视频渲染：${
+                    if (playerRender == com.ican.tvplay.data.SettingsRepository.RENDER_SURFACE) {
+                        "SurfaceView"
+                    } else {
+                        "TextureView"
+                    }
+                }",
+                onClick = onPlaybackSettingsClick,
+            )
             OverlayDropdownPreference(
                 title = "后台播放",
                 summary = "全屏播放时切后台自动进入画中画",

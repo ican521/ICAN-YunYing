@@ -249,6 +249,22 @@ class SettingsRepository(context: Context) {
         _playerEngine.value = engine
     }
 
+    /**
+     * 视频渲染方式（仿 fongmi PlayerSetting.render）：
+     * TEXTURE（默认，画面作为普通 View 参与合成：缩放跟手、支持圆角、播完可抓静帧）/
+     * SURFACE（独立图层交给系统合成器：HDR 片源才能真 HDR 直通，缩放动画可能滞后一帧、圆角失效）。
+     */
+    private val _playerRender = MutableStateFlow(
+        prefs.getString(KEY_PLAYER_RENDER, null).orEmpty().ifEmpty { RENDER_TEXTURE },
+    )
+    val playerRender: StateFlow<String> = _playerRender.asStateFlow()
+
+    fun setPlayerRender(render: String) {
+        val value = if (render == RENDER_SURFACE) RENDER_SURFACE else RENDER_TEXTURE
+        prefs.edit().putString(KEY_PLAYER_RENDER, value).apply()
+        _playerRender.value = value
+    }
+
     /** 播放解码方式（存 Decode.name 字符串，默认 AUTO；data 层不依赖 player 包） */
     private val _playerDecode = MutableStateFlow(prefs.getString(KEY_PLAYER_DECODE, null).orEmpty())
     val playerDecode: StateFlow<String> = _playerDecode.asStateFlow()
@@ -535,6 +551,8 @@ class SettingsRepository(context: Context) {
         _playerScale.value = prefs.getString(KEY_PLAYER_SCALE, null).orEmpty()
         _playerAutoNext.value = prefs.getBoolean(KEY_PLAYER_AUTO_NEXT, true)
         _playerEngine.value = prefs.getString(KEY_PLAYER_ENGINE, null).orEmpty()
+        _playerRender.value = prefs.getString(KEY_PLAYER_RENDER, null).orEmpty()
+            .ifEmpty { RENDER_TEXTURE }
         _playerDecode.value = prefs.getString(KEY_PLAYER_DECODE, null).orEmpty()
         _playerBuffer.value = prefs.getInt(KEY_PLAYER_BUFFER, 1)
         _playerBrightness.value = prefs.getFloat(KEY_PLAYER_BRIGHTNESS, -1f)
@@ -557,7 +575,11 @@ class SettingsRepository(context: Context) {
         _siteToggleVersion.value += 1
     }
 
-    private companion object {
+    /** 视频渲染方式取值（设置页/播放页共用） */
+    companion object {
+        const val RENDER_TEXTURE = "TEXTURE"
+        const val RENDER_SURFACE = "SURFACE"
+
         const val KEY_THEME = "theme_mode"
         const val KEY_THEME_COLOR = "theme_color"
         const val KEY_HOME_LAYOUT_SIZE = "home_layout_size"
@@ -570,6 +592,7 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_SCALE = "player_scale"
         const val KEY_PLAYER_AUTO_NEXT = "player_auto_next"
         const val KEY_PLAYER_ENGINE = "player_engine"
+        const val KEY_PLAYER_RENDER = "player_render"
         const val KEY_PLAYER_DECODE = "player_decode"
         const val KEY_PLAYER_BUFFER = "player_buffer"
         const val KEY_PLAYER_BRIGHTNESS = "player_brightness"

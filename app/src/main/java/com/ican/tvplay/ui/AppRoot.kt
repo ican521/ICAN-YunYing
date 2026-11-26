@@ -54,6 +54,7 @@ import com.ican.tvplay.ui.nav.topDestinations
 import com.ican.tvplay.player.core.Players
 import com.ican.tvplay.ui.search.SearchHomeScreen
 import com.ican.tvplay.ui.settings.ColorPaletteScreen
+import com.ican.tvplay.ui.settings.PlaybackSettingsScreen
 import com.ican.tvplay.ui.settings.SettingsScreen
 import com.ican.tvplay.ui.theme.LocalDarkTheme
 import com.ican.tvplay.ui.theme.Spacing
@@ -269,6 +270,7 @@ fun AppRoot() {
 
                             2 -> SettingsScreen(
                                 onColorPaletteClick = { navigator.push(Route.ColorPalette) },
+                                onPlaybackSettingsClick = { navigator.push(Route.PlaybackSettings) },
                                 onBack = { mainPagerState.animateToPage(0) },
                             )
                         }
@@ -276,6 +278,9 @@ fun AppRoot() {
                 }
                 entry<Route.ColorPalette>(swipeDismiss = NavSwipeDirection.None) {
                     ColorPaletteScreen(onBack = { navigator.pop() })
+                }
+                entry<Route.PlaybackSettings>(swipeDismiss = NavSwipeDirection.None) {
+                    PlaybackSettingsScreen(onBack = { navigator.pop() })
                 }
                 entry<Route.Search>(swipeDismiss = NavSwipeDirection.None) { key ->
                     SearchHomeScreen(
