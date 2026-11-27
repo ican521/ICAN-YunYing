@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -405,23 +406,16 @@ fun HistoryScreen(
     var editMode by remember { mutableStateOf(false) }
     // 清空确认弹窗
     var showConfirm by remember { mutableStateOf(false) }
-    // 已渐显的卡片索引：与首页首次加载同款错峰逐个淡入
-    var revealedCards by remember { mutableStateOf<Set<Int>>(emptySet()) }
-    LaunchedEffect(histories) {
-        if (histories.isEmpty()) return@LaunchedEffect
-        // 方案B：等滑入转场结束再开始错峰，转场帧上不做任何海报解码
-        delay(HISTORY_CARD_STAGGER_START_DELAY_MILLIS)
-        val base = System.currentTimeMillis()
-        histories.indices
-            .filter { it !in revealedCards }
-            .forEachIndexed { idx, index ->
-                // 前若干张错峰，其后同批一起出现；用绝对时间计算，避免逐个累加
-                val wait = base +
-                    idx.coerceAtMost(HISTORY_CARD_FADE_MAX_STAGGER_INDEX) * HISTORY_CARD_FADE_STAGGER_MILLIS -
-                    System.currentTimeMillis()
-                if (wait > 0) delay(wait)
-                revealedCards = revealedCards + index
-            }
+    // 渐显基准时刻：数据首次到达后 delay 120ms 起算。
+    // 用「绝对时间戳」代替原来的「全局已揭示索引集合」——后者每 40ms 更新一次 Set，
+    // 而每张卡片都在组合期读取它，等于每 40ms 让整屏卡片全部重组一遍（进入页面后立刻快速滑动就掉帧）。
+    // 改成时间戳后，每张卡片只在轮到自己的那一刻更新自身状态，只重组自己。
+    var revealBase by remember { mutableStateOf(0L) }
+    LaunchedEffect(histories.isNotEmpty()) {
+        if (histories.isNotEmpty() && revealBase == 0L) {
+            // 方案B：等滑入转场结束再开始错峰，转场帧上不做任何海报解码
+            revealBase = System.currentTimeMillis() + HISTORY_CARD_STAGGER_START_DELAY_MILLIS
+        }
     }
 
     // 编辑模式下按返回 = 取消编辑（留在页面）；清空弹窗打开时返回由弹窗自行消费，
@@ -477,16 +471,36 @@ fun HistoryScreen(
                     verticalArrangement = Arrangement.spacedBy(Spacing.cardGapV),
                 ) {
                 itemsIndexed(histories, key = { _, it -> it.videoId }, contentType = { _, _ -> "history" }) { index, history ->
+                    // 逐个渐显：每张卡片自己按时间戳等待（自己一个协程、只置自己的状态），
+                    // 不再由列表级 Set 统一推进，避免每 40ms 整屏卡片一起重组。
+                    // 初始值同步按时间判断：页面停留后新滚入的卡片直接全显，不会补一次淡入（与旧行为一致）
+                    val staggerIndex = index.coerceAtMost(HISTORY_CARD_FADE_MAX_STAGGER_INDEX)
+                    var revealed by remember(history.videoId) {
+                        val base = revealBase
+                        mutableStateOf(
+                            base != 0L &&
+                                System.currentTimeMillis() >=
+                                base + staggerIndex * HISTORY_CARD_FADE_STAGGER_MILLIS,
+                        )
+                    }
+                    LaunchedEffect(history.videoId, revealBase) {
+                        if (revealed) return@LaunchedEffect
+                        val base = revealBase.takeIf { it != 0L } ?: System.currentTimeMillis()
+                        val wait = base + staggerIndex * HISTORY_CARD_FADE_STAGGER_MILLIS -
+                            System.currentTimeMillis()
+                        if (wait > 0) delay(wait)
+                        revealed = true
+                    }
                     // 逐个渐显：alpha 只挂在卡片自身的 modifier 上，不新增布局层，尺寸/位置/间距不变
                     val cardAlpha by animateFloatAsState(
-                        targetValue = if (index !in revealedCards) 0f else 1f,
+                        targetValue = if (revealed) 1f else 0f,
                         animationSpec = tween(HISTORY_CARD_FADE_IN_MILLIS),
                         label = "historyCardFade",
                     )
                     HistoryCard(
                         history = history,
                         editMode = editMode,
-                        revealed = index in revealedCards,
+                        revealed = revealed,
                         modifier = Modifier.alpha(cardAlpha),
                         onClick = {
                             // 编辑模式下点卡片本体不响应，仅右上角叉号可删除
@@ -575,6 +589,9 @@ private fun HistoryCard(
     // 进度条高度与「胶囊到进度条」的间距：4dp 条高 + 8dp 常规叠加层边距
     val progressBarHeight = 4.dp
     val corner = Spacing.corner
+    // shape / 渐变 Brush 缓存：滚动时卡片会反复重组，不必每次重新构建 Squircle 路径和 33 段渐变
+    val cardShape = remember(corner) { SquircleShape(corner) }
+    val captionScrim = remember { posterCaptionScrim(span = 1f) }
     Card(
         modifier = modifier
             .aspectRatio(5f / 7f)
@@ -586,7 +603,8 @@ private fun HistoryCard(
             )
             .tvCardEffect(
                 onClick = onClick,
-                shape = SquircleShape(corner),
+                // shape 缓存：每次重组新建会让裁剪路径无法复用（滚动时反复构建 Squircle 路径）
+                shape = cardShape,
                 focusedScale = 1.03f,
                 glow = false,
                 onLongClick = onLongClick,
@@ -657,10 +675,14 @@ private fun HistoryCard(
                 }
 
                 // 海报内标题样式（与首页同款）：底部渐变压暗 + 标题 / 副标题（副标题 = 当前集数）
+                // 只铺底部 40%：曲线（span = 1）在 40% 高度内重新铺满，与原来整卡铺满 + span = 0.4 等价，
+                // 上半部分原本就是全透明，收窄后填充面积降到 40%
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(posterCaptionScrim()),
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.4f)
+                        .align(Alignment.BottomCenter)
+                        .background(captionScrim),
                 )
                 PosterCaption(
                     title = history.title,
