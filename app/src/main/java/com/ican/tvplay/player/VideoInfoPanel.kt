@@ -27,10 +27,22 @@ import java.util.Locale
 @Composable
 fun VideoInfoPanel(
     info: Players.VideoInfo,
+    /** 当前是否用 SurfaceView 渲染：HDR 片源只有 Surface 输出才可能真按 HDR 显示 */
+    renderSurface: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val rows = buildList {
         if (info.hasSize) add("分辨率" to "${info.width} × ${info.height}")
+        // 画质：用大白话说清「片源是不是 HDR」+「现在实际怎么显示」，不出现 PQ/BT.2020 这类参数
+        info.hdrSource?.let { hdr ->
+            add(
+                "画质" to when {
+                    !hdr -> "普通画面"
+                    info.hdrScreen == true && renderSurface -> "HDR"
+                    else -> "HDR 片源（当前按普通画面显示）"
+                },
+            )
+        }
         if (info.frameRate > 0f) add("帧率" to String.format(Locale.US, "%.3f fps", info.frameRate))
         val codec = buildString {
             info.videoMime?.substringAfterLast('/')?.uppercase(Locale.US)?.let { append(it) }

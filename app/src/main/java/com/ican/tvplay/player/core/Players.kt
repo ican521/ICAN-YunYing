@@ -159,6 +159,10 @@ object Players {
         val hardwareDecode: Boolean = false,
         /** 视频丢帧累计数（AnalyticsListener.onDroppedVideoFrames） */
         val droppedFrames: Int = 0,
+        /** 片源是不是 HDR（PQ / HLG 两种传输特性）；null = 读不到（MPV 内核 / 无视频轨道） */
+        val hdrSource: Boolean? = null,
+        /** 这块屏是否支持该片源的 HDR 格式；片源非 HDR 时为 null。配合渲染方式才能判「是否真按 HDR 输出」 */
+        val hdrScreen: Boolean? = null,
         /** true = 当前内核没有 media3 Tracks（MPV）：除 videoSize 外都读不到 */
         val unavailable: Boolean = false,
     ) {
@@ -176,6 +180,12 @@ object Players {
         val audio = firstFormat(tracks, C.TRACK_TYPE_AUDIO)
         val size = runCatching { p.videoSize }.getOrDefault(VideoSize.UNKNOWN)
         val color = video?.colorInfo
+        // HDR 判定：有轨道但没色彩信息（绝大多数普通片源）按非 HDR 处理；连视频轨道都读不到才算未知
+        val hdrSource = when {
+            video == null -> null
+            color == null -> false
+            else -> androidx.media3.common.ColorInfo.isTransferHdr(color)
+        }
         return VideoInfo(
             width = video?.width?.takeIf { it > 0 } ?: size.width,
             height = video?.height?.takeIf { it > 0 } ?: size.height,
@@ -209,8 +219,33 @@ object Players {
             decoderName = videoDecoderName,
             hardwareDecode = isHardwareDecoder(videoDecoderName),
             droppedFrames = droppedVideoFrames,
+            hdrSource = hdrSource,
+            // 屏幕能力只在片源确实 HDR 时才查：避免每 500ms 刷新的面板去碰 Display
+            hdrScreen = if (hdrSource == true) displaySupportsHdr(color?.colorTransfer) else null,
             unavailable = video == null && size.width <= 0,
         )
+    }
+
+    /**
+     * 这块屏是否支持该片源的 HDR 格式（判断「能不能真按 HDR 输出」用）：
+     * HLG 片源要屏幕声明 HLG；PQ（HDR10）片源要 HDR10 / HDR10+ / 杜比视界任一。
+     * 查询失败按「不支持」处理，宁可提示按普通画面显示，也不谎报 HDR。
+     */
+    private fun displaySupportsHdr(colorTransfer: Int?): Boolean {
+        val ctx = appContext ?: return false
+        val display = runCatching {
+            @Suppress("DEPRECATION")
+            (ctx.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager).defaultDisplay
+        }.getOrNull() ?: return false
+        val types = runCatching { display.hdrCapabilities?.supportedHdrTypes }.getOrNull() ?: return false
+        return types.any { type ->
+            when (colorTransfer) {
+                C.COLOR_TRANSFER_HLG -> type == android.view.Display.HdrCapabilities.HDR_TYPE_HLG
+                else -> type == android.view.Display.HdrCapabilities.HDR_TYPE_HDR10 ||
+                    type == android.view.Display.HdrCapabilities.HDR_TYPE_HDR10_PLUS ||
+                    type == android.view.Display.HdrCapabilities.HDR_TYPE_DOLBY_VISION
+            }
+        }
     }
 
     private fun firstFormat(tracks: Tracks?, type: Int): Format? {

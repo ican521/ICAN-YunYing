@@ -3801,6 +3801,8 @@ private fun FullscreenPlayLayout(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    // 视频信息面板里「HDR 是否真的在输出」取决于当前渲染方式（只有 Surface 输出才可能 HDR）
+    val infoRenderSurface by settings.playerRender.collectAsStateWithLifecycle()
     // 亮度持久化（仿 fongmi PlayerSetting）：进全屏应用上次保存的亮度，离开时保存当前值并恢复「跟随系统」
     LaunchedEffect(Unit) {
         val saved = settings.playerBrightness.value
@@ -4042,6 +4044,7 @@ private fun FullscreenPlayLayout(
                 .calculateStartPadding(LocalLayoutDirection.current)
             VideoInfoPanel(
                 info = videoInfo,
+                renderSurface = infoRenderSurface == SettingsRepository.RENDER_SURFACE,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .windowInsetsPadding(
