@@ -393,6 +393,7 @@ private const val HISTORY_CARD_STAGGER_START_DELAY_MILLIS = 120L
 /** 单张历史卡片淡入时长（毫秒），与首页一致 */
 private const val HISTORY_CARD_FADE_IN_MILLIS = 200
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun HistoryScreen(
     onPlay: (videoId: String, episodeIndex: Int, flag: String, preInit: Boolean) -> Unit,
@@ -403,6 +404,15 @@ fun HistoryScreen(
     val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    // 预取窗口：默认只向前预取视口 10%~50%、向后 0 像素，快滑时每张卡都是「滚到眼前才开始组合」，
+    // 组合峰值直接压在帧预算上。开大窗口后卡片在滚动途中/空闲期就被提前组合与预测量，
+    // 滑到眼前只剩贴图（官方 LazyLayoutCacheWindow；Meta 与 Google 联合实测可降约 8% 大卡顿）
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState(
+        cacheWindow = androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow(
+            aheadFraction = 1f,
+            behindFraction = 0.5f,
+        ),
+    )
 
     // 编辑模式：长按卡片进入（卡片显示叉号）；编辑模式内再长按 → 清空全部确认弹窗；返回键退出
     var editMode by remember { mutableStateOf(false) }
@@ -461,6 +471,7 @@ fun HistoryScreen(
             } else {
                 LazyVerticalGrid(
                     columns = videoGridColumns(homeLayoutSize),
+                    state = gridState,
                     modifier = Modifier
                         .fillMaxSize(),
                     contentPadding = PaddingValues(
@@ -595,7 +606,10 @@ private fun HistoryCard(
     val corner = Spacing.corner
     // shape / 渐变 Brush / 按压指示器 / 卡片配色 / 内边距 / 胶囊圆角 全部缓存：
     // 滚动时卡片会反复重组，每次新建实例都会让对应修饰符节点失效重配，属于纯开销
-    val cardShape = remember(corner) { SquircleShape(corner) }
+    // shape 用圆角矩形而不是 Squircle：Card 自身已按同一半径裁掉了海报，这层 clip 只用来
+    // 把按压蒙层裁出圆角；而 RoundedCornerShape 的 outline 走 HWUI 的 clipRRect 快路径，
+    // squircle 的自定义 Path 只能走 stencil，逐卡裁剪是滚动里的实打实开销
+    val cardShape = remember(corner) { RoundedCornerShape(corner) }
     val captionScrim = remember { posterCaptionScrim(span = 1f) }
     val sinkFeedback = remember { SinkFeedback() }
     val badgeShape = remember { RoundedCornerShape(percent = 50) }
@@ -622,9 +636,7 @@ private fun HistoryCard(
                 onLongClick = onLongClick,
                 // 按压蒙层固定浅色模式同款浅黑：收藏/历史卡片深色模式与浅色表现一致
                 pressColor = LightOnSurface,
-                // Card 自身已按同一 cornerRadius 裁圆角，这层 squircle clip 属重复裁剪；
-                // 先不挂，观察圆角是否仍完全一致（squircle 路径在 HWUI 上没有快速抗锯齿裁剪）
-                clipContent = false,
+                // 保留裁剪（蒙层需要圆角），但换成了上面的圆角矩形快路径
             ),
         cornerRadius = corner,
         insideMargin = zeroMargin,
