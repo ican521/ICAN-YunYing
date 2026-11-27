@@ -133,13 +133,24 @@ fun Modifier.tvCardEffect(
     val holdOverlayColor = pressIndicationColor
     val showHoldOverlay = holdDownState && isDark
 
+    // 未聚焦、也没有冻结时缩放恒为 1f：此时完全不下发 graphicsLayer。
+    // 滚动浏览时一屏十几二十张卡各挂一个 RenderNode，每帧都要把子内容记录进该图层，
+    // 是纯开销（scale = 1 没有任何视觉作用）。聚焦动画期间才挂上，观感与原来一致。
+    val scaleActive = frozenAt != null || animatedScale != 1f
+
     return this
-        // 动画值在 graphicsLayer lambda 内（绘制阶段）读取：缩放动画期间不再每帧触发重组
-        .graphicsLayer {
-            val currentScale = frozenAt ?: animatedScale
-            scaleX = currentScale
-            scaleY = currentScale
-        }
+        .then(
+            if (scaleActive) {
+                // 动画值在 graphicsLayer lambda 内（绘制阶段）读取：缩放动画期间不再每帧触发重组
+                Modifier.graphicsLayer {
+                    val currentScale = frozenAt ?: animatedScale
+                    scaleX = currentScale
+                    scaleY = currentScale
+                }
+            } else {
+                Modifier
+            },
+        )
         .then(
             if (glow) {
                 Modifier.blackElevationShadow(if (focused) 18.dp else 6.dp, shape)

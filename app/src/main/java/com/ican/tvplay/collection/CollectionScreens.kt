@@ -41,6 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 
@@ -501,7 +503,9 @@ fun HistoryScreen(
                         history = history,
                         editMode = editMode,
                         revealed = revealed,
-                        modifier = Modifier.alpha(cardAlpha),
+                        // 渐显结束（alpha 已到 1f）后不再挂 alpha：否则每张卡常驻一个离屏图层，
+                        // 滚动时一层层合成纯属浪费；渐显进行中才挂，观感与原来一致
+                        modifier = if (cardAlpha < 1f) Modifier.alpha(cardAlpha) else Modifier,
                         onClick = {
                             // 编辑模式下点卡片本体不响应，仅右上角叉号可删除
                             if (!editMode) {
@@ -592,6 +596,8 @@ private fun HistoryCard(
     // shape / 渐变 Brush 缓存：滚动时卡片会反复重组，不必每次重新构建 Squircle 路径和 33 段渐变
     val cardShape = remember(corner) { SquircleShape(corner) }
     val captionScrim = remember { posterCaptionScrim(span = 1f) }
+    // 进度条填充色提前取出：底色条与进度条合并成一次绘制后，不再在 Box 内读主题
+    val progressColor = MiuixTheme.colorScheme.primary
     Card(
         modifier = modifier
             .aspectRatio(5f / 7f)
@@ -615,97 +621,95 @@ private fun HistoryCard(
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // 海报区：占满「整卡高度 - 标题行」
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            ) {
-                PosterImage(
-                    title = history.title,
-                    // 错峰渐显轮到该卡片时才真正加载海报：把首屏 20 张海报的解码摊到错峰窗口内，
-                    // 避免进入页面首帧同时解码全部封面造成掉帧（未轮到时显示 Card 自带底色）
-                    cover = if (revealed) history.cover else null,
-                    modifier = Modifier.fillMaxSize(),
-                )
+        // 海报区直接铺满整卡：原先外层套了一层 Column + weight(1f)，但只有一个子项，
+        // 每次测量都要多走一次带权重的布局；去掉后排版结果完全一致
+        Box(modifier = Modifier.fillMaxSize()) {
+            PosterImage(
+                title = history.title,
+                // 错峰渐显轮到该卡片时才真正加载海报：把首屏 20 张海报的解码摊到错峰窗口内，
+                // 避免进入页面首帧同时解码全部封面造成掉帧（未轮到时显示 Card 自带底色）
+                cover = if (revealed) history.cover else null,
+                modifier = Modifier.fillMaxSize(),
+            )
 
-                // 左上角：站源胶囊（与收藏卡片同款，编辑模式下隐藏避免与右上角叉号冲突）
-                if (!editMode) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(Spacing.posterOverlayMargin)
-                            .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
-                            .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
-                    ) {
-                        Text(
-                            text = history.sourceName.ifBlank { "来源" },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-
-                // 右上角：编辑模式删除叉号（与收藏卡片一致）
-                if (editMode) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(Spacing.posterOverlayMargin)
-                            .size(30.dp)
-                            .tvCardEffect(
-                                onClick = onDelete,
-                                shape = CircleShape,
-                                focusedScale = 1.10f,
-                                glow = false,
-                            )
-                            .background(PosterActionScrim, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = MiuixIcons.Demibold.Close,
-                            contentDescription = "删除",
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
-                }
-
-                // 海报内标题样式（与首页同款）：底部渐变压暗 + 标题 / 副标题（副标题 = 当前集数）
-                // 只铺底部 40%：曲线（span = 1）在 40% 高度内重新铺满，与原来整卡铺满 + span = 0.4 等价，
-                // 上半部分原本就是全透明，收窄后填充面积降到 40%
+            // 左上角：站源胶囊（与收藏卡片同款，编辑模式下隐藏避免与右上角叉号冲突）
+            if (!editMode) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(0.4f)
-                        .align(Alignment.BottomCenter)
-                        .background(captionScrim),
-                )
-                PosterCaption(
-                    title = history.title,
-                    subtitle = history.episodeTitle.takeIf { it.isNotBlank() },
-                    modifier = Modifier.align(Alignment.BottomStart),
-                )
-
-                // 播放进度细条：贴海报最底部，通栏（画在渐变压暗之上，保证进度色不被压暗）
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .height(progressBarHeight)
-                        .background(Color(0x44FFFFFF)),
+                        .align(Alignment.TopStart)
+                        .padding(Spacing.posterOverlayMargin)
+                        .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
+                        .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(progress)
-                            .height(progressBarHeight)
-                            .background(MiuixTheme.colorScheme.primary),
+                    Text(
+                        text = history.sourceName.ifBlank { "来源" },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
+
+            // 右上角：编辑模式删除叉号（与收藏卡片一致）
+            if (editMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(Spacing.posterOverlayMargin)
+                        .size(30.dp)
+                        .tvCardEffect(
+                            onClick = onDelete,
+                            shape = CircleShape,
+                            focusedScale = 1.10f,
+                            glow = false,
+                        )
+                        .background(PosterActionScrim, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Demibold.Close,
+                        contentDescription = "删除",
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+
+            // 海报内标题样式（与首页同款）：底部渐变压暗 + 标题 / 副标题（副标题 = 当前集数）
+            // 只铺底部 40%：曲线（span = 1）在 40% 高度内重新铺满，与原来整卡铺满 + span = 0.4 等价，
+            // 上半部分原本就是全透明，收窄后填充面积降到 40%
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.4f)
+                    .align(Alignment.BottomCenter)
+                    .background(captionScrim),
+            )
+            PosterCaption(
+                title = history.title,
+                subtitle = history.episodeTitle.takeIf { it.isNotBlank() },
+                modifier = Modifier.align(Alignment.BottomStart),
+            )
+
+            // 播放进度细条：贴海报最底部，通栏（画在渐变压暗之上，保证进度色不被压暗）
+            // 底色条 + 进度条原本是两个 Box（多层测量 + 一层 fillMaxWidth 分数布局），
+            // 合并成一次绘制，像素结果一致
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(progressBarHeight)
+                    .drawBehind {
+                        drawRect(Color(0x44FFFFFF))
+                        if (progress > 0f) {
+                            drawRect(
+                                color = progressColor,
+                                size = Size(size.width * progress, size.height),
+                            )
+                        }
+                    },
+            )
         }
     }
 }
