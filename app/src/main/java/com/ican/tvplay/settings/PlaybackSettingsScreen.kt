@@ -114,9 +114,9 @@ fun PlaybackSettingsScreen(onBack: () -> Unit) {
                         OverlayDropdownPreference(
                             title = "视频渲染",
                             summary = if (surface) {
-                                "SurfaceView（HDR 直通）"
+                                "独立出层，支持 HDR10/HLG 直通屏幕"
                             } else {
-                                "TextureView（默认，缩放跟手）"
+                                "画面作为普通 View 参与合成，支持圆角，HDR 会映射为 SDR"
                             },
                             items = listOf("TextureView", "SurfaceView"),
                             selectedIndex = if (surface) 1 else 0,
@@ -137,9 +137,9 @@ fun PlaybackSettingsScreen(onBack: () -> Unit) {
                         OverlayDropdownPreference(
                             title = "后台播放",
                             summary = if (backgroundPlay == BACKGROUND_OFF) {
-                                "关闭：退出播放页即停止"
+                                "退出播放页即停止"
                             } else {
-                                "画中画：全屏播放切后台自动进小窗继续播"
+                                "切后台自动小窗继续播放"
                             },
                             items = listOf("关闭", "画中画"),
                             selectedIndex = if (backgroundPlay == BACKGROUND_OFF) 0 else 1,
