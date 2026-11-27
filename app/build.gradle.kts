@@ -146,6 +146,9 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer.smoothstreaming)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.common)
+    // effect：TextureView 下挂 GL 特效链，让 media3 的 HDR→SDR tone mapping（DefaultVideoFrameProcessor）
+    // 真正跑起来，修 HDR 片源被当 SDR 直出导致的偏暗
+    implementation(libs.androidx.media3.effect)
     // MediaSession + MediaStyle 通知栏控制（后台续播）
     implementation(libs.androidx.media3.session)
     // ffmpeg 软解扩展：fongmi 预编译 AAR（含 native so + Java 类，

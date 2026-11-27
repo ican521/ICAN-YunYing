@@ -18,6 +18,7 @@ import androidx.media3.common.VideoSize
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
+import androidx.media3.effect.Contrast
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -55,6 +56,7 @@ import com.ican.tvplay.data.SUBTITLE_MAX_SCALE
 import com.ican.tvplay.data.SUBTITLE_MIN_POSITION
 import com.ican.tvplay.data.SUBTITLE_MIN_SCALE
 import com.ican.tvplay.data.SUBTITLE_OFFSET_MAX_MS
+import com.ican.tvplay.data.SettingsRepository
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.data.local.upsertKeepingCover
 import com.ican.tvplay.data.model.Episode
@@ -642,6 +644,45 @@ object Players {
         }
     }
 
+    /**
+     * HDR 片源 + TextureView：把 GL 特效链挂到 ExoPlayer（对标 fongmi ExoVideoEffectController 的
+     * videoEffect 管线），让 media3 的 DefaultVideoFrameProcessor 走 OpenGL 的 HDR→SDR tone mapping
+     * （fragment_shader_transformation_hdr_internal_es3 里的 uApplyHdrToSdrToneMapping），
+     * 而不是把 PQ/HLG 码值直接当 SDR 显示——后者中灰会被压暗，整幅画面发灰发暗。
+     * SurfaceView 走 HDR 直通，不挂任何特效（Surface 输出不支持 GL effects，挂了会报错）；
+     * MPV 内核的 HDR→SDR 由 mpv.conf 的 libplacebo tone mapping 负责。
+     */
+    private var hdrToneMapApplied = false
+
+    /** 当前渲染方式是否为 TextureView（设置里 SURFACE 走 HDR 直通，不参与 GL 处理） */
+    private fun isTextureRender(): Boolean = runCatching {
+        val ctx = appContext ?: return@runCatching true
+        SettingsRepository(ctx).playerRender.value != SettingsRepository.RENDER_SURFACE
+    }.getOrDefault(true)
+
+    private fun applyHdrToneMapping(tracks: Tracks) {
+        val p = player as? ExoPlayer ?: return
+        val color = tracks.groups
+            .firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }
+            ?.let { group ->
+                (0 until group.length).firstNotNullOfOrNull { i ->
+                    group.getTrackFormat(i).colorInfo.takeIf { group.isTrackSelected(i) }
+                }
+            }
+        val hdr = color != null && androidx.media3.common.ColorInfo.isTransferHdr(color)
+        val need = hdr && isTextureRender()
+        if (need == hdrToneMapApplied) return
+        runCatching {
+            // Contrast(1.0) 是零调色，只用来让 media3 建起 GL 视频管线（HDR→SDR 在该管线内完成）
+            p.setVideoEffects(if (need) listOf(Contrast(1.0f)) else emptyList())
+        }.onSuccess {
+            hdrToneMapApplied = need
+            Log.i(TAG, "hdr tone mapping ${if (need) "on" else "off"} texture=${isTextureRender()}")
+        }.onFailure {
+            Log.w(TAG, "hdr tone mapping apply failed", it)
+        }
+    }
+
     /** 视频信息面板：EXO 实际启用的解码器名与丢帧数（MPV 内核没有这条回调，字段留空） */
     private var videoDecoderName: String? = null
     private var droppedVideoFrames = 0
@@ -742,6 +783,8 @@ object Players {
                 textDisabled = player?.trackSelectionParameters?.disabledTrackTypes
                     ?.contains(C.TRACK_TYPE_TEXT) == true,
             )
+            // 轨道出来才知道片源是不是 HDR：TextureView 下挂 GL 管线做 HDR→SDR tone mapping
+            applyHdrToneMapping(tracks)
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -762,6 +805,11 @@ object Players {
         view.useController = false
         view.player = player
         attachSubtitleView(view.subtitleView)
+        // 切渲染方式会重建 PlayerView：等新 surface（TextureView/SurfaceView）attach 完，
+        // 再按新的渲染类型重新判定 HDR tone mapping 挂不挂
+        handler.postDelayed({
+            if (playerView === view) player?.currentTracks?.let { applyHdrToneMapping(it) }
+        }, 500L)
         Log.d(TAG, "bindPlayerView view=$view player=$player")
     }
 
@@ -1366,6 +1414,8 @@ object Players {
         val ctx = appContext ?: error("Players.start() 未先调用")
         val p = buildPlayer(ctx, _state.value.kernel, _state.value.decode, _state.value.bufferTier)
         player = p
+        // 新播放器没有挂过任何 videoEffect，标记归零，等 onTracksChanged 按片源重新判定
+        hdrToneMapApplied = false
         handler.post(ticker)
         onPlayerChanged?.invoke(p)
         // 创建新 player 后重新绑定到已保存的 PlayerView（PlayerView 内部自管 surface）
@@ -1425,8 +1475,8 @@ object Players {
         // 每次覆盖写，仅 [hdr] 条件 profile；写失败只告警，不阻断后续 builder 构建
         // auto_profiles 条件里属性名含 "/" 不能直接写进 Lua 表达式，必须用脚本注入的全局 get("…") 取值；判 pq/hlg/smpte2084 三种 HDR 取值
         // 运行时读 Display.getHdrCapabilities()：HDR10 支持且 maxLuminance(API 34+) 可用 → HDR 分支
-        // 写 target-peak=<nits> + target-colorspace-hint=yes；不支持 HDR → 降级 SDR：
-        // target-prim=bt.709 / target-trc=srgb / target-peak=200，且不写 colorspace-hint。
+        // 写 target-peak=<nits> + target-colorspace-hint=yes 直通；不支持 HDR → 降级 SDR：交给
+        // libmpv(gpu-next/libplacebo) 做 HDR→SDR tone mapping，target-peak 抬到 1000 避免高光过早压缩、整体压暗。
         val (supportsHdr10, hdrPeakNits, hdrReady) = runCatching {
             val dm = ctx.getSystemService(android.hardware.display.DisplayManager::class.java)
             val display = dm?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
@@ -1445,12 +1495,16 @@ object Players {
                 "target-colorspace-hint=yes\n" +
                 "target-peak=$hdrPeakNits\n"
         } else {
+            // 屏幕不支持 HDR：HDR 片源在 libmpv 内部 tone map 成 SDR。对标 fongmi 的关键差异——
+            // 不再硬写 target-prim/target-trc（交给 libplacebo 按 surface 自动选，原来写 srgb 等于再压一档），
+            // target-peak 从 200 抬到 1000（tone map 的目标峰值越低，高光越早被压、整幅越暗）。
+            // bt.2446a 是 gpu-next 默认参考曲线，显式写死避免 libmpv 版本差异带来的默认值漂移。
             "[hdr]\n" +
                 "profile-cond=get(\"video-params/gamma\") == \"pq\" or get(\"video-params/gamma\") == \"hlg\" or get(\"video-params/gamma\") == \"smpte2084\"\n" +
                 "profile-restore=copy\n" +
-                "target-prim=bt.709\n" +
-                "target-trc=srgb\n" +
-                "target-peak=200\n"
+                "tone-mapping=bt.2446a\n" +
+                "hdr-compute-peak=yes\n" +
+                "target-peak=1000\n"
         }
         try {
             java.io.File(mpvDir, "mpv.conf").writeText(mpvConf, java.nio.charset.StandardCharsets.UTF_8)
@@ -1675,6 +1729,8 @@ object Players {
         player = null
         val p = buildPlayer(ctx, _state.value.kernel, _state.value.decode, _state.value.bufferTier)
         player = p
+        // 新播放器没有挂过任何 videoEffect，标记归零，等 onTracksChanged 按片源重新判定
+        hdrToneMapApplied = false
         handler.post(ticker)
         onPlayerChanged?.invoke(p)
         // 重新绑定到 PlayerView（PlayerView 内部自管 surface）
