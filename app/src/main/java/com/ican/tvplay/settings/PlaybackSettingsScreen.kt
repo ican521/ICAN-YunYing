@@ -46,7 +46,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 /**
  * 播放设置页（设置页「播放设置」入口进入）。
  * 视频渲染（TextureView / SurfaceView）+ 输出设置两项（照 fongmi 输出设置挑的）：
- * AAC 优先（默认开）、隧道模式（默认关，仅 Surface）+ 后台播放（关闭 / 画中画）。
+ * AAC 优先（默认关）、隧道模式（默认关，仅 Surface）+ 后台播放（关闭 / 画中画）。
  * 后续内核/解码等播放参数也归到这里，不再散落在播放页弹窗。
  */
 @Composable

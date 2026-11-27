@@ -115,8 +115,8 @@ object Players {
         val kernel: Kernel = Kernel.EXO,
         val scaleMode: ScaleMode = ScaleMode.FIT,
         val bufferTier: BufferTier = BufferTier.LOW,
-        /** AAC 音轨优先（仿 fongmi preferAac，默认开） */
-        val aacFirst: Boolean = true,
+        /** AAC 音轨优先（仿 fongmi preferAac，默认关） */
+        val aacFirst: Boolean = false,
         /** 隧道模式（仿 fongmi tunnel，默认关；只在 Surface 输出下生效） */
         val tunnel: Boolean = false,
         val audioTracks: List<TrackOption> = emptyList(),

@@ -271,10 +271,10 @@ class SettingsRepository(context: Context) {
     }
 
     /**
-     * AAC 音轨优先（仿 fongmi DecodeSetting.isPreferAAC，默认开）：
-     * 多音轨片源优先选 AAC，避免优先选中手机不支持的 AC3/EAC3 造成无声或回落失败。
+     * AAC 音轨优先（仿 fongmi DecodeSetting.isPreferAAC，默认关）：
+     * 打开后多音轨片源优先选 AAC，避免优先选中手机不支持的 AC3/EAC3 造成无声；关掉交给播放器自行按码率挑。
      */
-    private val _playerAacFirst = MutableStateFlow(prefs.getBoolean(KEY_PLAYER_AAC_FIRST, true))
+    private val _playerAacFirst = MutableStateFlow(prefs.getBoolean(KEY_PLAYER_AAC_FIRST, false))
     val playerAacFirst: StateFlow<Boolean> = _playerAacFirst.asStateFlow()
 
     fun setPlayerAacFirst(enabled: Boolean) {
@@ -607,7 +607,7 @@ class SettingsRepository(context: Context) {
         _playerRender.value = prefs.getString(KEY_PLAYER_RENDER, null).orEmpty()
             .ifEmpty { RENDER_TEXTURE }
         _playerDecode.value = prefs.getString(KEY_PLAYER_DECODE, null).orEmpty()
-        _playerAacFirst.value = prefs.getBoolean(KEY_PLAYER_AAC_FIRST, true)
+        _playerAacFirst.value = prefs.getBoolean(KEY_PLAYER_AAC_FIRST, false)
         _playerTunnel.value = prefs.getBoolean(KEY_PLAYER_TUNNEL, false)
         _playerBuffer.value = prefs.getInt(KEY_PLAYER_BUFFER, 1)
         _playerBrightness.value = prefs.getFloat(KEY_PLAYER_BRIGHTNESS, -1f)
