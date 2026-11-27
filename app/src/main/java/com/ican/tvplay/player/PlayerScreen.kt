@@ -523,11 +523,13 @@ fun PlayerScreen(
     // 共享 PlayerView（fongmi 同思路：全屏/竖屏只是改容器尺寸，PlayerView 从不销毁重建）。
     // 常驻唯一 AndroidView，竖屏↔全屏↔画中画切换时 Surface 不销毁，消除切换黑屏。
     // 渲染方式来自设置（设置→播放设置→视频渲染）：
-    //   TEXTURE（默认）对齐现有体验：画面参与 View 合成，缩放跟手、圆角可裁、播完能抓静帧；
-    //   SURFACE 由系统合成器独立出层，HDR 片源的 10bit/PQ 才能直通（缩放动画可能滞后一帧）。
+    //   SURFACE（默认）由系统合成器独立出层，HDR 片源的 10bit/PQ 直通（缩放动画可能滞后一帧）；
+    //   TEXTURE 画面参与 View 合成，缩放跟手、圆角可裁、播完能抓静帧，但 HDR 会被压成 SDR。
+    // 另：HDR 片源（EXO 读到 PQ/HLG）粘滞置位 playerState.forceSurface，本片源强制走 Surface 直通。
     // media3 的 surface_type 只在 inflate 时读 attrs、运行期改不了，所以切换时按设置重建这一个
     // PlayerView（Player 实例不动，音频继续，画面重新 attach）；AndroidView 节点用 key 强制重建。
-    val renderSurface = savedRender == com.ican.tvplay.data.SettingsRepository.RENDER_SURFACE
+    val renderSurface = savedRender == com.ican.tvplay.data.SettingsRepository.RENDER_SURFACE ||
+        playerState.forceSurface
     val sharedPlayerView = remember(renderSurface) {
         android.view.LayoutInflater.from(context)
             .inflate(
@@ -3801,8 +3803,9 @@ private fun FullscreenPlayLayout(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // 视频信息面板里「HDR 是否真的在输出」取决于当前渲染方式（只有 Surface 输出才可能 HDR）
+    // 视频信息面板里「HDR 是否真的在输出」取决于实际渲染方式：设置 SURFACE，或 HDR 片源强制 Surface
     val infoRenderSurface by settings.playerRender.collectAsStateWithLifecycle()
+    val infoPlayerState by Players.state.collectAsStateWithLifecycle()
     // 亮度持久化（仿 fongmi PlayerSetting）：进全屏应用上次保存的亮度，离开时保存当前值并恢复「跟随系统」
     LaunchedEffect(Unit) {
         val saved = settings.playerBrightness.value
@@ -4044,7 +4047,8 @@ private fun FullscreenPlayLayout(
                 .calculateStartPadding(LocalLayoutDirection.current)
             VideoInfoPanel(
                 info = videoInfo,
-                renderSurface = infoRenderSurface == SettingsRepository.RENDER_SURFACE,
+                renderSurface = infoRenderSurface == SettingsRepository.RENDER_SURFACE ||
+                    infoPlayerState.forceSurface,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .windowInsetsPadding(

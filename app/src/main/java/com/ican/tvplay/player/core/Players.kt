@@ -18,7 +18,6 @@ import androidx.media3.common.VideoSize
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
-import androidx.media3.effect.Contrast
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -56,7 +55,6 @@ import com.ican.tvplay.data.SUBTITLE_MAX_SCALE
 import com.ican.tvplay.data.SUBTITLE_MIN_POSITION
 import com.ican.tvplay.data.SUBTITLE_MIN_SCALE
 import com.ican.tvplay.data.SUBTITLE_OFFSET_MAX_MS
-import com.ican.tvplay.data.SettingsRepository
 import com.ican.tvplay.data.local.HistoryEntity
 import com.ican.tvplay.data.local.upsertKeepingCover
 import com.ican.tvplay.data.model.Episode
@@ -135,6 +133,8 @@ object Players {
         val videoAspectRatio: Float = DEFAULT_VIDEO_ASPECT_RATIO,
         /** 当前源是 ISO 光盘镜像：EXO 无容器能力（start 会自动切 MPV），播放内核弹窗据此把 EXO 置灰 */
         val isoSource: Boolean = false,
+        /** HDR 片源粘滞标志：true 时 PlayerScreen 强制用 surface_view 直通（本次播放内保持，换源/切集重置） */
+        val forceSurface: Boolean = false,
     )
 
     /** 视频信息面板的数据快照：只取当前媒体轨的编码参数（标题/内核/网速这类界面可见项不重复展示） */
@@ -645,23 +645,13 @@ object Players {
     }
 
     /**
-     * HDR 片源 + TextureView：把 GL 特效链挂到 ExoPlayer（对标 fongmi ExoVideoEffectController 的
-     * videoEffect 管线），让 media3 的 DefaultVideoFrameProcessor 走 OpenGL 的 HDR→SDR tone mapping
-     * （fragment_shader_transformation_hdr_internal_es3 里的 uApplyHdrToSdrToneMapping），
-     * 而不是把 PQ/HLG 码值直接当 SDR 显示——后者中灰会被压暗，整幅画面发灰发暗。
-     * SurfaceView 走 HDR 直通，不挂任何特效（Surface 输出不支持 GL effects，挂了会报错）；
-     * MPV 内核的 HDR→SDR 由 mpv.conf 的 libplacebo tone mapping 负责。
+     * HDR 片源一律走 SurfaceView 直通：EXO 读到视频轨是 PQ/HLG 时把 forceSurface 置位，
+     * PlayerScreen 据此换成 surface_view 布局，画面交给系统合成器直出，10bit/PQ 不再被应用内压成 SDR。
+     * 粘滞：本次播放内保持，后续 tracks 抖动/清空不会来回切；换源/切集时重置。
+     * MPV 内核没有 media3 Tracks（读不到色彩信息），走 mpv.conf 的 libplacebo 路径。
      */
-    private var hdrToneMapApplied = false
-
-    /** 当前渲染方式是否为 TextureView（设置里 SURFACE 走 HDR 直通，不参与 GL 处理） */
-    private fun isTextureRender(): Boolean = runCatching {
-        val ctx = appContext ?: return@runCatching true
-        SettingsRepository(ctx).playerRender.value != SettingsRepository.RENDER_SURFACE
-    }.getOrDefault(true)
-
-    private fun applyHdrToneMapping(tracks: Tracks) {
-        val p = player as? ExoPlayer ?: return
+    private fun markHdrSource(tracks: Tracks) {
+        if (_state.value.forceSurface) return
         val color = tracks.groups
             .firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }
             ?.let { group ->
@@ -670,17 +660,9 @@ object Players {
                 }
             }
         val hdr = color != null && androidx.media3.common.ColorInfo.isTransferHdr(color)
-        val need = hdr && isTextureRender()
-        if (need == hdrToneMapApplied) return
-        runCatching {
-            // Contrast(1.0) 是零调色，只用来让 media3 建起 GL 视频管线（HDR→SDR 在该管线内完成）
-            p.setVideoEffects(if (need) listOf(Contrast(1.0f)) else emptyList())
-        }.onSuccess {
-            hdrToneMapApplied = need
-            Log.i(TAG, "hdr tone mapping ${if (need) "on" else "off"} texture=${isTextureRender()}")
-        }.onFailure {
-            Log.w(TAG, "hdr tone mapping apply failed", it)
-        }
+        if (!hdr) return
+        _state.value = _state.value.copy(forceSurface = true)
+        Log.i(TAG, "hdr source detected, force SurfaceView passthrough")
     }
 
     /** 视频信息面板：EXO 实际启用的解码器名与丢帧数（MPV 内核没有这条回调，字段留空） */
@@ -783,8 +765,8 @@ object Players {
                 textDisabled = player?.trackSelectionParameters?.disabledTrackTypes
                     ?.contains(C.TRACK_TYPE_TEXT) == true,
             )
-            // 轨道出来才知道片源是不是 HDR：TextureView 下挂 GL 管线做 HDR→SDR tone mapping
-            applyHdrToneMapping(tracks)
+            // 轨道出来才知道片源是不是 HDR：HDR 一律强制走 SurfaceView 直通
+            markHdrSource(tracks)
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -805,11 +787,6 @@ object Players {
         view.useController = false
         view.player = player
         attachSubtitleView(view.subtitleView)
-        // 切渲染方式会重建 PlayerView：等新 surface（TextureView/SurfaceView）attach 完，
-        // 再按新的渲染类型重新判定 HDR tone mapping 挂不挂
-        handler.postDelayed({
-            if (playerView === view) player?.currentTracks?.let { applyHdrToneMapping(it) }
-        }, 500L)
         Log.d(TAG, "bindPlayerView view=$view player=$player")
     }
 
@@ -860,6 +837,8 @@ object Players {
             error = null,
             subtitleOffsetMs = 0L,
             switching = false,
+            // 新源重新判定：上个源的 HDR 粘滞标记不能带到这一集
+            forceSurface = false,
             isoSource = isIsoUrl(spec.url),
         )
         // ISO 光盘镜像：EXO 无容器能力，自动切到自带 libmpv（libbluray/udf/iso9660 已编进 so）。
@@ -1414,8 +1393,6 @@ object Players {
         val ctx = appContext ?: error("Players.start() 未先调用")
         val p = buildPlayer(ctx, _state.value.kernel, _state.value.decode, _state.value.bufferTier)
         player = p
-        // 新播放器没有挂过任何 videoEffect，标记归零，等 onTracksChanged 按片源重新判定
-        hdrToneMapApplied = false
         handler.post(ticker)
         onPlayerChanged?.invoke(p)
         // 创建新 player 后重新绑定到已保存的 PlayerView（PlayerView 内部自管 surface）
@@ -1729,8 +1706,6 @@ object Players {
         player = null
         val p = buildPlayer(ctx, _state.value.kernel, _state.value.decode, _state.value.bufferTier)
         player = p
-        // 新播放器没有挂过任何 videoEffect，标记归零，等 onTracksChanged 按片源重新判定
-        hdrToneMapApplied = false
         handler.post(ticker)
         onPlayerChanged?.invoke(p)
         // 重新绑定到 PlayerView（PlayerView 内部自管 surface）

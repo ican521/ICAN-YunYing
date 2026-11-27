@@ -253,11 +253,11 @@ class SettingsRepository(context: Context) {
 
     /**
      * 视频渲染方式（仿 fongmi PlayerSetting.render）：
-     * TEXTURE（默认，画面作为普通 View 参与合成：缩放跟手、支持圆角、播完可抓静帧）/
-     * SURFACE（独立图层交给系统合成器：HDR 片源才能真 HDR 直通，缩放动画可能滞后一帧、圆角失效）。
+     * SURFACE（默认，独立图层交给系统合成器：HDR 片源 10bit/PQ 直通到屏幕；代价是缩放动画可能滞后一帧、圆角失效）/
+     * TEXTURE（手动可选，画面作为普通 View 参与合成：缩放跟手、支持圆角、播完可抓静帧，但 HDR 在应用内被压成 SDR）。
      */
     private val _playerRender = MutableStateFlow(
-        prefs.getString(KEY_PLAYER_RENDER, null).orEmpty().ifEmpty { RENDER_TEXTURE },
+        prefs.getString(KEY_PLAYER_RENDER, null).orEmpty().ifEmpty { RENDER_SURFACE },
     )
     val playerRender: StateFlow<String> = _playerRender.asStateFlow()
 
@@ -605,7 +605,7 @@ class SettingsRepository(context: Context) {
         _playerAutoNext.value = prefs.getBoolean(KEY_PLAYER_AUTO_NEXT, true)
         _playerEngine.value = prefs.getString(KEY_PLAYER_ENGINE, null).orEmpty()
         _playerRender.value = prefs.getString(KEY_PLAYER_RENDER, null).orEmpty()
-            .ifEmpty { RENDER_TEXTURE }
+            .ifEmpty { RENDER_SURFACE }
         _playerDecode.value = prefs.getString(KEY_PLAYER_DECODE, null).orEmpty()
         _playerAacFirst.value = prefs.getBoolean(KEY_PLAYER_AAC_FIRST, false)
         _playerTunnel.value = prefs.getBoolean(KEY_PLAYER_TUNNEL, false)
