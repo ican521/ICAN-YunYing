@@ -593,9 +593,15 @@ private fun HistoryCard(
     // 进度条高度与「胶囊到进度条」的间距：4dp 条高 + 8dp 常规叠加层边距
     val progressBarHeight = 4.dp
     val corner = Spacing.corner
-    // shape / 渐变 Brush 缓存：滚动时卡片会反复重组，不必每次重新构建 Squircle 路径和 33 段渐变
+    // shape / 渐变 Brush / 按压指示器 / 卡片配色 / 内边距 / 胶囊圆角 全部缓存：
+    // 滚动时卡片会反复重组，每次新建实例都会让对应修饰符节点失效重配，属于纯开销
     val cardShape = remember(corner) { SquircleShape(corner) }
     val captionScrim = remember { posterCaptionScrim(span = 1f) }
+    val sinkFeedback = remember { SinkFeedback() }
+    val badgeShape = remember { RoundedCornerShape(percent = 50) }
+    val zeroMargin = remember { PaddingValues(0.dp) }
+    // 卡片配色只能在组合里取（CardDefaults.defaultColors 是 @Composable），无法 remember
+    val surfaceColor = MiuixTheme.colorScheme.surfaceContainer
     // 进度条填充色提前取出：底色条与进度条合并成一次绘制后，不再在 Box 内读主题
     val progressColor = MiuixTheme.colorScheme.primary
     Card(
@@ -604,7 +610,7 @@ private fun HistoryCard(
             // pressable 在外层：按压蒙层跟随 Sink 缩放一起缩小（与 VideoCard 同序）
             .pressable(
                 interactionSource = null,
-                indication = SinkFeedback(),
+                indication = sinkFeedback,
                 delay = null,
             )
             .tvCardEffect(
@@ -616,10 +622,13 @@ private fun HistoryCard(
                 onLongClick = onLongClick,
                 // 按压蒙层固定浅色模式同款浅黑：收藏/历史卡片深色模式与浅色表现一致
                 pressColor = LightOnSurface,
+                // Card 自身已按同一 cornerRadius 裁圆角，这层 squircle clip 属重复裁剪；
+                // 先不挂，观察圆角是否仍完全一致（squircle 路径在 HWUI 上没有快速抗锯齿裁剪）
+                clipContent = false,
             ),
         cornerRadius = corner,
-        insideMargin = PaddingValues(0.dp),
-        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
+        insideMargin = zeroMargin,
+        colors = CardDefaults.defaultColors(color = surfaceColor),
     ) {
         // 海报区直接铺满整卡：原先外层套了一层 Column + weight(1f)，但只有一个子项，
         // 每次测量都要多走一次带权重的布局；去掉后排版结果完全一致
@@ -638,7 +647,7 @@ private fun HistoryCard(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(Spacing.posterOverlayMargin)
-                        .background(PosterBadgeScrim, RoundedCornerShape(percent = 50))
+                        .background(PosterBadgeScrim, badgeShape)
                         .padding(horizontal = Spacing.posterBadgePaddingH, vertical = Spacing.posterBadgePaddingV),
                 ) {
                     Text(

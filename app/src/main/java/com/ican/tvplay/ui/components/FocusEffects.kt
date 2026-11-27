@@ -75,6 +75,11 @@ fun Modifier.tvCardEffect(
     /** 按压蒙层颜色覆盖：null 时取主题 onSurface（浅色深灰、深色浅白，随主题适配）。
      *  视频卡片等海报类组件固定传浅黑色，保证深色模式按压特效与浅色模式完全一致 */
     pressColor: Color? = null,
+    /** 内容裁剪开关：false 时不套 .clip(shape)。
+     *  仅用于「外层容器已经按同一圆角裁剪」的卡片（如 miuix Card 的 cornerRadius）——
+     *  此时这层 clip 是重复裁剪，而 squircle 这类自定义路径在 HWUI 上没有快速抗锯齿裁剪路径，
+     *  逐卡裁剪是滚动时实打实的开销。默认 true，其余调用方行为不变 */
+    clipContent: Boolean = true,
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
@@ -158,7 +163,7 @@ fun Modifier.tvCardEffect(
                 Modifier
             },
         )
-        .clip(shape)
+        .then(if (clipContent) Modifier.clip(shape) else Modifier)
         .combinedClickable(
             interactionSource = interactionSource,
             indication = if (pressEffect) pressIndication else null,
