@@ -394,11 +394,11 @@ private const val HISTORY_CARD_STAGGER_START_DELAY_MILLIS = 120L
 private const val HISTORY_CARD_FADE_IN_MILLIS = 200
 
 /**
- * 实验开关：历史卡片底部的播放进度条是否挂载。
- * false = 实验版（不挂载），用于验证历史页与首页视频卡片的帧率差是否来自这条进度条。
- * 验证完改回 true 即恢复。
+ * 历史卡片底部的播放进度条是否挂载。
+ * 已用实验版验证：关掉它帧率没有变化，帧率差来自无封面卡片的绘制方式，与进度条无关，
+ * 因此恢复常显；保留开关方便以后再单独隔离变量做 A/B。
  */
-private const val HISTORY_CARD_SHOW_PROGRESS = false
+private const val HISTORY_CARD_SHOW_PROGRESS = true
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable

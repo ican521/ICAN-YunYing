@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -24,13 +23,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -364,23 +368,38 @@ private fun PosterTextFallback(title: String) {
     val color = remember(key) {
         Color(POSTER_FALLBACK_PALETTE[(key.hashCode() and Int.MAX_VALUE) % POSTER_FALLBACK_PALETTE.size])
     }
-    BoxWithConstraints(
-        modifier = Modifier.fillMaxSize().background(color),
-        contentAlignment = Alignment.Center,
-    ) {
-        // fongmi TextDrawable：字号取短边 / 2.5；这里按像素换算成 sp 并除掉系统字体缩放，
-        // 保证「大字号」设置下色块里的字不会撑爆卡片（它只是图形，不是可读文本）
-        val fontPx = with(LocalDensity.current) { minOf(maxWidth, maxHeight).toPx() / 2.5f }
-        val fontSize = with(LocalDensity.current) { (fontPx / fontScale).toSp() }
-        Text(
-            text = key,
-            color = Color.White,
-            fontSize = fontSize,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-        )
-    }
+    // 只有一个纯色 Box + 一次绘制。
+    // 原实现是 BoxWithConstraints（SubcomposeLayout）：每张兜底卡都要在测量阶段额外做一次
+    // 子组合 + 一次测量，一屏八张就是八次；边滑边重新组合时这部分是主要耗帧点。
+    // 现在改成 drawWithCache 里按当前尺寸算一次文本布局（只有尺寸/字号变化才重算），
+    // 之后每帧只做一次 drawText，字形的栅格化交给系统的字形缓存。
+    // fongmi TextDrawable 的字号规则不变：短边 / 2.5；除掉系统字体缩放，
+    // 保证「大字号」设置下色块里的字不会撑爆卡片（它只是图形，不是可读文本）
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(color)
+            .drawWithCache {
+                val fontPx = minOf(size.width, size.height) / 2.5f
+                val fontSize = with(density) { (fontPx / density.fontScale).toSp() }
+                val layout = measurer.measure(
+                    text = key,
+                    style = TextStyle(
+                        color = Color.White,
+                        fontSize = fontSize,
+                        fontWeight = FontWeight.Medium,
+                    ),
+                    maxLines = 1,
+                )
+                val left = (size.width - layout.size.width) / 2f
+                val top = (size.height - layout.size.height) / 2f
+                onDrawBehind {
+                    drawText(layout, topLeft = Offset(left, top))
+                }
+            },
+    )
 }
 
 /**
