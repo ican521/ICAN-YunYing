@@ -393,6 +393,13 @@ private const val HISTORY_CARD_STAGGER_START_DELAY_MILLIS = 120L
 /** 单张历史卡片淡入时长（毫秒），与首页一致 */
 private const val HISTORY_CARD_FADE_IN_MILLIS = 200
 
+/**
+ * 实验开关：历史卡片底部的播放进度条是否挂载。
+ * false = 实验版（不挂载），用于验证历史页与首页视频卡片的帧率差是否来自这条进度条。
+ * 验证完改回 true 即恢复。
+ */
+private const val HISTORY_CARD_SHOW_PROGRESS = false
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun HistoryScreen(
@@ -716,21 +723,26 @@ private fun HistoryCard(
             // 播放进度细条：贴海报最底部，通栏（画在渐变压暗之上，保证进度色不被压暗）
             // 底色条 + 进度条原本是两个 Box（多层测量 + 一层 fillMaxWidth 分数布局），
             // 合并成一次绘制，像素结果一致
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(progressBarHeight)
-                    .drawBehind {
-                        drawRect(Color(0x44FFFFFF))
-                        if (progress > 0f) {
-                            drawRect(
-                                color = progressColor,
-                                size = Size(size.width * progress, size.height),
-                            )
-                        }
-                    },
-            )
+            //
+            // 实验版：整条不挂载，用于验证「历史页比首页视频卡片少 10 帧左右」是否由进度条造成。
+            // 关掉后卡片少一个布局节点 + 一次双矩形绘制；改回 true 即恢复原样
+            if (HISTORY_CARD_SHOW_PROGRESS) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(progressBarHeight)
+                        .drawBehind {
+                            drawRect(Color(0x44FFFFFF))
+                            if (progress > 0f) {
+                                drawRect(
+                                    color = progressColor,
+                                    size = Size(size.width * progress, size.height),
+                                )
+                            }
+                        },
+                )
+            }
         }
     }
 }
