@@ -400,6 +400,36 @@ private const val HISTORY_CARD_FADE_IN_MILLIS = 200
  */
 private const val HISTORY_CARD_SHOW_PROGRESS = true
 
+/**
+ * 压测开关：往历史页列表最前面插入多少条「无封面」假记录（cover 为空 → 走首字兜底卡）。
+ * 只在渲染层插入，不写数据库、不动真实历史；改成 0 即完全恢复。
+ * 用途：一次性造出十几张兜底卡，用来验证兜底卡绘制方式对滑动帧率的影响。
+ */
+private const val FALLBACK_STRESS_COUNT = 16
+
+/** 压测用首字：故意混入不同字符（撑满字形缓存）与重复字符（命中缓存） */
+private val FALLBACK_STRESS_CHARS = listOf(
+    "山", "海", "风", "雨", "雪", "夜", "城", "光",
+    "山", "剑", "春", "秋", "梦", "岛", "塔", "火",
+)
+
+/** 压测用假历史：cover 恒为空串，保证一定落到首字色块；站源名标记成「压测」便于识别 */
+private val FALLBACK_STRESS_ENTRIES: List<HistoryEntity> = List(FALLBACK_STRESS_COUNT) { i ->
+    HistoryEntity(
+        videoId = "stress-coverless-$i",
+        title = FALLBACK_STRESS_CHARS[i % FALLBACK_STRESS_CHARS.size] + "测试剧集" + i,
+        cover = "",
+        categoryName = "压测",
+        episodeIndex = i,
+        episodeTitle = "第" + (i + 1) + "集",
+        positionMs = (i + 1) * 60_000L,
+        durationMs = 2_400_000L,
+        updatedAt = 1_700_000_000_000L - i * 60_000L,
+        sourceKey = "stress",
+        sourceName = "压测源",
+    )
+}
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun HistoryScreen(
@@ -407,7 +437,11 @@ fun HistoryScreen(
     onBack: () -> Unit = {},
 ) {
     val viewModel = appViewModel { CollectionViewModel(this) }
-    val histories by viewModel.histories.collectAsStateWithLifecycle()
+    val realHistories by viewModel.histories.collectAsStateWithLifecycle()
+    // 压测版：把 16 条无封面假记录拼在最前面，一进页面就是一屏兜底卡（FALLBACK_STRESS_COUNT=0 即恢复）
+    val histories = remember(realHistories) {
+        if (FALLBACK_STRESS_COUNT > 0) FALLBACK_STRESS_ENTRIES + realHistories else realHistories
+    }
     val homeLayoutSize by viewModel.homeLayoutSize.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
